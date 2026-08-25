@@ -13,7 +13,7 @@ import {
   type ParsedScanValue,
 } from "@/lib/scan/parseScanValue";
 
-type OperationType =
+export type StockOperationType =
   | "stock_in"
   | "stock_out"
   | "transfer"
@@ -32,6 +32,7 @@ type WarehouseRelation = {
   id: string;
   code: string;
   name: string;
+  warehouse_type: string;
 };
 
 type ZoneRelation = {
@@ -69,6 +70,7 @@ type LocationOption = {
   warehouse_id: string;
   warehouse_code: string;
   warehouse_name: string;
+  warehouse_type: string;
 
   zone_id: string | null;
   zone_code: string | null;
@@ -111,46 +113,64 @@ type ProductStockLocation = {
 };
 
 type GuidedStockOperationProps = {
+  operationType: StockOperationType;
+
   scannedValue?: string;
   scanNonce?: number;
+
+  onWorkflowReadyChange?: (
+    isReady: boolean
+  ) => void;
 };
 
-const operationOptions: {
-  value: OperationType;
-  label: string;
-  description: string;
-}[] = [
-    {
-      value: "stock_in",
-      label: "Stock In",
-      description:
-        "Scan or select a product, then scan or select the target shelf.",
-    },
-    {
-      value: "stock_out",
-      label: "Stock Out",
-      description:
-        "Scan or select a product, then scan a shelf where available stock exists.",
-    },
-    {
-      value: "transfer",
-      label: "Transfer",
-      description:
-        "Scan product, source shelf, and target shelf in sequence.",
-    },
-    {
-      value: "reserve",
-      label: "Reserve Stock",
-      description:
-        "Reserve available stock from the selected shelf.",
-    },
-    {
-      value: "release",
-      label: "Release Reservation",
-      description:
-        "Release previously reserved stock from the selected shelf.",
-    },
-  ];
+const operationMeta: Record<
+  StockOperationType,
+  {
+    title: string;
+    description: string;
+    buttonLabel: string;
+  }
+> = {
+  stock_in: {
+    title: "Stock In",
+    description:
+      "Scan the product and the target shelf.",
+    buttonLabel:
+      "Confirm Stock In",
+  },
+
+  stock_out: {
+    title: "Stock Out",
+    description:
+      "Scan the product, then choose or scan the source shelf.",
+    buttonLabel:
+      "Confirm Stock Out",
+  },
+
+  transfer: {
+    title: "Transfer Stock",
+    description:
+      "Scan the product, choose the source shelf, then scan the target shelf.",
+    buttonLabel:
+      "Confirm Transfer",
+  },
+
+  reserve: {
+    title: "Reserve Stock",
+    description:
+      "Scan the product and choose the shelf with available stock.",
+    buttonLabel:
+      "Confirm Reservation",
+  },
+
+  release: {
+    title: "Release Reservation",
+    description:
+      "Scan the product and choose the shelf containing reserved stock.",
+    buttonLabel:
+      "Confirm Release",
+  },
+};
 
 function getSingleRelation<T>(
   value: Relation<T>
@@ -174,6 +194,18 @@ function formatNumber(
   ).toLocaleString("en-US", {
     maximumFractionDigits: 2,
   });
+}
+
+function formatWarehouseType(
+  value: string
+) {
+  return value
+    .replaceAll("_", " ")
+    .replace(
+      /\b\w/g,
+      (char) =>
+        char.toUpperCase()
+    );
 }
 
 function mapLocationRow(
@@ -205,6 +237,9 @@ function mapLocationRow(
     warehouse_name:
       warehouse.name,
 
+    warehouse_type:
+      warehouse.warehouse_type,
+
     zone_id: row.zone_id,
 
     zone_code:
@@ -228,17 +263,13 @@ function mapLocationRow(
 }
 
 export default function GuidedStockOperation({
+  operationType,
+
   scannedValue,
   scanNonce,
-}: GuidedStockOperationProps) {
-  const [
-    operationType,
-    setOperationType,
-  ] =
-    useState<OperationType>(
-      "transfer"
-    );
 
+  onWorkflowReadyChange,
+}: GuidedStockOperationProps) {
   const [
     products,
     setProducts,
@@ -329,6 +360,11 @@ export default function GuidedStockOperation({
       null
     );
 
+  const meta =
+    operationMeta[
+    operationType
+    ];
+
   const selectedProduct =
     useMemo(
       () =>
@@ -341,17 +377,6 @@ export default function GuidedStockOperation({
         products,
         productId,
       ]
-    );
-
-  const selectedOperation =
-    useMemo(
-      () =>
-        operationOptions.find(
-          (item) =>
-            item.value ===
-            operationType
-        ),
-      [operationType]
     );
 
   const needsSource =
@@ -370,6 +395,10 @@ export default function GuidedStockOperation({
     operationType ===
     "transfer";
 
+  /*
+   * Stock positions eligible
+   * as source for current operation.
+   */
   const filteredSourceLocations =
     useMemo(() => {
       if (
@@ -384,23 +413,12 @@ export default function GuidedStockOperation({
         );
       }
 
-      if (
-        operationType ===
-        "stock_out" ||
-        operationType ===
-        "transfer" ||
-        operationType ===
-        "reserve"
-      ) {
-        return productStockLocations.filter(
-          (item) =>
-            Number(
-              item.available_quantity
-            ) > 0
-        );
-      }
-
-      return [];
+      return productStockLocations.filter(
+        (item) =>
+          Number(
+            item.available_quantity
+          ) > 0
+      );
     }, [
       operationType,
       productStockLocations,
@@ -434,13 +452,84 @@ export default function GuidedStockOperation({
       ]
     );
 
+  const sourceLocationMeta =
+    useMemo(
+      () =>
+        locations.find(
+          (item) =>
+            item.location_id ===
+            sourceLocationId
+        ),
+      [
+        locations,
+        sourceLocationId,
+      ]
+    );
+
+  const productReady =
+    Boolean(productId);
+
+  const sourceReady =
+    !needsSource ||
+    Boolean(
+      sourceLocationId
+    );
+
+  const targetReady =
+    !needsTarget ||
+    Boolean(
+      targetLocationId
+    );
+
+  const workflowReady =
+    productReady &&
+    sourceReady &&
+    targetReady;
+
   /*
-   * --------------------------------------------------
-   * LOAD PRODUCTS + ACTIVE LOCATIONS
-   * --------------------------------------------------
-   *
-   * Locations are loaded directly from the locations
-   * table so qr_payload is always available.
+   * Parent uses this to decide
+   * when camera can disappear.
+   */
+  useEffect(() => {
+    onWorkflowReadyChange?.(
+      workflowReady
+    );
+  }, [
+    workflowReady,
+    onWorkflowReadyChange,
+  ]);
+
+  /*
+   * Reset workflow when operation
+   * changes from parent.
+   */
+  useEffect(() => {
+    setProductId("");
+
+    setSourceLocationId(
+      ""
+    );
+
+    setTargetLocationId(
+      ""
+    );
+
+    setProductStockLocations(
+      []
+    );
+
+    setQuantity("1");
+    setReferenceNo("");
+    setNotes("");
+
+    setInfoMessage(null);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+  }, [operationType]);
+
+  /*
+   * Load products and all active
+   * shelf locations.
    */
   useEffect(() => {
     async function loadOptions() {
@@ -455,6 +544,7 @@ export default function GuidedStockOperation({
           data: productsData,
           error: productsError,
         },
+
         {
           data: locationsData,
           error: locationsError,
@@ -488,7 +578,8 @@ export default function GuidedStockOperation({
               warehouses (
                 id,
                 code,
-                name
+                name,
+                warehouse_type
               ),
               zones (
                 id,
@@ -599,9 +690,8 @@ export default function GuidedStockOperation({
   }, []);
 
   /*
-   * --------------------------------------------------
-   * LOAD STOCK LOCATIONS FOR SELECTED PRODUCT
-   * --------------------------------------------------
+   * Load every shelf where the
+   * selected product currently exists.
    */
   useEffect(() => {
     async function loadProductLocations() {
@@ -632,6 +722,10 @@ export default function GuidedStockOperation({
         true
       );
 
+      setSourceLocationId(
+        ""
+      );
+
       const {
         data,
         error,
@@ -653,10 +747,6 @@ export default function GuidedStockOperation({
 
         setProductStockLocations(
           []
-        );
-
-        setSourceLocationId(
-          ""
         );
 
         setIsLoadingProductLocations(
@@ -682,36 +772,98 @@ export default function GuidedStockOperation({
         rows
       );
 
-      if (
-        sourceLocationId &&
-        !rows.some(
-          (item) =>
-            item.location_id ===
-            sourceLocationId
-        )
-      ) {
-        setSourceLocationId(
-          ""
-        );
-      }
-
       setIsLoadingProductLocations(
         false
       );
     }
 
     loadProductLocations();
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     productId,
     products,
   ]);
 
   /*
-   * --------------------------------------------------
-   * APPLY EXTERNAL SCAN
-   * --------------------------------------------------
+   * AUTO SOURCE SELECTION
+   *
+   * 0 sources:
+   * show warning.
+   *
+   * 1 source:
+   * select automatically.
+   *
+   * >1 sources:
+   * user chooses.
+   */
+  useEffect(() => {
+    if (
+      !productId ||
+      !needsSource ||
+      isLoadingProductLocations
+    ) {
+      return;
+    }
+
+    if (
+      filteredSourceLocations.length ===
+      0
+    ) {
+      setSourceLocationId(
+        ""
+      );
+
+      if (
+        operationType ===
+        "release"
+      ) {
+        setInfoMessage(
+          "No shelf with reserved stock was found for this product."
+        );
+      } else {
+        setInfoMessage(
+          "No shelf with available stock was found for this product."
+        );
+      }
+
+      return;
+    }
+
+    if (
+      filteredSourceLocations.length ===
+      1
+    ) {
+      const onlySource =
+        filteredSourceLocations[0];
+
+      setSourceLocationId(
+        onlySource.location_id
+      );
+
+      setInfoMessage(
+        `Source shelf automatically selected: ${onlySource.warehouse_code} / ${onlySource.location_code}`
+      );
+
+      return;
+    }
+
+    if (
+      !sourceLocationId
+    ) {
+      setInfoMessage(
+        `This product exists in ${filteredSourceLocations.length} eligible shelf locations. Select or scan the source shelf.`
+      );
+    }
+  }, [
+    productId,
+    needsSource,
+    operationType,
+    filteredSourceLocations,
+    isLoadingProductLocations,
+    sourceLocationId,
+  ]);
+
+  /*
+   * External scanner input.
    */
   useEffect(() => {
     if (
@@ -745,20 +897,17 @@ export default function GuidedStockOperation({
       ""
     );
 
+    setProductStockLocations(
+      []
+    );
+
     setQuantity("1");
-
     setReferenceNo("");
-
     setNotes("");
 
     resetMessages();
   }
 
-  /*
-   * --------------------------------------------------
-   * PRODUCT RESOLVER
-   * --------------------------------------------------
-   */
   function findProductFromValue(
     value: string
   ) {
@@ -780,11 +929,6 @@ export default function GuidedStockOperation({
     );
   }
 
-  /*
-   * --------------------------------------------------
-   * LOCATION RESOLVER
-   * --------------------------------------------------
-   */
   function findLocationFromValue(
     value: string,
     parsed: ParsedScanValue
@@ -801,7 +945,7 @@ export default function GuidedStockOperation({
         .toLowerCase();
 
     /*
-     * 1. Exact qr_payload
+     * Exact qr_payload.
      */
     const byPayload =
       locations.find(
@@ -820,7 +964,7 @@ export default function GuidedStockOperation({
     }
 
     /*
-     * 2. Exact human-readable qr_code
+     * Exact qr_code.
      */
     const byQrCode =
       locations.find(
@@ -839,10 +983,7 @@ export default function GuidedStockOperation({
     }
 
     /*
-     * 3. Full hierarchy:
-     *
-     * LOC|MAIN|B|B-01-01
-     * MAIN / B / B-01-01
+     * Full canonical hierarchy.
      */
     if (
       parsed.type ===
@@ -863,7 +1004,8 @@ export default function GuidedStockOperation({
         );
 
       if (
-        matches.length === 1
+        matches.length ===
+        1
       ) {
         return {
           location:
@@ -873,10 +1015,12 @@ export default function GuidedStockOperation({
       }
 
       if (
-        matches.length > 1
+        matches.length >
+        1
       ) {
         return {
           location: null,
+
           error:
             "Multiple shelf locations matched this QR hierarchy.",
         };
@@ -884,10 +1028,8 @@ export default function GuidedStockOperation({
     }
 
     /*
-     * 4. Warehouse + Location
-     *
-     * Legacy:
-     * MAIN / B-01-01
+     * Warehouse + location
+     * legacy support.
      */
     if (
       parsed.type ===
@@ -906,7 +1048,8 @@ export default function GuidedStockOperation({
         );
 
       if (
-        matches.length === 1
+        matches.length ===
+        1
       ) {
         return {
           location:
@@ -916,20 +1059,20 @@ export default function GuidedStockOperation({
       }
 
       if (
-        matches.length > 1
+        matches.length >
+        1
       ) {
         return {
           location: null,
+
           error:
-            "This location code exists more than once inside the warehouse. Scan the full location QR code.",
+            "This location code exists more than once inside the warehouse. Scan the full shelf QR.",
         };
       }
     }
 
     /*
-     * 5. Plain location code
-     *
-     * Only use when globally unique.
+     * Plain location code.
      */
     if (
       parsed.type ===
@@ -944,7 +1087,8 @@ export default function GuidedStockOperation({
         );
 
       if (
-        matches.length === 1
+        matches.length ===
+        1
       ) {
         return {
           location:
@@ -954,12 +1098,14 @@ export default function GuidedStockOperation({
       }
 
       if (
-        matches.length > 1
+        matches.length >
+        1
       ) {
         return {
           location: null,
+
           error:
-            "This location code exists in more than one place. Scan the full location QR code.",
+            "This shelf code exists in more than one location. Scan the full shelf QR.",
         };
       }
     }
@@ -970,26 +1116,27 @@ export default function GuidedStockOperation({
     };
   }
 
-  /*
-   * --------------------------------------------------
-   * SELECT LOCATION FOR WORKFLOW
-   * --------------------------------------------------
-   */
   function selectScannedLocation(
     location: LocationOption
   ) {
     resetMessages();
 
     /*
-     * STOCK IN
-     *
-     * Any active shelf can be
-     * selected as target.
+     * STOCK IN:
+     * scanned shelf = target.
      */
     if (
       operationType ===
       "stock_in"
     ) {
+      if (!productId) {
+        setErrorMessage(
+          "Scan or select the product first."
+        );
+
+        return;
+      }
+
       setTargetLocationId(
         location.location_id
       );
@@ -1005,25 +1152,26 @@ export default function GuidedStockOperation({
     }
 
     /*
-     * Other workflows need
-     * the product first.
+     * Other operations require
+     * a selected product.
      */
     if (!productId) {
       setErrorMessage(
-        "Scan or select the product before scanning the source shelf."
+        "Scan or select the product before selecting a source shelf."
       );
 
       return;
     }
 
     /*
-     * TRANSFER
+     * TRANSFER:
      *
-     * First location scan:
-     * source.
+     * If source is not selected,
+     * scanned location tries to
+     * become source.
      *
-     * Second location scan:
-     * target.
+     * If source already exists,
+     * scanned location becomes target.
      */
     if (
       operationType ===
@@ -1036,7 +1184,7 @@ export default function GuidedStockOperation({
           isLoadingProductLocations
         ) {
           setErrorMessage(
-            "Product stock locations are still loading. Scan the source shelf again."
+            "Product stock locations are still loading."
           );
 
           return;
@@ -1051,7 +1199,7 @@ export default function GuidedStockOperation({
 
         if (!validSource) {
           setErrorMessage(
-            "This shelf does not contain available stock for the selected product."
+            "The scanned shelf does not contain available stock for this product."
           );
 
           return;
@@ -1062,10 +1210,7 @@ export default function GuidedStockOperation({
         );
 
         setInfoMessage(
-          `Source shelf selected: ${location.warehouse_code} / ${location.zone_code
-            ? `${location.zone_code} / `
-            : ""
-          }${location.location_code}. Scan the target shelf next.`
+          `Source shelf selected: ${location.warehouse_code} / ${location.location_code}. Scan the target shelf next.`
         );
 
         return;
@@ -1087,23 +1232,22 @@ export default function GuidedStockOperation({
       );
 
       setInfoMessage(
-        `Target shelf selected: ${location.warehouse_code} / ${location.zone_code
-          ? `${location.zone_code} / `
-          : ""
-        }${location.location_code}`
+        `Target shelf selected: ${location.warehouse_code} / ${location.location_code}`
       );
 
       return;
     }
 
     /*
-     * STOCK OUT / RESERVE / RELEASE
+     * STOCK OUT / RESERVE /
+     * RELEASE:
+     * scanned location = source.
      */
     if (
       isLoadingProductLocations
     ) {
       setErrorMessage(
-        "Product stock locations are still loading. Scan the shelf again."
+        "Product stock locations are still loading."
       );
 
       return;
@@ -1126,7 +1270,7 @@ export default function GuidedStockOperation({
         );
       } else {
         setErrorMessage(
-          "This shelf does not contain enough available stock for this workflow."
+          "This shelf does not contain available stock for the selected product."
         );
       }
 
@@ -1138,18 +1282,10 @@ export default function GuidedStockOperation({
     );
 
     setInfoMessage(
-      `Source shelf selected: ${location.warehouse_code} / ${location.zone_code
-        ? `${location.zone_code} / `
-        : ""
-      }${location.location_code}`
+      `Source shelf selected: ${location.warehouse_code} / ${location.location_code}`
     );
   }
 
-  /*
-   * --------------------------------------------------
-   * APPLY SCANNED VALUE
-   * --------------------------------------------------
-   */
   function applyScannedValue(
     value: string
   ) {
@@ -1165,29 +1301,13 @@ export default function GuidedStockOperation({
     const parsed =
       parseScanValue(raw);
 
-    /*
-     * Warehouse / Zone QR codes
-     * are informational and cannot
-     * directly participate in a stock
-     * operation.
-     */
     if (
       parsed.type ===
-      "warehouse"
+      "warehouse" ||
+      parsed.type === "zone"
     ) {
       setErrorMessage(
-        "Warehouse QR codes cannot be used as a stock source or target. Scan a product or shelf location."
-      );
-
-      return;
-    }
-
-    if (
-      parsed.type ===
-      "zone"
-    ) {
-      setErrorMessage(
-        "Zone QR codes cannot be used as a stock source or target. Scan a shelf location inside the zone."
+        "Scan a product or shelf location for this stock operation."
       );
 
       return;
@@ -1219,7 +1339,7 @@ export default function GuidedStockOperation({
 
       if (!location) {
         setErrorMessage(
-          "No active shelf location found for this QR value."
+          "No active shelf location found for this QR."
         );
 
         return;
@@ -1277,11 +1397,6 @@ export default function GuidedStockOperation({
     );
   }
 
-  /*
-   * --------------------------------------------------
-   * VALIDATION
-   * --------------------------------------------------
-   */
   function validate() {
     if (!productId) {
       return "Product is required.";
@@ -1365,18 +1480,12 @@ export default function GuidedStockOperation({
 
     const sourceLabel =
       sourceLocation
-        ? `${sourceLocation.warehouse_code} / ${sourceLocation.zone_code
-          ? `${sourceLocation.zone_code} / `
-          : ""
-        }${sourceLocation.location_code}`
+        ? `${sourceLocation.warehouse_code} / ${sourceLocation.location_code}`
         : "";
 
     const targetLabel =
       targetLocation
-        ? `${targetLocation.warehouse_code} / ${targetLocation.zone_code
-          ? `${targetLocation.zone_code} / `
-          : ""
-        }${targetLocation.location_code}`
+        ? `${targetLocation.warehouse_code} / ${targetLocation.location_code}`
         : "";
 
     if (
@@ -1410,11 +1519,6 @@ export default function GuidedStockOperation({
     return `Release ${quantity} reserved unit(s) of ${productLabel} from ${sourceLabel}?`;
   }
 
-  /*
-   * --------------------------------------------------
-   * REFRESH PRODUCT STOCK
-   * --------------------------------------------------
-   */
   async function refreshProductStock() {
     if (!productId) {
       return;
@@ -1470,11 +1574,6 @@ export default function GuidedStockOperation({
     );
   }
 
-  /*
-   * --------------------------------------------------
-   * RUN STOCK OPERATION
-   * --------------------------------------------------
-   */
   async function runOperation() {
     resetMessages();
 
@@ -1514,9 +1613,6 @@ export default function GuidedStockOperation({
         }
         | undefined;
 
-      /*
-       * STOCK IN
-       */
       if (
         operationType ===
         "stock_in" &&
@@ -1552,9 +1648,6 @@ export default function GuidedStockOperation({
           );
       }
 
-      /*
-       * STOCK OUT / RESERVE / RELEASE
-       */
       if (
         (
           operationType ===
@@ -1605,9 +1698,6 @@ export default function GuidedStockOperation({
           );
       }
 
-      /*
-       * TRANSFER
-       */
       if (
         operationType ===
         "transfer" &&
@@ -1667,7 +1757,7 @@ export default function GuidedStockOperation({
       }
 
       setSuccessMessage(
-        "Operation completed successfully."
+        `${meta.title} completed successfully.`
       );
 
       setQuantity("1");
@@ -1682,40 +1772,78 @@ export default function GuidedStockOperation({
     }
   }
 
-  const productReady =
-    Boolean(
-      selectedProduct
-    );
-
-  const sourceReady =
-    !needsSource ||
-    Boolean(
-      sourceLocationId
-    );
-
-  const targetReady =
-    !needsTarget ||
-    Boolean(
-      targetLocationId
-    );
-
   return (
     <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
       {/* HEADER */}
       <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Guided Stock Workflow
+          {meta.title}
         </h3>
 
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Scan product and shelf
-          QR codes in sequence
-          before confirming the
-          stock operation.
+          {meta.description}
         </p>
       </div>
 
       <div className="space-y-5 p-5">
+        {/* PROGRESS */}
+        <div className="grid grid-cols-3 gap-2">
+          <div
+            className={`rounded-xl border p-3 ${productReady
+              ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10"
+              : "border-gray-200 dark:border-gray-800"
+              }`}
+          >
+            <p className="text-[10px] font-medium uppercase text-gray-500">
+              Product
+            </p>
+
+            <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90">
+              {productReady
+                ? "Ready ✓"
+                : "Waiting"}
+            </p>
+          </div>
+
+          <div
+            className={`rounded-xl border p-3 ${sourceReady
+              ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10"
+              : "border-gray-200 dark:border-gray-800"
+              }`}
+          >
+            <p className="text-[10px] font-medium uppercase text-gray-500">
+              Source
+            </p>
+
+            <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90">
+              {!needsSource
+                ? "—"
+                : sourceReady
+                  ? "Ready ✓"
+                  : "Waiting"}
+            </p>
+          </div>
+
+          <div
+            className={`rounded-xl border p-3 ${targetReady
+              ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10"
+              : "border-gray-200 dark:border-gray-800"
+              }`}
+          >
+            <p className="text-[10px] font-medium uppercase text-gray-500">
+              Target
+            </p>
+
+            <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90">
+              {!needsTarget
+                ? "—"
+                : targetReady
+                  ? "Ready ✓"
+                  : "Waiting"}
+            </p>
+          </div>
+        </div>
+
         {/* MESSAGES */}
         {errorMessage && (
           <div className="rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
@@ -1735,126 +1863,6 @@ export default function GuidedStockOperation({
           </div>
         )}
 
-        {/* WORKFLOW */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Workflow
-          </label>
-
-          <select
-            value={
-              operationType
-            }
-            onChange={(
-              event
-            ) => {
-              setOperationType(
-                event.target
-                  .value as OperationType
-              );
-
-              resetOperation();
-            }}
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          >
-            {operationOptions.map(
-              (operation) => (
-                <option
-                  key={
-                    operation.value
-                  }
-                  value={
-                    operation.value
-                  }
-                >
-                  {
-                    operation.label
-                  }
-                </option>
-              )
-            )}
-          </select>
-
-          <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
-            {
-              selectedOperation?.description
-            }
-          </p>
-        </div>
-
-        {/* SCAN PROGRESS */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div
-            className={`rounded-xl border p-3 ${productReady
-              ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10"
-              : "border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03]"
-              }`}
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Product
-            </p>
-
-            <p
-              className={`mt-1 text-sm font-semibold ${productReady
-                ? "text-success-700 dark:text-success-400"
-                : "text-gray-600 dark:text-gray-400"
-                }`}
-            >
-              {productReady
-                ? "Selected ✓"
-                : "Waiting"}
-            </p>
-          </div>
-
-          <div
-            className={`rounded-xl border p-3 ${sourceReady
-              ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10"
-              : "border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03]"
-              }`}
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Source Shelf
-            </p>
-
-            <p
-              className={`mt-1 text-sm font-semibold ${sourceReady
-                ? "text-success-700 dark:text-success-400"
-                : "text-gray-600 dark:text-gray-400"
-                }`}
-            >
-              {!needsSource
-                ? "Not Required"
-                : sourceReady
-                  ? "Selected ✓"
-                  : "Waiting"}
-            </p>
-          </div>
-
-          <div
-            className={`rounded-xl border p-3 ${targetReady
-              ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10"
-              : "border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03]"
-              }`}
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Target Shelf
-            </p>
-
-            <p
-              className={`mt-1 text-sm font-semibold ${targetReady
-                ? "text-success-700 dark:text-success-400"
-                : "text-gray-600 dark:text-gray-400"
-                }`}
-            >
-              {!needsTarget
-                ? "Not Required"
-                : targetReady
-                  ? "Selected ✓"
-                  : "Waiting"}
-            </p>
-          </div>
-        </div>
-
         {/* PRODUCT */}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
@@ -1863,6 +1871,9 @@ export default function GuidedStockOperation({
 
           <select
             value={productId}
+            disabled={
+              isLoadingOptions
+            }
             onChange={(
               event
             ) => {
@@ -1880,14 +1891,10 @@ export default function GuidedStockOperation({
 
               resetMessages();
             }}
-            disabled={
-              isLoadingOptions
-            }
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
           >
             <option value="">
-              Scan or select
-              product
+              Scan or select product
             </option>
 
             {products.map(
@@ -1913,120 +1920,146 @@ export default function GuidedStockOperation({
           </select>
         </div>
 
-        {/* SELECTED PRODUCT */}
-        {selectedProduct && (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.03]">
-            <div className="flex flex-col gap-1">
-              <p className="text-xs uppercase text-gray-500 dark:text-gray-400">
-                Selected Product
-              </p>
+        {/* SOURCE */}
+        {needsSource &&
+          productId && (
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-400">
+                  Source Shelf
+                </label>
 
-              <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                {
-                  selectedProduct.sku
-                }{" "}
-                —{" "}
-                {
-                  selectedProduct.name
-                }
-              </p>
+                {filteredSourceLocations.length >
+                  1 && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {
+                        filteredSourceLocations.length
+                      }{" "}
+                      locations found
+                    </span>
+                  )}
+              </div>
 
-              {selectedProduct.barcode && (
-                <p className="font-mono text-xs text-gray-500 dark:text-gray-400">
-                  Barcode:{" "}
-                  {
-                    selectedProduct.barcode
-                  }
-                </p>
+              {isLoadingProductLocations ? (
+                <div className="rounded-xl border border-gray-200 p-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                  Loading product
+                  locations...
+                </div>
+              ) : filteredSourceLocations.length ===
+                0 ? (
+                <div className="rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+                  No eligible source
+                  shelf found.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredSourceLocations.map(
+                    (
+                      stock
+                    ) => {
+                      const location =
+                        locations.find(
+                          (
+                            item
+                          ) =>
+                            item.location_id ===
+                            stock.location_id
+                        );
+
+                      const isSelected =
+                        sourceLocationId ===
+                        stock.location_id;
+
+                      return (
+                        <button
+                          key={
+                            stock.inventory_id
+                          }
+                          type="button"
+                          onClick={() => {
+                            setSourceLocationId(
+                              stock.location_id
+                            );
+
+                            resetMessages();
+                          }}
+                          className={`w-full rounded-xl border p-4 text-left transition ${isSelected
+                            ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+                            : "border-gray-200 hover:border-brand-300 dark:border-gray-800"
+                            }`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                                {
+                                  stock.warehouse_code
+                                }{" "}
+                                /{" "}
+                                {location?.zone_code
+                                  ? `${location.zone_code} / `
+                                  : ""}
+                                {
+                                  stock.location_code
+                                }
+                              </p>
+
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {location
+                                  ? `${location.warehouse_name} · ${formatWarehouseType(
+                                    location.warehouse_type
+                                  )}`
+                                  : stock.warehouse_name}
+                              </p>
+
+                              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {
+                                  stock.location_name
+                                }
+                              </p>
+                            </div>
+
+                            <div className="text-right">
+                              {isSelected && (
+                                <p className="mb-1 text-xs font-semibold text-brand-600 dark:text-brand-400">
+                                  Selected ✓
+                                </p>
+                              )}
+
+                              <p className="text-xs text-gray-500">
+                                Available
+                              </p>
+
+                              <p className="text-base font-semibold text-gray-800 dark:text-white">
+                                {formatNumber(
+                                  stock.available_quantity
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex gap-4 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                            <span>
+                              On Hand:{" "}
+                              {formatNumber(
+                                stock.quantity
+                              )}
+                            </span>
+
+                            <span>
+                              Reserved:{" "}
+                              {formatNumber(
+                                stock.reserved_quantity
+                              )}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* SOURCE */}
-        {needsSource && (
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-              Source Shelf
-            </label>
-
-            <select
-              value={
-                sourceLocationId
-              }
-              onChange={(
-                event
-              ) => {
-                setSourceLocationId(
-                  event.target
-                    .value
-                );
-
-                resetMessages();
-              }}
-              disabled={
-                !productId ||
-                isLoadingProductLocations
-              }
-              className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-            >
-              <option value="">
-                {!productId
-                  ? "Select product first"
-                  : isLoadingProductLocations
-                    ? "Loading stock locations..."
-                    : "Scan or select source shelf"}
-              </option>
-
-              {filteredSourceLocations.map(
-                (
-                  location
-                ) => (
-                  <option
-                    key={
-                      location.location_id
-                    }
-                    value={
-                      location.location_id
-                    }
-                  >
-                    {
-                      location.warehouse_code
-                    }{" "}
-                    /{" "}
-                    {location.zone_code
-                      ? `${location.zone_code} / `
-                      : ""}
-                    {
-                      location.location_code
-                    }{" "}
-                    | Available:{" "}
-                    {formatNumber(
-                      location.available_quantity
-                    )}{" "}
-                    | Reserved:{" "}
-                    {formatNumber(
-                      location.reserved_quantity
-                    )}
-                  </option>
-                )
-              )}
-            </select>
-
-            {productId &&
-              !isLoadingProductLocations &&
-              filteredSourceLocations.length ===
-              0 && (
-                <p className="mt-1 text-xs text-warning-600 dark:text-warning-400">
-                  No valid source
-                  shelf is currently
-                  available for this
-                  product and
-                  workflow.
-                </p>
-              )}
-          </div>
-        )}
+          )}
 
         {/* TARGET */}
         {needsTarget && (
@@ -2039,24 +2072,24 @@ export default function GuidedStockOperation({
               value={
                 targetLocationId
               }
+              disabled={
+                isLoadingOptions ||
+                !productId
+              }
               onChange={(
                 event
               ) => {
                 setTargetLocationId(
-                  event.target
-                    .value
+                  event.target.value
                 );
 
                 resetMessages();
               }}
-              disabled={
-                isLoadingOptions
-              }
-              className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+              className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
             >
               <option value="">
-                Scan or select
-                target shelf
+                Scan or select target
+                shelf
               </option>
 
               {locations.map(
@@ -2092,7 +2125,68 @@ export default function GuidedStockOperation({
           </div>
         )}
 
-        {/* QUANTITY + REFERENCE */}
+        {/* SUMMARY */}
+        {selectedProduct && (
+          <div className="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.03]">
+            <p className="text-xs font-medium uppercase text-gray-500">
+              Operation Summary
+            </p>
+
+            <div className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-500">
+                  Product
+                </span>
+
+                <span className="text-right font-medium text-gray-800 dark:text-white/90">
+                  {
+                    selectedProduct.sku
+                  }{" "}
+                  —{" "}
+                  {
+                    selectedProduct.name
+                  }
+                </span>
+              </div>
+
+              {needsSource && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-gray-500">
+                    From
+                  </span>
+
+                  <span className="text-right font-medium text-gray-800 dark:text-white/90">
+                    {sourceLocation
+                      ? `${sourceLocation.warehouse_code} / ${sourceLocationMeta?.zone_code
+                        ? `${sourceLocationMeta.zone_code} / `
+                        : ""
+                      }${sourceLocation.location_code}`
+                      : "Waiting"}
+                  </span>
+                </div>
+              )}
+
+              {needsTarget && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-gray-500">
+                    To
+                  </span>
+
+                  <span className="text-right font-medium text-gray-800 dark:text-white/90">
+                    {targetLocation
+                      ? `${targetLocation.warehouse_code} / ${targetLocation.zone_code
+                        ? `${targetLocation.zone_code} / `
+                        : ""
+                      }${targetLocation.location_code}`
+                      : "Waiting"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* QUANTITY */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
@@ -2105,14 +2199,13 @@ export default function GuidedStockOperation({
                 event
               ) =>
                 setQuantity(
-                  event.target
-                    .value
+                  event.target.value
                 )
               }
               type="number"
               min="0.01"
               step="0.01"
-              className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+              className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
             />
           </div>
 
@@ -2129,13 +2222,12 @@ export default function GuidedStockOperation({
                 event
               ) =>
                 setReferenceNo(
-                  event.target
-                    .value
+                  event.target.value
                 )
               }
               type="text"
-              placeholder="SCAN-OP-0001"
-              className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+              placeholder="Optional"
+              className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
             />
           </div>
         </div>
@@ -2155,27 +2247,28 @@ export default function GuidedStockOperation({
                 event.target.value
               )
             }
-            rows={3}
-            placeholder="Optional operation notes..."
-            className="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+            rows={2}
+            placeholder="Optional"
+            className="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
           />
         </div>
 
-        {/* BUTTONS */}
-        <div className="flex flex-col gap-3 sm:flex-row">
+        {/* ACTIONS */}
+        <div className="flex gap-3">
           <button
             type="button"
             onClick={
               runOperation
             }
             disabled={
-              isSubmitting
+              isSubmitting ||
+              !workflowReady
             }
-            className="inline-flex h-10 flex-1 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting
               ? "Processing..."
-              : "Confirm Operation"}
+              : meta.buttonLabel}
           </button>
 
           <button
@@ -2186,7 +2279,7 @@ export default function GuidedStockOperation({
             disabled={
               isSubmitting
             }
-            className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+            className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
           >
             Reset
           </button>
