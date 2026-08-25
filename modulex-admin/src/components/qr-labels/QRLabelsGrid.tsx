@@ -8,9 +8,12 @@ import React, {
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/lib/supabase/client";
 
-type LabelType = "all" | "zone" | "location";
+type LabelTypeFilter =
+  | "all"
+  | "zone"
+  | "location";
 
-type BulkPrinterMode =
+type BulkPrintMode =
   | "a4"
   | "label";
 
@@ -19,24 +22,10 @@ type LabelSizeKey =
   | "60x40"
   | "70x50";
 
-type A4LabelSizeKey =
+type A4GridSizeKey =
   | "small"
   | "medium"
   | "large";
-
-type PrintJob =
-  | {
-    kind: "bulk";
-  }
-  | {
-    kind: "single-label";
-    label: QRLabel;
-  }
-  | {
-    kind: "single-a4";
-    label: QRLabel;
-  }
-  | null;
 
 type QRLabel = {
   id: string;
@@ -63,68 +52,78 @@ type QRLabel = {
   subtitle: string;
 };
 
+type PrintJob =
+  | {
+    kind: "bulk";
+  }
+  | {
+    kind: "single-label";
+    label: QRLabel;
+  }
+  | {
+    kind: "single-a4";
+    label: QRLabel;
+  }
+  | null;
+
 const LABEL_SIZES = {
   "50x30": {
+    label: "50 × 30 mm",
     width: 50,
     height: 30,
     qr: 20,
-    label: "50 × 30 mm",
   },
 
   "60x40": {
+    label: "60 × 40 mm",
     width: 60,
     height: 40,
     qr: 27,
-    label: "60 × 40 mm",
   },
 
   "70x50": {
+    label: "70 × 50 mm",
     width: 70,
     height: 50,
     qr: 32,
-    label: "70 × 50 mm",
   },
 } satisfies Record<
   LabelSizeKey,
   {
+    label: string;
     width: number;
     height: number;
     qr: number;
-    label: string;
   }
 >;
 
-const A4_LABEL_SIZES = {
+const A4_GRID_SIZES = {
   small: {
     label: "Small",
-    width: 60,
-    minHeight: 42,
     columns: 3,
-    qr: 27,
+    minHeight: 52,
+    qr: 92,
   },
 
   medium: {
     label: "Medium",
-    width: 90,
-    minHeight: 62,
     columns: 2,
-    qr: 38,
+    minHeight: 78,
+    qr: 132,
   },
 
   large: {
     label: "Large",
-    width: 185,
-    minHeight: 95,
     columns: 1,
-    qr: 55,
+    minHeight: 125,
+    qr: 190,
   },
 } satisfies Record<
-  A4LabelSizeKey,
+  A4GridSizeKey,
   {
     label: string;
-    width: number;
-    minHeight: number;
     columns: number;
+    minHeight: number;
     qr: number;
   }
 >;
@@ -187,7 +186,7 @@ function formatLocationType(value: string) {
     );
 }
 
-function getPrimaryCode(label: QRLabel) {
+function getMainCode(label: QRLabel) {
   if (
     label.type === "location" &&
     label.location_code
@@ -203,28 +202,38 @@ export default function QRLabelsGrid() {
     QRLabel[]
   >([]);
 
-  const [query, setQuery] = useState("");
-
-  const [labelType, setLabelType] =
-    useState<LabelType>("all");
-
-  const [warehouseId, setWarehouseId] =
+  const [query, setQuery] =
     useState("");
 
   const [
-    bulkPrinterMode,
-    setBulkPrinterMode,
+    labelTypeFilter,
+    setLabelTypeFilter,
   ] =
-    useState<BulkPrinterMode>("a4");
+    useState<LabelTypeFilter>("all");
 
-  const [labelSize, setLabelSize] =
+  const [
+    warehouseFilter,
+    setWarehouseFilter,
+  ] =
+    useState("");
+
+  const [
+    bulkPrintMode,
+    setBulkPrintMode,
+  ] =
+    useState<BulkPrintMode>("a4");
+
+  const [
+    bulkLabelSize,
+    setBulkLabelSize,
+  ] =
     useState<LabelSizeKey>("60x40");
 
   const [
-    a4LabelSize,
-    setA4LabelSize,
+    bulkA4Size,
+    setBulkA4Size,
   ] =
-    useState<A4LabelSizeKey>("medium");
+    useState<A4GridSizeKey>("medium");
 
   const [
     selectedLabel,
@@ -238,10 +247,16 @@ export default function QRLabelsGrid() {
   ] =
     useState<LabelSizeKey>("60x40");
 
-  const [printJob, setPrintJob] =
+  const [
+    printJob,
+    setPrintJob,
+  ] =
     useState<PrintJob>(null);
 
-  const [isLoading, setIsLoading] =
+  const [
+    isLoading,
+    setIsLoading,
+  ] =
     useState(true);
 
   const [
@@ -309,77 +324,101 @@ export default function QRLabelsGrid() {
     ]);
 
     if (zoneError) {
-      setErrorMessage(zoneError.message);
       setLabels([]);
+      setErrorMessage(
+        zoneError.message
+      );
       setIsLoading(false);
       return;
     }
 
     if (locationError) {
+      setLabels([]);
       setErrorMessage(
         locationError.message
       );
-
-      setLabels([]);
       setIsLoading(false);
       return;
     }
 
     const zoneLabels: QRLabel[] =
-      zoneData?.flatMap((zone: any) => {
-        const warehouseRaw =
-          Array.isArray(zone.warehouses)
-            ? zone.warehouses[0]
-            : zone.warehouses;
+      zoneData?.flatMap(
+        (zone: any) => {
+          const warehouseRaw =
+            Array.isArray(
+              zone.warehouses
+            )
+              ? zone.warehouses[0]
+              : zone.warehouses;
 
-        if (!warehouseRaw) {
-          return [];
-        }
+          if (!warehouseRaw) {
+            return [];
+          }
 
-        return [
-          {
-            id: `zone-${zone.id}`,
-
-            type: "zone",
-
-            warehouse_id:
-              zone.warehouse_id,
-
-            warehouse_code:
+          const qrCode =
+            zone.qr_code ||
+            buildZoneQrCode(
               warehouseRaw.code,
+              zone.code
+            );
 
-            warehouse_name:
-              warehouseRaw.name,
+          const qrPayload =
+            zone.qr_payload ||
+            buildZoneQrPayload(
+              warehouseRaw.code,
+              zone.code
+            );
 
-            zone_id: zone.id,
-            zone_code: zone.code,
-            zone_name: zone.name,
+          return [
+            {
+              id: `zone-${zone.id}`,
 
-            location_id: null,
-            location_code: null,
-            location_name: null,
-            location_type: null,
+              type: "zone",
 
-            qr_code:
-              zone.qr_code ||
-              buildZoneQrCode(
+              warehouse_id:
+                zone.warehouse_id,
+
+              warehouse_code:
                 warehouseRaw.code,
-                zone.code
-              ),
 
-            qr_payload:
-              zone.qr_payload ||
-              buildZoneQrPayload(
-                warehouseRaw.code,
-                zone.code
-              ),
+              warehouse_name:
+                warehouseRaw.name,
 
-            title: `${warehouseRaw.code} / ${zone.code}`,
+              zone_id:
+                zone.id,
 
-            subtitle: zone.name,
-          },
-        ];
-      }) ?? [];
+              zone_code:
+                zone.code,
+
+              zone_name:
+                zone.name,
+
+              location_id:
+                null,
+
+              location_code:
+                null,
+
+              location_name:
+                null,
+
+              location_type:
+                null,
+
+              qr_code:
+                qrCode,
+
+              qr_payload:
+                qrPayload,
+
+              title: `${warehouseRaw.code} / ${zone.code}`,
+
+              subtitle:
+                zone.name,
+            },
+          ];
+        }
+      ) ?? [];
 
     const locationLabels: QRLabel[] =
       locationData?.flatMap(
@@ -404,6 +443,25 @@ export default function QRLabelsGrid() {
           ) {
             return [];
           }
+
+          const qrCode =
+            location.qr_code?.startsWith(
+              "LOC-"
+            )
+              ? location.qr_code
+              : buildLocationQrCode(
+                warehouseRaw.code,
+                zoneRaw.code,
+                location.code
+              );
+
+          const qrPayload =
+            location.qr_payload ||
+            buildLocationQrPayload(
+              warehouseRaw.code,
+              zoneRaw.code,
+              location.code
+            );
 
           return [
             {
@@ -442,23 +500,10 @@ export default function QRLabelsGrid() {
                 location.location_type,
 
               qr_code:
-                location.qr_code?.startsWith(
-                  "LOC-"
-                )
-                  ? location.qr_code
-                  : buildLocationQrCode(
-                    warehouseRaw.code,
-                    zoneRaw.code,
-                    location.code
-                  ),
+                qrCode,
 
               qr_payload:
-                location.qr_payload ||
-                buildLocationQrPayload(
-                  warehouseRaw.code,
-                  zoneRaw.code,
-                  location.code
-                ),
+                qrPayload,
 
               title: `${warehouseRaw.code} / ${zoneRaw.code} / ${location.code}`,
 
@@ -469,47 +514,49 @@ export default function QRLabelsGrid() {
         }
       ) ?? [];
 
-    const combined = [
+    const combinedLabels = [
       ...zoneLabels,
       ...locationLabels,
     ];
 
-    combined.sort((a, b) => {
-      const warehouseComparison =
-        a.warehouse_code.localeCompare(
-          b.warehouse_code
+    combinedLabels.sort(
+      (a, b) => {
+        const warehouseCompare =
+          a.warehouse_code.localeCompare(
+            b.warehouse_code
+          );
+
+        if (
+          warehouseCompare !== 0
+        ) {
+          return warehouseCompare;
+        }
+
+        const zoneCompare = (
+          a.zone_code ?? ""
+        ).localeCompare(
+          b.zone_code ?? ""
         );
 
-      if (
-        warehouseComparison !== 0
-      ) {
-        return warehouseComparison;
+        if (zoneCompare !== 0) {
+          return zoneCompare;
+        }
+
+        if (a.type !== b.type) {
+          return a.type === "zone"
+            ? -1
+            : 1;
+        }
+
+        return (
+          a.location_code ?? ""
+        ).localeCompare(
+          b.location_code ?? ""
+        );
       }
+    );
 
-      const zoneComparison = (
-        a.zone_code ?? ""
-      ).localeCompare(
-        b.zone_code ?? ""
-      );
-
-      if (zoneComparison !== 0) {
-        return zoneComparison;
-      }
-
-      if (a.type !== b.type) {
-        return a.type === "zone"
-          ? -1
-          : 1;
-      }
-
-      return (
-        a.location_code ?? ""
-      ).localeCompare(
-        b.location_code ?? ""
-      );
-    });
-
-    setLabels(combined);
+    setLabels(combinedLabels);
     setIsLoading(false);
   }
 
@@ -536,89 +583,125 @@ export default function QRLabelsGrid() {
   }, []);
 
   const warehouses = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        id: string;
-        code: string;
-        name: string;
-      }
-    >();
+    const warehouseMap =
+      new Map<
+        string,
+        {
+          id: string;
+          code: string;
+          name: string;
+        }
+      >();
 
-    for (const label of labels) {
+    labels.forEach((label) => {
       if (
-        !map.has(label.warehouse_id)
+        warehouseMap.has(
+          label.warehouse_id
+        )
       ) {
-        map.set(label.warehouse_id, {
+        return;
+      }
+
+      warehouseMap.set(
+        label.warehouse_id,
+        {
           id: label.warehouse_id,
           code: label.warehouse_code,
           name: label.warehouse_name,
-        });
-      }
-    }
+        }
+      );
+    });
 
     return Array.from(
-      map.values()
+      warehouseMap.values()
     ).sort((a, b) =>
       a.code.localeCompare(b.code)
     );
   }, [labels]);
 
-  const filteredLabels = useMemo(() => {
-    const search =
-      query.trim().toLowerCase();
+  const filteredLabels =
+    useMemo(() => {
+      const normalizedQuery =
+        query
+          .trim()
+          .toLowerCase();
 
-    return labels.filter((label) => {
-      if (
-        labelType !== "all" &&
-        label.type !== labelType
-      ) {
-        return false;
-      }
+      return labels.filter(
+        (label) => {
+          if (
+            labelTypeFilter !==
+            "all" &&
+            label.type !==
+            labelTypeFilter
+          ) {
+            return false;
+          }
 
-      if (
-        warehouseId &&
-        label.warehouse_id !==
-        warehouseId
-      ) {
-        return false;
-      }
+          if (
+            warehouseFilter &&
+            label.warehouse_id !==
+            warehouseFilter
+          ) {
+            return false;
+          }
 
-      if (!search) {
-        return true;
-      }
+          if (!normalizedQuery) {
+            return true;
+          }
 
-      return [
-        label.type,
-        label.warehouse_code,
-        label.warehouse_name,
-        label.zone_code,
-        label.zone_name,
-        label.location_code,
-        label.location_name,
-        label.location_type,
-        label.qr_code,
-        label.qr_payload,
-      ]
-        .filter(Boolean)
-        .some((value) =>
-          String(value)
-            .toLowerCase()
-            .includes(search)
-        );
-    });
-  }, [
-    labels,
-    query,
-    labelType,
-    warehouseId,
-  ]);
+          const searchable =
+            [
+              label.type,
 
-  function runPrint(job: PrintJob) {
-    if (!job) {
-      return;
-    }
+              label.warehouse_code,
+              label.warehouse_name,
 
+              label.zone_code,
+              label.zone_name,
+
+              label.location_code,
+              label.location_name,
+              label.location_type,
+
+              label.qr_code,
+              label.qr_payload,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
+
+          return searchable.includes(
+            normalizedQuery
+          );
+        }
+      );
+    }, [
+      labels,
+      query,
+      labelTypeFilter,
+      warehouseFilter,
+    ]);
+
+  const zoneCount =
+    filteredLabels.filter(
+      (label) =>
+        label.type === "zone"
+    ).length;
+
+  const locationCount =
+    filteredLabels.filter(
+      (label) =>
+        label.type ===
+        "location"
+    ).length;
+
+  function executePrint(
+    job: Exclude<
+      PrintJob,
+      null
+    >
+  ) {
+    setSelectedLabel(null);
     setPrintJob(job);
     setErrorMessage(null);
 
@@ -640,70 +723,79 @@ export default function QRLabelsGrid() {
       return;
     }
 
-    runPrint({
+    executePrint({
       kind: "bulk",
     });
   }
 
-  function openPrintOptions(
-    label: QRLabel
-  ) {
-    setSelectedLabel(label);
-  }
+  const bulkLabelDimensions =
+    LABEL_SIZES[bulkLabelSize];
 
-  const selectedBulkLabelSize =
-    LABEL_SIZES[labelSize];
-
-  const selectedSingleLabelSize =
+  const singleLabelDimensions =
     LABEL_SIZES[singleLabelSize];
 
-  const selectedA4Size =
-    A4_LABEL_SIZES[a4LabelSize];
+  const bulkA4Dimensions =
+    A4_GRID_SIZES[bulkA4Size];
 
-  const printStyles = useMemo(() => {
-    let pageRule =
-      "@page { size: A4 portrait; margin: 10mm; }";
+  const printCss = useMemo(() => {
+    let pageCss = `
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+    `;
 
     if (
       printJob?.kind ===
       "single-a4"
     ) {
-      pageRule =
-        "@page { size: A4 portrait; margin: 0; }";
+      pageCss = `
+        @page {
+          size: A4 portrait;
+          margin: 0;
+        }
+      `;
     }
 
     if (
       printJob?.kind ===
-      "single-label" ||
-      (printJob?.kind === "bulk" &&
-        bulkPrinterMode ===
-        "label")
+      "single-label"
     ) {
-      const size =
-        printJob?.kind ===
-          "single-label"
-          ? selectedSingleLabelSize
-          : selectedBulkLabelSize;
-
-      pageRule = `
+      pageCss = `
         @page {
-          size: ${size.width}mm ${size.height}mm;
+          size: ${singleLabelDimensions.width}mm ${singleLabelDimensions.height}mm;
+          margin: 0;
+        }
+      `;
+    }
+
+    if (
+      printJob?.kind ===
+      "bulk" &&
+      bulkPrintMode ===
+      "label"
+    ) {
+      pageCss = `
+        @page {
+          size: ${bulkLabelDimensions.width}mm ${bulkLabelDimensions.height}mm;
           margin: 0;
         }
       `;
     }
 
     return `
-      ${pageRule}
-
       .modulex-print-root {
         display: none;
       }
 
       @media print {
+        ${pageCss}
+
         html,
         body {
-          background: #ffffff !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: white !important;
         }
 
         body * {
@@ -720,8 +812,10 @@ export default function QRLabelsGrid() {
           position: absolute !important;
           top: 0 !important;
           left: 0 !important;
-          background: #ffffff !important;
-          color: #000000 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: white !important;
+          color: black !important;
         }
 
         * {
@@ -732,18 +826,83 @@ export default function QRLabelsGrid() {
     `;
   }, [
     printJob,
-    bulkPrinterMode,
-    selectedBulkLabelSize,
-    selectedSingleLabelSize,
+    bulkPrintMode,
+    bulkLabelDimensions,
+    singleLabelDimensions,
   ]);
 
-  function renderCompactLabel(
-    label: QRLabel,
-    qrSize = 128
+  function renderScreenLabel(
+    label: QRLabel
   ) {
     return (
-      <div className="flex h-full items-center gap-4">
-        <div className="shrink-0 bg-white p-1">
+      <div className="flex items-start gap-5">
+        <div className="shrink-0 rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-700">
+          <QRCodeSVG
+            value={label.qr_payload}
+            size={112}
+            level="M"
+            includeMargin={false}
+          />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${label.type === "zone"
+                ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
+                : "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"
+                }`}
+            >
+              {label.type === "zone"
+                ? "Zone"
+                : "Location"}
+            </span>
+
+            {label.location_type && (
+              <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-[10px] font-medium text-gray-600 dark:bg-white/[0.06] dark:text-gray-400">
+                {formatLocationType(
+                  label.location_type
+                )}
+              </span>
+            )}
+          </div>
+
+          <h4 className="mt-3 text-lg font-bold text-gray-900 dark:text-white">
+            {label.title}
+          </h4>
+
+          <p className="mt-1 text-sm font-medium text-gray-600 dark:text-gray-300">
+            {label.subtitle}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPrintLabel(
+    label: QRLabel,
+    qrSize: number
+  ) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "4mm",
+          width: "100%",
+          height: "100%",
+          boxSizing: "border-box",
+          overflow: "hidden",
+          color: "#000000",
+          background: "#ffffff",
+        }}
+      >
+        <div
+          style={{
+            flexShrink: 0,
+            background: "#ffffff",
+          }}
+        >
           <QRCodeSVG
             value={label.qr_payload}
             size={qrSize}
@@ -752,106 +911,235 @@ export default function QRLabelsGrid() {
           />
         </div>
 
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 print:text-black">
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              fontSize: "7pt",
+              fontWeight: 700,
+              textTransform:
+                "uppercase",
+              letterSpacing:
+                "0.08em",
+            }}
+          >
             {label.type === "zone"
               ? "Zone"
-              : "Location"}
-          </p>
+              : "Shelf Location"}
+          </div>
 
-          <h4 className="mt-1 text-lg font-bold text-gray-900 print:text-black">
+          <div
+            style={{
+              marginTop: "1.5mm",
+              fontSize: "12pt",
+              lineHeight: 1.1,
+              fontWeight: 800,
+              overflowWrap:
+                "anywhere",
+            }}
+          >
             {label.title}
-          </h4>
+          </div>
 
-          <p className="mt-1 text-sm font-medium text-gray-600 print:text-black">
+          <div
+            style={{
+              marginTop: "1mm",
+              fontSize: "8pt",
+              lineHeight: 1.15,
+              fontWeight: 600,
+              overflowWrap:
+                "anywhere",
+            }}
+          >
             {label.subtitle}
-          </p>
+          </div>
 
-          <p className="mt-3 break-all font-mono text-xs font-bold text-gray-800 print:text-black">
+          <div
+            style={{
+              marginTop: "2mm",
+              fontSize: "7pt",
+              lineHeight: 1.1,
+              fontWeight: 700,
+              fontFamily:
+                "monospace",
+              overflowWrap:
+                "anywhere",
+            }}
+          >
             {label.qr_code}
-          </p>
+          </div>
         </div>
       </div>
     );
   }
 
-  function renderSingleA4(
+  function renderA4ShelfSign(
     label: QRLabel
   ) {
-    const primaryCode =
-      getPrimaryCode(label);
+    const mainCode =
+      getMainCode(label);
 
     return (
       <div
         style={{
           width: "210mm",
           height: "297mm",
-          padding: "15mm",
           boxSizing: "border-box",
+          padding: "15mm",
+          background: "#ffffff",
+          color: "#000000",
+          display: "flex",
+          flexDirection: "column",
         }}
-        className="flex flex-col items-center justify-between bg-white text-black"
       >
-        <div className="w-full text-center">
-          <p className="text-lg font-bold uppercase tracking-[0.3em]">
+        <div
+          style={{
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "15pt",
+              fontWeight: 800,
+              textTransform:
+                "uppercase",
+              letterSpacing:
+                "0.2em",
+            }}
+          >
             {label.type ===
               "location"
               ? "Shelf Location"
               : "Warehouse Zone"}
-          </p>
+          </div>
 
-          <p className="mt-4 text-3xl font-semibold">
-            {label.warehouse_name}
-          </p>
-        </div>
-
-        <div className="flex flex-1 flex-col items-center justify-center">
-          <p
-            className="font-black leading-none"
+          <div
             style={{
-              fontSize:
-                primaryCode.length > 12
-                  ? "52pt"
-                  : "72pt",
+              marginTop: "5mm",
+              fontSize: "24pt",
+              fontWeight: 700,
             }}
           >
-            {primaryCode}
-          </p>
+            {label.warehouse_name}
+          </div>
+        </div>
 
-          <p className="mt-4 text-2xl font-bold">
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent:
+              "center",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize:
+                mainCode.length > 12
+                  ? "48pt"
+                  : "68pt",
+              fontWeight: 900,
+              lineHeight: 1,
+              overflowWrap:
+                "anywhere",
+            }}
+          >
+            {mainCode}
+          </div>
+
+          <div
+            style={{
+              marginTop: "7mm",
+              fontSize: "23pt",
+              lineHeight: 1.15,
+              fontWeight: 800,
+            }}
+          >
             {label.subtitle}
-          </p>
+          </div>
 
-          <p className="mt-2 text-xl">
+          <div
+            style={{
+              marginTop: "4mm",
+              fontSize: "16pt",
+              fontWeight: 500,
+            }}
+          >
             {label.title}
-          </p>
+          </div>
 
-          <div className="mt-10 bg-white p-5">
+          <div
+            style={{
+              marginTop: "12mm",
+              padding: "5mm",
+              background: "#ffffff",
+            }}
+          >
             <QRCodeSVG
-              value={label.qr_payload}
+              value={
+                label.qr_payload
+              }
               size={430}
               level="M"
               includeMargin={false}
             />
           </div>
 
-          <p className="mt-8 font-mono text-xl font-bold">
+          <div
+            style={{
+              marginTop: "10mm",
+              fontFamily:
+                "monospace",
+              fontSize: "18pt",
+              fontWeight: 800,
+              overflowWrap:
+                "anywhere",
+            }}
+          >
             {label.qr_code}
-          </p>
+          </div>
         </div>
 
-        <div className="w-full border-t border-black pt-5 text-center">
-          <p className="text-sm">
-            Scan QR code to identify this{" "}
+        <div
+          style={{
+            borderTop:
+              "1px solid #000000",
+            paddingTop: "5mm",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontSize: "10pt",
+              fontWeight: 600,
+            }}
+          >
+            Scan QR code to identify
+            this{" "}
             {label.type ===
               "location"
               ? "shelf location"
               : "warehouse zone"}
             .
-          </p>
+          </div>
 
-          <p className="mt-2 font-mono text-xs">
+          <div
+            style={{
+              marginTop: "2mm",
+              fontFamily:
+                "monospace",
+              fontSize: "8pt",
+            }}
+          >
             {label.qr_payload}
-          </p>
+          </div>
         </div>
       </div>
     );
@@ -859,10 +1147,11 @@ export default function QRLabelsGrid() {
 
   return (
     <>
-      <style>{printStyles}</style>
+      <style>{printCss}</style>
 
-      <div className="space-y-6 print:hidden">
-        <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+      {/* SCREEN CONTENT */}
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] print:hidden">
           <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -871,8 +1160,9 @@ export default function QRLabelsGrid() {
                 </h3>
 
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Print individual or bulk
-                  QR labels for warehouse
+                  Print individual
+                  or bulk QR labels
+                  for warehouse
                   zones and shelf
                   locations.
                 </p>
@@ -887,7 +1177,7 @@ export default function QRLabelsGrid() {
                   filteredLabels.length ===
                   0
                 }
-                className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-5 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Print All (
                 {filteredLabels.length})
@@ -902,14 +1192,16 @@ export default function QRLabelsGrid() {
               </label>
 
               <select
-                value={labelType}
+                value={
+                  labelTypeFilter
+                }
                 onChange={(event) =>
-                  setLabelType(
+                  setLabelTypeFilter(
                     event.target
-                      .value as LabelType
+                      .value as LabelTypeFilter
                   )
                 }
-                className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+                className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
               >
                 <option value="all">
                   Zones + Locations
@@ -931,13 +1223,15 @@ export default function QRLabelsGrid() {
               </label>
 
               <select
-                value={warehouseId}
+                value={
+                  warehouseFilter
+                }
                 onChange={(event) =>
-                  setWarehouseId(
+                  setWarehouseFilter(
                     event.target.value
                   )
                 }
-                className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+                className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
               >
                 <option value="">
                   All Warehouses
@@ -946,11 +1240,20 @@ export default function QRLabelsGrid() {
                 {warehouses.map(
                   (warehouse) => (
                     <option
-                      key={warehouse.id}
-                      value={warehouse.id}
+                      key={
+                        warehouse.id
+                      }
+                      value={
+                        warehouse.id
+                      }
                     >
-                      {warehouse.code} —{" "}
-                      {warehouse.name}
+                      {
+                        warehouse.code
+                      }{" "}
+                      —{" "}
+                      {
+                        warehouse.name
+                      }
                     </option>
                   )
                 )}
@@ -964,17 +1267,18 @@ export default function QRLabelsGrid() {
 
               <select
                 value={
-                  bulkPrinterMode
+                  bulkPrintMode
                 }
                 onChange={(event) =>
-                  setBulkPrinterMode(
+                  setBulkPrintMode(
                     event.target
-                      .value as BulkPrinterMode
+                      .value as BulkPrintMode
                   )
                 }
-                className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+                className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
               >
                 <option value="a4">
+                  Normal Printer —
                   A4 Sheet
                 </option>
 
@@ -984,7 +1288,7 @@ export default function QRLabelsGrid() {
               </select>
             </div>
 
-            {bulkPrinterMode ===
+            {bulkPrintMode ===
               "label" ? (
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
@@ -992,24 +1296,31 @@ export default function QRLabelsGrid() {
                 </label>
 
                 <select
-                  value={labelSize}
+                  value={
+                    bulkLabelSize
+                  }
                   onChange={(event) =>
-                    setLabelSize(
+                    setBulkLabelSize(
                       event.target
                         .value as LabelSizeKey
                     )
                   }
-                  className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+                  className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
                 >
                   {Object.entries(
                     LABEL_SIZES
                   ).map(
-                    ([key, size]) => (
+                    ([
+                      key,
+                      size,
+                    ]) => (
                       <option
                         key={key}
                         value={key}
                       >
-                        {size.label}
+                        {
+                          size.label
+                        }
                       </option>
                     )
                   )}
@@ -1022,24 +1333,31 @@ export default function QRLabelsGrid() {
                 </label>
 
                 <select
-                  value={a4LabelSize}
+                  value={
+                    bulkA4Size
+                  }
                   onChange={(event) =>
-                    setA4LabelSize(
+                    setBulkA4Size(
                       event.target
-                        .value as A4LabelSizeKey
+                        .value as A4GridSizeKey
                     )
                   }
-                  className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+                  className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
                 >
                   {Object.entries(
-                    A4_LABEL_SIZES
+                    A4_GRID_SIZES
                   ).map(
-                    ([key, size]) => (
+                    ([
+                      key,
+                      size,
+                    ]) => (
                       <option
                         key={key}
                         value={key}
                       >
-                        {size.label}
+                        {
+                          size.label
+                        }
                       </option>
                     )
                   )}
@@ -1052,70 +1370,200 @@ export default function QRLabelsGrid() {
                 Search
               </label>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <input
                   value={query}
                   onChange={(event) =>
                     setQuery(
-                      event.target.value
+                      event.target
+                        .value
                     )
                   }
-                  placeholder="Search warehouse, zone, shelf or QR..."
-                  className="h-11 flex-1 rounded-lg border border-gray-200 bg-transparent px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
+                  type="text"
+                  placeholder="Search warehouse, zone, location or QR..."
+                  className="h-11 flex-1 rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                 />
 
                 <button
                   type="button"
                   onClick={loadLabels}
-                  className="rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 dark:border-gray-800 dark:text-gray-300"
+                  className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
                 >
                   Refresh
                 </button>
               </div>
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-5 border-t border-gray-200 px-5 py-4 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+            <span>
+              Zones:{" "}
+              <strong className="text-gray-700 dark:text-gray-300">
+                {zoneCount}
+              </strong>
+            </span>
+
+            <span>
+              Locations:{" "}
+              <strong className="text-gray-700 dark:text-gray-300">
+                {locationCount}
+              </strong>
+            </span>
+
+            <span>
+              Total:{" "}
+              <strong className="text-gray-700 dark:text-gray-300">
+                {
+                  filteredLabels.length
+                }
+              </strong>
+            </span>
+          </div>
         </div>
 
         {errorMessage && (
-          <div className="rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+          <div className="rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400 print:hidden">
             {errorMessage}
           </div>
         )}
 
+        {bulkPrintMode ===
+          "label" && (
+            <div className="rounded-xl border border-blue-light-200 bg-blue-light-25 px-4 py-3 text-sm text-blue-light-700 dark:border-blue-light-500/20 dark:bg-blue-light-500/10 dark:text-blue-light-400 print:hidden">
+              Label Printer mode:
+              select the same{" "}
+              <strong>
+                {
+                  LABEL_SIZES[
+                    bulkLabelSize
+                  ].label
+                }
+              </strong>{" "}
+              paper size in the
+              printer driver and use
+              100% scale.
+            </div>
+          )}
+
         {isLoading ? (
-          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            Loading QR labels...
+          <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] print:hidden">
+            <div className="text-center">
+              <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
+
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Loading QR
+                labels...
+              </p>
+            </div>
+          </div>
+        ) : filteredLabels.length ===
+          0 ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400 print:hidden">
+            No QR labels found.
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 print:hidden">
             {filteredLabels.map(
               (label) => (
                 <div
                   key={label.id}
-                  className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
+                  className="flex flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900"
                 >
-                  {renderCompactLabel(
+                  {renderScreenLabel(
                     label
                   )}
 
-                  <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4 dark:border-gray-800">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {label.type ===
-                        "zone"
-                        ? "Zone label"
-                        : "Shelf label"}
-                    </span>
+                  {/* DETAILS */}
+                  <div className="mt-5 grid grid-cols-1 gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        Warehouse
+                      </p>
 
+                      <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {
+                          label.warehouse_code
+                        }{" "}
+                        —{" "}
+                        {
+                          label.warehouse_name
+                        }
+                      </p>
+                    </div>
+
+                    {label.zone_code && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                          Zone
+                        </p>
+
+                        <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {
+                            label.zone_code
+                          }
+
+                          {label.zone_name
+                            ? ` — ${label.zone_name}`
+                            : ""}
+                        </p>
+                      </div>
+                    )}
+
+                    {label.type ===
+                      "location" &&
+                      label.location_code && (
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                            Location
+                          </p>
+
+                          <p className="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {
+                              label.location_code
+                            }
+
+                            {label.location_name
+                              ? ` — ${label.location_name}`
+                              : ""}
+                          </p>
+                        </div>
+                      )}
+
+                    <div className="rounded-lg bg-gray-50 p-3 dark:bg-white/[0.03]">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        QR Code
+                      </p>
+
+                      <p className="mt-1 break-all font-mono text-xs font-semibold text-gray-800 dark:text-gray-200">
+                        {
+                          label.qr_code
+                        }
+                      </p>
+
+                      <p className="mt-3 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                        QR Payload
+                      </p>
+
+                      <p className="mt-1 break-all font-mono text-[11px] text-gray-600 dark:text-gray-400">
+                        {
+                          label.qr_payload
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* PER-LABEL PRINT BUTTON */}
+                  <div className="mt-auto pt-5">
                     <button
                       type="button"
                       onClick={() =>
-                        openPrintOptions(
+                        setSelectedLabel(
                           label
                         )
                       }
-                      className="inline-flex h-9 items-center justify-center rounded-lg bg-brand-50 px-4 text-xs font-semibold text-brand-700 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-400"
+                      className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-semibold text-white transition hover:bg-brand-600"
                     >
-                      Print
+                      Print This QR
                     </button>
                   </div>
                 </div>
@@ -1125,162 +1573,228 @@ export default function QRLabelsGrid() {
         )}
       </div>
 
+      {/* SINGLE LABEL PRINT MODAL */}
       {selectedLabel && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 p-4 print:hidden">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl dark:bg-gray-900">
-            <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-                Print Label
-              </h3>
+          <div className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+                  Print QR Label
+                </h3>
 
-              <p className="mt-1 text-sm text-gray-500">
-                {selectedLabel.title}
-              </p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {
+                    selectedLabel.title
+                  }{" "}
+                  —{" "}
+                  {
+                    selectedLabel.subtitle
+                  }
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedLabel(
+                    null
+                  )
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-lg text-gray-500 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.03]"
+              >
+                ×
+              </button>
             </div>
 
             <div className="space-y-4 p-5">
+              {/* STANDARD LABEL */}
               <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-                <h4 className="font-semibold text-gray-800 dark:text-white">
+                <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
                   Standard Label
                 </h4>
 
-                <p className="mt-1 text-xs text-gray-500">
-                  For label printers or
-                  adhesive shelf labels.
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  For adhesive labels
+                  and label printers.
                 </p>
 
-                <select
-                  value={
-                    singleLabelSize
-                  }
-                  onChange={(event) =>
-                    setSingleLabelSize(
-                      event.target
-                        .value as LabelSizeKey
-                    )
-                  }
-                  className="mt-4 h-10 w-full rounded-lg border border-gray-200 px-3 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                >
-                  {Object.entries(
-                    LABEL_SIZES
-                  ).map(
-                    ([key, size]) => (
-                      <option
-                        key={key}
-                        value={key}
-                      >
-                        {size.label}
-                      </option>
-                    )
-                  )}
-                </select>
+                <div className="mt-4">
+                  <label className="mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    Label Size
+                  </label>
+
+                  <select
+                    value={
+                      singleLabelSize
+                    }
+                    onChange={(event) =>
+                      setSingleLabelSize(
+                        event.target
+                          .value as LabelSizeKey
+                      )
+                    }
+                    className="h-10 w-full rounded-lg border border-gray-200 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                  >
+                    {Object.entries(
+                      LABEL_SIZES
+                    ).map(
+                      ([
+                        key,
+                        size,
+                      ]) => (
+                        <option
+                          key={key}
+                          value={key}
+                        >
+                          {
+                            size.label
+                          }
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
 
                 <button
                   type="button"
                   onClick={() =>
-                    runPrint({
-                      kind: "single-label",
+                    executePrint({
+                      kind:
+                        "single-label",
+
                       label:
                         selectedLabel,
                     })
                   }
-                  className="mt-3 h-10 w-full rounded-lg bg-brand-500 text-sm font-medium text-white hover:bg-brand-600"
+                  className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
                 >
                   Print Standard Label
                 </button>
               </div>
 
+              {/* FULL A4 */}
               <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-                <h4 className="font-semibold text-gray-800 dark:text-white">
-                  A4 Full Page / Shelf
-                  Sign
+                <h4 className="text-sm font-semibold text-gray-800 dark:text-white">
+                  A4 Full Page /
+                  Shelf Sign
                 </h4>
 
-                <p className="mt-1 text-xs text-gray-500">
-                  Large QR and large
-                  shelf/zone code for
-                  attaching directly to
-                  warehouse racks.
+                <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                  Prints one QR on a
+                  full A4 page with a
+                  large zone or shelf
+                  code. Recommended
+                  for warehouse racks,
+                  shelf ends, and
+                  locations that need
+                  to be readable from
+                  a distance.
                 </p>
 
                 <button
                   type="button"
                   onClick={() =>
-                    runPrint({
-                      kind: "single-a4",
+                    executePrint({
+                      kind:
+                        "single-a4",
+
                       label:
                         selectedLabel,
                     })
                   }
-                  className="mt-4 h-10 w-full rounded-lg bg-gray-900 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900"
+                  className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg bg-gray-900 px-4 text-sm font-medium text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900"
                 >
                   Print A4 Shelf Sign
                 </button>
               </div>
             </div>
-
-            <div className="flex justify-end border-t border-gray-200 px-5 py-4 dark:border-gray-800">
-              <button
-                type="button"
-                onClick={() =>
-                  setSelectedLabel(null)
-                }
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm dark:border-gray-800"
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}
 
+      {/* PRINT-ONLY CONTENT */}
       <div className="modulex-print-root">
-        {printJob?.kind ===
-          "single-a4" &&
-          renderSingleA4(
-            printJob.label
-          )}
-
+        {/* SINGLE STANDARD LABEL */}
         {printJob?.kind ===
           "single-label" && (
             <div
               style={{
-                width: `${selectedSingleLabelSize.width}mm`,
-                height: `${selectedSingleLabelSize.height}mm`,
-                boxSizing: "border-box",
+                width: `${singleLabelDimensions.width}mm`,
+                height: `${singleLabelDimensions.height}mm`,
                 padding: "3mm",
+                boxSizing:
+                  "border-box",
+                overflow: "hidden",
+                background:
+                  "#ffffff",
               }}
             >
-              {renderCompactLabel(
+              {renderPrintLabel(
                 printJob.label,
-                110
+                singleLabelDimensions.qr *
+                3.7795
               )}
             </div>
           )}
 
+        {/* SINGLE FULL A4 */}
+        {printJob?.kind ===
+          "single-a4" &&
+          renderA4ShelfSign(
+            printJob.label
+          )}
+
+        {/* BULK LABEL PRINTER */}
         {printJob?.kind ===
           "bulk" &&
-          bulkPrinterMode ===
+          bulkPrintMode ===
           "label" && (
-            <div>
+            <div
+              style={{
+                width: `${bulkLabelDimensions.width}mm`,
+              }}
+            >
               {filteredLabels.map(
-                (label) => (
+                (label, index) => (
                   <div
                     key={label.id}
                     style={{
-                      width: `${selectedBulkLabelSize.width}mm`,
-                      height: `${selectedBulkLabelSize.height}mm`,
+                      width: `${bulkLabelDimensions.width}mm`,
+
+                      height: `${bulkLabelDimensions.height}mm`,
+
+                      padding:
+                        "3mm",
+
                       boxSizing:
                         "border-box",
-                      padding: "3mm",
+
+                      overflow:
+                        "hidden",
+
+                      background:
+                        "#ffffff",
+
+                      breakAfter:
+                        index ===
+                          filteredLabels.length -
+                          1
+                          ? "auto"
+                          : "page",
+
                       pageBreakAfter:
-                        "always",
-                      breakAfter: "page",
+                        index ===
+                          filteredLabels.length -
+                          1
+                          ? "auto"
+                          : "always",
                     }}
                   >
-                    {renderCompactLabel(
+                    {renderPrintLabel(
                       label,
-                      110
+                      bulkLabelDimensions.qr *
+                      3.7795
                     )}
                   </div>
                 )
@@ -1288,16 +1802,22 @@ export default function QRLabelsGrid() {
             </div>
           )}
 
+        {/* BULK A4 */}
         {printJob?.kind ===
           "bulk" &&
-          bulkPrinterMode ===
+          bulkPrintMode ===
           "a4" && (
             <div
               style={{
                 width: "190mm",
                 display: "grid",
-                gridTemplateColumns: `repeat(${selectedA4Size.columns}, 1fr)`,
+
+                gridTemplateColumns: `repeat(${bulkA4Dimensions.columns}, minmax(0, 1fr))`,
+
                 gap: "4mm",
+
+                boxSizing:
+                  "border-box",
               }}
             >
               {filteredLabels.map(
@@ -1305,20 +1825,33 @@ export default function QRLabelsGrid() {
                   <div
                     key={label.id}
                     style={{
-                      minHeight: `${selectedA4Size.minHeight}mm`,
-                      padding: "4mm",
-                      border:
-                        "1px solid black",
+                      minHeight: `${bulkA4Dimensions.minHeight}mm`,
+
+                      padding:
+                        "4mm",
+
                       boxSizing:
                         "border-box",
+
+                      border:
+                        "0.3mm solid #000000",
+
+                      borderRadius:
+                        "2mm",
+
                       breakInside:
                         "avoid",
+
+                      pageBreakInside:
+                        "avoid",
+
+                      background:
+                        "#ffffff",
                     }}
                   >
-                    {renderCompactLabel(
+                    {renderPrintLabel(
                       label,
-                      selectedA4Size.qr *
-                      3.78
+                      bulkA4Dimensions.qr
                     )}
                   </div>
                 )
