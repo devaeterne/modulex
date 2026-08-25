@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import LocationsTable from "@/components/locations/LocationsTable";
+import LocationForm from "@/components/locations/LocationForm";
 
-type LocationsPageProps = {
+type NewLocationPageProps = {
   searchParams: Promise<{
     zone?: string | string[];
     warehouse?: string | string[];
@@ -10,33 +10,36 @@ type LocationsPageProps = {
 };
 
 export const metadata: Metadata = {
-  title: "Locations | Modulex Admin",
+  title: "Add Location | Modulex Admin",
   description:
-    "Manage Modulex warehouse shelf locations",
+    "Create a new Modulex warehouse location",
 };
 
-export default async function LocationsPage({
+export default async function NewLocationPage({
   searchParams,
-}: LocationsPageProps) {
+}: NewLocationPageProps) {
   const params = await searchParams;
 
-  const zoneId =
+  const initialZoneId =
     typeof params.zone === "string"
       ? params.zone
       : undefined;
 
-  const warehouseId =
+  const initialWarehouseId =
     typeof params.warehouse === "string"
       ? params.warehouse
       : undefined;
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Locations" />
+      <PageBreadcrumb pageTitle="Add Location" />
 
-      <LocationsTable
-        zoneId={zoneId}
-        warehouseId={warehouseId}
+      <LocationForm
+        mode="create"
+        initialZoneId={initialZoneId}
+        initialWarehouseId={
+          initialWarehouseId
+        }
       />
     </div>
   );

@@ -4,7 +4,8 @@ import QRLabelsGrid from "@/components/qr-labels/QRLabelsGrid";
 
 export const metadata: Metadata = {
   title: "QR Labels | Modulex Admin",
-  description: "Print Modulex warehouse shelf QR labels",
+  description:
+    "Print Modulex warehouse zone and location QR labels",
 };
 
 export default function QRLabelsPage() {

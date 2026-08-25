@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { QRCodeSVG } from "qrcode.react";
 
 type WarehouseType = "sellable" | "non_sellable";
 
@@ -554,14 +555,39 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
                     </td>
 
                     <td className="px-5 py-4">
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-gray-800 dark:text-white/90">
-                          {zone.qr_code || "-"}
-                        </p>
+                      <div className="flex min-w-[290px] items-center gap-4">
+                        <div className="shrink-0 rounded-xl border border-gray-200 bg-white p-2 dark:border-gray-700">
+                          {zone.qr_payload ? (
+                            <QRCodeSVG
+                              value={zone.qr_payload}
+                              size={72}
+                              level="M"
+                              includeMargin={false}
+                            />
+                          ) : (
+                            <div className="flex h-[72px] w-[72px] items-center justify-center text-xs text-gray-400">
+                              No QR
+                            </div>
+                          )}
+                        </div>
 
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {zone.qr_payload || "-"}
-                        </p>
+                        <div className="max-w-[190px]">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                            QR Code
+                          </p>
+
+                          <p className="mt-1 break-all font-mono text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            {zone.qr_code || "-"}
+                          </p>
+
+                          <p className="mt-3 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                            Payload
+                          </p>
+
+                          <p className="mt-1 break-all font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                            {zone.qr_payload || "-"}
+                          </p>
+                        </div>
                       </div>
                     </td>
 

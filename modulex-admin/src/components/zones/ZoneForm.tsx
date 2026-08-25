@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { QRCodeSVG } from "qrcode.react";
 
 type WarehouseType = "sellable" | "non_sellable";
 
@@ -730,25 +731,79 @@ export default function ZoneForm({
               )}
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  QR Code
-                </label>
-
-                <div className="min-h-11 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90">
-                  {generatedQrCode || "-"}
+            <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-center">
+              <div className="shrink-0">
+                <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700">
+                  {generatedQrPayload ? (
+                    <QRCodeSVG
+                      value={generatedQrPayload}
+                      size={160}
+                      level="M"
+                      includeMargin={false}
+                    />
+                  ) : (
+                    <div className="flex h-[160px] w-[160px] items-center justify-center rounded-xl bg-gray-50 text-sm text-gray-400 dark:bg-white/[0.03]">
+                      QR Preview
+                    </div>
+                  )}
                 </div>
+
+                {generatedQrCode && (
+                  <p className="mt-2 text-center font-mono text-xs font-semibold text-gray-600 dark:text-gray-400">
+                    {generatedQrCode}
+                  </p>
+                )}
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  QR Payload
-                </label>
+              <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                    QR Code
+                  </p>
 
-                <div className="min-h-11 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90">
-                  {generatedQrPayload || "-"}
+                  <p className="mt-2 break-all font-mono text-sm font-semibold text-gray-800 dark:text-white/90">
+                    {generatedQrCode || "-"}
+                  </p>
+
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Human-readable zone identifier.
+                  </p>
                 </div>
+
+                <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                    QR Payload
+                  </p>
+
+                  <p className="mt-2 break-all font-mono text-sm font-semibold text-gray-800 dark:text-white/90">
+                    {generatedQrPayload || "-"}
+                  </p>
+
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    This value is encoded inside the QR code and used by the scanner.
+                  </p>
+                </div>
+
+                {selectedWarehouse && values.code && (
+                  <div className="rounded-lg border border-gray-200 bg-white p-4 md:col-span-2 dark:border-gray-800 dark:bg-gray-900">
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                      Zone Path
+                    </p>
+
+                    <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white/90">
+                      <span>{selectedWarehouse.code}</span>
+
+                      <span className="text-gray-400">/</span>
+
+                      <span>{normalizeZoneCode(values.code)}</span>
+                    </div>
+
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      {selectedWarehouse.name} →{" "}
+                      {values.name.trim() || "Zone"}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
