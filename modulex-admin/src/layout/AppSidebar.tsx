@@ -15,6 +15,7 @@ import {
   PieChartIcon,
   TableIcon,
   UserCircleIcon,
+  DollarLineIcon,
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
 
@@ -44,6 +45,20 @@ const navItems: NavItem[] = [
       {
         name: "Categories",
         path: "/categories",
+      },
+    ],
+  },
+  {
+    icon: <DollarLineIcon />,
+    name: "Pricing",
+    subItems: [
+      {
+        name: "Product Prices",
+        path: "/pricing/products",
+      },
+      {
+        name: "Price Groups",
+        path: "/pricing/groups",
       },
     ],
   },
