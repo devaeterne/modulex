@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>360-Interior</title>
+<link rel="icon" href="assets/images/ico-gray.png" type="image/x-icon">
+<link rel="stylesheet" href="assets/css/panorama.css">
+<link href="assets/css/bootstrap.min.css" rel="stylesheet">
+<link href="assets/css/bootstrap-icons.css" rel="stylesheet">
+<link href="assets/css/pano-360-interior.css" rel="stylesheet">
+</head>
+<body>
+
+<section id="slider">
+  <div class="pano-slider" id="pano-slider">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg fixed-top custom-navbar-360">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">
+          <img src="assets/images/logo.png" class="logo" alt="logo">
+        </a>
+
+        <ul class="navbar-nav" id="MainNav">
+          <li class="nav-item">
+            <a class="nav-link pop-sec" data-type="section" data-src="#about">About</a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link pop-sec" data-type="section" data-src="#gallery">Gallery</a>
+          </li>
+
+          <li class="nav-item">
+            <a class="nav-link pop-sec" data-type="section" data-src="#facilities">Facilities</a>
+          </li>
+
+          <!-- Panorama Tours Dropdown -->
+          <li class="nav-item nav-has-dd">
+            <a class="nav-link dd-toggle" href="javascript:void(0)">
+             Virtual Tour
+            </a>
+            <ul class="nav-dropdown">
+              <li><a href="#" class="jump-to-pano" data-index="0">Panorama 1</a></li>
+              <li><a href="#" class="jump-to-pano" data-index="1">Panorama 2</a></li>
+              <li><a href="#" class="jump-to-pano" data-index="2">Panorama 3</a></li>
+            </ul>
+          </li>
+
+          <li class="nav-header">
+            <a href="tel:+62123456789" class="nav-header-item">
+              <i class="bi bi-telephone"></i>
+              +62 123 456 789
+            </a>
+          </li>
+
+          <li class="nav-footer">
+            <div class="nav-footer-social">
+              <a href="#" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
+              <a href="#" aria-label="Facebook"><i class="bi bi-facebook"></i></a>
+              <a href="#" aria-label="Twitter"><i class="bi bi-twitter-x"></i></a>
+            </div>
+            <a href="mailto:info@Oakwell.com" class="nav-footer-item">
+              <i class="bi bi-envelope"></i> 
+              info@Oakwell.com
+            </a>
+            <small class="nav-footer-item">© 2026 Oakwell Resort by On3Step</small>
+          </li>
+        </ul>
+
+        <!-- Burger -->
+        <div class="burger-menu" id="burgerMenu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+    </nav>
+
+    <div id="loader" class="loader">
+      <img src="assets/images/ico.png" alt="preloader">
+      <div class="title"><small>Virtual 360°</small></div>
+    </div>
+
+    <div id="pano-title" class="listing-card">
+      <div class="badge" id="scene-badge"></div>
+      <div class="descp">
+        <div class="maintitle">
+          <div class="title" id="scene-title"></div>
+          <div class="address" id="scene-address"></div>
+        </div>
+        <div class="tags">
+          <span class="status" id="scene-status"></span>
+          <span class="type" id="scene-type"></span>
+        </div>
+        <div class="meta">
+          <span><b id="scene-beds"></b> Beds</span>
+          <span><b id="scene-baths"></b> Baths</span>
+          <span><b id="scene-size"></b> Sqft</span>
+          <span><b id="scene-year"></b> Year</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDES -->
+    <div id="slides"></div>
+    <button class="nav sld prev"><i class="bi bi-chevron-left"></i></button>
+    <button class="nav sld next"><i class="bi bi-chevron-right"></i></button>
+    <!-- SHOW HIDE HOTSPOT -->
+    <button id="toggle-hotspots" class="hotspot-toggle active" aria-label="Toggle hotspots">
+      <i class="bi bi-circle-fill"></i>
+    </button>
+    <!-- CAPTURE -->
+    <button id="capture-btn" class="capture-btn"><i class="bi bi-camera"></i></button>
+    <!-- FULL SCREEN -->
+    <button id="fs-btn" class="fs-btn"><i class="bi bi-arrows-angle-expand"></i></button>
+    <!-- AUDIO -->
+    <button id="sound-toggle" class="sound-toggle" aria-label="Toggle sound"><i class="bi bi-volume-down-fill"></i></button>
+    <audio id="bg-audio" loop preload="auto">
+      <source src="assets/audio/musicintro.mp3" type="audio/mpeg">
+    </audio>
+    <!-- THUMBLIST -->
+    <button id="thumblist" class="thumblist"><i class="bi bi-grid-3x2-gap-fill"></i></button>
+    <!-- COUNTER -->
+    <div class="counter" id="counter"></div>
+
+    <!-- POPUP -->
+    <div class="popup" id="popup" onclick="closePopup()">
+      <div class="popup-box" onclick="event.stopPropagation()">
+        <div class="close-btn" onclick="closePopup()">×</div>
+        <img id="popup-img" src="#" alt="popupimg">
+        <div class="popup-content">
+          <h3 id="popup-title">#</h3>
+          <p id="popup-text"></p>
+          <div class="popup-info">
+            <div><b>Price:</b> <span id="popup-price"></span></div>
+            <div><b>Address:</b> <span id="popup-address"></span></div>
+            <div>
+              <b>Beds:</b> <span id="popup-beds"></span> | 
+              <b>Baths:</b> <span id="popup-baths"></span>
+            </div>
+            <div><b>Phone:</b> <a id="popup-phone" href="#"></a></div>
+            <div><b>Email:</b> <a id="popup-email" href="#"></a></div>
+          </div>
+          <a id="popup-link" href="#" target="_blank">BOOK NOW</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMAGE POPUP -->
+    <div class="img-popup" id="imgPopup">
+      <div class="img-popup-overlay"></div>
+      <div class="img-popup-content">
+        <button class="img-popup-close" id="imgPopupClose">
+          <i class="bi bi-x-lg"></i>
+        </button>
+        <img id="imgPopupImage" src="#" alt="imgPopupImage">
+      </div>
+    </div>
+
+    <!-- LIGHTBOX -->
+    <div class="gallery-lightbox" id="galleryLightbox">
+      <div class="lightbox-overlay"></div>
+      <div class="lightbox-content">
+        <button class="lightbox-close" id="lightboxClose">
+          <i class="bi bi-x-lg"></i>
+        </button>
+        <img id="lightboxImage" src="#" alt="lightboxImage">
+        <iframe id="lightboxPano" src="#" allowfullscreen></iframe>
+        <div id="lightboxSection" class="lightbox-section"></div>
+      </div>
+    </div>
+
+    <!-- THUMBNAIL LIST POPUP -->
+    <div id="thumblist-popup" class="thumblist-popup">
+      <div class="thumblist-container">
+        <button class="thumblist-close" id="thumblist-close">&times;</button>
+        <div id="thumblist-grid" class="thumblist-grid">
+          <!-- Thumbnails will be generated here -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Section About -->
+<section id="about" hidden>
+  <div class="container section">
+    <!-- Breadcrumb -->
+    <div class="row pb-5">
+      <div class="col-12">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item closeLgt"><i class="bi bi-house-door me-1"></i>Home</li>
+            <li class="breadcrumb-item active" aria-current="page">About</li>
+          </ol>
+        </nav>
+      </div>
+    </div>
+    <!-- Main Philosophy Section -->
+    <div class="row g-5 align-items-center mb-5 pb-5">
+      <div class="col-lg-6">
+        <span class="badge badge-soft mb-3">Our Philosophy</span>
+        <h2 class="fw-bold mb-4">
+          A Space Created for Healing & Balance
+        </h2>
+        <p class=" mb-3">
+          Vistra Wellness Retreat was founded on the belief that true wellness
+          comes from slowing down, reconnecting with nature, and listening
+          deeply to oneself.
+        </p>
+        <p class=" mb-4">
+          Here, you're invited to step away from the demands of daily life and 
+          rediscover what brings you peace, clarity, and authentic joy.
+        </p>
+        
+        <div class="row g-3 mt-4">
+          <div class="col-4">
+            
+              <h3 class="fw-bold text-primary mb-1">15+</h3>
+              <p class="small  mb-0">Acres of Nature</p>
+            
+          </div>
+          <div class="col-4">
+            
+              <h3 class="fw-bold text-primary mb-1">20+</h3>
+              <p class="small  mb-0">Wellness Programs</p>
+            
+          </div>
+          <div class="col-4">
+            
+              <h3 class="fw-bold text-primary mb-1">2000+</h3>
+              <p class="small  mb-0">Lives Transformed</p>
+          
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-lg-6">
+        <img src="assets/images/interior/img1.jpg"
+             alt="Peaceful tropical garden sanctuary with lush greenery and water features"
+             class="img-fluid rounded-3 h-100">
+      </div>
+    </div>
+    <!-- Core Values Grid -->
+    <div class="row g-4">
+      <div class="col-12 text-center mb-3">
+        <span class="badge badge-soft mb-3">What Guides Us</span>
+        <h3 class="fw-bold">Our Core Values</h3>
+      </div>
+      
+      <div class="col-md-6 col-lg-3">
+        <div class="card p-4 h-100">
+          <div class="icon-box mb-3">
+            <i class="bi bi-infinity"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Holistic Healing</h3>
+          <p class=" mb-0">
+            We honor the interconnection of mind, body, and spirit in every 
+            program and practice we offer.
+          </p>
+        </div>
+      </div>
+      
+      <div class="col-md-6 col-lg-3">
+        <div class="card p-4 h-100">
+          <div class="icon-box mb-3">
+            <i class="bi bi-tree"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Nature Connection</h3>
+          <p class=" mb-0">
+            Immersed in pristine natural surroundings, we facilitate a deep 
+            reconnection with the earth's healing rhythms.
+          </p>
+        </div>
+      </div>
+      
+      <div class="col-md-6 col-lg-3">
+        <div class="card p-4 h-100">
+          <div class="icon-box mb-3">
+            <i class="bi bi-circle"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Mindful Presence</h3>
+          <p class=" mb-0">
+            We create space for you to slow down, be present, and cultivate 
+            awareness in each moment.
+          </p>
+        </div>
+      </div>
+      
+      <div class="col-md-6 col-lg-3">
+        <div class="card p-4 h-100">
+          <div class="icon-box mb-3">
+            <i class="bi bi-person-heart"></i>
+          </div>
+          <h3 class="fw-bold mb-3">Personal Journey</h3>
+          <p class=" mb-0">
+            Your wellness path is unique. We support your individual needs 
+            without judgment or comparison.
+          </p>
+        </div>
+      </div>
+    </div>
+    <!-- Founder's Story -->
+    <div class="row g-5 align-items-center mt-5">
+      <div class="col-lg-6 order-lg-2">
+        <span class="badge badge-soft mb-3">Our Story</span>
+        <h3 class="fw-bold mb-4">
+          Born from a Personal Journey
+        </h3>
+        <p class="mb-3">
+          Vistra was created by wellness practitioners who experienced firsthand 
+          the transformative power of intentional retreat. After years of studying 
+          ancient healing traditions and modern wellness science, they envisioned 
+          a sanctuary that honors both.
+        </p>
+        <p class="mb-3">
+          What began as a small meditation space has grown into a comprehensive 
+          wellness destination, welcoming guests from around the world seeking 
+          respite, renewal, and profound personal growth.
+        </p>
+      </div>
+      
+      <div class="col-lg-6 order-lg-1">
+        <img src="assets/images/interior/img2.jpg"
+             alt="Woman meditating peacefully in nature surrounded by tropical plants"
+             class="img-fluid rounded-3 w-100">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Section Gallery -->
+<section id="gallery" hidden aria-label="gallery">
+  <div class="container section">
+    <!-- Breadcrumb -->
+    <div class="row pb-5">
+      <div class="col-12">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item closeLgt"><i class="bi bi-house-door me-1"></i>Home</li>
+            <li class="breadcrumb-item active" aria-current="page">Gallery</li>
+          </ol>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Gallery -->
+    <div class="row g-4" id="galleryGrid">
+      <!-- Image Item -->
+      <div class="col-md-4 col-sm-6 gallery-item" data-category="view">
+        <div class="experience-card pop-sec" data-type="image" data-src="assets/images/gallery(360).jpg">
+          <img src="assets/images/gallery(360).jpg" alt="">
+          <span class="badge">view</span>
+        </div>
+      </div>
+      <div class="col-md-4 col-sm-6 gallery-item" data-category="interior">
+        <div class="experience-card pop-sec" data-type="image" data-src="assets/images/gallery(7).jpg">
+          <img src="assets/images/gallery(7).jpg" alt="">
+          <span class="badge">view</span>
+        </div>
+      </div>
+      <div class="col-md-4 col-sm-6 gallery-item" data-category="pool">
+        <div class="experience-card pop-sec" data-type="image" data-src="assets/images/gallery(8).jpg">
+          <img src="assets/images/gallery(8).jpg" alt="">
+          <span class="badge">view</span>
+        </div>
+      </div>
+      <div class="col-md-4 col-sm-6 gallery-item" data-category="bedroom">
+        <div class="experience-card pop-sec" data-type="image" data-src="assets/images/gallery(1).jpg">
+          <img src="assets/images/gallery(2).jpg" alt="">
+          <span class="badge">view</span>
+        </div>
+      </div>
+      <div class="col-md-4 col-sm-6 gallery-item" data-category="view">
+        <div class="experience-card pop-sec" data-type="image" data-src="assets/images/gallery(2).jpg">
+          <img src="assets/images/gallery(2).jpg" alt="">
+          <span class="badge">view</span>
+        </div>
+      </div>
+      <div class="col-md-4 col-sm-6 gallery-item" data-category="view">
+        <div class="experience-card pop-sec" data-type="image" data-src="assets/images/gallery(360-1).jpg">
+          <img src="assets/images/gallery(360-1).jpg" alt="">
+          <span class="badge">view</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- Section Facilities -->
+<section id="facilities" hidden>
+  <div class="container section">
+    <!-- Breadcrumb -->
+    <div class="row pb-5">
+      <div class="col-12">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item closeLgt"><i class="bi bi-house-door me-1"></i>Home</li>
+            <li class="breadcrumb-item active" aria-current="page">Highlights</li>
+          </ol>
+        </nav>
+      </div>
+    </div>
+
+    <div class="text-center mb-5">
+      <span class="badge badge-soft mb-3">Daily Programs</span>
+      <h2 class="fw-bold mb-3">Rituals That Shape Each Day</h2>
+      <p class="mx-auto" style="max-width: 700px;">
+        Each day at Vistra follows a gentle rhythm designed to honor the natural cycles 
+        of rest, movement, nourishment, and reflection. You're free to participate fully 
+        or honor your own pace.
+      </p>
+    </div>
+    <div class="row g-4 mb-5">
+      <div class="col-md-6 col-lg-3">
+        <div class="text-center">
+          <img src="assets/images/interior/img5.jpg"
+               alt="Sunrise yoga session on wooden deck overlooking tropical ocean"
+               class="img-fluid rounded-3 mb-3">
+          <h3 class="fw-bold mb-2">Morning Yoga</h3>
+          <p class="small mb-2">6:30 AM - 7:30 AM</p>
+          <p class="mb-0">
+            Gentle movement to awaken the body and set intentions for the day ahead. 
+            Flow with the sunrise in our open-air pavilion.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="text-center">
+          <img src="assets/images/interior/img1.jpg"
+               alt="Tranquil spa treatment room with natural stones and tropical plants"
+               class="img-fluid rounded-3 mb-3">
+          <h3 class="fw-bold mb-2">Spa & Recovery</h3>
+          <p class="small mb-2">10:00 AM - 12:00 PM</p>
+          <p class="mb-0">
+            Deep relaxation and muscle release through therapeutic massage, 
+            hydrotherapy, and restorative bodywork treatments.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="text-center">
+          <img src="assets/images/interior/img4.jpg"
+               alt="Healthy plant-based meal beautifully presented with fresh ingredients"
+               class="img-fluid rounded-3 mb-3">
+          <h3 class="fw-bold mb-2">Mindful Dining</h3>
+          <p class="small mb-2">12:30 PM & 6:30 PM</p>
+          <p class="mb-0">
+            Nourishment through conscious eating. Plant-forward cuisine crafted 
+            from organic, locally-sourced ingredients served in silence or community.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <div class="text-center">
+          <img src="assets/images/interior/img2.jpg"
+               alt="Peaceful forest path surrounded by lush tropical vegetation"
+               class="img-fluid rounded-3 mb-3">
+          <h3 class="fw-bold mb-2">Nature Walks</h3>
+          <p class="small mb-2">4:00 PM - 5:00 PM</p>
+          <p class="mb-0">
+            Grounding experiences in silence. Forest bathing, mindful hiking, 
+            and meditative walks through tropical gardens and coastal trails.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Optional Programs -->
+    <div class="row g-4 mt-5">
+      <div class="col-12 text-center mb-3">
+        <h4 class="fw-bold">Optional Evening Activities</h4>
+        <p class="text-white">Choose what resonates with your journey</p>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card p-5 h-100">
+          <h5 class="fw-bold mb-2">Sound Healing Ceremony</h5>
+          <p class="small mb-0">
+            7:30 PM | Immersive sound baths with crystal bowls, gongs, 
+            and indigenous instruments for deep meditation and cellular healing.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card p-5 h-100">
+          <h5 class="fw-bold mb-2">Guided Journaling</h5>
+          <p class="small mb-0">
+            8:00 PM | Reflective writing prompts and creative expression 
+            sessions to process emotions and insights from the day.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card p-5 h-100">
+          <h5 class="fw-bold mb-2">Stargazing & Silence</h5>
+          <p class="small mb-0">
+            9:00 PM | Evening contemplation under tropical skies. 
+            A time for stillness, wonder, and connection to something greater.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<script src="assets/js/mainpanorama.js"></script>
+<script src="assets/js/viewer-360-interior.js"></script>
+</body>
+</html>

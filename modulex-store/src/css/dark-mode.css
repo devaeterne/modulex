@@ -1,0 +1,1552 @@
+/* ================================================== */
+/* Oakwell — DARK MODE */
+/* Activated via: body.dark                          */
+/* ================================================== */
+/* TABLE OF CONTENTS
+   ==================================================
+   1.  Dark Variables
+   2.  Base & Body
+   3.  Preloader
+   4.  Navigation
+   5.  Hero Section
+   6.  Buttons
+   7.  Stats Section
+   8.  Section Headers
+   9.  Services Section
+   10. Portfolio / Gallery
+   11. Gallery Lightbox
+   12. Banner Section
+   13. Virtual Tour
+   14. About / Process
+   15. Enhanced Stats
+   16. Testimonials
+   17. FAQ Section
+   18. CTA Section
+   19. Contact Section
+   20. Footer
+   21. Back To Top
+   22. Page Header
+   23. About Page
+   24. Process Timeline
+   25. Team Section
+   26. Why Choose Us
+   27. Awards Section
+   28. Service Detail Page
+   29. Blog Section
+   30. Blog Detail Page
+   31. Blog Sidebar
+   32. Responsive Dark Overrides
+   ================================================== */
+
+
+/* =====================================================
+   1. DARK VARIABLES
+   ===================================================== */
+body.dark {
+    --orange-primary: #F97240;
+    --orange-light: #FFA07A;
+    --orange-dark: #D95E2A;
+    --orange-accent: #FFCBA4;
+
+    --cream: #1A1714;
+    --dark: #EDE9E4;
+    --dark-brown: #231E1A;
+    --text-light: #A89F96;
+
+    --bg-base: #161210;
+    --bg-surface: #1D1916;
+    --bg-elevated: #26211D;
+    --bg-card: #211D19;
+    --bg-input: #1A1612;
+
+    --border-subtle: rgba(255, 235, 210, 0.06);
+    --border-soft: rgba(255, 235, 210, 0.11);
+    --border-orange: rgba(249, 114, 64, 0.18);
+
+    --text-primary: #EDE9E4;
+    --text-secondary: #A89F96;
+    --text-muted: #6B6159;
+
+    --shadow-dark: rgba(0, 0, 0, 0.45);
+    --shadow-orange: rgba(249, 114, 64, 0.18);
+}
+
+
+/* =====================================================
+   2. BASE & BODY
+   ===================================================== */
+body.dark {
+    background: var(--bg-base);
+    color: var(--text-primary);
+}
+
+body.dark section {
+    background: transparent;
+}
+
+body.dark section.grad {
+    background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-surface) 100%);
+}
+
+body.dark section.grad-rev {
+    background: linear-gradient(360deg, var(--bg-base) 0%, var(--bg-surface) 100%);
+}
+
+
+/* =====================================================
+   3. PRELOADER
+   ===================================================== */
+body.dark #preloader {
+    background: var(--bg-base);
+}
+
+body.dark .line-loader {
+    border-color: rgba(255, 255, 255, 0.1);
+    border-top-color: var(--orange-primary);
+}
+
+
+/* =====================================================
+   4. NAVIGATION
+   ===================================================== */
+body.dark .custom-navbar {
+    background: var(--bg-base);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+body.dark .logo img.logo {
+    display: none;
+}
+
+body.dark .logo img.logo-dark {
+    display: block;
+}
+
+body.dark .custom-nav .nav-link {
+    color: var(--text-primary) !important;
+}
+
+body.dark .custom-nav .nav-link:hover {
+    color: var(--orange-primary) !important;
+}
+
+/* Home Dropdown */
+body.dark .home-dd-menu {
+    background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+    border-color: var(--border-subtle);
+    box-shadow: 0 20px 60px var(--shadow-dark);
+}
+
+body.dark .home-dd-menu a {
+    background: var(--bg-elevated);
+}
+
+body.dark .home-dd-item {
+    color: var(--text-primary);
+}
+
+/* New Dropdown */
+body.dark .nav-new-menu {
+    background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+    border-color: var(--border-subtle);
+    box-shadow: 0 20px 60px var(--shadow-dark);
+}
+
+body.dark .nav-new-item {
+    color: var(--text-primary);
+}
+
+body.dark .nav-new-item:hover {
+    background: rgba(255, 122, 71, 0.75);
+}
+
+/* Burger */
+body.dark .burger-menu span {
+    background-color: var(--text-primary);
+}
+
+body.dark .home-dd-menu,
+body.dark .nav-new-menu {
+    background: rgba(0, 0, 0, 0.95);
+}
+
+body.dark .home-dd-menu a {
+    background: var(--bg-base);
+}
+
+
+/* =====================================================
+   5. HERO SECTION
+   ===================================================== */
+body.dark .hero {
+    background: var(--bg-base);
+}
+
+body.dark .hero::before {
+    background: radial-gradient(circle, rgba(255, 122, 71, 0.06) 0%, transparent 70%);
+}
+
+body.dark .floating-badge {
+    background: var(--bg-elevated);
+    box-shadow: 0 15px 40px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .floating-badge h3 {
+    color: var(--orange-primary);
+}
+
+body.dark .floating-badge p {
+    color: var(--text-secondary);
+}
+
+body.dark .float-img {
+    box-shadow: 0 10px 40px var(--shadow-dark);
+}
+
+
+/* =====================================================
+   6. BUTTONS
+   ===================================================== */
+body.dark .btn-primary {
+    background: var(--orange-primary);
+    color: #fff;
+}
+
+body.dark .btn-primary:hover {
+    background: var(--orange-dark);
+    box-shadow: 0 15px 40px var(--shadow-orange);
+}
+
+body.dark .btn-secondary {
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+body.dark .btn-secondary:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+    color: var(--text-primary);
+}
+
+body.dark .btn-white {
+    background: white;
+    color: var(--orange-primary);
+    box-shadow: 0 10px 30px var(--shadow-dark);
+}
+
+body.dark .btn-white:hover {
+    background: var(--orange-primary);
+    color: #fff;
+}
+
+body.dark .btn-outline {
+    border-color: rgba(255, 255, 255, 0.3);
+    color: var(--text-primary);
+}
+
+body.dark .btn-outline:hover {
+    background: var(--text-primary);
+    color: var(--orange-primary);
+}
+
+body.dark .btn-submit {
+    background: var(--orange-primary);
+    box-shadow: 0 10px 30px var(--shadow-orange);
+}
+
+body.dark .btn-submit:hover {
+    background: var(--orange-dark);
+    box-shadow: 0 15px 40px var(--shadow-orange);
+}
+
+
+/* =====================================================
+   7. STATS SECTION
+   ===================================================== */
+body.dark .stats {
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+body.dark .stat-number {
+    color: var(--text-primary);
+}
+
+body.dark .stat-label {
+    color: var(--text-secondary);
+}
+
+
+/* =====================================================
+   8. SECTION HEADERS
+   ===================================================== */
+body.dark .section-tag {
+    background: none;
+    color: var(--orange-primary);
+}
+
+body.dark .section-header h2 {
+    color: var(--text-primary);
+}
+
+body.dark .section-header p {
+    color: var(--text-secondary);
+}
+
+
+/* =====================================================
+   9. SERVICES SECTION
+   ===================================================== */
+body.dark .service-card {
+    background: var(--bg-card);
+    box-shadow: 0 10px 40px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .service-card:hover {
+    box-shadow: 0 20px 60px var(--shadow-dark),
+        0 0 0 1px var(--border-orange);
+    background: var(--bg-elevated);
+}
+
+body.dark .service-card h3 {
+    color: var(--text-primary);
+}
+
+body.dark .service-card p {
+    color: var(--text-secondary);
+}
+
+body.dark .service-link {
+    color: var(--orange-primary);
+}
+
+body.dark .service-icon {
+    box-shadow: 0 8px 20px var(--shadow-orange);
+}
+
+
+/* =====================================================
+   10. PORTFOLIO / GALLERY
+   ===================================================== */
+body.dark .portfolio {
+    background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-surface) 100%);
+}
+
+body.dark .portfolio-item {
+    box-shadow: 0 15px 50px var(--shadow-dark);
+}
+
+body.dark .gallery-filter .nav-link {
+    color: var(--text-secondary);
+}
+
+body.dark .gallery-filter .nav-link:hover {
+    color: var(--text-primary);
+}
+
+body.dark .gallery-filter .nav-link.active {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
+
+/* =====================================================
+   11. GALLERY LIGHTBOX
+   ===================================================== */
+body.dark .lightbox-overlay {
+    background: rgba(0, 0, 0, 0.92);
+}
+
+body.dark .lightbox-close {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--border-subtle);
+}
+
+body.dark .lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+
+/* =====================================================
+   12. BANNER SECTION
+   ===================================================== */
+body.dark .banner-container {
+    background: linear-gradient(135deg, var(--orange-dark) 0%, #C04A1F 100%);
+    box-shadow: 0 15px 50px rgba(255, 122, 71, 0.15);
+}
+
+
+/* =====================================================
+   13. VIRTUAL TOUR
+   ===================================================== */
+body.dark .virtual-tour {
+    background: var(--bg-base);
+}
+
+body.dark .tour-video {
+    box-shadow: 0 20px 60px var(--shadow-dark);
+}
+
+body.dark .tour-info h3 {
+    color: var(--text-primary);
+}
+
+body.dark .tour-info p {
+    color: var(--text-secondary);
+}
+
+body.dark .tour-feature {
+    background: var(--bg-card);
+    box-shadow: 0 5px 15px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .tour-feature:hover {
+    box-shadow: 0 8px 20px var(--shadow-dark),
+        0 0 0 1px var(--border-orange);
+    background: var(--bg-elevated);
+}
+
+body.dark .tour-feature span {
+    color: var(--text-primary);
+}
+
+
+/* =====================================================
+   14. ABOUT / PROCESS SECTION
+   ===================================================== */
+body.dark .about-process {
+    background: var(--bg-surface);
+}
+
+body.dark .about-img-overlay {
+    border-color: var(--bg-surface);
+}
+
+body.dark .experience-badge {
+    background: var(--orange-primary);
+    box-shadow: 0 10px 30px var(--shadow-orange);
+}
+
+body.dark .about-content p {
+    color: var(--text-secondary);
+}
+
+body.dark .step-content h4 {
+    color: var(--text-primary);
+}
+
+body.dark .step-content p {
+    color: var(--text-secondary);
+}
+
+
+/* =====================================================
+   15. ENHANCED STATS
+   ===================================================== */
+body.dark .stats-enhanced {
+    background: linear-gradient(135deg, #0D0F14 0%, #111318 100%);
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+body.dark .stats-enhanced::before {
+    opacity: 0.25;
+}
+
+body.dark .stat-item-enhanced .stat-number {
+    color: var(--text-primary);
+}
+
+body.dark .stat-item-enhanced .stat-label {
+    color: var(--text-secondary);
+}
+
+body.dark .stat-icon {
+    background: rgba(255, 122, 71, 0.15);
+}
+
+
+/* =====================================================
+   16. TESTIMONIALS
+   ===================================================== */
+body.dark .testimonials {
+    background: var(--bg-surface);
+}
+
+body.dark .testimonial-card {
+    background: var(--bg-card);
+    box-shadow: 0 5px 20px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .testimonial-card:hover {
+    box-shadow: 0 10px 30px var(--shadow-dark),
+        0 0 0 1px var(--border-orange);
+}
+
+body.dark .testimonial-card.featured {
+    background: linear-gradient(135deg, var(--orange-dark) 0%, #B84820 100%);
+}
+
+body.dark .testimonial-text {
+    color: var(--text-secondary);
+}
+
+body.dark .client-info h4 {
+    color: var(--text-primary);
+}
+
+body.dark .client-info p {
+    color: var(--text-secondary);
+}
+
+body.dark .testimonials-grid .swiper-prev,
+body.dark .testimonials-grid .swiper-next {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    box-shadow: 0 6px 20px var(--shadow-dark);
+}
+
+body.dark .testimonials-grid .swiper-prev:hover,
+body.dark .testimonials-grid .swiper-next:hover {
+    background: var(--orange-primary);
+    color: #fff;
+}
+
+
+/* =====================================================
+   17. FAQ SECTION
+   ===================================================== */
+body.dark .faq {
+    background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-surface) 100%);
+}
+
+body.dark .faq-item {
+    background: var(--bg-card);
+    box-shadow: 0 5px 20px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .faq-item:hover {
+    box-shadow: 0 10px 30px var(--shadow-dark),
+        0 0 0 1px var(--border-orange);
+}
+
+body.dark .faq-question:hover {
+    background: rgba(255, 122, 71, 0.06);
+}
+
+body.dark .faq-question h3 {
+    color: var(--text-primary);
+}
+
+body.dark .faq-icon {
+    color: var(--orange-primary);
+}
+
+body.dark .faq-answer p {
+    color: var(--text-secondary);
+}
+
+/* Mobile FAQ overrides */
+body.dark .faq-question {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+body.dark .faq-question:hover {
+    background-color: rgba(255, 122, 71, 0.06);
+}
+
+
+/* =====================================================
+   18. CTA SECTION
+   ===================================================== */
+body.dark .cta-section {
+    background: var(--orange-dark);
+}
+
+body.dark .cta-section::before {
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0%, transparent 70%);
+}
+
+body.dark .cta-content h2 {
+    color: #fff;
+}
+
+body.dark .cta-content p {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+
+/* =====================================================
+   19. CONTACT SECTION
+   ===================================================== */
+body.dark .contact-map-section {
+    background: var(--bg-base);
+}
+
+body.dark .contact-map {
+    border-color: var(--bg-elevated);
+    box-shadow: 0 10px 40px var(--shadow-dark);
+}
+
+body.dark .contact-section {
+    background: var(--bg-surface);
+}
+
+body.dark .contact-intro h3 {
+    color: var(--text-primary);
+}
+
+body.dark .contact-intro p {
+    color: var(--text-secondary);
+}
+
+body.dark .contact-icon {
+    box-shadow: 0 8px 20px var(--shadow-orange);
+}
+
+body.dark .contact-text h4 {
+    color: var(--text-primary);
+}
+
+body.dark .contact-text p {
+    color: var(--text-secondary);
+}
+
+body.dark .contact-social h4 {
+    color: var(--text-primary);
+}
+
+body.dark .social-links-contact a {
+    color: var(--text-secondary);
+    background: var(--bg-elevated);
+    border-color: var(--border-subtle);
+}
+
+body.dark .social-links-contact a:hover {
+    color: #fff;
+    background: var(--orange-primary);
+    border-color: var(--orange-primary);
+}
+
+/* Contact Form */
+body.dark .contact-form-wrapper {
+    background: var(--bg-card);
+    box-shadow: 0 20px 60px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .form-group label {
+    color: var(--text-primary);
+}
+
+body.dark .form-group input,
+body.dark .form-group select,
+body.dark .form-group textarea {
+    background: var(--bg-input);
+    border-color: var(--border-subtle);
+    color: var(--text-primary);
+}
+
+body.dark .form-group input::placeholder,
+body.dark .form-group textarea::placeholder {
+    color: var(--text-muted);
+}
+
+body.dark .form-group input:focus,
+body.dark .form-group select:focus,
+body.dark .form-group textarea:focus {
+    background: var(--bg-elevated);
+    border-color: var(--orange-primary);
+    box-shadow: 0 0 0 4px rgba(255, 122, 71, 0.08);
+    color: var(--text-primary);
+}
+
+body.dark .form-group select {
+    color: var(--text-primary);
+}
+
+body.dark .form-group select option {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
+body.dark .checkbox-label {
+    color: var(--text-secondary);
+}
+
+body.dark .form-note {
+    color: var(--text-muted);
+}
+
+
+/* =====================================================
+   20. FOOTER
+   ===================================================== */
+body.dark footer {
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border-subtle);
+}
+
+body.dark .footer-brand h3 {
+    color: var(--orange-primary);
+}
+
+body.dark .footer-brand p {
+    color: var(--text-secondary);
+}
+
+body.dark .social-links a {
+    background: rgba(255, 122, 71, 0.1);
+    color: var(--text-secondary);
+}
+
+body.dark .social-links a:hover {
+    background: var(--orange-primary);
+    color: #fff;
+}
+
+body.dark .footer-links h4 {
+    color: var(--text-primary);
+}
+
+body.dark .footer-links ul li a,
+body.dark .footer-links ul li span {
+    color: var(--text-muted);
+}
+
+body.dark .footer-links ul li a:hover {
+    color: var(--orange-primary);
+}
+
+body.dark .footer-bottom {
+    border-top-color: var(--border-subtle);
+    color: var(--text-muted);
+}
+
+body.dark .text-dark {
+    color: white !important;
+}
+
+body.dark .nav-tabs .nav-item.show .nav-link,
+body.dark .nav-tabs .nav-link.active {
+    background: var(--orange-primary);
+    border-color: rgba(255, 255, 255, .1);
+}
+
+body.dark .nav-tabs .nav-link:focus,
+body.dark .nav-tabs .nav-link:hover {
+    border-color: rgba(255, 255, 255, .1);
+}
+
+body.dark .text-muted {
+    color: rgba(255, 255, 255, .7) !important;
+}
+
+body.dark .bg-light {
+    background: none !important;
+}
+
+body.dark .form-control::placeholder,
+body.dark .form-control {
+    color: rgba(255, 255, 255, .7) !important;
+}
+
+body.dark .quantity-wrapper {
+    border: none !important;
+}
+
+body.dark .nav-tabs {
+    border-bottom: 1px solid rgba(255, 255, 255, .1);
+}
+
+body.dark .border {
+    border: 1px solid rgba(255, 255, 255, .1) !important;
+}
+
+body.dark .process-number,
+body.dark .process-card h3 {
+    color: rgba(255, 255, 255, .7);
+}
+
+body.dark .service-feature-box h3,
+body.dark .service-feature-box h4 {
+    color: rgba(255, 255, 255, .75);
+}
+
+body.dark .why-text h3,
+body.dark .why-text h5 {
+    color: rgba(255, 255, 255, .75);
+}
+
+
+/* =====================================================
+   21. BACK TO TOP
+   ===================================================== */
+body.dark .back-to-top {
+    background: var(--orange-primary);
+    box-shadow: 0 6px 20px var(--shadow-dark);
+}
+
+body.dark .back-to-top::before {
+    background: rgba(255, 122, 71, 0.5);
+}
+
+
+/* =====================================================
+   22. PAGE HEADER
+   ===================================================== */
+body.dark .header-overlay {
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15) 0%, rgba(0, 0, 0, 0.38) 100%);
+}
+
+body.dark .header-bg-image::before {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+body.dark .breadcrumb a {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+body.dark .breadcrumb a:hover {
+    color: var(--orange-primary);
+}
+
+body.dark .breadcrumb .separator {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+body.dark .bread-title h2 {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+body.dark .header-tag {
+    background: rgba(255, 122, 71, 0.15);
+    color: var(--orange-accent);
+    border-color: rgba(255, 122, 71, 0.2);
+}
+
+
+/* =====================================================
+   23. ABOUT PAGE
+   ===================================================== */
+body.dark .about-story {
+    background: var(--bg-surface);
+}
+
+body.dark .about-story::before {
+    background: linear-gradient(90deg, transparent, rgba(255, 122, 71, 0.1), transparent);
+}
+
+body.dark .about-img-overlay {
+    border-color: var(--bg-surface);
+}
+
+body.dark .about-content h2 {
+    color: var(--text-primary);
+}
+
+body.dark .about-content p {
+    color: var(--text-secondary);
+}
+
+body.dark .signature-section {
+    border-top-color: rgba(255, 122, 71, 0.1);
+}
+
+body.dark .signature h4 {
+    color: var(--text-primary);
+}
+
+body.dark .signature p {
+    color: var(--orange-primary);
+}
+
+body.dark .signature img {
+    border-color: var(--orange-primary);
+    box-shadow: 0 8px 20px var(--shadow-dark);
+}
+
+
+/* =====================================================
+   24. PROCESS TIMELINE
+   ===================================================== */
+body.dark .process-section {
+    background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-surface) 100%);
+}
+
+body.dark .step-content {
+    background: var(--bg-card);
+    box-shadow: 0 10px 40px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .step-content:hover {
+    box-shadow: 0 15px 50px var(--shadow-dark),
+        0 0 0 1px var(--border-orange);
+}
+
+body.dark .step-content h3 {
+    color: var(--text-primary);
+}
+
+body.dark .step-content p {
+    color: var(--text-secondary);
+}
+
+body.dark .step-icon {
+    background: rgba(255, 122, 71, 0.1);
+    color: var(--orange-primary);
+}
+
+body.dark .step-number::after {
+    border-color: var(--bg-base);
+    box-shadow: 0 0 0 8px rgba(255, 122, 71, 0.07);
+}
+
+
+/* =====================================================
+   25. TEAM SECTION
+   ===================================================== */
+body.dark .team-section {
+    background: var(--bg-surface);
+}
+
+body.dark .member-image {
+    box-shadow: 0 15px 40px var(--shadow-dark);
+}
+
+body.dark .member-info h3 {
+    color: var(--text-primary);
+}
+
+body.dark .member-role {
+    color: var(--orange-primary);
+}
+
+body.dark .member-bio {
+    color: var(--text-secondary);
+}
+
+body.dark .member-overlay .social-links a {
+    background: var(--bg-elevated);
+    color: var(--orange-primary);
+}
+
+body.dark .member-overlay .social-links a:hover {
+    background: var(--orange-primary);
+    color: #fff;
+}
+
+
+/* =====================================================
+   26. WHY CHOOSE US
+   ===================================================== */
+body.dark .why-choose {
+    background: var(--bg-base);
+}
+
+body.dark .why-content h2 {
+    color: var(--text-primary);
+}
+
+body.dark .why-content>p {
+    color: var(--text-secondary);
+}
+
+body.dark .why-text h4 {
+    color: var(--text-primary);
+}
+
+body.dark .why-text p {
+    color: var(--text-secondary);
+}
+
+body.dark .why-text h5 {
+    color: var(--text-primary);
+}
+
+body.dark .why-grid img {
+    box-shadow: 0 20px 60px var(--shadow-dark);
+}
+
+/* Service page why badge */
+body.dark .service-why-content>p {
+    color: var(--text-secondary);
+}
+
+
+/* =====================================================
+   27. AWARDS SECTION
+   ===================================================== */
+body.dark .awards-section {
+    background: var(--bg-surface);
+}
+
+body.dark .award-item {
+    background: var(--bg-card);
+    box-shadow: 0 10px 40px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .award-item:hover {
+    box-shadow: 0 20px 60px var(--shadow-dark),
+        0 0 0 1px var(--border-orange);
+    background: var(--bg-elevated);
+}
+
+body.dark .award-icon {
+    background: var(--orange-primary);
+    box-shadow: 0 10px 30px var(--shadow-orange);
+}
+
+body.dark .award-item h4 {
+    color: var(--text-primary);
+}
+
+body.dark .award-item p {
+    color: var(--text-secondary);
+}
+
+
+/* =====================================================
+   28. SERVICE DETAIL PAGE
+   ===================================================== */
+body.dark .service-detail-section {
+    background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-surface) 100%);
+}
+
+body.dark .service-subtitle {
+    color: var(--orange-primary);
+}
+
+body.dark .service-main-title {
+    color: var(--text-primary);
+}
+
+body.dark .service-intro-text {
+    border-left-color: var(--orange-primary);
+}
+
+body.dark .service-intro-text p {
+    color: var(--text-secondary);
+}
+
+/* Feature Box */
+body.dark .service-feature-box {
+    background: var(--bg-card);
+    border-color: var(--border-subtle);
+}
+
+body.dark .service-feature-box:hover {
+    border-color: var(--orange-primary);
+    box-shadow: 0 10px 40px var(--shadow-dark);
+    background: var(--bg-elevated);
+}
+
+body.dark .service-feature-box h4 {
+    color: var(--text-primary);
+}
+
+body.dark .service-feature-box p {
+    color: var(--text-secondary);
+}
+
+body.dark .feature-icon-wrap {
+    background: rgba(255, 122, 71, 0.1);
+}
+
+body.dark .service-feature-box:hover .feature-icon-wrap {
+    background: var(--orange-primary);
+}
+
+/* Section Title */
+body.dark .section-title {
+    color: var(--text-primary);
+}
+
+body.dark .service-process-header p {
+    color: var(--text-secondary);
+}
+
+/* Process Cards */
+body.dark .process-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+}
+
+body.dark .process-card:hover {
+    background: var(--bg-elevated);
+    box-shadow: 0 10px 40px var(--shadow-dark);
+    border-color: var(--border-orange);
+}
+
+body.dark .process-card h4 {
+    color: var(--text-primary);
+}
+
+body.dark .process-card p {
+    color: var(--text-secondary);
+}
+
+/* Project Cards */
+body.dark .project-overlay {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, transparent 100%);
+}
+
+/* Service Testimonial */
+body.dark .service-testimonial-wrapper {
+    background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%);
+    border: 1px solid var(--border-subtle);
+}
+
+body.dark .testimonial-quote-icon {
+    background: var(--orange-primary);
+}
+
+body.dark .testimonial-quote {
+    color: var(--text-primary);
+}
+
+body.dark .testimonial-author-info h6 {
+    color: var(--text-primary);
+}
+
+body.dark .testimonial-author-info span {
+    color: var(--text-secondary);
+}
+
+body.dark .testimonial-author-info img {
+    border-color: var(--bg-elevated);
+}
+
+
+/* =====================================================
+   29. BLOG SECTION
+   ===================================================== */
+body.dark .recent-post-content h5,
+body.dark .popular-post-content h5 {
+    color: white;
+}
+
+body.dark .blog-card {
+    background: var(--bg-card);
+    box-shadow: 0 4px 20px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .blog-card:hover {
+    box-shadow: 0 12px 40px var(--shadow-dark),
+        0 0 0 1px var(--border-orange);
+    background: var(--bg-elevated);
+}
+
+body.dark .blog-title a {
+    color: var(--text-primary);
+}
+
+body.dark .blog-title a:hover {
+    color: var(--orange-primary);
+}
+
+body.dark .blog-excerpt {
+    color: var(--text-secondary);
+}
+
+body.dark .blog-meta {
+    color: var(--text-muted);
+}
+
+body.dark .blog-link {
+    color: var(--orange-primary);
+}
+
+/* Pagination */
+body.dark .page-link {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+}
+
+body.dark .page-link:hover {
+    background: var(--orange-primary);
+    color: #fff;
+    border-color: var(--orange-primary);
+}
+
+body.dark .page-item.active .page-link {
+    background: linear-gradient(135deg, var(--orange-primary) 0%, var(--orange-dark) 100%);
+    color: #fff;
+    border-color: transparent;
+}
+
+body.dark .page-item.disabled .page-link {
+    background: var(--bg-card);
+    color: var(--text-muted);
+    border-color: var(--border-subtle);
+}
+
+
+/* =====================================================
+   30. BLOG DETAIL PAGE
+   ===================================================== */
+body.dark .blog-detail-section {
+    background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-surface) 100%);
+}
+
+body.dark .blog-category-badge {
+    background: rgba(255, 122, 71, 0.12);
+    color: var(--orange-primary);
+}
+
+body.dark .blog-date,
+body.dark .blog-reading-time {
+    color: var(--text-muted);
+}
+
+body.dark .blog-detail-title {
+    color: var(--text-primary);
+}
+
+body.dark .blog-author-inline {
+    border-bottom-color: var(--border-subtle);
+}
+
+body.dark .author-name {
+    color: var(--text-primary);
+}
+
+body.dark .author-role {
+    color: var(--text-muted);
+}
+
+body.dark .blog-detail-thumb {
+    box-shadow: 0 10px 40px var(--shadow-dark);
+}
+
+/* Blog Content */
+body.dark .blog-content {
+    color: var(--text-secondary);
+}
+
+body.dark .lead-text {
+    color: var(--text-secondary);
+    border-left-color: var(--orange-primary);
+}
+
+body.dark .blog-content p {
+    color: var(--text-secondary);
+}
+
+body.dark .blog-content h2,
+body.dark .blog-content h3,
+body.dark .blog-content h4 {
+    color: var(--text-primary);
+}
+
+/* Quote */
+body.dark .blog-quote {
+    background: linear-gradient(135deg, rgba(255, 122, 71, 0.07) 0%, rgba(255, 122, 71, 0.03) 100%);
+    border-left-color: var(--orange-primary);
+}
+
+body.dark .blog-quote p {
+    color: var(--text-primary);
+}
+
+body.dark .blog-quote cite {
+    color: var(--text-secondary);
+}
+
+body.dark .quote-icon {
+    color: var(--orange-primary);
+}
+
+/* Image Caption */
+body.dark .image-caption {
+    color: var(--text-muted);
+}
+
+/* Callout */
+body.dark .blog-callout {
+    background: var(--bg-card);
+    border-color: var(--border-subtle);
+}
+
+body.dark .callout-content h4 {
+    color: var(--text-primary);
+}
+
+body.dark .callout-content p {
+    color: var(--text-secondary);
+}
+
+/* Tags */
+body.dark .blog-tags-wrapper {
+    border-top-color: var(--border-subtle);
+}
+
+body.dark .blog-tag {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+}
+
+body.dark .blog-tag:hover {
+    background: var(--orange-primary);
+    color: #fff;
+    border-color: transparent;
+}
+
+/* Divider */
+body.dark .blog-divider {
+    border-top-color: var(--border-subtle);
+}
+
+/* Author Box */
+body.dark .author-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+}
+
+body.dark .author-box-avatar {
+    border-color: var(--bg-elevated);
+}
+
+body.dark .author-box-name {
+    color: var(--text-primary);
+}
+
+body.dark .author-box-role {
+    color: var(--orange-primary);
+}
+
+body.dark .author-box-bio {
+    color: var(--text-secondary);
+}
+
+body.dark .author-social a {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+}
+
+body.dark .author-social a:hover {
+    background: var(--orange-primary);
+    color: #fff;
+}
+
+/* Comments */
+body.dark .comments-title {
+    color: var(--text-primary);
+}
+
+body.dark .comment-item {
+    border-bottom-color: var(--border-subtle);
+}
+
+body.dark .comment-author {
+    color: var(--text-primary);
+}
+
+body.dark .comment-date {
+    color: var(--text-muted);
+}
+
+body.dark .comment-text {
+    color: var(--text-secondary);
+}
+
+body.dark .comment-reply {
+    color: var(--orange-primary);
+}
+
+body.dark .comment-reply:hover {
+    color: var(--orange-light);
+}
+
+body.dark .comment-avatar {
+    border: 2px solid var(--border-subtle);
+    border-radius: 50%;
+}
+
+/* Comment Form */
+body.dark .comment-form-wrapper {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+}
+
+body.dark .comment-form-title {
+    color: var(--text-primary);
+}
+
+body.dark .comment-form .form-control {
+    background: var(--bg-input);
+    border-color: var(--border-subtle);
+    color: var(--text-primary);
+}
+
+body.dark .comment-form .form-control::placeholder {
+    color: var(--text-muted);
+}
+
+body.dark .comment-form .form-control:focus {
+    border-color: var(--orange-primary);
+    background: var(--bg-elevated);
+    box-shadow: 0 0 0 4px rgba(255, 122, 71, 0.08);
+    color: var(--text-primary);
+}
+
+body.dark .btn-primary-blog {
+    background: linear-gradient(135deg, var(--orange-primary) 0%, var(--orange-dark) 100%);
+    color: #fff;
+}
+
+body.dark .btn-primary-blog:hover {
+    box-shadow: 0 8px 20px var(--shadow-orange);
+    color: #fff;
+}
+
+
+/* =====================================================
+   31. BLOG SIDEBAR
+   ===================================================== */
+body.dark .sidebar-widget {
+    background: var(--bg-card);
+    box-shadow: 0 4px 20px var(--shadow-dark),
+        0 0 0 1px var(--border-subtle);
+}
+
+body.dark .widget-title {
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Search */
+body.dark .sidebar-search .form-control {
+    background: var(--bg-input);
+    border-color: var(--border-subtle);
+    color: var(--text-primary);
+}
+
+body.dark .sidebar-search .form-control::placeholder {
+    color: var(--text-muted);
+}
+
+body.dark .sidebar-search .form-control:focus {
+    border-color: var(--orange-primary);
+    background: var(--bg-elevated);
+    box-shadow: 0 0 0 4px rgba(255, 122, 71, 0.08);
+    color: var(--text-primary);
+}
+
+/* Categories */
+body.dark .category-list a {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+}
+
+body.dark .category-list a:hover {
+    background: var(--orange-primary);
+    color: #fff;
+}
+
+/* Recent Posts */
+body.dark .recent-post-content h6 {
+    color: var(--text-primary);
+}
+
+body.dark .recent-post-date {
+    color: var(--text-muted);
+}
+
+/* Popular Posts */
+body.dark .popular-post-item {
+    background: var(--bg-elevated);
+}
+
+body.dark .popular-post-item:hover {
+    background: rgba(255, 122, 71, 0.08);
+}
+
+body.dark .popular-post-content h6 {
+    color: var(--text-primary);
+}
+
+body.dark .popular-post-meta {
+    color: var(--text-muted);
+}
+
+/* Tags */
+body.dark .tag-item {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+}
+
+body.dark .tag-item:hover {
+    background: var(--orange-primary);
+    color: #fff;
+    border-color: transparent;
+}
+
+/* Newsletter */
+body.dark .newsletter-form .form-control {
+    background: var(--bg-elevated);
+    border-color: var(--border-subtle);
+    color: var(--text-primary);
+}
+
+body.dark .newsletter-form .form-control::placeholder {
+    color: var(--text-muted);
+}
+
+body.dark .newsletter-form .form-control:focus {
+    background: rgba(255, 122, 71, 0.06);
+    border-color: var(--orange-primary);
+    color: var(--text-primary);
+}
+
+body.dark .newsletter-form .btn-primary-blog {
+    background: var(--orange-primary);
+    color: #fff;
+}
+
+body.dark .newsletter-form .btn-primary-blog:hover {
+    background: var(--orange-dark);
+}
+
+
+/* =====================================================
+   32. RESPONSIVE DARK OVERRIDES
+   ===================================================== */
+@media (max-width: 1024px) {
+    body.dark .custom-nav {
+        background: rgba(13, 15, 20, 0.99);
+    }
+
+    body.dark .home-dd-menu,
+    body.dark .nav-new-menu {
+        background: rgba(0, 0, 0, 0);
+        box-shadow: none;
+    }
+
+    body.dark .home-dd-menu a {
+        background: var(--bg-elevated);
+    }
+}
+
+@media (max-width: 768px) {
+    body.dark .custom-nav {
+        background: rgba(13, 15, 20, 0.99);
+        box-shadow: 4px 0 30px var(--shadow-dark);
+    }
+
+    body.dark .faq-answer p {
+        color: var(--text-secondary);
+    }
+}
