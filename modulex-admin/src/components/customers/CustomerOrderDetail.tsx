@@ -1,0 +1,109 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
+import { getCurrentProfile } from "@/lib/supabase/profile";
+import type { Customer, CustomerOrder, CustomerOrderItem, CustomerOrderStatus, CustomerOrderStatusHistory, ProfileLookup } from "@/lib/customers/types";
+
+const statuses: CustomerOrderStatus[] = ["draft","confirmed","in_preparation","ready_for_shipment","shipped","delivered","installation_scheduled","installation_in_progress","completed","cancelled"];
+const selectClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
+
+function money(value: string | number | null | undefined) { const n = Number(value ?? 0); return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number.isFinite(n) ? n : 0); }
+function date(value: string | null | undefined) { if (!value) return "—"; return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value)); }
+function dateTime(value: string | null | undefined) { if (!value) return "—"; return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
+function titleCase(value: string) { return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()); }
+function statusClass(status: CustomerOrderStatus) { if (status === "completed") return "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"; if (status === "cancelled") return "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400"; if (["shipped","delivered","installation_scheduled","installation_in_progress"].includes(status)) return "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400"; if (["confirmed","in_preparation","ready_for_shipment"].includes(status)) return "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400"; return "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400"; }
+
+export default function CustomerOrderDetail() {
+  const params = useParams<{ id: string; orderId: string }>();
+  const customerId = params.id;
+  const orderId = params.orderId;
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [order, setOrder] = useState<CustomerOrder | null>(null);
+  const [items, setItems] = useState<CustomerOrderItem[]>([]);
+  const [history, setHistory] = useState<CustomerOrderStatusHistory[]>([]);
+  const [profiles, setProfiles] = useState<ProfileLookup[]>([]);
+  const [newStatus, setNewStatus] = useState<CustomerOrderStatus>("draft");
+  const [statusNote, setStatusNote] = useState("");
+  const [canEdit, setCanEdit] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  async function load() {
+    setIsLoading(true);
+    const [customerResult, orderResult, itemsResult, historyResult, profilesResult] = await Promise.all([
+      supabase.from("customers").select("*").eq("id", customerId).single(),
+      supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
+      supabase.from("customer_order_items").select("*").eq("order_id", orderId).order("line_no"),
+      supabase.from("customer_order_status_history").select("*").eq("order_id", orderId).order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, full_name, email, role, is_active"),
+    ]);
+    const firstError = customerResult.error || orderResult.error || itemsResult.error || historyResult.error || profilesResult.error;
+    if (firstError) { setErrorMessage(firstError.message); setIsLoading(false); return; }
+    const loadedOrder = orderResult.data as CustomerOrder;
+    setCustomer(customerResult.data as Customer);
+    setOrder(loadedOrder);
+    setItems((itemsResult.data ?? []) as CustomerOrderItem[]);
+    setHistory((historyResult.data ?? []) as CustomerOrderStatusHistory[]);
+    setProfiles((profilesResult.data ?? []) as ProfileLookup[]);
+    setNewStatus(loadedOrder.status);
+    setIsLoading(false);
+  }
+
+  useEffect(() => {
+    async function init() {
+      const { profile, error } = await getCurrentProfile();
+      if (error) { setErrorMessage(error.message); setIsLoading(false); return; }
+      const allowed = ["super_admin", "admin", "sales"].includes(profile?.role ?? "");
+      setCanEdit(allowed);
+      if (!allowed) { setErrorMessage("You do not have access to customer orders."); setIsLoading(false); return; }
+      await load();
+    }
+    init();
+  }, [customerId, orderId]);
+
+  const profileMap = useMemo(() => new Map(profiles.map((p) => [p.id, p.full_name || p.email || "User"])), [profiles]);
+
+  async function updateStatus() {
+    if (!order || newStatus === order.status) return;
+    setIsSaving(true); setErrorMessage(null); setSuccessMessage(null);
+    const { error } = await supabase.rpc("set_customer_order_status", { p_order_id: order.id, p_status: newStatus, p_note: statusNote.trim() || null });
+    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
+    await load(); setStatusNote(""); setSuccessMessage("Order status updated."); setIsSaving(false);
+  }
+
+  if (isLoading) return <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"><div className="text-center"><div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" /><p className="text-sm text-gray-500">Loading order...</p></div></div>;
+  if (!customer || !order) return <div className="rounded-2xl border border-error-200 bg-error-50 p-6 text-error-700">{errorMessage || "Order not found."}</div>;
+
+  const billing = order.billing_address_snapshot as Record<string, string | null> | null;
+  const shipping = order.shipping_address_snapshot as Record<string, string | null> | null;
+
+  return <div className="space-y-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">{order.order_number}</h1><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(order.status)}`}>{titleCase(order.status)}</span></div><p className="mt-2 text-sm text-gray-500">{customer.name} • {customer.customer_code} • {date(order.order_date)}</p></div><div className="flex flex-wrap gap-2"><Link href={`/customers/${customer.id}`} className="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">Customer Card</Link><Link href={`/customers/${customer.id}/orders`} className="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">All Customer Orders</Link></div></div>
+    </div>
+
+    {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{errorMessage}</div>}
+    {successMessage && <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">{successMessage}</div>}
+
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Summary label="Total" value={money(order.total_amount)} /><Summary label="Items" value={String(order.item_count)} /><Summary label="Price Group" value={order.price_group_name_snapshot || "—"} /><Summary label="Expected Delivery" value={date(order.expected_delivery_date)} /></div>
+
+    {canEdit && <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Update Status</h2><div className="mt-4 grid gap-3 md:grid-cols-[260px_1fr_auto]"><select value={newStatus} onChange={(e) => setNewStatus(e.target.value as CustomerOrderStatus)} className={selectClass}>{statuses.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}</select><input value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="Optional status note" className={selectClass} /><button disabled={isSaving || newStatus === order.status} onClick={updateStatus} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-40">{isSaving ? "Saving..." : "Update"}</button></div></div>}
+
+    <div className="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900"><div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Order Items</h2></div><div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["#","SKU","Product","Qty","Unit Price","Discount","Total","Source"].map((l) => <th key={l} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{l}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">{items.map((item) => <tr key={item.id}><td className="px-4 py-4 text-sm text-gray-500">{item.line_no}</td><td className="px-4 py-4 text-sm font-semibold text-gray-800 dark:text-white/90">{item.sku_snapshot}</td><td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">{item.product_name_snapshot}</td><td className="px-4 py-4 text-sm text-gray-700">{Number(item.quantity)}</td><td className="px-4 py-4 text-sm text-gray-700">{money(item.unit_price)}</td><td className="px-4 py-4 text-sm text-gray-500">{Number(item.discount_percent).toFixed(1)}%</td><td className="px-4 py-4 text-sm font-semibold text-gray-800 dark:text-white/90">{money(item.line_total)}</td><td className="px-4 py-4"><span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-400">{titleCase(item.price_source)}</span></td></tr>)}</tbody></table></div></div>
+
+    <div className="grid gap-5 xl:grid-cols-12">
+      <div className="space-y-5 xl:col-span-8"><div className="grid gap-5 md:grid-cols-2"><AddressCard title="Billing Address" data={billing} /><AddressCard title="Shipping Address" data={shipping} /></div><div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Notes & References</h2><div className="mt-4 grid gap-4 md:grid-cols-3"><Info label="Customer Reference" value={order.customer_reference} /><Info label="Customer Notes" value={order.customer_notes} /><Info label="Internal Notes" value={order.internal_notes} /></div></div></div>
+      <div className="space-y-5 xl:col-span-4"><div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Totals</h2><div className="mt-4 space-y-3 text-sm"><Row label="Subtotal" value={money(order.subtotal)} /><Row label="Order Discount" value={`-${money(order.discount_amount)}`} /><Row label={`Tax (${Number(order.tax_rate).toFixed(1)}%)`} value={money(order.tax_amount)} /><div className="border-t border-gray-200 pt-3 dark:border-gray-800"><Row label="Total" value={money(order.total_amount)} strong /></div></div></div><div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Status Timeline</h2><div className="mt-4 space-y-4">{history.map((entry) => <div key={entry.id} className="border-l-2 border-brand-200 pl-3"><p className="text-sm font-medium text-gray-800 dark:text-white/90">{titleCase(entry.to_status)}</p><p className="mt-0.5 text-xs text-gray-400">{dateTime(entry.created_at)}{entry.changed_by ? ` • ${profileMap.get(entry.changed_by) ?? "User"}` : ""}</p>{entry.note && <p className="mt-1 text-xs text-gray-500">{entry.note}</p>}</div>)}</div></div></div>
+    </div>
+  </div>;
+}
+
+function Summary({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"><p className="text-xs text-gray-500">{label}</p><p className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">{value}</p></div>; }
+function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) { return <div className="flex items-center justify-between gap-4"><span className="text-gray-500">{label}</span><span className={strong ? "text-lg font-semibold text-gray-800 dark:text-white/90" : "font-medium text-gray-800 dark:text-white/90"}>{value}</span></div>; }
+function Info({ label, value }: { label: string; value: string | null }) { return <div><p className="text-xs font-medium uppercase text-gray-400">{label}</p><p className="mt-2 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{value || "—"}</p></div>; }
+function AddressCard({ title, data }: { title: string; data: Record<string, string | null> | null }) { return <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">{title}</h2>{!data ? <p className="mt-4 text-sm text-gray-500">No address selected.</p> : <div className="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-300"><p className="font-medium text-gray-800 dark:text-white/90">{data.address_name}</p>{data.company_name && <p>{data.company_name}</p>}{data.contact_name && <p>{data.contact_name}</p>}<p>{data.address_line_1}{data.address_line_2 ? `, ${data.address_line_2}` : ""}</p><p>{[data.postal_code, data.city, data.state_region, data.country_code].filter(Boolean).join(", ")}</p>{data.phone && <p>{data.phone}</p>}</div>}</div>; }
