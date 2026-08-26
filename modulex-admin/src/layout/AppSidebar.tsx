@@ -71,6 +71,16 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    icon: <UserCircleIcon />,
+    name: "Customers",
+    subItems: [
+      {
+        name: "Customer List",
+        path: "/customers",
+      },
+    ],
+  },
+  {
     icon: <TableIcon />,
     name: "Inventory",
     subItems: [
