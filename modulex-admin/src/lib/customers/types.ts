@@ -159,3 +159,72 @@ export type CustomerActivity = {
   actor_user_id: string | null;
   created_at: string;
 };
+
+export type CustomerOrderStatus =
+  | "draft"
+  | "confirmed"
+  | "in_preparation"
+  | "ready_for_shipment"
+  | "shipped"
+  | "delivered"
+  | "installation_scheduled"
+  | "installation_in_progress"
+  | "completed"
+  | "cancelled";
+
+export type CustomerOrder = {
+  id: string;
+  order_number: string;
+  customer_id: string;
+  status: CustomerOrderStatus;
+  order_date: string;
+  expected_delivery_date: string | null;
+  price_group_id: string | null;
+  price_group_name_snapshot: string | null;
+  currency_code: string;
+  billing_address_id: string | null;
+  shipping_address_id: string | null;
+  billing_address_snapshot: Record<string, unknown> | null;
+  shipping_address_snapshot: Record<string, unknown> | null;
+  customer_reference: string | null;
+  customer_notes: string | null;
+  internal_notes: string | null;
+  item_count: number;
+  subtotal: string | number;
+  discount_amount: string | number;
+  tax_rate: string | number;
+  tax_amount: string | number;
+  total_amount: string | number;
+  confirmed_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CustomerOrderItem = {
+  id: string;
+  order_id: string;
+  product_id: string | null;
+  line_no: number;
+  sku_snapshot: string;
+  product_name_snapshot: string;
+  quantity: string | number;
+  unit_price: string | number;
+  discount_percent: string | number;
+  discount_amount: string | number;
+  line_subtotal: string | number;
+  line_total: string | number;
+  price_source: "price_group" | "manual";
+  created_at: string;
+};
+
+export type CustomerOrderStatusHistory = {
+  id: string;
+  order_id: string;
+  from_status: CustomerOrderStatus | null;
+  to_status: CustomerOrderStatus;
+  note: string | null;
+  changed_by: string | null;
+  created_at: string;
+};
