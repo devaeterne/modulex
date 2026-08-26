@@ -5,6 +5,7 @@ import CustomerOrderEditActions from "@/components/customers/CustomerOrderEditAc
 import CustomerOrderRevisionHistory from "@/components/customers/CustomerOrderRevisionHistory";
 import CreateInvoiceFromOrderButton from "@/components/customers/CreateInvoiceFromOrderButton";
 import CreateShipmentFromOrderButton from "@/components/customers/CreateShipmentFromOrderButton";
+import CreateInstallationFromOrder from "@/components/customers/CreateInstallationFromOrder";
 
 export const metadata: Metadata = {
   title: "Order Detail | Modulex Admin",
@@ -19,6 +20,7 @@ export default function CustomerOrderDetailPage() {
         <CreateShipmentFromOrderButton />
         <CreateInvoiceFromOrderButton />
       </div>
+      <CreateInstallationFromOrder />
       <CustomerOrderEditActions />
       <CustomerOrderDetail />
       <CustomerOrderRevisionHistory />
