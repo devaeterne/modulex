@@ -85,7 +85,7 @@ export default function ForgotPasswordForm() {
                 <Input
                   type="email"
                   placeholder="name@company.com"
-                  value={email}
+                  defaultValue={email}
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </div>
