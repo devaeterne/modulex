@@ -6,7 +6,10 @@ export type NotificationEventType =
   | "new_dealer_application"
   | "order_ready_for_shipment"
   | "order_cancellation"
-  | "stock_warehouse_problem";
+  | "stock_warehouse_problem"
+  | "order_status_changed"
+  | "price_review_required"
+  | "invoice_issued";
 
 export type NotificationSeverity =
   | "critical"
@@ -37,6 +40,9 @@ export const NOTIFICATION_ROLE_POLICY: Record<
   order_ready_for_shipment: ["shipping"],
   order_cancellation: [...ADMIN_ROLES, "sales", "warehouse"],
   stock_warehouse_problem: [...ADMIN_ROLES, "warehouse"],
+  order_status_changed: [...ADMIN_ROLES, "sales", "warehouse", "shipping"],
+  price_review_required: [...ADMIN_ROLES, "sales"],
+  invoice_issued: [...ADMIN_ROLES, "sales"],
 };
 
 export function canRoleSeeNotification(
@@ -53,4 +59,7 @@ export const NOTIFICATION_LABELS: Record<NotificationEventType, string> = {
   order_ready_for_shipment: "Ready for Shipment",
   order_cancellation: "Order Cancellation",
   stock_warehouse_problem: "Stock / Warehouse Problem",
+  order_status_changed: "Order Status Changed",
+  price_review_required: "Price Review Required",
+  invoice_issued: "Invoice Issued",
 };
