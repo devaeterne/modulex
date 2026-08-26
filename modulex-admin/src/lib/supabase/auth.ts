@@ -10,6 +10,12 @@ export async function signInWithEmail(email: string, password: string) {
   });
 }
 
+export async function requestPasswordReset(email: string, redirectTo: string) {
+  return supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+}
+
 export async function signOut() {
   const result = await supabase.auth.signOut({ scope: "global" });
 
