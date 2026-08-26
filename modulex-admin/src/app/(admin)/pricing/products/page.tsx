@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import ProductPricesTable from "@/components/pricing/ProductPricesTable";
+import ProductPricesServerTable from "@/components/pricing/ProductPricesServerTable";
 
 export const metadata: Metadata = {
   title:
@@ -14,7 +14,7 @@ export default function ProductPricesPage() {
     <div>
       <PageBreadcrumb pageTitle="Product Prices" />
 
-      <ProductPricesTable />
+      <ProductPricesServerTable />
     </div>
   );
 }
