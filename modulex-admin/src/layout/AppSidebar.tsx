@@ -53,6 +53,10 @@ const navItems: NavItem[] = [
     name: "Pricing",
     subItems: [
       {
+        name: "Pricing Dashboard",
+        path: "/pricing/dashboard",
+      },
+      {
         name: "Product Prices",
         path: "/pricing/products",
       },
