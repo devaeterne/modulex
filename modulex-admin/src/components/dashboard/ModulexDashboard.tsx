@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 
 type DashboardKpis = {
@@ -44,19 +45,21 @@ const emptyKpis: DashboardKpis = {
   total_movements: 0,
 };
 
-function formatNumber(value: number | string | null | undefined) {
-  const numberValue = Number(value ?? 0);
+const numberFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 2,
+});
 
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 2,
-  }).format(numberValue);
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+function formatNumber(value: number | string | null | undefined) {
+  return numberFormatter.format(Number(value ?? 0));
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return dateTimeFormatter.format(new Date(value));
 }
 
 export default function ModulexDashboard() {
@@ -272,30 +275,30 @@ export default function ModulexDashboard() {
           </p>
 
           <div className="mt-5 grid grid-cols-1 gap-3">
-            <a
+            <Link
               href="/qr-labels"
               className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
             >
               Print QR Labels
-            </a>
-            <a
+            </Link>
+            <Link
               href="/scan"
               className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
             >
               Scan QR / Barcode
-            </a>
-            <a
+            </Link>
+            <Link
               href="/inventory"
               className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
             >
               View Stock Overview
-            </a>
-            <a
+            </Link>
+            <Link
               href="/low-stock"
               className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
             >
               Check Low Stock
-            </a>
+            </Link>
           </div>
         </div>
       </div>
