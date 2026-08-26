@@ -213,8 +213,7 @@ export default function CustomerOrderPrint() {
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Order Information</p>
-            <p className="mt-2 text-sm"><span className="font-medium">Price Group:</span> {order.price_group_name_snapshot || "—"}</p>
-            <p className="text-sm"><span className="font-medium">Payment:</span> {order.payment_method_name_snapshot || "—"}</p>
+            <p className="mt-2 text-sm"><span className="font-medium">Payment:</span> {order.payment_method_name_snapshot || "—"}</p>
             <p className="text-sm"><span className="font-medium">Currency:</span> {currency}</p>
             {Number(order.payment_commission_percent ?? 0) > 0 && (
               <p className="text-sm"><span className="font-medium">Payment Commission:</span> {Number(order.payment_commission_percent).toFixed(2)}%</p>
