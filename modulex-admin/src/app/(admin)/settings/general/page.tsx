@@ -1,25 +1,12 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import GeneralSettingsManager from "@/components/settings/GeneralSettingsManager";
-import InvoiceDocumentSettings from "@/components/settings/InvoiceDocumentSettings";
-import EmailNotificationSettings from "@/components/settings/EmailNotificationSettings";
-import NotificationDeliveryRules from "@/components/settings/NotificationDeliveryRules";
-import EmailNotificationManagementLink from "@/components/settings/EmailNotificationManagementLink";
+import GeneralSettingsOverview from "@/components/settings/GeneralSettingsOverview";
 
 export const metadata: Metadata = {
-  title: "Company & General Settings | Modulex Admin",
-  description: "Manage company identity, contact information and document defaults",
+  title: "General Settings | Modulex Admin",
+  description: "Manage company, document, email and notification settings",
 };
 
 export default function GeneralSettingsPage() {
-  return (
-    <div>
-      <PageBreadcrumb pageTitle="Company & General Settings" />
-      <GeneralSettingsManager />
-      <InvoiceDocumentSettings />
-      <EmailNotificationSettings />
-      <NotificationDeliveryRules />
-      <EmailNotificationManagementLink />
-    </div>
-  );
+  return <div><PageBreadcrumb pageTitle="General Settings" /><GeneralSettingsOverview /></div>;
 }
