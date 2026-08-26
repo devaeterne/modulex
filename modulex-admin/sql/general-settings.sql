@@ -8,7 +8,7 @@ begin;
 
 create table if not exists public.general_settings (
   id smallint primary key default 1,
-  company_name text not null default 'Modulex',
+  company_name text not null default 'Your Company',
   legal_name text,
   logo_url text,
   tax_number text,
@@ -38,7 +38,7 @@ create table if not exists public.general_settings (
 );
 
 insert into public.general_settings (id, company_name)
-values (1, 'Modulex')
+values (1, 'Your Company')
 on conflict (id) do nothing;
 
 create or replace function public.set_general_settings_updated_metadata()
