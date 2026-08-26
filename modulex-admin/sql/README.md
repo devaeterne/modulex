@@ -11,6 +11,9 @@ Until the project is moved to Supabase CLI migrations under `supabase/migrations
 7. `customer-invoice-payment-terms.sql`
 8. `customer-shipments.sql`
 9. `customer-installations.sql`
+10. `performance-rls.sql`
+
+`performance-rls.sql` is a query-planning hardening step. It preserves the existing RLS role rules while converting known stable role/permission helper predicates to one-time statement checks. Apply it after all schema files that create those policies. Existing environments can apply it once as the final performance migration.
 
 After applying schema changes, reload the PostgREST schema cache when required:
 
