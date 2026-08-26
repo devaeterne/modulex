@@ -25,7 +25,7 @@ export type GeneralSettings = {
 
 export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   id: 1,
-  company_name: "Modulex",
+  company_name: "Your Company",
   legal_name: null,
   logo_url: null,
   tax_number: null,
