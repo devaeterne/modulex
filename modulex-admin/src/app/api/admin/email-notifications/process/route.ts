@@ -1,8 +1,45 @@
-import { jsonError, requireAdmin } from "@/lib/auth/admin-api";
 import { processPendingEmailNotifications } from "@/lib/email/transactional";
+import { isSupabaseAdminConfigured, supabaseAdmin } from "@/lib/supabase/server-admin";
+
+function jsonError(message: string, status: number) {
+  return Response.json({ error: message }, { status });
+}
+
+async function requireActiveStaff(request: Request) {
+  if (!isSupabaseAdminConfigured) {
+    return { response: jsonError("Server email processing is not configured.", 503) };
+  }
+
+  const authorization = request.headers.get("authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return { response: jsonError("Authentication required.", 401) };
+  }
+
+  const accessToken = authorization.slice("Bearer ".length).trim();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabaseAdmin.auth.getUser(accessToken);
+
+  if (userError || !user) {
+    return { response: jsonError("Invalid or expired session.", 401) };
+  }
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("id, role, is_active")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile || !profile.is_active) {
+    return { response: jsonError("Active staff access is required.", 403) };
+  }
+
+  return { response: null };
+}
 
 export async function POST(request: Request) {
-  const auth = await requireAdmin(request);
+  const auth = await requireActiveStaff(request);
   if (auth.response) return auth.response;
 
   let body: Record<string, unknown> = {};
@@ -18,6 +55,9 @@ export async function POST(request: Request) {
     const results = await processPendingEmailNotifications(limit);
     return Response.json({ success: true, processed: results.length, results });
   } catch (error) {
-    return jsonError(error instanceof Error ? error.message : "Email notifications could not be processed.", 500);
+    return jsonError(
+      error instanceof Error ? error.message : "Email notifications could not be processed.",
+      500
+    );
   }
 }
