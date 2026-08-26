@@ -7,6 +7,7 @@ import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import { supabase } from "@/lib/supabase/client";
+import { getCurrentProfile } from "@/lib/supabase/profile";
 
 export default function AdminLayout({
   children,
@@ -15,10 +16,11 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
-
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     async function checkSession() {
       const {
         data: { session },
@@ -29,10 +31,20 @@ export default function AdminLayout({
         return;
       }
 
-      setIsCheckingAuth(false);
+      const { profile, error } = await getCurrentProfile();
+
+      if (error || !profile || !profile.is_active) {
+        await supabase.auth.signOut();
+        router.replace("/signin?reason=inactive");
+        return;
+      }
+
+      if (mounted) {
+        setIsCheckingAuth(false);
+      }
     }
 
-    checkSession();
+    void checkSession();
 
     const {
       data: { subscription },
@@ -43,6 +55,7 @@ export default function AdminLayout({
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, [router]);
