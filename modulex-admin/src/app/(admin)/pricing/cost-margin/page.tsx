@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import CostMarginTable from "@/components/pricing/CostMarginTable";
+import CostMarginServerTable from "@/components/pricing/CostMarginServerTable";
 
 export const metadata: Metadata = {
   title: "Cost & Margin | Modulex Admin",
@@ -12,7 +12,7 @@ export default function CostMarginPage() {
   return (
     <div>
       <PageBreadcrumb pageTitle="Cost & Margin" />
-      <CostMarginTable />
+      <CostMarginServerTable />
     </div>
   );
 }
