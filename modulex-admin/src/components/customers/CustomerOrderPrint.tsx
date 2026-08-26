@@ -4,23 +4,71 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import type { Customer, CustomerOrder, CustomerOrderItem } from "@/lib/customers/types";
+import {
+  DEFAULT_GENERAL_SETTINGS,
+  type GeneralSettings,
+} from "@/lib/settings/types";
 
-function money(value: string | number | null | undefined) {
+function money(
+  value: string | number | null | undefined,
+  currency: string,
+  locale: string
+) {
   const number = Number(value ?? 0);
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  }).format(Number.isFinite(number) ? number : 0);
+  const safeNumber = Number.isFinite(number) ? number : 0;
+
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+    }).format(safeNumber);
+  } catch {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+    }).format(safeNumber);
+  }
 }
 
-function date(value: string | null | undefined) {
+function date(
+  value: string | null | undefined,
+  locale: string,
+  timezone: string
+) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
+
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: "medium",
+      timeZone: timezone,
+    }).format(new Date(value));
+  } catch {
+    return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
+      new Date(value)
+    );
+  }
 }
 
 function titleCase(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function companyAddress(settings: GeneralSettings) {
+  const firstLine = [settings.address_line_1, settings.address_line_2]
+    .filter(Boolean)
+    .join(", ");
+  const secondLine = [
+    settings.postal_code,
+    settings.city,
+    settings.state_region,
+    settings.country_code,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return [firstLine, secondLine].filter(Boolean);
 }
 
 export default function CustomerOrderPrint() {
@@ -28,15 +76,26 @@ export default function CustomerOrderPrint() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [order, setOrder] = useState<CustomerOrder | null>(null);
   const [items, setItems] = useState<CustomerOrderItem[]>([]);
+  const [settings, setSettings] = useState<GeneralSettings>(DEFAULT_GENERAL_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const [customerResult, orderResult, itemsResult] = await Promise.all([
+      const [customerResult, orderResult, itemsResult, settingsResult] = await Promise.all([
         supabase.from("customers").select("*").eq("id", params.id).single(),
-        supabase.from("customer_orders").select("*").eq("id", params.orderId).eq("customer_id", params.id).single(),
-        supabase.from("customer_order_items").select("*").eq("order_id", params.orderId).order("line_no"),
+        supabase
+          .from("customer_orders")
+          .select("*")
+          .eq("id", params.orderId)
+          .eq("customer_id", params.id)
+          .single(),
+        supabase
+          .from("customer_order_items")
+          .select("*")
+          .eq("order_id", params.orderId)
+          .order("line_no"),
+        supabase.from("general_settings").select("*").eq("id", 1).maybeSingle(),
       ]);
 
       const firstError = customerResult.error || orderResult.error || itemsResult.error;
@@ -49,17 +108,36 @@ export default function CustomerOrderPrint() {
       setCustomer(customerResult.data as Customer);
       setOrder(orderResult.data as CustomerOrder);
       setItems((itemsResult.data ?? []) as CustomerOrderItem[]);
+
+      if (!settingsResult.error && settingsResult.data) {
+        setSettings(settingsResult.data as GeneralSettings);
+      }
+
       setIsLoading(false);
     }
     load();
   }, [params.id, params.orderId]);
 
-  if (isLoading) return <div className="p-10 text-center text-sm text-gray-500">Preparing printable order...</div>;
-  if (!customer || !order) return <div className="p-10 text-center text-sm text-error-600">{errorMessage || "Order not found."}</div>;
+  if (isLoading) {
+    return <div className="p-10 text-center text-sm text-gray-500">Preparing printable order...</div>;
+  }
+
+  if (!customer || !order) {
+    return <div className="p-10 text-center text-sm text-error-600">{errorMessage || "Order not found."}</div>;
+  }
 
   const billing = order.billing_address_snapshot as Record<string, string | null> | null;
   const shipping = order.shipping_address_snapshot as Record<string, string | null> | null;
   const grandTotal = Number(order.grand_total ?? order.total_amount ?? 0);
+  const currency = order.currency_code || settings.default_currency || "USD";
+  const locale = settings.locale || "en-US";
+  const timezone = settings.timezone || "UTC";
+  const addressLines = companyAddress(settings);
+
+  const formatMoney = (value: string | number | null | undefined) =>
+    money(value, currency, locale);
+  const formatDate = (value: string | null | undefined) =>
+    date(value, locale, timezone);
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 text-gray-900 print:bg-white print:p-0">
@@ -75,15 +153,51 @@ export default function CustomerOrderPrint() {
         </div>
 
         <div className="flex items-start justify-between gap-8 border-b border-gray-300 pb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">MODULEX</h1>
-            <p className="mt-2 text-sm text-gray-500">Sales Order / Order Confirmation</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-4">
+              {settings.logo_url && (
+                <div className="shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={settings.logo_url}
+                    alt={`${settings.company_name} logo`}
+                    className="max-h-16 max-w-[180px] object-contain"
+                  />
+                </div>
+              )}
+              <div className="min-w-0">
+                <h1 className="text-3xl font-bold tracking-tight">{settings.company_name}</h1>
+                {settings.legal_name && settings.legal_name !== settings.company_name && (
+                  <p className="mt-1 text-sm font-medium text-gray-600">{settings.legal_name}</p>
+                )}
+                <p className="mt-2 text-sm text-gray-500">{settings.order_document_title}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-0.5 text-xs leading-5 text-gray-500">
+              {addressLines.map((line) => <p key={line}>{line}</p>)}
+              {(settings.phone || settings.email) && (
+                <p>{[settings.phone, settings.email].filter(Boolean).join(" · ")}</p>
+              )}
+              {settings.website && <p>{settings.website}</p>}
+              {(settings.tax_number || settings.registration_number) && (
+                <p>
+                  {[
+                    settings.tax_number ? `Tax/VAT: ${settings.tax_number}` : null,
+                    settings.registration_number ? `Reg: ${settings.registration_number}` : null,
+                  ].filter(Boolean).join(" · ")}
+                </p>
+              )}
+            </div>
           </div>
-          <div className="text-right">
+
+          <div className="shrink-0 text-right">
             <p className="text-2xl font-semibold">{order.order_number}</p>
-            <p className="mt-2 text-sm text-gray-500">Order Date: {date(order.order_date)}</p>
+            <p className="mt-2 text-sm text-gray-500">Order Date: {formatDate(order.order_date)}</p>
             <p className="text-sm text-gray-500">Status: {titleCase(order.status)}</p>
-            {order.expected_delivery_date && <p className="text-sm text-gray-500">Expected Delivery: {date(order.expected_delivery_date)}</p>}
+            {order.expected_delivery_date && (
+              <p className="text-sm text-gray-500">Expected Delivery: {formatDate(order.expected_delivery_date)}</p>
+            )}
           </div>
         </div>
 
@@ -101,6 +215,7 @@ export default function CustomerOrderPrint() {
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Order Information</p>
             <p className="mt-2 text-sm"><span className="font-medium">Price Group:</span> {order.price_group_name_snapshot || "—"}</p>
             <p className="text-sm"><span className="font-medium">Payment:</span> {order.payment_method_name_snapshot || "—"}</p>
+            <p className="text-sm"><span className="font-medium">Currency:</span> {currency}</p>
             {Number(order.payment_commission_percent ?? 0) > 0 && (
               <p className="text-sm"><span className="font-medium">Payment Commission:</span> {Number(order.payment_commission_percent).toFixed(2)}%</p>
             )}
@@ -133,9 +248,9 @@ export default function CustomerOrderPrint() {
                   <td className="px-3 py-3 text-sm font-medium">{item.sku_snapshot}</td>
                   <td className="px-3 py-3 text-sm">{item.product_name_snapshot}</td>
                   <td className="px-3 py-3 text-right text-sm">{Number(item.quantity)}</td>
-                  <td className="px-3 py-3 text-right text-sm">{money(item.unit_price)}</td>
+                  <td className="px-3 py-3 text-right text-sm">{formatMoney(item.unit_price)}</td>
                   <td className="px-3 py-3 text-right text-sm">{Number(item.discount_percent).toFixed(1)}%</td>
-                  <td className="px-3 py-3 text-right text-sm font-medium">{money(item.line_total)}</td>
+                  <td className="px-3 py-3 text-right text-sm font-medium">{formatMoney(item.line_total)}</td>
                 </tr>
               ))}
             </tbody>
@@ -143,18 +258,18 @@ export default function CustomerOrderPrint() {
         </div>
 
         <div className="mt-6 ml-auto w-full max-w-[360px] space-y-2 text-sm">
-          <TotalRow label="Subtotal" value={money(order.subtotal)} />
-          <TotalRow label="Order Discount" value={`-${money(order.discount_amount)}`} />
-          <TotalRow label={`Tax (${Number(order.tax_rate).toFixed(1)}%)`} value={money(order.tax_amount)} />
-          <TotalRow label="Order Total" value={money(order.total_amount)} />
+          <TotalRow label="Subtotal" value={formatMoney(order.subtotal)} />
+          <TotalRow label="Order Discount" value={`-${formatMoney(order.discount_amount)}`} />
+          <TotalRow label={`Tax (${Number(order.tax_rate).toFixed(1)}%)`} value={formatMoney(order.tax_amount)} />
+          <TotalRow label="Order Total" value={formatMoney(order.total_amount)} />
           {Number(order.payment_commission_amount ?? 0) > 0 && (
             <TotalRow
               label={`${order.payment_method_name_snapshot || "Payment"} Commission (${Number(order.payment_commission_percent).toFixed(2)}%)`}
-              value={money(order.payment_commission_amount)}
+              value={formatMoney(order.payment_commission_amount)}
             />
           )}
           <div className="border-t-2 border-gray-900 pt-3">
-            <TotalRow label="Grand Total" value={money(grandTotal)} strong />
+            <TotalRow label="Grand Total" value={formatMoney(grandTotal)} strong />
           </div>
         </div>
 
@@ -162,6 +277,12 @@ export default function CustomerOrderPrint() {
           <div className="mt-8 border-t border-gray-200 pt-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Customer Notes</p>
             <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{order.customer_notes}</p>
+          </div>
+        )}
+
+        {settings.order_footer_note && (
+          <div className="mt-8 border-t border-gray-200 pt-5">
+            <p className="whitespace-pre-wrap text-xs leading-5 text-gray-500">{settings.order_footer_note}</p>
           </div>
         )}
 
