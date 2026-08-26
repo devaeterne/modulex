@@ -59,6 +59,7 @@ const navItems: NavItem[] = [
       { name: "Dashboard", path: "/customers/dashboard" },
       { name: "Customer List", path: "/customers" },
       { name: "Orders", path: "/customers/orders" },
+      { name: "Invoices", path: "/customers/invoices" },
     ],
   },
   {
