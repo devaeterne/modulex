@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import type { ProfileLookup } from "@/lib/customers/types";
+import { isValidPhone, sanitizePhoneInput } from "@/lib/validation";
 
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30";
 
@@ -35,6 +36,10 @@ export default function CreateInstallationFromOrder() {
   async function createInstallation() {
     if (!startAt) {
       setErrorMessage("Scheduled start is required.");
+      return;
+    }
+    if (contactPhone.trim() && !isValidPhone(contactPhone)) {
+      setErrorMessage("Enter a valid contact phone number using 7 to 15 digits. Letters are not allowed.");
       return;
     }
     setIsSaving(true);
@@ -84,7 +89,7 @@ export default function CreateInstallationFromOrder() {
             <label className="text-sm text-gray-600 dark:text-gray-300">Assigned User<select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className={`mt-1 ${inputClass}`}><option value="">Unassigned</option>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.full_name || profile.email || profile.id}</option>)}</select></label>
             <label className="text-sm text-gray-600 dark:text-gray-300">Team<input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Installation team" className={`mt-1 ${inputClass}`} /></label>
             <label className="text-sm text-gray-600 dark:text-gray-300">Contact Name<input value={contactName} onChange={(e) => setContactName(e.target.value)} className={`mt-1 ${inputClass}`} /></label>
-            <label className="text-sm text-gray-600 dark:text-gray-300">Contact Phone<input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className={`mt-1 ${inputClass}`} /></label>
+            <label className="text-sm text-gray-600 dark:text-gray-300">Contact Phone<input type="tel" inputMode="tel" autoComplete="tel" maxLength={24} value={contactPhone} onChange={(e) => setContactPhone(sanitizePhoneInput(e.target.value))} placeholder="+1 (202) 555-0123" className={`mt-1 ${inputClass}`} /></label>
           </div>
           <label className="mt-3 block text-sm text-gray-600 dark:text-gray-300">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" /></label>
           <div className="mt-4 flex justify-end"><button disabled={isSaving} onClick={createInstallation} className="h-10 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-50 dark:hover:bg-brand-600">{isSaving ? "Scheduling..." : "Create Appointment"}</button></div>

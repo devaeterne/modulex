@@ -7,6 +7,18 @@ import {
   DEFAULT_GENERAL_SETTINGS,
   type GeneralSettings,
 } from "@/lib/settings/types";
+import {
+  isValidCountryCode,
+  isValidCurrencyCode,
+  isValidEmail,
+  isValidHttpUrl,
+  isValidPhone,
+  normalizeCountryCode,
+  normalizeCurrencyCode,
+  normalizeEmail,
+  normalizeOptional,
+  sanitizePhoneInput,
+} from "@/lib/validation";
 
 const inputClass =
   "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs transition placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:disabled:bg-gray-800";
@@ -20,11 +32,6 @@ const primaryButtonClass =
 const secondaryButtonClass =
   "inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
 
-function optional(value: string | null | undefined) {
-  const trimmed = value?.trim() ?? "";
-  return trimmed || null;
-}
-
 function Field({
   label,
   value,
@@ -34,6 +41,9 @@ function Field({
   required = false,
   type = "text",
   hint,
+  maxLength,
+  inputMode,
+  autoComplete,
 }: {
   label: string;
   value: string | null;
@@ -43,6 +53,9 @@ function Field({
   required?: boolean;
   type?: string;
   hint?: string;
+  maxLength?: number;
+  inputMode?: "text" | "email" | "tel" | "url" | "numeric" | "decimal" | "search";
+  autoComplete?: string;
 }) {
   return (
     <label className="block">
@@ -55,6 +68,10 @@ function Field({
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
         placeholder={placeholder}
+        required={required}
+        maxLength={maxLength}
+        inputMode={inputMode}
+        autoComplete={autoComplete}
         className={inputClass}
       />
       {hint && <span className="mt-1.5 block text-xs text-gray-400">{hint}</span>}
@@ -152,15 +169,25 @@ export default function GeneralSettingsManager() {
 
   async function save() {
     const companyName = settings.company_name.trim();
-    const currency = settings.default_currency.trim().toUpperCase();
-    const country = optional(settings.country_code)?.toUpperCase() ?? null;
+    const currency = normalizeCurrencyCode(settings.default_currency);
+    const country = normalizeOptional(settings.country_code)
+      ? normalizeCountryCode(settings.country_code ?? "")
+      : null;
     const locale = settings.locale.trim();
     const timezone = settings.timezone.trim();
     const documentTitle = settings.order_document_title.trim();
+    const email = normalizeOptional(settings.email);
+    const phone = normalizeOptional(settings.phone);
+    const website = normalizeOptional(settings.website);
+    const logoUrl = normalizeOptional(settings.logo_url);
 
     if (!companyName) return setErrorMessage("Company name is required.");
-    if (!/^[A-Z]{3}$/.test(currency)) return setErrorMessage("Default currency must be a 3-letter ISO code, for example EUR or USD.");
-    if (country && !/^[A-Z]{2}$/.test(country)) return setErrorMessage("Country code must be a 2-letter ISO code, for example ME or TR.");
+    if (!isValidCurrencyCode(currency)) return setErrorMessage("Default currency must be a 3-letter ISO code, for example USD or CAD.");
+    if (country && !isValidCountryCode(country)) return setErrorMessage("Country code must be a 2-letter ISO code, for example US or CA.");
+    if (email && !isValidEmail(email)) return setErrorMessage("Enter a valid company email address.");
+    if (phone && !isValidPhone(phone)) return setErrorMessage("Enter a valid phone number using 7 to 15 digits. Letters are not allowed.");
+    if (website && !isValidHttpUrl(website)) return setErrorMessage("Website must be a valid http:// or https:// URL.");
+    if (logoUrl && !isValidHttpUrl(logoUrl)) return setErrorMessage("Logo URL must be a valid http:// or https:// URL.");
     if (!locale) return setErrorMessage("Locale is required.");
     if (!timezone) return setErrorMessage("Timezone is required.");
     if (!documentTitle) return setErrorMessage("Order document title is required.");
@@ -171,24 +198,24 @@ export default function GeneralSettingsManager() {
 
     const payload = {
       company_name: companyName,
-      legal_name: optional(settings.legal_name),
-      logo_url: optional(settings.logo_url),
-      tax_number: optional(settings.tax_number),
-      registration_number: optional(settings.registration_number),
-      email: optional(settings.email),
-      phone: optional(settings.phone),
-      website: optional(settings.website),
-      address_line_1: optional(settings.address_line_1),
-      address_line_2: optional(settings.address_line_2),
-      postal_code: optional(settings.postal_code),
-      city: optional(settings.city),
-      state_region: optional(settings.state_region),
+      legal_name: normalizeOptional(settings.legal_name),
+      logo_url: logoUrl,
+      tax_number: normalizeOptional(settings.tax_number),
+      registration_number: normalizeOptional(settings.registration_number),
+      email: email ? normalizeEmail(email) : null,
+      phone,
+      website,
+      address_line_1: normalizeOptional(settings.address_line_1),
+      address_line_2: normalizeOptional(settings.address_line_2),
+      postal_code: normalizeOptional(settings.postal_code),
+      city: normalizeOptional(settings.city),
+      state_region: normalizeOptional(settings.state_region),
       country_code: country,
       default_currency: currency,
       locale,
       timezone,
       order_document_title: documentTitle,
-      order_footer_note: optional(settings.order_footer_note),
+      order_footer_note: normalizeOptional(settings.order_footer_note),
     };
 
     const { data, error } = await supabase
@@ -251,7 +278,7 @@ export default function GeneralSettingsManager() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Company Display Name" value={settings.company_name} onChange={(value) => patch("company_name", value)} disabled={disabled} required placeholder="Example Company" />
-          <Field label="Legal Company Name" value={settings.legal_name} onChange={(value) => patch("legal_name", value)} disabled={disabled} placeholder="Example Company d.o.o." />
+          <Field label="Legal Company Name" value={settings.legal_name} onChange={(value) => patch("legal_name", value)} disabled={disabled} placeholder="Example Company LLC" />
 
           <div className="md:col-span-2">
             <span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Company Logo</span>
@@ -289,7 +316,7 @@ export default function GeneralSettingsManager() {
           </div>
 
           <div className="md:col-span-2">
-            <Field label="Logo URL" value={settings.logo_url} onChange={(value) => patch("logo_url", value)} disabled={disabled} placeholder="https://.../logo.png" hint="Filled automatically after upload. It can also point to another public HTTPS image." />
+            <Field label="Logo URL" type="url" inputMode="url" value={settings.logo_url} onChange={(value) => patch("logo_url", value)} disabled={disabled} placeholder="https://example.com/logo.png" hint="Filled automatically after upload. It can also point to another public HTTPS image." />
           </div>
         </div>
       </section>
@@ -300,8 +327,8 @@ export default function GeneralSettingsManager() {
           <p className="mt-1 text-sm text-gray-500">Official identifiers that can be shown on commercial documents.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Tax / VAT Number" value={settings.tax_number} onChange={(value) => patch("tax_number", value)} disabled={disabled} placeholder="Tax or VAT ID" />
-          <Field label="Registration Number" value={settings.registration_number} onChange={(value) => patch("registration_number", value)} disabled={disabled} placeholder="Company registration number" />
+          <Field label="Tax / EIN Number" value={settings.tax_number} onChange={(value) => patch("tax_number", value)} disabled={disabled} placeholder="12-3456789" />
+          <Field label="Registration Number" value={settings.registration_number} onChange={(value) => patch("registration_number", value)} disabled={disabled} placeholder="State registration number" />
         </div>
       </section>
 
@@ -311,9 +338,9 @@ export default function GeneralSettingsManager() {
           <p className="mt-1 text-sm text-gray-500">Primary company contact details used on orders and future documents.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Field label="Email" type="email" value={settings.email} onChange={(value) => patch("email", value)} disabled={disabled} placeholder="office@example.com" />
-          <Field label="Phone" value={settings.phone} onChange={(value) => patch("phone", value)} disabled={disabled} placeholder="+382 ..." />
-          <Field label="Website" value={settings.website} onChange={(value) => patch("website", value)} disabled={disabled} placeholder="https://example.com" />
+          <Field label="Email" type="email" inputMode="email" autoComplete="email" value={settings.email} onChange={(value) => patch("email", value)} disabled={disabled} placeholder="office@example.com" />
+          <Field label="Phone" type="tel" inputMode="tel" autoComplete="tel" maxLength={24} value={settings.phone} onChange={(value) => patch("phone", sanitizePhoneInput(value))} disabled={disabled} placeholder="+1 (202) 555-0123" />
+          <Field label="Website" type="url" inputMode="url" value={settings.website} onChange={(value) => patch("website", value)} disabled={disabled} placeholder="https://example.com" />
         </div>
       </section>
 
@@ -324,13 +351,13 @@ export default function GeneralSettingsManager() {
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="md:col-span-2 xl:col-span-2">
-            <Field label="Address Line 1" value={settings.address_line_1} onChange={(value) => patch("address_line_1", value)} disabled={disabled} placeholder="Street and number" />
+            <Field label="Address Line 1" value={settings.address_line_1} onChange={(value) => patch("address_line_1", value)} disabled={disabled} placeholder="123 Main St" />
           </div>
-          <Field label="Address Line 2" value={settings.address_line_2} onChange={(value) => patch("address_line_2", value)} disabled={disabled} placeholder="Suite, floor, etc." />
-          <Field label="Postal Code" value={settings.postal_code} onChange={(value) => patch("postal_code", value)} disabled={disabled} />
-          <Field label="City" value={settings.city} onChange={(value) => patch("city", value)} disabled={disabled} />
-          <Field label="State / Region" value={settings.state_region} onChange={(value) => patch("state_region", value)} disabled={disabled} />
-          <Field label="Country Code" value={settings.country_code} onChange={(value) => patch("country_code", value.toUpperCase().slice(0, 2))} disabled={disabled} placeholder="ME" hint="2-letter ISO country code." />
+          <Field label="Address Line 2" value={settings.address_line_2} onChange={(value) => patch("address_line_2", value)} disabled={disabled} placeholder="Suite 400" />
+          <Field label="ZIP / Postal Code" autoComplete="postal-code" value={settings.postal_code} onChange={(value) => patch("postal_code", value)} disabled={disabled} placeholder="10001" />
+          <Field label="City" autoComplete="address-level2" value={settings.city} onChange={(value) => patch("city", value)} disabled={disabled} placeholder="New York" />
+          <Field label="State" autoComplete="address-level1" value={settings.state_region} onChange={(value) => patch("state_region", value)} disabled={disabled} placeholder="NY" />
+          <Field label="Country Code" maxLength={2} value={settings.country_code} onChange={(value) => patch("country_code", normalizeCountryCode(value))} disabled={disabled} placeholder="US" hint="2-letter ISO country code." />
         </div>
       </section>
 
@@ -340,9 +367,9 @@ export default function GeneralSettingsManager() {
           <p className="mt-1 text-sm text-gray-500">System-wide defaults. Order-specific values still take priority when an order already stores its own currency.</p>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <Field label="Default Currency" value={settings.default_currency} onChange={(value) => patch("default_currency", value.toUpperCase().slice(0, 3))} disabled={disabled} required placeholder="EUR" hint="3-letter ISO currency code." />
+          <Field label="Default Currency" maxLength={3} value={settings.default_currency} onChange={(value) => patch("default_currency", normalizeCurrencyCode(value))} disabled={disabled} required placeholder="USD" hint="3-letter ISO currency code." />
           <Field label="Locale" value={settings.locale} onChange={(value) => patch("locale", value)} disabled={disabled} required placeholder="en-US" hint="Used for number and date formatting." />
-          <Field label="Timezone" value={settings.timezone} onChange={(value) => patch("timezone", value)} disabled={disabled} required placeholder="Europe/Podgorica" />
+          <Field label="Timezone" value={settings.timezone} onChange={(value) => patch("timezone", value)} disabled={disabled} required placeholder="America/New_York" />
           <div className="md:col-span-2 xl:col-span-3">
             <Field label="Order Document Title" value={settings.order_document_title} onChange={(value) => patch("order_document_title", value)} disabled={disabled} required placeholder="Sales Order / Order Confirmation" />
           </div>

@@ -5,6 +5,7 @@ import {
   requireAdmin,
 } from "@/lib/auth/admin-api";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
+import { isValidEmail, isValidPhone } from "@/lib/validation";
 
 const VALID_ROLES: UserRole[] = [
   "super_admin",
@@ -168,8 +169,15 @@ export async function POST(request: Request) {
   const mode = body.mode === "password" ? "password" : "invite";
   const password = typeof body.password === "string" ? body.password : "";
 
-  if (!email || !email.includes("@")) {
+  if (!email || !isValidEmail(email)) {
     return jsonError("A valid email address is required.", 400);
+  }
+
+  if (phone && !isValidPhone(phone)) {
+    return jsonError(
+      "Phone must contain 7 to 15 digits and cannot contain letters.",
+      400
+    );
   }
 
   if (!isUserRole(role)) {
@@ -298,8 +306,8 @@ export async function PATCH(request: Request) {
   if (action === "send_reset") {
     const email = normalizeEmail(currentProfile.email);
 
-    if (!email) {
-      return jsonError("This user does not have an email address.", 400);
+    if (!email || !isValidEmail(email)) {
+      return jsonError("This user does not have a valid email address.", 400);
     }
 
     const siteUrl = getSiteUrl(request);
@@ -374,8 +382,15 @@ export async function PATCH(request: Request) {
   const phone = normalizeOptionalText(body.phone);
   const email = normalizeEmail(body.email ?? currentProfile.email);
 
-  if (!email || !email.includes("@")) {
+  if (!email || !isValidEmail(email)) {
     return jsonError("A valid email address is required.", 400);
+  }
+
+  if (phone && !isValidPhone(phone)) {
+    return jsonError(
+      "Phone must contain 7 to 15 digits and cannot contain letters.",
+      400
+    );
   }
 
   if (email !== currentProfile.email) {
