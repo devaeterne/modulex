@@ -129,20 +129,20 @@ export default function CustomerShipmentsList({ customerId }: { customerId?: str
   }, [query, rows, status]);
 
   if (isLoading) {
-    return <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Loading shipments...</div>;
+    return <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400">Loading shipments...</div>;
   }
 
   return (
     <div className="space-y-4">
-      {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{errorMessage}</div>}
+      {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="grid gap-3 md:grid-cols-[1fr_220px]">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search shipment, customer, order, carrier or tracking"
-            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
           <select
             value={status}
@@ -154,21 +154,21 @@ export default function CustomerShipmentsList({ customerId }: { customerId?: str
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
             <thead className="bg-gray-50 dark:bg-white/[0.02]">
               <tr>
                 {["Shipment", "Customer", "Order", "Status", "Carrier / Tracking", "Shipped", "Delivered"].map((label) => (
-                  <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>
+                  <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filtered.map((row) => (
-                <tr key={row.id}>
+                <tr key={row.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                   <td className="px-4 py-4">
-                    <Link href={`/customers/${row.customer_id}/shipments/${row.id}`} className="text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400">
+                    <Link href={`/customers/${row.customer_id}/shipments/${row.id}`} className="text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">
                       {row.shipment_number}
                     </Link>
                   </td>
@@ -177,14 +177,14 @@ export default function CustomerShipmentsList({ customerId }: { customerId?: str
                   <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(row.status)}`}>{titleCase(row.status)}</span></td>
                   <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
                     <div>{row.carrier || "—"}</div>
-                    {row.tracking_number && <div className="mt-1 text-xs text-gray-400">{row.tracking_number}</div>}
+                    {row.tracking_number && <div className="mt-1 text-xs text-gray-400 dark:text-gray-500">{row.tracking_number}</div>}
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{date(row.shipped_at)}</td>
                   <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{date(row.delivered_at)}</td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500">No shipments found.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No shipments found.</td></tr>
               )}
             </tbody>
           </table>
