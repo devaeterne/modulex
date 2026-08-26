@@ -6,20 +6,18 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseSecretKey =
   process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl) {
-  throw new Error("NEXT_PUBLIC_SUPABASE_URL is missing");
-}
+export const isSupabaseAdminConfigured = Boolean(
+  supabaseUrl && supabaseSecretKey
+);
 
-if (!supabaseSecretKey) {
-  throw new Error(
-    "SUPABASE_SECRET_KEY (or legacy SUPABASE_SERVICE_ROLE_KEY) is missing"
-  );
-}
-
-export const supabaseAdmin = createClient(supabaseUrl, supabaseSecretKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
-  },
-});
+export const supabaseAdmin = createClient(
+  supabaseUrl ?? "http://127.0.0.1:54321",
+  supabaseSecretKey ?? "missing-server-secret",
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  }
+);
