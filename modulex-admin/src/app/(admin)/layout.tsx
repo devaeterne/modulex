@@ -6,6 +6,7 @@ import { useSidebar } from "@/context/SidebarContext";
 import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
+import EmailNotificationPump from "@/components/email/EmailNotificationPump";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import {
@@ -115,6 +116,7 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen xl:flex print:block print:min-h-0">
+      <EmailNotificationPump />
       <div className="print:hidden">
         <AppSidebar />
         <Backdrop />
