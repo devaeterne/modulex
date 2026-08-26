@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
-import type { Customer, CustomerAddress, PriceGroupLookup } from "@/lib/customers/types";
+import type { Customer, CustomerAddress, PaymentMethod, PriceGroupLookup } from "@/lib/customers/types";
 
 type Product = { id: string; sku: string; name: string; barcode: string | null; status: string };
 type PriceRow = { product_id: string; price_group_id: string; amount: string | number };
@@ -25,9 +25,11 @@ export default function NewCustomerOrder() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [priceGroups, setPriceGroups] = useState<PriceGroupLookup[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [prices, setPrices] = useState<PriceRow[]>([]);
   const [priceGroupId, setPriceGroupId] = useState("");
+  const [paymentMethodId, setPaymentMethodId] = useState("");
   const [billingAddressId, setBillingAddressId] = useState("");
   const [shippingAddressId, setShippingAddressId] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
@@ -57,14 +59,15 @@ export default function NewCustomerOrder() {
         return;
       }
 
-      const [customerResult, addressesResult, groupsResult, productsResult] = await Promise.all([
+      const [customerResult, addressesResult, groupsResult, methodsResult, productsResult] = await Promise.all([
         supabase.from("customers").select("*").eq("id", customerId).single(),
         supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("address_name"),
         supabase.from("price_groups").select("id, name, system_key, sort_order, is_base_price, is_active").eq("is_active", true).order("sort_order"),
+        supabase.from("payment_methods").select("id, system_key, name, commission_percent, sort_order, is_active").eq("is_active", true).order("sort_order"),
         supabase.from("products").select("id, sku, name, barcode, status").eq("status", "active").order("sku"),
       ]);
 
-      const firstError = customerResult.error || addressesResult.error || groupsResult.error || productsResult.error;
+      const firstError = customerResult.error || addressesResult.error || groupsResult.error || methodsResult.error || productsResult.error;
       if (firstError) {
         setErrorMessage(firstError.message);
         setIsLoading(false);
@@ -74,11 +77,15 @@ export default function NewCustomerOrder() {
       const loadedCustomer = customerResult.data as Customer;
       const loadedAddresses = (addressesResult.data ?? []) as CustomerAddress[];
       const loadedGroups = (groupsResult.data ?? []) as PriceGroupLookup[];
+      const loadedMethods = (methodsResult.data ?? []) as PaymentMethod[];
+
       setCustomer(loadedCustomer);
       setAddresses(loadedAddresses);
       setPriceGroups(loadedGroups);
+      setPaymentMethods(loadedMethods);
       setProducts((productsResult.data ?? []) as Product[]);
       setPriceGroupId(loadedCustomer.price_group_id || loadedGroups.find((g) => g.is_base_price)?.id || loadedGroups[0]?.id || "");
+      setPaymentMethodId(loadedMethods.find((m) => m.system_key === "cash")?.id || loadedMethods[0]?.id || "");
       setBillingAddressId(loadedAddresses.find((a) => a.is_default_billing)?.id || "");
       setShippingAddressId(loadedAddresses.find((a) => a.is_default_shipping)?.id || "");
       setIsLoading(false);
@@ -106,26 +113,22 @@ export default function NewCustomerOrder() {
         .eq("currency_code", "USD");
 
       if (!active) return;
-
       if (error) {
         setErrorMessage(error.message);
         setPrices([]);
       } else {
         setPrices((data ?? []) as PriceRow[]);
       }
-
       setIsLoadingPrices(false);
     }
 
     loadGroupPrices();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [priceGroupId]);
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const priceMap = useMemo(() => new Map(prices.map((p) => [p.product_id, Number(p.amount)])), [prices]);
+  const selectedPaymentMethod = useMemo(() => paymentMethods.find((m) => m.id === paymentMethodId) ?? null, [paymentMethods, paymentMethodId]);
 
   const preview = useMemo(() => {
     let subtotal = 0;
@@ -138,8 +141,12 @@ export default function NewCustomerOrder() {
     const orderDiscountNumber = Math.max(0, Number(orderDiscount || 0));
     const taxable = Math.max(0, subtotal - orderDiscountNumber);
     const tax = taxable * Math.max(0, Number(taxRate || 0)) / 100;
-    return { subtotal, tax, total: taxable + tax };
-  }, [items, priceMap, orderDiscount, taxRate]);
+    const orderTotal = taxable + tax;
+    const commissionPercent = Number(selectedPaymentMethod?.commission_percent ?? 0);
+    const paymentCommission = orderTotal * commissionPercent / 100;
+    const grandTotal = orderTotal + paymentCommission;
+    return { subtotal, tax, orderTotal, commissionPercent, paymentCommission, grandTotal };
+  }, [items, priceMap, orderDiscount, taxRate, selectedPaymentMethod]);
 
   function updateItem(index: number, values: Partial<DraftItem>) {
     setItems((current) => current.map((item, i) => i === index ? { ...item, ...values } : item));
@@ -148,6 +155,7 @@ export default function NewCustomerOrder() {
   async function saveOrder() {
     setErrorMessage(null);
     if (!customer || !priceGroupId) return setErrorMessage("Customer and price group are required.");
+    if (!paymentMethodId) return setErrorMessage("Payment method is required.");
     if (isLoadingPrices) return setErrorMessage("Prices are still loading.");
 
     const validItems = items.filter((item) => item.product_id && Number(item.quantity) > 0);
@@ -180,6 +188,7 @@ export default function NewCustomerOrder() {
       p_internal_notes: internalNotes.trim() || null,
       p_tax_rate: Number(taxRate || 0),
       p_order_discount_amount: Number(orderDiscount || 0),
+      p_payment_method_id: paymentMethodId,
       p_initial_status: initialStatus,
     });
 
@@ -207,6 +216,7 @@ export default function NewCustomerOrder() {
       <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Order Information</h2>
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Field label="Price Group"><select value={priceGroupId} onChange={(e) => setPriceGroupId(e.target.value)} className={inputClass}>{priceGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>{isLoadingPrices && <span className="mt-1 block text-xs text-gray-400">Loading prices...</span>}</Field>
+        <Field label="Payment Method"><select value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)} className={inputClass}>{paymentMethods.map((m) => <option key={m.id} value={m.id}>{m.name}{Number(m.commission_percent) > 0 ? ` (+${Number(m.commission_percent).toFixed(2)}%)` : ""}</option>)}</select></Field>
         <Field label="Initial Status"><select value={initialStatus} onChange={(e) => setInitialStatus(e.target.value as "draft" | "confirmed")} className={inputClass}><option value="draft">Draft</option><option value="confirmed">Confirmed</option></select></Field>
         <Field label="Expected Delivery"><input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className={inputClass} /></Field>
         <Field label="Customer Reference"><input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="PO / reference" className={inputClass} /></Field>
@@ -230,7 +240,7 @@ export default function NewCustomerOrder() {
 
     <div className="grid gap-5 xl:grid-cols-12">
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 xl:col-span-8"><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes"><textarea value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} className="min-h-[110px] w-full rounded-lg border border-gray-300 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" /></Field><Field label="Internal Notes"><textarea value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="min-h-[110px] w-full rounded-lg border border-gray-300 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" /></Field></div></div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 xl:col-span-4"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Order Total</h2><div className="mt-4 space-y-3 text-sm"><Row label="Lines after discount" value={money(preview.subtotal)} /><Row label="Order discount" value={`-${money(Number(orderDiscount || 0))}`} /><Row label="Tax" value={money(preview.tax)} /><div className="border-t border-gray-200 pt-3 dark:border-gray-800"><Row label="Total" value={money(preview.total)} strong /></div></div><button type="button" disabled={isSaving || isLoadingPrices} onClick={saveOrder} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">{isSaving ? "Creating..." : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</button></div>
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 xl:col-span-4"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Order Total</h2><div className="mt-4 space-y-3 text-sm"><Row label="Lines after discount" value={money(preview.subtotal)} /><Row label="Order discount" value={`-${money(Number(orderDiscount || 0))}`} /><Row label="Tax" value={money(preview.tax)} /><Row label="Order Total" value={money(preview.orderTotal)} />{preview.paymentCommission > 0 && <Row label={`${selectedPaymentMethod?.name || "Payment"} Commission (${preview.commissionPercent.toFixed(2)}%)`} value={money(preview.paymentCommission)} />}<div className="border-t border-gray-200 pt-3 dark:border-gray-800"><Row label="Grand Total" value={money(preview.grandTotal)} strong /></div></div><button type="button" disabled={isSaving || isLoadingPrices || !paymentMethodId} onClick={saveOrder} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">{isSaving ? "Creating..." : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</button></div>
     </div>
   </div>;
 }

@@ -57,6 +57,17 @@ export type PaymentTerm = {
   is_active: boolean;
 };
 
+export type PaymentMethod = {
+  id: string;
+  system_key: string;
+  name: string;
+  commission_percent: string | number;
+  sort_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type CustomerContact = {
   id: string;
   customer_id: string;
@@ -182,6 +193,11 @@ export type CustomerOrder = {
   price_group_id: string | null;
   price_group_name_snapshot: string | null;
   currency_code: string;
+  payment_method_id: string | null;
+  payment_method_name_snapshot: string | null;
+  payment_commission_percent: string | number;
+  payment_commission_amount: string | number;
+  grand_total: string | number;
   billing_address_id: string | null;
   shipping_address_id: string | null;
   billing_address_snapshot: Record<string, unknown> | null;

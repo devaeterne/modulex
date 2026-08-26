@@ -59,6 +59,7 @@ const navItems: NavItem[] = [
       { name: "Dashboard", path: "/customers/dashboard" },
       { name: "Customer List", path: "/customers" },
       { name: "Orders", path: "/customers/orders" },
+      { name: "Payment Methods", path: "/customers/payment-methods" },
     ],
   },
   {
@@ -313,31 +314,11 @@ const AppSidebar: React.FC = () => {
         <Link href="/">
           {isExpanded || isHovered || isMobileOpen ? (
             <>
-              <Image
-                className="dark:hidden"
-                src="/images/logo/logo.svg"
-                alt="Modulex"
-                width={150}
-                height={40}
-                priority
-              />
-              <Image
-                className="hidden dark:block"
-                src="/images/logo/logo-dark.svg"
-                alt="Modulex"
-                width={150}
-                height={40}
-                priority
-              />
+              <Image className="dark:hidden" src="/images/logo/logo.svg" alt="Modulex" width={150} height={40} priority />
+              <Image className="hidden dark:block" src="/images/logo/logo-dark.svg" alt="Modulex" width={150} height={40} priority />
             </>
           ) : (
-            <Image
-              src="/images/logo/logo-icon.svg"
-              alt="Modulex"
-              width={32}
-              height={32}
-              priority
-            />
+            <Image src="/images/logo/logo-icon.svg" alt="Modulex" width={32} height={32} priority />
           )}
         </Link>
       </div>

@@ -30,6 +30,12 @@ function badge(status: CustomerOrderStatus) {
   return "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400";
 }
 
+function orderGrandTotal(order: CustomerOrder) {
+  const grand = Number(order.grand_total ?? 0);
+  if (grand > 0 || Number(order.total_amount ?? 0) === 0) return grand;
+  return Number(order.total_amount ?? 0);
+}
+
 export default function CustomerOrdersList({ customerId }: { customerId?: string }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
@@ -80,7 +86,12 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
     const query = search.trim().toLowerCase();
     return orders.filter((order) => {
       const customer = customerMap.get(order.customer_id);
-      const matchesSearch = !query || order.order_number.toLowerCase().includes(query) || (order.customer_reference ?? "").toLowerCase().includes(query) || (customer?.name ?? "").toLowerCase().includes(query) || (customer?.customer_code ?? "").toLowerCase().includes(query);
+      const matchesSearch = !query ||
+        order.order_number.toLowerCase().includes(query) ||
+        (order.customer_reference ?? "").toLowerCase().includes(query) ||
+        (order.payment_method_name_snapshot ?? "").toLowerCase().includes(query) ||
+        (customer?.name ?? "").toLowerCase().includes(query) ||
+        (customer?.customer_code ?? "").toLowerCase().includes(query);
       return matchesSearch && (status === "all" || order.status === status);
     });
   }, [orders, search, status, customerMap]);
@@ -88,7 +99,7 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const page = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const openOrders = orders.filter((item) => !["completed", "cancelled"].includes(item.status));
-  const totalValue = orders.reduce((sum, item) => sum + Number(item.total_amount ?? 0), 0);
+  const totalValue = orders.reduce((sum, item) => sum + orderGrandTotal(item), 0);
 
   useEffect(() => setCurrentPage(1), [search, status, pageSize]);
 
@@ -117,7 +128,7 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
 
     <div className="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
       <div className="grid gap-3 border-b border-gray-200 p-4 md:grid-cols-[1fr_220px] dark:border-gray-800">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order, reference or customer..." className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order, reference, payment or customer..." className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" />
         <select value={status} onChange={(e) => setStatus(e.target.value as "all" | CustomerOrderStatus)} className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
           <option value="all">All Statuses</option>
           {["draft","confirmed","in_preparation","ready_for_shipment","shipped","delivered","installation_scheduled","installation_in_progress","completed","cancelled"].map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}
@@ -126,7 +137,7 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
 
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-          <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Order", ...(selectedCustomer ? [] : ["Customer"]), "Date", "Expected", "Items", "Status", "Total"].map((label) => <th key={label} className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>)}</tr></thead>
+          <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Order", ...(selectedCustomer ? [] : ["Customer"]), "Date", "Expected", "Payment", "Items", "Status", "Grand Total"].map((label) => <th key={label} className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>)}</tr></thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {page.map((order) => {
               const customer = customerMap.get(order.customer_id);
@@ -135,12 +146,13 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
                 {!selectedCustomer && <td className="px-5 py-4"><Link href={`/customers/${order.customer_id}`} className="text-sm font-medium text-gray-800 hover:text-brand-600 dark:text-white/90">{customer?.name ?? "Unknown"}</Link><p className="text-xs text-gray-400">{customer?.customer_code}</p></td>}
                 <td className="px-5 py-4 text-sm text-gray-500">{date(order.order_date)}</td>
                 <td className="px-5 py-4 text-sm text-gray-500">{date(order.expected_delivery_date)}</td>
+                <td className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">{order.payment_method_name_snapshot || "—"}{Number(order.payment_commission_percent ?? 0) > 0 ? ` (+${Number(order.payment_commission_percent).toFixed(2)}%)` : ""}</td>
                 <td className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">{order.item_count}</td>
                 <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge(order.status)}`}>{titleCase(order.status)}</span></td>
-                <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{money(order.total_amount)}</td>
+                <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{money(orderGrandTotal(order))}</td>
               </tr>;
             })}
-            {page.length === 0 && <tr><td colSpan={selectedCustomer ? 6 : 7} className="px-5 py-12 text-center text-sm text-gray-500">No orders found.</td></tr>}
+            {page.length === 0 && <tr><td colSpan={selectedCustomer ? 7 : 8} className="px-5 py-12 text-center text-sm text-gray-500">No orders found.</td></tr>}
           </tbody>
         </table>
       </div>
