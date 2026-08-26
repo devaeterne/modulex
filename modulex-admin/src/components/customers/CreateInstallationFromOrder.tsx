@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import type { ProfileLookup } from "@/lib/customers/types";
 
-const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
+const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30";
 
 export default function CreateInstallationFromOrder() {
   const params = useParams<{ id: string; orderId: string }>();
@@ -64,20 +64,20 @@ export default function CreateInstallationFromOrder() {
   }
 
   return (
-    <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
+    <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">Installation Appointment</h2>
-          <p className="mt-1 text-sm text-gray-500">Schedule installation directly from this order.</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Schedule installation directly from this order.</p>
         </div>
-        <button onClick={() => setOpen((value) => !value)} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
+        <button onClick={() => setOpen((value) => !value)} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600 dark:hover:bg-brand-600">
           {open ? "Close" : "Schedule Installation"}
         </button>
       </div>
 
       {open && (
         <div className="mt-5 border-t border-gray-100 pt-5 dark:border-gray-800">
-          {errorMessage && <div className="mb-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{errorMessage}</div>}
+          {errorMessage && <div className="mb-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <label className="text-sm text-gray-600 dark:text-gray-300">Start<input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} className={`mt-1 ${inputClass}`} /></label>
             <label className="text-sm text-gray-600 dark:text-gray-300">End<input type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} className={`mt-1 ${inputClass}`} /></label>
@@ -86,8 +86,8 @@ export default function CreateInstallationFromOrder() {
             <label className="text-sm text-gray-600 dark:text-gray-300">Contact Name<input value={contactName} onChange={(e) => setContactName(e.target.value)} className={`mt-1 ${inputClass}`} /></label>
             <label className="text-sm text-gray-600 dark:text-gray-300">Contact Phone<input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className={`mt-1 ${inputClass}`} /></label>
           </div>
-          <label className="mt-3 block text-sm text-gray-600 dark:text-gray-300">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" /></label>
-          <div className="mt-4 flex justify-end"><button disabled={isSaving} onClick={createInstallation} className="h-10 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white disabled:opacity-50">{isSaving ? "Scheduling..." : "Create Appointment"}</button></div>
+          <label className="mt-3 block text-sm text-gray-600 dark:text-gray-300">Notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" /></label>
+          <div className="mt-4 flex justify-end"><button disabled={isSaving} onClick={createInstallation} className="h-10 rounded-lg bg-brand-500 px-5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-50 dark:hover:bg-brand-600">{isSaving ? "Scheduling..." : "Create Appointment"}</button></div>
         </div>
       )}
     </div>
