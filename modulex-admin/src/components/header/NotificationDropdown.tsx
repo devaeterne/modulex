@@ -1,108 +1,242 @@
 "use client";
 
 import Link from "next/link";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
+import { supabase } from "@/lib/supabase/client";
+import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
+import {
+  canRoleSeeNotification,
+  type AppNotification,
+  type NotificationSeverity,
+} from "@/lib/notifications";
 
-type NotificationItem = {
-  id: string;
-  title: string;
-  description: string;
-  type: "stock" | "warehouse" | "qr" | "system";
-  time: string;
-  href: string;
+type InventoryAlertRow = {
+  inventory_id: string;
+  sku: string;
+  product_name: string;
+  warehouse_code: string;
+  location_code: string;
+  available_quantity: number;
+  stock_status: string;
 };
 
-const notifications: NotificationItem[] = [
-  {
-    id: "1",
-    title: "Low stock detected",
-    description: "SKU-0003 is below the minimum stock level.",
-    type: "stock",
-    time: "Just now",
-    href: "/low-stock",
-  },
-  {
-    id: "2",
-    title: "New stock movement",
-    description: "A stock-in operation was recorded for SKU-0001.",
-    type: "warehouse",
-    time: "5 min ago",
-    href: "/stock-movements",
-  },
-  {
-    id: "3",
-    title: "QR labels ready",
-    description: "Shelf labels can be generated for active locations.",
-    type: "qr",
-    time: "Today",
-    href: "/qr-labels",
-  },
-];
-
-function getNotificationBadge(type: NotificationItem["type"]) {
-  const baseClass =
-    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold";
-
-  switch (type) {
-    case "stock":
-      return (
-        <span className={`${baseClass} bg-error-50 text-error-600 dark:bg-error-500/10 dark:text-error-400`}>
-          !
-        </span>
-      );
-    case "warehouse":
-      return (
-        <span className={`${baseClass} bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400`}>
-          S
-        </span>
-      );
-    case "qr":
-      return (
-        <span className={`${baseClass} bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400`}>
-          QR
-        </span>
-      );
+function severityStyles(severity: NotificationSeverity) {
+  switch (severity) {
+    case "critical":
+      return {
+        icon: "bg-error-50 text-error-600 ring-error-100 dark:bg-error-500/10 dark:text-error-400 dark:ring-error-500/20",
+        badge: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
+        dot: "bg-error-500",
+        label: "Critical",
+      };
+    case "warning":
+      return {
+        icon: "bg-warning-50 text-warning-700 ring-warning-100 dark:bg-warning-500/10 dark:text-warning-400 dark:ring-warning-500/20",
+        badge: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
+        dot: "bg-warning-500",
+        label: "Attention",
+      };
+    case "success":
+      return {
+        icon: "bg-success-50 text-success-700 ring-success-100 dark:bg-success-500/10 dark:text-success-400 dark:ring-success-500/20",
+        badge: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
+        dot: "bg-success-500",
+        label: "Ready",
+      };
+    case "dealer":
+      return {
+        icon: "bg-purple-50 text-purple-700 ring-purple-100 dark:bg-purple-500/10 dark:text-purple-400 dark:ring-purple-500/20",
+        badge: "bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400",
+        dot: "bg-purple-500",
+        label: "Application",
+      };
+    case "info":
     default:
-      return (
-        <span className={`${baseClass} bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300`}>
-          i
-        </span>
-      );
+      return {
+        icon: "bg-brand-50 text-brand-700 ring-brand-100 dark:bg-brand-500/10 dark:text-brand-400 dark:ring-brand-500/20",
+        badge: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400",
+        dot: "bg-brand-500",
+        label: "New",
+      };
   }
+}
+
+function notificationIcon(notification: AppNotification) {
+  const styles = severityStyles(notification.severity);
+  const baseClass = `flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold ring-1 ${styles.icon}`;
+
+  switch (notification.type) {
+    case "low_stock":
+      return <span className={baseClass}>STK</span>;
+    case "new_order_request":
+      return <span className={baseClass}>ORD</span>;
+    case "new_dealer_application":
+      return <span className={baseClass}>DLR</span>;
+    case "order_ready_for_shipment":
+      return <span className={baseClass}>SHP</span>;
+    case "order_cancellation":
+      return <span className={baseClass}>CAN</span>;
+    case "stock_warehouse_problem":
+      return <span className={baseClass}>WH</span>;
+    default:
+      return <span className={baseClass}>!</span>;
+  }
+}
+
+function readStorageKey(userId: string) {
+  return `modulex-notifications-read:${userId}`;
 }
 
 export default function NotificationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
-  const [notifying, setNotifying] = useState(notifications.length > 0);
+  const [role, setRole] = useState<UserRole | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadNotifications() {
+      setIsLoading(true);
+
+      const { profile } = await getCurrentProfile();
+
+      if (!mounted || !profile) {
+        if (mounted) setIsLoading(false);
+        return;
+      }
+
+      setRole(profile.role);
+      setUserId(profile.id);
+
+      try {
+        const storedReadIds = window.localStorage.getItem(readStorageKey(profile.id));
+        if (storedReadIds) {
+          setReadIds(new Set(JSON.parse(storedReadIds) as string[]));
+        }
+      } catch {
+        setReadIds(new Set());
+      }
+
+      const nextNotifications: AppNotification[] = [];
+
+      if (canRoleSeeNotification(profile.role, "low_stock")) {
+        const { data } = await supabase.rpc("search_stock", {
+          p_query: "",
+          p_limit: 100,
+        });
+
+        const lowStockRows = ((data as InventoryAlertRow[] | null) ?? [])
+          .filter((row) => row.stock_status === "LOW_STOCK")
+          .sort(
+            (a, b) =>
+              Number(a.available_quantity ?? 0) - Number(b.available_quantity ?? 0)
+          )
+          .slice(0, 8);
+
+        for (const row of lowStockRows) {
+          const available = Number(row.available_quantity ?? 0);
+          const critical = available <= 1;
+
+          nextNotifications.push({
+            id: `low-stock:${row.inventory_id}:${available}`,
+            type: "low_stock",
+            title: critical ? "Critical stock level" : "Low stock detected",
+            description: `${row.sku} · ${row.product_name} has ${available.toLocaleString(
+              "en-US"
+            )} available at ${row.warehouse_code} / ${row.location_code}.`,
+            severity: critical ? "critical" : "warning",
+            href: "/inventory",
+            timeLabel: "Current stock",
+          });
+        }
+      }
+
+      if (!mounted) return;
+
+      setNotifications(nextNotifications);
+      setIsLoading(false);
+    }
+
+    void loadNotifications();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const visibleNotifications = useMemo(() => {
+    if (!role) return [];
+
+    return notifications.filter((notification) =>
+      canRoleSeeNotification(role, notification.type)
+    );
+  }, [notifications, role]);
+
+  const unreadCount = useMemo(
+    () => visibleNotifications.filter((notification) => !readIds.has(notification.id)).length,
+    [visibleNotifications, readIds]
+  );
+
+  function persistReadIds(nextReadIds: Set<string>) {
+    setReadIds(nextReadIds);
+
+    if (!userId) return;
+
+    try {
+      window.localStorage.setItem(
+        readStorageKey(userId),
+        JSON.stringify(Array.from(nextReadIds))
+      );
+    } catch {
+      // Notification read state is non-critical; keep the in-memory state.
+    }
+  }
+
+  function markAsRead(notificationId: string) {
+    if (readIds.has(notificationId)) return;
+
+    const nextReadIds = new Set(readIds);
+    nextReadIds.add(notificationId);
+    persistReadIds(nextReadIds);
+  }
+
+  function markAllAsRead() {
+    const nextReadIds = new Set(readIds);
+
+    for (const notification of visibleNotifications) {
+      nextReadIds.add(notification.id);
+    }
+
+    persistReadIds(nextReadIds);
+  }
 
   function toggleDropdown() {
-    setIsOpen(!isOpen);
+    setIsOpen((current) => !current);
   }
 
   function closeDropdown() {
     setIsOpen(false);
   }
 
-  const handleClick = () => {
-    toggleDropdown();
-    setNotifying(false);
-  };
-
   return (
     <div className="relative">
       <button
-        className="relative dropdown-toggle flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full hover:text-gray-700 h-11 w-11 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-        onClick={handleClick}
-        aria-label="Open notifications"
+        type="button"
+        className="dropdown-toggle relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+        onClick={toggleDropdown}
+        aria-label={`Open notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
+        aria-expanded={isOpen}
       >
-        <span
-          className={`absolute right-0 top-0.5 z-10 h-2 w-2 rounded-full bg-orange-400 ${!notifying ? "hidden" : "flex"
-            }`}
-        >
-          <span className="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 animate-ping" />
-        </span>
+        {unreadCount > 0 && (
+          <span className="absolute -right-1 -top-1 z-10 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-error-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white dark:ring-gray-900">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
+        )}
 
         <svg
           className="fill-current"
@@ -123,77 +257,136 @@ export default function NotificationDropdown() {
       <Dropdown
         isOpen={isOpen}
         onClose={closeDropdown}
-        className="absolute -right-[240px] mt-[17px] flex w-[350px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[361px] lg:right-0"
+        className="absolute -right-[240px] mt-[17px] flex w-[360px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[400px] lg:right-0"
       >
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 dark:border-gray-700">
-          <div>
-            <h5 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-              Notifications
-            </h5>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Inventory and warehouse updates
-            </p>
+        <div className="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h5 className="text-base font-semibold text-gray-800 dark:text-white/90">
+                  Notifications
+                </h5>
+                {unreadCount > 0 && (
+                  <span className="rounded-full bg-error-50 px-2 py-0.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400">
+                    {unreadCount} new
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Actionable updates for your assigned role
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeDropdown}
+              className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/5 dark:hover:text-gray-300"
+              aria-label="Close notifications"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M6 6L18 18M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
           </div>
 
-          <button
-            onClick={toggleDropdown}
-            className="text-gray-500 transition dropdown-toggle dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            aria-label="Close notifications"
-          >
-            <svg
-              className="fill-current"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={markAllAsRead}
+              className="mt-3 text-xs font-medium text-brand-500 transition hover:text-brand-600 dark:text-brand-400"
             >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M6.21967 7.28131C5.92678 6.98841 5.92678 6.51354 6.21967 6.22065C6.51256 5.92775 6.98744 5.92775 7.28033 6.22065L11.999 10.9393L16.7176 6.22078C17.0105 5.92789 17.4854 5.92788 17.7782 6.22078C18.0711 6.51367 18.0711 6.98855 17.7782 7.28144L13.0597 12L17.7782 16.7186C18.0711 17.0115 18.0711 17.4863 17.7782 17.7792C17.4854 18.0721 17.0105 18.0721 16.7176 17.7792L11.999 13.0607L7.28033 17.7794C6.98744 18.0722 6.51256 18.0722 6.21967 17.7794C5.92678 17.4865 5.92678 17.0116 6.21967 16.7187L10.9384 12L6.21967 7.28131Z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
+              Mark all as read
+            </button>
+          )}
         </div>
 
-        <ul className="flex max-h-[360px] flex-col overflow-y-auto custom-scrollbar">
-          {notifications.map((notification) => (
-            <li key={notification.id}>
-              <DropdownItem
-                onItemClick={closeDropdown}
-                href={notification.href}
-                className="flex gap-3 rounded-lg border-b border-gray-100 px-4.5 py-3 hover:bg-gray-100 dark:border-gray-800 dark:hover:bg-white/5"
-              >
-                {getNotificationBadge(notification.type)}
+        <div className="max-h-[430px] overflow-y-auto custom-scrollbar">
+          {isLoading ? (
+            <div className="flex min-h-[180px] items-center justify-center px-5 py-8">
+              <div className="text-center">
+                <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Loading notifications...
+                </p>
+              </div>
+            </div>
+          ) : visibleNotifications.length === 0 ? (
+            <div className="flex min-h-[200px] flex-col items-center justify-center px-6 py-8 text-center">
+              <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400">
+                ✓
+              </span>
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                You&apos;re all caught up
+              </p>
+              <p className="mt-1 max-w-[260px] text-xs leading-5 text-gray-500 dark:text-gray-400">
+                New stock, order, dealer and warehouse alerts relevant to your role will appear here.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+              {visibleNotifications.map((notification) => {
+                const unread = !readIds.has(notification.id);
+                const styles = severityStyles(notification.severity);
 
-                <span className="block">
-                  <span className="mb-1 block text-theme-sm font-medium text-gray-800 dark:text-white/90">
-                    {notification.title}
-                  </span>
+                return (
+                  <li key={notification.id}>
+                    <DropdownItem
+                      tag="a"
+                      href={notification.href ?? "/"}
+                      onClick={() => markAsRead(notification.id)}
+                      onItemClick={closeDropdown}
+                      baseClassName="block w-full text-left"
+                      className={`relative flex gap-3 px-4 py-4 transition hover:bg-gray-50 dark:hover:bg-white/[0.03] ${
+                        unread ? "bg-brand-50/30 dark:bg-brand-500/[0.03]" : ""
+                      }`}
+                    >
+                      {unread && (
+                        <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-brand-500" />
+                      )}
 
-                  <span className="mb-2 block text-theme-sm text-gray-500 dark:text-gray-400">
-                    {notification.description}
-                  </span>
+                      {notificationIcon(notification)}
 
-                  <span className="flex items-center gap-2 text-gray-500 text-theme-xs dark:text-gray-400">
-                    <span>Modulex</span>
-                    <span className="w-1 h-1 bg-gray-400 rounded-full" />
-                    <span>{notification.time}</span>
-                  </span>
-                </span>
-              </DropdownItem>
-            </li>
-          ))}
-        </ul>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-start justify-between gap-2">
+                          <span className="block text-sm font-medium text-gray-800 dark:text-white/90">
+                            {notification.title}
+                          </span>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${styles.badge}`}>
+                            {styles.label}
+                          </span>
+                        </span>
 
-        <Link
-          href="/low-stock"
-          onClick={closeDropdown}
-          className="block px-4 py-2 mt-3 text-sm font-medium text-center text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
-        >
-          View Stock Alerts
-        </Link>
+                        <span className="mt-1.5 block text-xs leading-5 text-gray-500 dark:text-gray-400">
+                          {notification.description}
+                        </span>
+
+                        <span className="mt-2 flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500">
+                          <span className={`h-1.5 w-1.5 rounded-full ${styles.dot}`} />
+                          <span>{notification.timeLabel}</span>
+                        </span>
+                      </span>
+                    </DropdownItem>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="border-t border-gray-100 p-3 dark:border-gray-800">
+          <Link
+            href="/inventory"
+            onClick={closeDropdown}
+            className="block rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-center text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]"
+          >
+            View inventory
+          </Link>
+        </div>
       </Dropdown>
     </div>
   );
