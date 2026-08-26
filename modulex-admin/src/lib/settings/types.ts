@@ -19,6 +19,8 @@ export type GeneralSettings = {
   timezone: string;
   order_document_title: string;
   order_footer_note: string | null;
+  invoice_document_title: string;
+  invoice_footer_note: string | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -44,4 +46,6 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   timezone: "UTC",
   order_document_title: "Sales Order / Order Confirmation",
   order_footer_note: null,
+  invoice_document_title: "Invoice",
+  invoice_footer_note: null,
 };

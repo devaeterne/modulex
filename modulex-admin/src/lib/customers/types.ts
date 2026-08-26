@@ -91,3 +91,51 @@ export type CustomerOrderRevision = {
   revised_by: string | null;
   created_at: string;
 };
+
+export type CustomerInvoiceStatus = "draft" | "issued" | "partially_paid" | "paid" | "overdue" | "void";
+
+export type CustomerInvoice = {
+  id: string;
+  invoice_number: string;
+  customer_id: string;
+  order_id: string | null;
+  status: CustomerInvoiceStatus;
+  invoice_date: string;
+  due_date: string | null;
+  currency_code: string;
+  customer_reference: string | null;
+  order_number_snapshot: string | null;
+  billing_address_snapshot: Record<string, unknown> | null;
+  subtotal: string | number;
+  discount_amount: string | number;
+  tax_rate: string | number;
+  tax_amount: string | number;
+  payment_commission_percent: string | number;
+  payment_commission_amount: string | number;
+  total_amount: string | number;
+  paid_amount: string | number;
+  notes: string | null;
+  internal_notes: string | null;
+  issued_at: string | null;
+  paid_at: string | null;
+  voided_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CustomerInvoiceItem = {
+  id: string;
+  invoice_id: string;
+  order_item_id: string | null;
+  product_id: string | null;
+  line_no: number;
+  sku_snapshot: string;
+  product_name_snapshot: string;
+  quantity: string | number;
+  unit_price: string | number;
+  discount_percent: string | number;
+  discount_amount: string | number;
+  line_subtotal: string | number;
+  line_total: string | number;
+  created_at: string;
+};
