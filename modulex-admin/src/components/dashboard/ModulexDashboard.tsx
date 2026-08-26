@@ -31,6 +31,11 @@ type RecentMovement = {
   created_at: string;
 };
 
+type DashboardLoadResult = {
+  kpis: DashboardKpis;
+  recentMovements: RecentMovement[];
+};
+
 const emptyKpis: DashboardKpis = {
   total_products: 0,
   active_products: 0,
@@ -54,12 +59,55 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   timeStyle: "short",
 });
 
+let dashboardLoadPromise: Promise<DashboardLoadResult> | null = null;
+
 function formatNumber(value: number | string | null | undefined) {
   return numberFormatter.format(Number(value ?? 0));
 }
 
 function formatDate(value: string) {
   return dateTimeFormatter.format(new Date(value));
+}
+
+async function fetchDashboardData(): Promise<DashboardLoadResult> {
+  if (dashboardLoadPromise) {
+    return dashboardLoadPromise;
+  }
+
+  const request = (async () => {
+    const [
+      { data: kpiData, error: kpiError },
+      { data: movementsData, error: movementsError },
+    ] = await Promise.all([
+      supabase.rpc("get_dashboard_kpis"),
+      supabase.rpc("get_recent_inventory_movements", {
+        p_limit: 5,
+      }),
+    ]);
+
+    if (kpiError) {
+      throw kpiError;
+    }
+
+    if (movementsError) {
+      throw movementsError;
+    }
+
+    return {
+      kpis: (kpiData?.[0] as DashboardKpis) ?? emptyKpis,
+      recentMovements: (movementsData as RecentMovement[]) ?? [],
+    };
+  })();
+
+  dashboardLoadPromise = request;
+
+  try {
+    return await request;
+  } finally {
+    if (dashboardLoadPromise === request) {
+      dashboardLoadPromise = null;
+    }
+  }
 }
 
 export default function ModulexDashboard() {
@@ -69,36 +117,43 @@ export default function ModulexDashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadDashboard() {
       setIsLoading(true);
       setErrorMessage(null);
 
-      const [{ data: kpiData, error: kpiError }, { data: movementsData, error: movementsError }] =
-        await Promise.all([
-          supabase.rpc("get_dashboard_kpis"),
-          supabase.rpc("get_recent_inventory_movements", {
-            p_limit: 5,
-          }),
-        ]);
+      try {
+        const result = await fetchDashboardData();
 
-      if (kpiError) {
-        setErrorMessage(kpiError.message);
-        setIsLoading(false);
-        return;
+        if (!mounted) {
+          return;
+        }
+
+        setKpis(result.kpis);
+        setRecentMovements(result.recentMovements);
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Dashboard could not be loaded."
+        );
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
-
-      if (movementsError) {
-        setErrorMessage(movementsError.message);
-        setIsLoading(false);
-        return;
-      }
-
-      setKpis((kpiData?.[0] as DashboardKpis) ?? emptyKpis);
-      setRecentMovements((movementsData as RecentMovement[]) ?? []);
-      setIsLoading(false);
     }
 
-    loadDashboard();
+    void loadDashboard();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (isLoading) {
