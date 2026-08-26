@@ -7,6 +7,13 @@ import Label from "@/components/form/Label";
 import Button from "@/components/ui/button/Button";
 import { requestPasswordReset } from "@/lib/supabase/auth";
 
+function getSiteUrl() {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const baseUrl = configuredSiteUrl || window.location.origin;
+
+  return baseUrl.replace(/\/$/, "");
+}
+
 export default function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +34,7 @@ export default function ForgotPasswordForm() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const redirectTo = `${window.location.origin}/reset-password`;
+    const redirectTo = `${getSiteUrl()}/reset-password`;
     const { error } = await requestPasswordReset(cleanEmail, redirectTo);
 
     if (error) {
