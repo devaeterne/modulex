@@ -1,6 +1,9 @@
 import type { User } from "@supabase/supabase-js";
 import type { UserRole } from "@/lib/supabase/profile";
-import { supabaseAdmin } from "@/lib/supabase/server-admin";
+import {
+  isSupabaseAdminConfigured,
+  supabaseAdmin,
+} from "@/lib/supabase/server-admin";
 
 export type AdminActor = {
   user: User;
@@ -19,6 +22,15 @@ export async function requireAdmin(request: Request): Promise<
   | { actor: AdminActor; response?: never }
   | { actor?: never; response: Response }
 > {
+  if (!isSupabaseAdminConfigured) {
+    return {
+      response: jsonError(
+        "Server user management is not configured. Add SUPABASE_SECRET_KEY to the deployment environment.",
+        503
+      ),
+    };
+  }
+
   const authorization = request.headers.get("authorization");
 
   if (!authorization?.startsWith("Bearer ")) {
