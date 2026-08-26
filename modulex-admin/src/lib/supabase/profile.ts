@@ -21,14 +21,20 @@ export type Profile = {
 const PROFILE_CACHE_TTL_MS = 30_000;
 
 async function loadCurrentProfile() {
+  // The browser client already maintains and refreshes the authenticated session.
+  // Reading that session is local and avoids an extra /auth/v1/user round-trip before
+  // every profile lookup. Authorization is still enforced by the access token + RLS
+  // when the profile row is requested from PostgREST.
   const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
 
-  if (userError) {
-    return { profile: null, error: userError };
+  if (sessionError) {
+    return { profile: null, error: sessionError };
   }
+
+  const user = session?.user ?? null;
 
   if (!user) {
     return { profile: null, error: null };
