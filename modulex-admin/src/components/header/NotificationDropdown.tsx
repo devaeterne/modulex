@@ -6,6 +6,7 @@ import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
+import { armNotificationAudio, queueNotificationChime } from "@/lib/notification-sound";
 import {
   canRoleSeeNotification,
   type AppNotification,
@@ -121,46 +122,11 @@ export default function NotificationDropdown() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const panelIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
-    function unlockAudio() {
-      if (!audioContextRef.current) audioContextRef.current = new AudioContext();
-      void audioContextRef.current.resume().catch(() => undefined);
-    }
-    window.addEventListener("pointerdown", unlockAudio, { once: true });
-    window.addEventListener("keydown", unlockAudio, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
-      void audioContextRef.current?.close().catch(() => undefined);
-    };
+    armNotificationAudio();
   }, []);
-
-  function playSoftChime() {
-    const context = audioContextRef.current;
-    if (!context || context.state !== "running") return;
-    const now = context.currentTime;
-    const gain = context.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.035, now + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
-    gain.connect(context.destination);
-
-    const first = context.createOscillator();
-    const second = context.createOscillator();
-    first.type = "sine";
-    second.type = "sine";
-    first.frequency.setValueAtTime(620, now);
-    second.frequency.setValueAtTime(780, now + 0.11);
-    first.connect(gain);
-    second.connect(gain);
-    first.start(now);
-    first.stop(now + 0.2);
-    second.start(now + 0.11);
-    second.stop(now + 0.38);
-  }
 
   useEffect(() => {
     let mounted = true;
@@ -196,7 +162,7 @@ export default function NotificationDropdown() {
       const previousPanelIds = panelIdsRef.current;
       if (previousPanelIds) {
         const hasNewSoundEvent = panelRows.some((row) => row.sound_enabled && !previousPanelIds.has(row.id));
-        if (hasNewSoundEvent) playSoftChime();
+        if (hasNewSoundEvent) queueNotificationChime();
       }
       panelIdsRef.current = currentPanelIds;
 

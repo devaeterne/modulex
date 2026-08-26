@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { previewNotificationChime } from "@/lib/notification-sound";
 
 type Rule = {
   event_type: string;
@@ -27,6 +28,7 @@ export default function NotificationDeliveryRules() {
   const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingSound, setTestingSound] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,15 +85,32 @@ export default function NotificationDeliveryRules() {
     setSaving(false);
   }
 
+  async function testSound() {
+    setTestingSound(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await previewNotificationChime();
+      setMessage("Sound preview played.");
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Notification sound could not be played.");
+    } finally {
+      setTestingSound(false);
+    }
+  }
+
   if (loading) return <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Loading notification rules...</section>;
 
   return <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">Notification Delivery Rules</h2>
-        <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">Choose how each internal event is delivered. Email can be disabled while the event remains visible in the panel. Sound is a short, low-volume in-app chime.</p>
+        <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">Choose how each internal event is delivered. Email can be disabled while the event remains visible in the panel. Sound is a short, calm in-app chime.</p>
       </div>
-      {canEdit && <button type="button" onClick={save} disabled={saving} className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">{saving ? "Saving..." : "Save Rules"}</button>}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={testSound} disabled={testingSound} className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.03]">{testingSound ? "Playing..." : "Test Sound"}</button>
+        {canEdit && <button type="button" onClick={save} disabled={saving} className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">{saving ? "Saving..." : "Save Rules"}</button>}
+      </div>
     </div>
 
     {error && <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{error}</div>}
