@@ -27,6 +27,8 @@ create table if not exists public.general_settings (
   timezone text not null default 'UTC',
   order_document_title text not null default 'Sales Order / Order Confirmation',
   order_footer_note text,
+  invoice_document_title text not null default 'Invoice',
+  invoice_footer_note text,
   created_by uuid default auth.uid() references public.profiles(id) on delete set null,
   updated_by uuid default auth.uid() references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
@@ -36,6 +38,11 @@ create table if not exists public.general_settings (
   constraint general_settings_currency_format check (default_currency ~ '^[A-Z]{3}$'),
   constraint general_settings_country_format check (country_code is null or country_code ~ '^[A-Z]{2}$')
 );
+
+-- Safe additive upgrade for databases where general_settings already exists.
+alter table public.general_settings
+  add column if not exists invoice_document_title text not null default 'Invoice',
+  add column if not exists invoice_footer_note text;
 
 insert into public.general_settings (id, company_name)
 values (1, 'Your Company')
