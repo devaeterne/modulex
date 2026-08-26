@@ -1,208 +1,957 @@
-# TailAdmin Next.js - Free Next.js Tailwind Admin Dashboard Template
+# Modulex Admin
 
-TailAdmin is a free and open-source admin dashboard template built on **Next.js and Tailwind CSS** providing developers with everything they need to create a feature-rich and data-driven: back-end, dashboard, or admin panel solution for any sort of web project.
+> **Warehouse, Inventory & Operations Management Platform**
 
-![TailAdmin - Next.js Dashboard Preview](./banner.png)
+Modulex Admin is a modern warehouse, inventory, product, and operations management platform designed to centralize day-to-day business operations within a single administrative environment.
 
-With TailAdmin Next.js, you get access to all the necessary dashboard UI components, elements, and pages required to build a high-quality and complete dashboard or admin panel. Whether you're building a dashboard or admin panel for a complex web application or a simple website.
+It connects physical warehouse operations with structured digital data, allowing teams to manage products, stock, warehouse locations, pricing, customers, orders, QR-based workflows, and operational settings from one system.
 
-TailAdmin utilizes the powerful features of **Next.js 16** and common features of Next.js such as server-side rendering (SSR), static site generation (SSG), and seamless API route integration. Combined with the advancements of **React 19** and the robustness of **TypeScript**, TailAdmin is the perfect solution to help get your project up and running quickly.
+Modulex is designed as more than a traditional admin dashboard. Its goal is to provide a scalable operational infrastructure for businesses that need accurate inventory visibility, structured warehouse management, traceable stock movements, and centralized business data.
+
+---
 
 ## Overview
 
-TailAdmin provides essential UI components and layouts for building feature-rich, data-driven admin dashboards and control panels. It's built on:
+Modulex Admin provides a centralized interface for managing:
 
-* Next.js 16.x
-* React 19
-* TypeScript
-* Tailwind CSS V4
+* Products
+* Brands
+* Categories
+* Warehouses
+* Warehouse zones
+* Shelves and storage locations
+* Inventory
+* Stock movements
+* QR-based warehouse operations
+* Pricing groups
+* Customers
+* Orders
+* Media and product assets
+* Company information
+* Application settings
+* Users and authentication
+* Operational reporting
 
-### Quick Links
+The core principle of Modulex is simple:
 
-* [✨ Visit Website](https://tailadmin.com)
-* [📄 Documentation](https://tailadmin.com/docs)
-* [⬇️ Download](https://tailadmin.com/download)
-* [🖌️ Figma Design File (Community Edition)](https://www.figma.com/community/file/1463141366275764364)
-* [⚡ Get PRO Version](https://tailadmin.com/pricing)
+> **Know what the product is, where it is located, how much stock is available, and what happened to it over time.**
 
-### Demos
+---
 
-* [Free Version](https://nextjs-free-demo.tailadmin.com)
-* [Pro Version](https://nextjs-demo.tailadmin.com)
+# Core Capabilities
 
-### Other Versions
+## Product Management
 
-- [Next.js Version](https://github.com/TailAdmin/free-nextjs-admin-dashboard)
-- [React.js Version](https://github.com/TailAdmin/free-react-tailwind-admin-dashboard)
-- [Vue.js Version](https://github.com/TailAdmin/vue-tailwind-admin-dashboard)
-- [Angular Version](https://github.com/TailAdmin/free-angular-tailwind-dashboard)
-- [Laravel Version](https://github.com/TailAdmin/tailadmin-laravel)
+Modulex provides a centralized product catalog for managing product master data independently from inventory and pricing.
 
-## Installation
+Products can include:
 
-### Prerequisites
+* SKU
+* Product name
+* Description
+* Brand
+* Category
+* Product variants
+* Internal product codes
+* QR values
+* Product images
+* Media assets
+* Active / inactive status
+* Inventory relationships
+* Metadata
 
-To get started with TailAdmin, ensure you have the following prerequisites installed and set up:
+Product information is intentionally separated from pricing and inventory records.
 
-* Node.js 18.x or later (recommended to use Node.js 20.x or later)
+This architecture makes it possible to modify prices or stock levels without changing the core product record.
 
-### Cloning the Repository
+---
 
-Clone the repository using the following command:
+## Advanced Pricing Management
 
-```bash
-git clone https://github.com/TailAdmin/free-nextjs-admin-dashboard.git
+Modulex uses a dedicated pricing architecture rather than storing prices directly inside the product table.
+
+This allows the pricing system to evolve independently from product master data.
+
+By default, the platform can support multiple pricing tiers such as:
+
+```text
+List Price
+Silver
+Gold
+Platinum
 ```
 
-> Windows Users: place the repository near the root of your drive if you face issues while cloning.
+Pricing group names are configurable.
 
-1. Install dependencies:
+For example:
 
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
+```text
+Retail
+Dealer
+Distributor
+VIP
+```
 
-   > Use `--legacy-peer-deps` flag if you face peer-dependency error during installation.
+or:
 
-2. Start the development server:
+```text
+A
+B
+C
+D
+```
 
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
+This architecture can later support:
 
-## Components
+* Customer-specific pricing
+* Pricing groups
+* Multiple price lists
+* Promotional pricing
+* Scheduled prices
+* Price validity periods
+* Multiple currencies
+* Bulk price updates
+* Price history
+* Contract-based pricing
 
-TailAdmin is a pre-designed starting point for building a web-based dashboard using Next.js and Tailwind CSS. The template includes:
+---
 
-* Sophisticated and accessible sidebar
-* Data visualization components
-* Profile management and custom 404 page
-* Tables and Charts(Line and Bar)
-* Authentication forms and input elements
-* Alerts, Dropdowns, Modals, Buttons and more
-* Can't forget Dark Mode 🕶️
+# Warehouse Management
 
-All components are built with React and styled using Tailwind CSS for easy customization.
+Modulex digitally models physical warehouse infrastructure using a hierarchical structure.
 
-## Feature Comparison
+```text
+Warehouse
+└── Zone
+    └── Location / Shelf
+```
 
-### Free Version
+Example:
 
-* 1 Unique Dashboard
-* 30+ dashboard components
-* 50+ UI elements
-* Basic Figma design files
-* Community support
+```text
+Main Warehouse
+│
+├── Zone A
+│   ├── A-01-01
+│   ├── A-01-02
+│   └── A-01-03
+│
+├── Zone B
+│   ├── B-01-01
+│   └── B-01-02
+│
+└── Zone C
+```
 
-### Pro Version
+This structure allows inventory to be tracked beyond a simple warehouse-level quantity.
 
-* 7 Unique Dashboards: Analytics, Ecommerce, Marketing, CRM, SaaS, Stocks, Logistics (more coming soon)
-* 500+ dashboard components and UI elements
-* Complete Figma design file
-* Email support
+Instead of knowing only:
 
-To learn more about pro version features and pricing, visit our [pricing page](https://tailadmin.com/pricing).
+```text
+Product X: 20 units
+```
 
-## Changelog
+Modulex can represent:
 
-### Version 2.3.0 - [April 28, 2026]
+```text
+Product X
+Main Warehouse
+Zone A
+Location A-01-03
+8 units
+```
 
-- **New Feature**: Added **AI Dashboard** with token usage and revenue tracking.
-- **New Feature**: Added **Sales Dashboard** with retention and multi-channel analytics.
-- **New Feature**: Added **Finance Dashboard** with cashflow and balance management.
-- **New Feature**: Introduced **6 New Layout variations** for improved UI flexibility.
-- **Enhancement**: Integrated **Advanced Data Visualization** with 7+ new chart types.
+This creates significantly better operational visibility inside the warehouse.
 
-### Version 2.2.3 - [March 15, 2026]
+---
 
-* update ESLint configuration and dependencies; upgrade Next.js to version 16.1.6
+## Warehouses
 
-### Version 2.2.2 - [December 30, 2025]
+The system supports one or multiple warehouses.
 
-* Fixed date picker positioning and functionality in Statistics Chart.
+Each warehouse can have its own:
 
+* Name
+* Code
+* Description
+* Address
+* Zones
+* Locations
+* Inventory
+* QR identifier
 
-### Version 2.1.0 - [November 15, 2025]
+Example:
 
-* Updated to Next.js 16.x
-* Fixed all reported minor bugs
+```text
+Main Warehouse
+Secondary Warehouse
+Returns Warehouse
+Showroom Stock
+```
 
-### Version 2.0.2 - [March 25, 2025]
+---
 
-* Upgraded to Next.js 16.x for [CVE-2025-29927](https://nextjs.org/blog/cve-2025-29927) concerns
-* Included overrides vectormap for packages to prevent peer dependency errors during installation.
-* Migrated from react-flatpickr to flatpickr package for React 19 support
+## Zones
 
-### Version 2.0.1 - [February 27, 2025]
+Warehouses can be divided into operational zones.
 
-#### Update Overview
+Examples:
 
-* Upgraded to Tailwind CSS v4 for better performance and efficiency.
-* Updated class usage to match the latest syntax and features.
-* Replaced deprecated class and optimized styles.
+```text
+Zone A
+Zone B
+Receiving
+Dispatch
+Returns
+Quarantine
+Reserved Stock
+```
 
-#### Next Steps
+Zones make it easier to organize large warehouses and define operational areas.
 
-* Run npm install or yarn install to update dependencies.
-* Check for any style changes or compatibility issues.
-* Refer to the Tailwind CSS v4 [Migration Guide](https://tailwindcss.com/docs/upgrade-guide) on this release. if needed.
-* This update keeps the project up to date with the latest Tailwind improvements. 🚀
+---
 
-### v2.0.0 (February 2025)
+## Locations & Shelves
 
-A major update focused on Next.js 16 implementation and comprehensive redesign.
+Locations represent the most specific physical storage position where inventory can be stored.
 
-#### Major Improvements
+Examples:
 
-* Complete redesign using Next.js 16 App Router and React Server Components
-* Enhanced user interface with Next.js-optimized components
-* Improved responsiveness and accessibility
-* New features including collapsible sidebar, chat screens, and calendar
-* Redesigned authentication using Next.js App Router and server actions
-* Updated data visualization using ApexCharts for React
+```text
+A-01-01
+A-01-02
+A-02-05
+B-03-04
+```
 
-#### Breaking Changes
+Inventory can therefore be tracked at shelf or storage-location level.
 
-* Migrated from Next.js 14 to Next.js 16
-* Chart components now use ApexCharts for React
-* Authentication flow updated to use Server Actions and middleware
+---
 
-[Read more](https://tailadmin.com/docs/update-logs/nextjs) on this release.
+# QR-Based Warehouse Operations
 
-### v1.3.4 (July 01, 2024)
+One of the core operational capabilities of Modulex is its QR-driven warehouse workflow.
 
-* Fixed JSvectormap rendering issues
+Products, warehouses, zones, and locations can each have their own QR identity.
 
-### v1.3.3 (June 20, 2024)
+When a QR code is scanned, Modulex identifies the type of entity automatically.
 
-* Fixed build error related to Loader component
+### Warehouse
 
-### v1.3.2 (June 19, 2024)
+```text
+WH|MAIN
+```
 
-* Added ClickOutside component for dropdown menus
-* Refactored sidebar components
-* Updated Jsvectormap package
+### Zone
 
-### v1.3.1 (Feb 12, 2024)
+```text
+ZONE|MAIN|A
+```
 
-* Fixed layout naming consistency
-* Updated styles
+### Location
 
-### v1.3.0 (Feb 05, 2024)
+```text
+LOC|MAIN|A|A-01-01
+```
 
-* Upgraded to Next.js 14
-* Added Flatpickr integration
-* Improved form elements
-* Enhanced multiselect functionality
-* Added default layout component
+### Product
 
-## License
+Products can be identified using an SKU or a dedicated product QR value.
 
-TailAdmin Next.js Free Version is released under the MIT License.
+Product QR codes are generated by the platform and their SVG assets can be stored in Supabase Storage.
 
-## Support
-If you find this project helpful, please consider giving it a star on GitHub. Your support helps us continue developing and maintaining this template.
+---
+
+## Example QR Workflow
+
+A warehouse operation can follow a simple scan-driven process:
+
+```text
+1. Scan Warehouse
+        ↓
+2. Scan Zone
+        ↓
+3. Scan Location
+        ↓
+4. Scan Product
+        ↓
+5. Enter Quantity
+        ↓
+6. Confirm Operation
+```
+
+This workflow reduces manual product selection and minimizes data-entry errors during warehouse operations.
+
+---
+
+# Inventory Management
+
+Modulex does not treat inventory as a single quantity field attached directly to a product.
+
+Inventory is modeled through relationships between:
+
+```text
+Product
++
+Warehouse
++
+Location
++
+Quantity
+```
+
+This enables detailed physical inventory tracking.
+
+The inventory architecture is designed to support operations such as:
+
+* Stock In
+* Stock Out
+* Warehouse Transfer
+* Location Transfer
+* Stock Adjustment
+* Inventory Count
+* Stock Reservation
+* Order Allocation
+* Returns
+* Damaged Stock
+* Inventory Reconciliation
+
+---
+
+## Stock Movement History
+
+Inventory changes should be traceable.
+
+Rather than simply overwriting a stock quantity, Modulex can maintain a movement history describing why inventory changed.
+
+Example:
+
+```text
+Product: MX-001
+Operation: Stock Transfer
+From: Main Warehouse / A-01-01
+To: Main Warehouse / B-02-03
+Quantity: 12
+User: Admin
+Timestamp: 2026-08-26 14:32
+```
+
+This creates an operational audit trail for warehouse activity.
+
+---
+
+# QR Code Management
+
+Modulex supports product-specific QR code generation and storage.
+
+Product QR information can include:
+
+```text
+qr_value
+qr_svg_path
+qr_svg_url
+qr_generated_at
+```
+
+Generated QR assets are stored in Supabase Storage.
+
+Example bucket:
+
+```text
+product-qrcodes
+```
+
+QR codes can later be used for:
+
+* Product lookup
+* Warehouse receiving
+* Picking
+* Stock counting
+* Location transfers
+* Warehouse transfers
+* Order preparation
+* Product labels
+* Inventory audits
+
+---
+
+# Customer Management
+
+Modulex includes a customer management layer that can be integrated with pricing and order operations.
+
+Customer records can support:
+
+* Company name
+* Contact information
+* Address information
+* Tax information
+* Customer status
+* Pricing group
+* Notes
+* Order history
+
+The pricing architecture allows customers to be associated with specific pricing groups.
+
+Example:
+
+```text
+Customer A → Silver
+Customer B → Gold
+Customer C → Platinum
+```
+
+---
+
+# Order Management
+
+Orders are designed to connect customers, products, pricing, and inventory.
+
+The system can support:
+
+* Order creation
+* Customer selection
+* Product selection
+* Pricing resolution
+* Quantity management
+* Order status
+* Inventory allocation
+* Warehouse preparation
+* Picking
+* Dispatch
+* Order history
+
+The long-term goal is to connect the administrative order workflow with a dedicated customer-facing catalog or store application.
+
+---
+
+# Company Settings
+
+Business-specific information should be managed centrally instead of being hardcoded throughout the application.
+
+The General Settings area can contain:
+
+* Company name
+* Company logo
+* Legal company name
+* Tax / registration information
+* Address
+* Phone
+* Email
+* Website
+* Support information
+* Currency
+* Locale
+* Time zone
+* Application branding
+
+This allows Modulex to operate as a reusable platform rather than an application tied to one specific company identity.
+
+---
+
+# Authentication & User Management
+
+Authentication is powered by Supabase Auth.
+
+The platform architecture supports:
+
+* User authentication
+* Email verification
+* Password reset
+* User invitations
+* Session management
+* Protected application routes
+* Role-based access control
+
+Future access-control structures can include roles such as:
+
+```text
+Super Admin
+Administrator
+Warehouse Manager
+Warehouse Operator
+Sales
+Viewer
+```
+
+Permissions can then be applied at module or action level.
+
+For example:
+
+```text
+Products
+├── View
+├── Create
+├── Edit
+└── Delete
+
+Inventory
+├── View
+├── Stock In
+├── Stock Out
+├── Transfer
+└── Adjustment
+```
+
+---
+
+# Dashboard & Reporting
+
+The Modulex dashboard is intended to provide a high-level operational overview.
+
+Possible dashboard metrics include:
+
+* Total products
+* Total inventory
+* Low-stock products
+* Out-of-stock products
+* Warehouse utilization
+* Recent stock movements
+* Incoming inventory
+* Outgoing inventory
+* Orders
+* Customer activity
+* Inventory value
+* Most active products
+
+Reporting can later be expanded into dedicated analytics modules.
+
+---
+
+# Architecture
+
+Modulex uses a modern web application architecture.
+
+```text
+┌──────────────────────────────┐
+│        Modulex Admin         │
+│                              │
+│     Next.js / React UI       │
+└───────────────┬──────────────┘
+                │
+                │
+                ▼
+┌──────────────────────────────┐
+│           Supabase           │
+│                              │
+│ PostgreSQL                   │
+│ Authentication               │
+│ Storage                      │
+│ Row Level Security           │
+│ Server-side capabilities     │
+└──────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────────┐
+│        Customer Apps         │
+│                              │
+│ Catalog / Store / Portal     │
+└──────────────────────────────┘
+```
+
+---
+
+# Technology Stack
+
+## Frontend
+
+* **Next.js 16**
+* **React 19**
+* **TypeScript**
+* **Tailwind CSS v4**
+* **TailAdmin**
+* React Server Components
+* Next.js App Router
+
+## Backend
+
+* **Supabase Cloud**
+* PostgreSQL
+* Supabase Auth
+* Supabase Storage
+* Row Level Security
+* Database functions and policies
+
+## Deployment
+
+* **Vercel** — frontend hosting and deployment
+* **Supabase Cloud** — database, authentication and storage
+
+---
+
+# Application Structure
+
+A simplified project structure may look like:
+
+```text
+modulex-admin/
+│
+├── src/
+│   ├── app/
+│   ├── components/
+│   ├── context/
+│   ├── hooks/
+│   ├── icons/
+│   ├── layout/
+│   ├── lib/
+│   └── types/
+│
+├── public/
+├── .env.local
+├── package.json
+├── next.config.ts
+├── tsconfig.json
+└── README.md
+```
+
+---
+
+# Environment Variables
+
+The application requires Supabase environment variables.
+
+Create:
+
+```text
+.env.local
+```
+
+Example:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Environment variables must also be configured in the Vercel project settings for production deployments.
+
+Never commit private keys or service-role credentials to the repository.
+
+---
+
+# Installation
+
+## Requirements
+
+Recommended:
+
+```text
+Node.js 20+
+npm
+```
+
+Clone the repository:
+
+```bash
+git clone <repository-url>
+cd modulex-admin
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create the environment file:
+
+```bash
+cp .env.example .env.local
+```
+
+Add the required Supabase configuration.
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+---
+
+# Production Build
+
+Create a production build:
+
+```bash
+npm run build
+```
+
+Run the production server locally:
+
+```bash
+npm start
+```
+
+---
+
+# Deployment
+
+The recommended production architecture is:
+
+```text
+Frontend
+└── Vercel
+
+Backend
+└── Supabase Cloud
+    ├── PostgreSQL
+    ├── Authentication
+    └── Storage
+```
+
+A dedicated administration subdomain can be used for the platform.
+
+Example:
+
+```text
+admin.example.com
+```
+
+A future customer-facing application can use another domain or subdomain.
+
+Example:
+
+```text
+catalog.example.com
+store.example.com
+portal.example.com
+```
+
+---
+
+# Data Architecture Principles
+
+Modulex follows several important architectural principles.
+
+## 1. Product Master Data Is Independent
+
+Products should describe the product itself.
+
+Pricing, inventory, and operational data should live in dedicated structures.
+
+---
+
+## 2. Inventory Is Location-Aware
+
+Inventory should be associated with its physical location rather than existing only as a global product quantity.
+
+---
+
+## 3. Inventory Changes Are Transactions
+
+Stock movements should generate traceable records instead of silently replacing quantity values.
+
+---
+
+## 4. Pricing Is Configurable
+
+Price groups should not be hardcoded into the product model.
+
+Businesses should be able to create and rename pricing structures according to their own commercial model.
+
+---
+
+## 5. Business Identity Is Configurable
+
+Company-specific names, logos, addresses, and contact information should come from system settings rather than application source code.
+
+---
+
+## 6. Operations Should Be Scan-Friendly
+
+Warehouse workflows should minimize typing and manual selection.
+
+QR scanning is therefore a first-class part of the Modulex operational architecture.
+
+---
+
+# Platform Scope
+
+Modulex is being designed around several connected operational domains:
+
+```text
+MODULEX
+│
+├── Product Management
+│
+├── Pricing
+│
+├── Inventory
+│
+├── Warehouses
+│   ├── Zones
+│   └── Locations
+│
+├── QR Operations
+│
+├── Customers
+│
+├── Orders
+│
+├── Reporting
+│
+├── Users & Permissions
+│
+└── General Settings
+```
+
+These modules share a common data model and are designed to work as parts of one operational platform rather than isolated tools.
+
+---
+
+# Future Scope
+
+The architecture is designed to support future modules without requiring a complete rewrite of the core platform.
+
+Potential future capabilities include:
+
+* Customer catalog portal
+* B2B ordering
+* Barcode support
+* Purchase orders
+* Suppliers
+* Procurement
+* Goods receiving
+* Picking workflows
+* Packing workflows
+* Shipping integrations
+* Returns management
+* Serial number tracking
+* Batch / lot tracking
+* Expiration dates
+* Inventory forecasting
+* Reorder points
+* Automated replenishment
+* Multi-currency pricing
+* Customer-specific pricing
+* Advanced reporting
+* Notification center
+* Audit logs
+* Mobile warehouse interface
+* Camera-based QR scanning
+* API integrations
+* ERP integrations
+
+---
+
+# Development Philosophy
+
+Modulex is developed around four principles:
+
+### Operational Simplicity
+
+Common warehouse actions should require as few steps as possible.
+
+### Data Integrity
+
+Product, inventory, pricing, and operational data must remain logically separated and traceable.
+
+### Scalability
+
+The system should support growth from a single warehouse environment to a larger multi-warehouse operation.
+
+### Extensibility
+
+New business modules should be added without requiring major changes to the existing core architecture.
+
+---
+
+# Project Status
+
+Modulex Admin is under active development.
+
+The system is being developed incrementally, with each phase introducing and stabilizing additional operational modules.
+
+Current development areas include:
+
+* Product management
+* Product QR infrastructure
+* Warehouse structures
+* Zone management
+* Location management
+* Inventory architecture
+* Pricing architecture
+* Customer management
+* Orders
+* General settings
+* Authentication
+* User management
+* Operational UI improvements
+
+---
+
+# Security
+
+Security-sensitive operations should follow Supabase security best practices.
+
+Important principles include:
+
+* Row Level Security on exposed tables
+* Server-side handling of privileged operations
+* No service-role keys in client-side code
+* Protected administrative routes
+* Role-based authorization
+* Controlled Storage policies
+* Auditable administrative operations
+
+---
+
+# Contributing
+
+Modulex is currently developed as a private project.
+
+For development:
+
+```bash
+git checkout -b feature/your-feature
+```
+
+Commit changes using clear commit messages:
+
+```bash
+git commit -m "feat: add warehouse location management"
+```
+
+Push the branch:
+
+```bash
+git push origin feature/your-feature
+```
+
+---
+
+# License
+
+Modulex Admin is currently a private project.
+
+Unless explicitly stated otherwise, the source code, business logic, database architecture, and related assets are proprietary.
+
+Third-party libraries and components remain subject to their respective licenses.
+
+The administrative interface is based in part on TailAdmin and follows the applicable TailAdmin licensing terms.
+
+---
+
+# Modulex
+
+**Build smarter inventory operations.**
+
+Modulex connects products, warehouses, inventory, pricing, customers, and operational workflows through one centralized management platform.
+
+```text
+Product
+   +
+Location
+   +
+Inventory
+   +
+Operations
+   =
+Modulex
+```
