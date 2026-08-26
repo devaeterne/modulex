@@ -30,6 +30,7 @@ export default function NewCustomerOrder() {
   const [prices, setPrices] = useState<PriceRow[]>([]);
   const [priceGroupId, setPriceGroupId] = useState("");
   const [paymentMethodId, setPaymentMethodId] = useState("");
+  const [paymentCommissionPercent, setPaymentCommissionPercent] = useState("0");
   const [billingAddressId, setBillingAddressId] = useState("");
   const [shippingAddressId, setShippingAddressId] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
@@ -78,6 +79,7 @@ export default function NewCustomerOrder() {
       const loadedAddresses = (addressesResult.data ?? []) as CustomerAddress[];
       const loadedGroups = (groupsResult.data ?? []) as PriceGroupLookup[];
       const loadedMethods = (methodsResult.data ?? []) as PaymentMethod[];
+      const defaultMethod = loadedMethods.find((m) => m.system_key === "cash") ?? loadedMethods[0] ?? null;
 
       setCustomer(loadedCustomer);
       setAddresses(loadedAddresses);
@@ -85,7 +87,8 @@ export default function NewCustomerOrder() {
       setPaymentMethods(loadedMethods);
       setProducts((productsResult.data ?? []) as Product[]);
       setPriceGroupId(loadedCustomer.price_group_id || loadedGroups.find((g) => g.is_base_price)?.id || loadedGroups[0]?.id || "");
-      setPaymentMethodId(loadedMethods.find((m) => m.system_key === "cash")?.id || loadedMethods[0]?.id || "");
+      setPaymentMethodId(defaultMethod?.id || "");
+      setPaymentCommissionPercent(String(Number(defaultMethod?.commission_percent ?? 0)));
       setBillingAddressId(loadedAddresses.find((a) => a.is_default_billing)?.id || "");
       setShippingAddressId(loadedAddresses.find((a) => a.is_default_shipping)?.id || "");
       setIsLoading(false);
@@ -101,7 +104,6 @@ export default function NewCustomerOrder() {
     }
 
     let active = true;
-
     async function loadGroupPrices() {
       setIsLoadingPrices(true);
       const { data, error } = await supabase
@@ -129,6 +131,9 @@ export default function NewCustomerOrder() {
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const priceMap = useMemo(() => new Map(prices.map((p) => [p.product_id, Number(p.amount)])), [prices]);
   const selectedPaymentMethod = useMemo(() => paymentMethods.find((m) => m.id === paymentMethodId) ?? null, [paymentMethods, paymentMethodId]);
+  const defaultCommissionPercent = Number(selectedPaymentMethod?.commission_percent ?? 0);
+  const appliedCommissionPercent = Math.min(100, Math.max(0, Number(paymentCommissionPercent || 0)));
+  const commissionOverridden = Math.abs(appliedCommissionPercent - defaultCommissionPercent) > 0.0001;
 
   const preview = useMemo(() => {
     let subtotal = 0;
@@ -142,11 +147,16 @@ export default function NewCustomerOrder() {
     const taxable = Math.max(0, subtotal - orderDiscountNumber);
     const tax = taxable * Math.max(0, Number(taxRate || 0)) / 100;
     const orderTotal = taxable + tax;
-    const commissionPercent = Number(selectedPaymentMethod?.commission_percent ?? 0);
-    const paymentCommission = orderTotal * commissionPercent / 100;
+    const paymentCommission = orderTotal * appliedCommissionPercent / 100;
     const grandTotal = orderTotal + paymentCommission;
-    return { subtotal, tax, orderTotal, commissionPercent, paymentCommission, grandTotal };
-  }, [items, priceMap, orderDiscount, taxRate, selectedPaymentMethod]);
+    return { subtotal, tax, orderTotal, paymentCommission, grandTotal };
+  }, [items, priceMap, orderDiscount, taxRate, appliedCommissionPercent]);
+
+  function handlePaymentMethodChange(methodId: string) {
+    setPaymentMethodId(methodId);
+    const method = paymentMethods.find((item) => item.id === methodId);
+    setPaymentCommissionPercent(String(Number(method?.commission_percent ?? 0)));
+  }
 
   function updateItem(index: number, values: Partial<DraftItem>) {
     setItems((current) => current.map((item, i) => i === index ? { ...item, ...values } : item));
@@ -156,6 +166,7 @@ export default function NewCustomerOrder() {
     setErrorMessage(null);
     if (!customer || !priceGroupId) return setErrorMessage("Customer and price group are required.");
     if (!paymentMethodId) return setErrorMessage("Payment method is required.");
+    if (appliedCommissionPercent < 0 || appliedCommissionPercent > 100) return setErrorMessage("Payment commission must be between 0 and 100%.");
     if (isLoadingPrices) return setErrorMessage("Prices are still loading.");
 
     const validItems = items.filter((item) => item.product_id && Number(item.quantity) > 0);
@@ -189,6 +200,7 @@ export default function NewCustomerOrder() {
       p_tax_rate: Number(taxRate || 0),
       p_order_discount_amount: Number(orderDiscount || 0),
       p_payment_method_id: paymentMethodId,
+      p_payment_commission_percent: appliedCommissionPercent,
       p_initial_status: initialStatus,
     });
 
@@ -216,7 +228,8 @@ export default function NewCustomerOrder() {
       <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Order Information</h2>
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Field label="Price Group"><select value={priceGroupId} onChange={(e) => setPriceGroupId(e.target.value)} className={inputClass}>{priceGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>{isLoadingPrices && <span className="mt-1 block text-xs text-gray-400">Loading prices...</span>}</Field>
-        <Field label="Payment Method"><select value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)} className={inputClass}>{paymentMethods.map((m) => <option key={m.id} value={m.id}>{m.name}{Number(m.commission_percent) > 0 ? ` (+${Number(m.commission_percent).toFixed(2)}%)` : ""}</option>)}</select></Field>
+        <Field label="Payment Method"><select value={paymentMethodId} onChange={(e) => handlePaymentMethodChange(e.target.value)} className={inputClass}>{paymentMethods.map((m) => <option key={m.id} value={m.id}>{m.name}{Number(m.commission_percent) > 0 ? ` (+${Number(m.commission_percent).toFixed(2)}%)` : ""}</option>)}</select></Field>
+        <Field label="Applied Commission (%)"><div className="flex gap-2"><input type="number" min="0" max="100" step="0.01" value={paymentCommissionPercent} onChange={(e) => setPaymentCommissionPercent(e.target.value)} className={inputClass} /><button type="button" onClick={() => setPaymentCommissionPercent(String(defaultCommissionPercent))} className="whitespace-nowrap rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.05]">Use Default</button></div><span className={`mt-1 block text-xs ${commissionOverridden ? "text-warning-600 dark:text-warning-400" : "text-gray-400"}`}>Default: {defaultCommissionPercent.toFixed(2)}%{commissionOverridden ? ` • Override applied: ${appliedCommissionPercent.toFixed(2)}%` : ""}</span></Field>
         <Field label="Initial Status"><select value={initialStatus} onChange={(e) => setInitialStatus(e.target.value as "draft" | "confirmed")} className={inputClass}><option value="draft">Draft</option><option value="confirmed">Confirmed</option></select></Field>
         <Field label="Expected Delivery"><input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className={inputClass} /></Field>
         <Field label="Customer Reference"><input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="PO / reference" className={inputClass} /></Field>
@@ -240,7 +253,7 @@ export default function NewCustomerOrder() {
 
     <div className="grid gap-5 xl:grid-cols-12">
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 xl:col-span-8"><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes"><textarea value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} className="min-h-[110px] w-full rounded-lg border border-gray-300 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" /></Field><Field label="Internal Notes"><textarea value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="min-h-[110px] w-full rounded-lg border border-gray-300 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" /></Field></div></div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 xl:col-span-4"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Order Total</h2><div className="mt-4 space-y-3 text-sm"><Row label="Lines after discount" value={money(preview.subtotal)} /><Row label="Order discount" value={`-${money(Number(orderDiscount || 0))}`} /><Row label="Tax" value={money(preview.tax)} /><Row label="Order Total" value={money(preview.orderTotal)} />{preview.paymentCommission > 0 && <Row label={`${selectedPaymentMethod?.name || "Payment"} Commission (${preview.commissionPercent.toFixed(2)}%)`} value={money(preview.paymentCommission)} />}<div className="border-t border-gray-200 pt-3 dark:border-gray-800"><Row label="Grand Total" value={money(preview.grandTotal)} strong /></div></div><button type="button" disabled={isSaving || isLoadingPrices || !paymentMethodId} onClick={saveOrder} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">{isSaving ? "Creating..." : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</button></div>
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 xl:col-span-4"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Order Total</h2><div className="mt-4 space-y-3 text-sm"><Row label="Lines after discount" value={money(preview.subtotal)} /><Row label="Order discount" value={`-${money(Number(orderDiscount || 0))}`} /><Row label="Tax" value={money(preview.tax)} /><Row label="Order Total" value={money(preview.orderTotal)} />{preview.paymentCommission > 0 && <Row label={`${selectedPaymentMethod?.name || "Payment"} Commission (${appliedCommissionPercent.toFixed(2)}%)`} value={money(preview.paymentCommission)} />}<div className="border-t border-gray-200 pt-3 dark:border-gray-800"><Row label="Grand Total" value={money(preview.grandTotal)} strong /></div>{commissionOverridden && <p className="rounded-lg bg-warning-50 px-3 py-2 text-xs text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">Payment commission overridden from {defaultCommissionPercent.toFixed(2)}% to {appliedCommissionPercent.toFixed(2)}% for this order only.</p>}</div><button type="button" disabled={isSaving || isLoadingPrices || !paymentMethodId} onClick={saveOrder} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">{isSaving ? "Creating..." : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</button></div>
     </div>
   </div>;
 }

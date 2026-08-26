@@ -59,7 +59,6 @@ const navItems: NavItem[] = [
       { name: "Dashboard", path: "/customers/dashboard" },
       { name: "Customer List", path: "/customers" },
       { name: "Orders", path: "/customers/orders" },
-      { name: "Payment Methods", path: "/customers/payment-methods" },
     ],
   },
   {
@@ -106,6 +105,13 @@ const managementItems: NavItem[] = [
     subItems: [
       { name: "User Management", path: "/users" },
       { name: "Roles & Access", path: "/roles" },
+    ],
+  },
+  {
+    icon: <GridIcon />,
+    name: "General Settings",
+    subItems: [
+      { name: "Payment Methods", path: "/settings/payment-methods" },
     ],
   },
 ];
