@@ -111,6 +111,7 @@ const managementItems: NavItem[] = [
     icon: <GridIcon />,
     name: "General Settings",
     subItems: [
+      { name: "Company & General", path: "/settings/general" },
       { name: "Payment Methods", path: "/settings/payment-methods" },
     ],
   },
