@@ -60,6 +60,10 @@ const navItems: NavItem[] = [
         name: "Price Groups",
         path: "/pricing/groups",
       },
+      {
+        name: "Cost & Margin",
+        path: "/pricing/cost-margin",
+      },
     ],
   },
   {
