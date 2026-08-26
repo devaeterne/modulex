@@ -3,6 +3,7 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import GeneralSettingsManager from "@/components/settings/GeneralSettingsManager";
 import InvoiceDocumentSettings from "@/components/settings/InvoiceDocumentSettings";
 import EmailNotificationSettings from "@/components/settings/EmailNotificationSettings";
+import NotificationDeliveryRules from "@/components/settings/NotificationDeliveryRules";
 
 export const metadata: Metadata = {
   title: "Company & General Settings | Modulex Admin",
@@ -16,6 +17,7 @@ export default function GeneralSettingsPage() {
       <GeneralSettingsManager />
       <InvoiceDocumentSettings />
       <EmailNotificationSettings />
+      <NotificationDeliveryRules />
     </div>
   );
 }
