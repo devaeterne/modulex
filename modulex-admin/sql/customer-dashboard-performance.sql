@@ -113,6 +113,8 @@ as $$
   cross join recent_customers rc;
 $$;
 
+revoke all on function public.get_customer_dashboard(integer, integer) from public;
+revoke all on function public.get_customer_dashboard(integer, integer) from anon;
 grant execute on function public.get_customer_dashboard(integer, integer) to authenticated;
 
 notify pgrst, 'reload schema';
