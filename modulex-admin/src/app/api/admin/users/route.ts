@@ -31,6 +31,25 @@ function normalizeOptionalText(value: unknown) {
   return normalized || null;
 }
 
+function getSiteUrl(request: Request) {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+
+  if (configuredSiteUrl) {
+    return configuredSiteUrl.replace(/\/$/, "");
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+
+  if (forwardedHost) {
+    const forwardedProto =
+      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+
+    return `${forwardedProto}://${forwardedHost}`.replace(/\/$/, "");
+  }
+
+  return new URL(request.url).origin.replace(/\/$/, "");
+}
+
 async function getProfile(userId: string) {
   const { data } = await supabaseAdmin
     .from("profiles")
@@ -183,14 +202,14 @@ export async function POST(request: Request) {
 
     createdUserId = data.user.id;
   } else {
-    const origin = new URL(request.url).origin;
+    const siteUrl = getSiteUrl(request);
     const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
         data: {
           full_name: fullName,
         },
-        redirectTo: `${origin}/reset-password`,
+        redirectTo: `${siteUrl}/reset-password`,
       }
     );
 
@@ -283,9 +302,9 @@ export async function PATCH(request: Request) {
       return jsonError("This user does not have an email address.", 400);
     }
 
-    const origin = new URL(request.url).origin;
+    const siteUrl = getSiteUrl(request);
     const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-      redirectTo: `${origin}/reset-password`,
+      redirectTo: `${siteUrl}/reset-password`,
     });
 
     if (error) {
