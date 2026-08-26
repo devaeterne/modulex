@@ -17,6 +17,9 @@ const textareaClass =
 const primaryButtonClass =
   "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
 
+const secondaryButtonClass =
+  "inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
+
 function optional(value: string | null | undefined) {
   const trimmed = value?.trim() ?? "";
   return trimmed || null;
@@ -64,6 +67,7 @@ export default function GeneralSettingsManager() {
   const [canEdit, setCanEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -100,6 +104,50 @@ export default function GeneralSettingsManager() {
   function patch<K extends keyof GeneralSettings>(key: K, value: GeneralSettings[K]) {
     setSettings((current) => ({ ...current, [key]: value }));
     setSuccessMessage(null);
+  }
+
+  async function uploadLogo(file: File | undefined) {
+    if (!file) return;
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+    if (!allowedTypes.includes(file.type)) {
+      setErrorMessage("Logo must be PNG, JPG, WEBP or SVG.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("Logo file must be 5 MB or smaller.");
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const originalExtension = file.name.split(".").pop()?.toLowerCase();
+    const extension = originalExtension && /^[a-z0-9]+$/.test(originalExtension)
+      ? originalExtension
+      : "png";
+    const path = `branding/company-logo-${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("company-assets")
+      .upload(path, file, {
+        cacheControl: "3600",
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      setErrorMessage(uploadError.message);
+      setIsUploadingLogo(false);
+      return;
+    }
+
+    const { data } = supabase.storage.from("company-assets").getPublicUrl(path);
+    setSettings((current) => ({ ...current, logo_url: data.publicUrl }));
+    setSuccessMessage("Logo uploaded. Save settings to apply it to company documents.");
+    setIsUploadingLogo(false);
   }
 
   async function save() {
@@ -172,7 +220,7 @@ export default function GeneralSettingsManager() {
     );
   }
 
-  const disabled = !canEdit || isSaving;
+  const disabled = !canEdit || isSaving || isUploadingLogo;
 
   return (
     <div className="space-y-5">
@@ -185,7 +233,7 @@ export default function GeneralSettingsManager() {
             </p>
           </div>
           {canEdit && (
-            <button type="button" onClick={save} disabled={isSaving} className={primaryButtonClass}>
+            <button type="button" onClick={save} disabled={disabled} className={primaryButtonClass}>
               {isSaving ? "Saving..." : "Save Settings"}
             </button>
           )}
@@ -204,17 +252,45 @@ export default function GeneralSettingsManager() {
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Company Display Name" value={settings.company_name} onChange={(value) => patch("company_name", value)} disabled={disabled} required placeholder="Example Company" />
           <Field label="Legal Company Name" value={settings.legal_name} onChange={(value) => patch("legal_name", value)} disabled={disabled} placeholder="Example Company d.o.o." />
+
           <div className="md:col-span-2">
-            <Field label="Company Logo URL" value={settings.logo_url} onChange={(value) => patch("logo_url", value)} disabled={disabled} placeholder="https://.../logo.png" hint="Used on printable customer documents. A public HTTPS image URL is recommended." />
-          </div>
-          {settings.logo_url && (
-            <div className="md:col-span-2">
-              <div className="inline-flex min-h-20 items-center rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={settings.logo_url} alt={`${settings.company_name || "Company"} logo`} className="max-h-16 max-w-[240px] object-contain" />
+            <span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Company Logo</span>
+            <div className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700 sm:flex-row sm:items-center">
+              {settings.logo_url ? (
+                <div className="flex h-20 w-48 shrink-0 items-center justify-center rounded-lg bg-white p-3 ring-1 ring-gray-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={settings.logo_url} alt={`${settings.company_name || "Company"} logo`} className="max-h-14 max-w-[168px] object-contain" />
+                </div>
+              ) : (
+                <div className="flex h-20 w-48 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-xs text-gray-400 dark:bg-gray-800">No logo uploaded</div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {canEdit && (
+                  <label className={`${secondaryButtonClass} ${disabled ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
+                    {isUploadingLogo ? "Uploading..." : settings.logo_url ? "Replace Logo" : "Upload Logo"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                      disabled={disabled}
+                      onChange={(event) => uploadLogo(event.target.files?.[0])}
+                      className="sr-only"
+                    />
+                  </label>
+                )}
+                {canEdit && settings.logo_url && (
+                  <button type="button" className={secondaryButtonClass} disabled={disabled} onClick={() => patch("logo_url", null)}>
+                    Remove Logo
+                  </button>
+                )}
               </div>
             </div>
-          )}
+            <p className="mt-1.5 text-xs text-gray-400">PNG, JPG, WEBP or SVG. Maximum 5 MB. Stored in the company-assets bucket.</p>
+          </div>
+
+          <div className="md:col-span-2">
+            <Field label="Logo URL" value={settings.logo_url} onChange={(value) => patch("logo_url", value)} disabled={disabled} placeholder="https://.../logo.png" hint="Filled automatically after upload. It can also point to another public HTTPS image." />
+          </div>
         </div>
       </section>
 
@@ -285,7 +361,7 @@ export default function GeneralSettingsManager() {
 
       {canEdit && (
         <div className="flex justify-end">
-          <button type="button" onClick={save} disabled={isSaving} className={primaryButtonClass}>
+          <button type="button" onClick={save} disabled={disabled} className={primaryButtonClass}>
             {isSaving ? "Saving..." : "Save Settings"}
           </button>
         </div>
