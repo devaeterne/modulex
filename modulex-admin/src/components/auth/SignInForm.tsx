@@ -95,9 +95,19 @@ export default function SignInForm() {
               </div>
 
               <div>
-                <Label>
-                  Password <span className="text-error-500">*</span>
-                </Label>
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <Label>
+                    Password <span className="text-error-500">*</span>
+                  </Label>
+
+                  <Link
+                    href="/forgot-password"
+                    className="shrink-0 text-sm font-medium text-brand-500 transition hover:text-brand-600 dark:text-brand-400"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+
                 <div className="relative">
                   <Input
                     type={showPassword ? "text" : "password"}
@@ -106,26 +116,19 @@ export default function SignInForm() {
                     onChange={(event) => setPassword(event.target.value)}
                   />
 
-                  <span
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute right-4 top-1/2 z-30 -translate-y-1/2 text-gray-500 dark:text-gray-400"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? (
-                      <EyeIcon className="fill-gray-500 dark:fill-gray-400" />
+                      <EyeIcon className="fill-current" />
                     ) : (
-                      <EyeCloseIcon className="fill-gray-500 dark:fill-gray-400" />
+                      <EyeCloseIcon className="fill-current" />
                     )}
-                  </span>
+                  </button>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-end">
-                <Link
-                  href="/reset-password"
-                  className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
-                >
-                  Forgot password?
-                </Link>
               </div>
 
               <div>
