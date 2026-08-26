@@ -8,6 +8,10 @@ import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import {
+  MODULEX_AUTH_CHANNEL,
+  MODULEX_SIGNED_OUT_EVENT,
+} from "@/lib/supabase/auth";
 
 export default function AdminLayout({
   children,
@@ -21,21 +25,35 @@ export default function AdminLayout({
   useEffect(() => {
     let mounted = true;
 
+    const redirectToSignIn = () => {
+      if (typeof window !== "undefined") {
+        window.location.replace("/signin");
+      } else {
+        router.replace("/signin");
+      }
+    };
+
     async function checkSession() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       if (!session) {
-        router.replace("/signin");
+        redirectToSignIn();
         return;
       }
 
       const { profile, error } = await getCurrentProfile();
 
       if (error || !profile || !profile.is_active) {
-        await supabase.auth.signOut();
-        router.replace("/signin?reason=inactive");
+        await supabase.auth.signOut({ scope: "global" });
+
+        if (typeof window !== "undefined") {
+          window.location.replace("/signin?reason=inactive");
+        } else {
+          router.replace("/signin?reason=inactive");
+        }
+
         return;
       }
 
@@ -48,15 +66,31 @@ export default function AdminLayout({
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        router.replace("/signin");
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        redirectToSignIn();
       }
     });
+
+    const handleLocalSignedOut = () => redirectToSignIn();
+    window.addEventListener(MODULEX_SIGNED_OUT_EVENT, handleLocalSignedOut);
+
+    let authChannel: BroadcastChannel | null = null;
+
+    if ("BroadcastChannel" in window) {
+      authChannel = new BroadcastChannel(MODULEX_AUTH_CHANNEL);
+      authChannel.onmessage = (event) => {
+        if (event.data?.type === "SIGNED_OUT") {
+          redirectToSignIn();
+        }
+      };
+    }
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      window.removeEventListener(MODULEX_SIGNED_OUT_EVENT, handleLocalSignedOut);
+      authChannel?.close();
     };
   }, [router]);
 
