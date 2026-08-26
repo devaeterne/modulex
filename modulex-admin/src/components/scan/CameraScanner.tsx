@@ -6,10 +6,9 @@ import React, {
   useState,
 } from "react";
 
-import {
+import type {
   Html5Qrcode,
   Html5QrcodeCameraScanConfig,
-  Html5QrcodeSupportedFormats,
 } from "html5-qrcode";
 
 type CameraScannerProps = {
@@ -96,11 +95,6 @@ export default function CameraScanner({
       null
     );
 
-  /*
-   * Always keep latest parent
-   * callback without restarting
-   * the camera on every render.
-   */
   useEffect(() => {
     onScanSuccessRef.current =
       onScanSuccess;
@@ -119,12 +113,6 @@ export default function CameraScanner({
     const now =
       Date.now();
 
-    /*
-     * Avoid repeatedly scanning
-     * the same label while the
-     * camera is still pointing
-     * at it.
-     */
     if (
       lastScanRef.current
         .value === value &&
@@ -136,11 +124,6 @@ export default function CameraScanner({
       return;
     }
 
-    /*
-     * Do not start another
-     * lookup while the previous
-     * scan is still processing.
-     */
     if (
       processingRef.current
     ) {
@@ -165,10 +148,6 @@ export default function CameraScanner({
       setErrorMessage(null);
     }
 
-    /*
-     * Small scan feedback on
-     * supported mobile devices.
-     */
     if (
       typeof navigator !==
       "undefined" &&
@@ -220,11 +199,25 @@ export default function CameraScanner({
     }
 
     try {
+      // html5-qrcode is one of the heavier client dependencies in the admin app.
+      // Load its runtime only when the camera component is actually mounted instead
+      // of including it in the initial /scan route bundle.
+      const {
+        Html5Qrcode: Html5QrcodeRuntime,
+        Html5QrcodeSupportedFormats,
+      } = await import("html5-qrcode");
+
+      if (
+        !mountedRef.current
+      ) {
+        return;
+      }
+
       if (
         !scannerRef.current
       ) {
         scannerRef.current =
-          new Html5Qrcode(
+          new Html5QrcodeRuntime(
             SCANNER_REGION_ID,
             {
               formatsToSupport:
@@ -293,13 +286,6 @@ export default function CameraScanner({
           false,
       };
 
-      /*
-       * Prefer rear camera.
-       *
-       * No camera selection screen
-       * is necessary for normal
-       * warehouse use.
-       */
       await scannerRef.current.start(
         {
           facingMode:
@@ -317,12 +303,7 @@ export default function CameraScanner({
         },
 
         () => {
-          /*
-           * Frame decode failures
-           * are normal while the
-           * scanner is looking for
-           * a QR or barcode.
-           */
+          // Frame decode failures are expected while looking for a label.
         }
       );
 
@@ -381,15 +362,6 @@ export default function CameraScanner({
     }
   }
 
-  /*
-   * Camera starts automatically
-   * as soon as this component
-   * appears on screen.
-   *
-   * ScanPanel unmounts the
-   * component when camera is no
-   * longer needed.
-   */
   useEffect(() => {
     mountedRef.current =
       true;
@@ -408,7 +380,6 @@ export default function CameraScanner({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      {/* HEADER */}
       <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
         <div>
           <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
@@ -441,7 +412,6 @@ export default function CameraScanner({
         </div>
       </div>
 
-      {/* ERROR */}
       {errorMessage && (
         <div className="border-b border-error-200 bg-error-50 px-5 py-4 dark:border-error-500/30 dark:bg-error-500/10">
           <p className="text-sm font-medium text-error-600 dark:text-error-400">
@@ -464,7 +434,6 @@ export default function CameraScanner({
         </div>
       )}
 
-      {/* CAMERA */}
       <div className="relative bg-black">
         <div
           id={
@@ -473,7 +442,6 @@ export default function CameraScanner({
           className="min-h-[300px] w-full sm:min-h-[360px]"
         />
 
-        {/* STARTING OVERLAY */}
         {isStarting &&
           !errorMessage && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black">
@@ -487,7 +455,6 @@ export default function CameraScanner({
             </div>
           )}
 
-        {/* SIMPLE TARGET GUIDE */}
         {isScanning && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-[210px] w-[210px] rounded-2xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.15)] sm:h-[250px] sm:w-[250px]" />
@@ -495,7 +462,6 @@ export default function CameraScanner({
         )}
       </div>
 
-      {/* BOTTOM STATUS */}
       <div className="flex min-h-[58px] items-center justify-between gap-4 px-5 py-3">
         <div>
           {lastScannedValue ? (
