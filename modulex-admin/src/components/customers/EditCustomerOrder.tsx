@@ -112,6 +112,7 @@ export default function EditCustomerOrder() {
 
   useEffect(() => {
     if (!priceGroupId || !order) return;
+    const currencyCode = order.currency_code;
     let active = true;
     async function loadPrices() {
       setIsLoadingPrices(true);
@@ -121,7 +122,7 @@ export default function EditCustomerOrder() {
         .eq("price_group_id", priceGroupId)
         .eq("is_active", true)
         .is("valid_to", null)
-        .eq("currency_code", order.currency_code);
+        .eq("currency_code", currencyCode);
       if (!active) return;
       if (error) setErrorMessage(error.message);
       else setPrices((data ?? []) as PriceRow[]);
