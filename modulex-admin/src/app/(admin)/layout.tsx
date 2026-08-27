@@ -126,7 +126,7 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen xl:flex print:block print:min-h-0">
-      <EmailNotificationPump />
+      {role !== "hr" && <EmailNotificationPump />}
       <div className="print:hidden">
         <AppSidebar role={role} />
         <Backdrop />
