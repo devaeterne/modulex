@@ -127,11 +127,11 @@ const managementItems: NavItem[] = [
       { name: "Company", path: "/settings/general/company", permission: "settings.view" },
       { name: "Localization", path: "/settings/general/localization", permission: "settings.view" },
       { name: "Documents", path: "/settings/general/documents", permission: "settings.view" },
-      { name: "Tax Rules", path: "/settings/general/tax-rules", permission: "settings.view", new: true },
+      { name: "Tax Rules", path: "/settings/general/tax-rules", permission: "finance.manage", new: true },
       { name: "Email", path: "/settings/general/email", permission: "settings.view" },
       { name: "Notifications", path: "/settings/general/notifications", permission: "settings.view" },
       { name: "Email Delivery Log", path: "/settings/general/email-notifications", permission: "settings.view" },
-      { name: "Payment Methods", path: "/settings/payment-methods", permission: "settings.view" },
+      { name: "Payment Methods", path: "/settings/payment-methods", permission: "finance.manage" },
     ],
   },
   {
