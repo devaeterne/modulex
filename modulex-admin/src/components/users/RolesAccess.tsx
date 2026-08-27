@@ -12,6 +12,7 @@ const roles: UserRole[] = [
   "admin",
   "sales",
   "finance",
+  "hr",
   "warehouse",
   "shipping",
 ];
@@ -21,7 +22,7 @@ const permissions = Object.keys(PERMISSION_LABELS) as Permission[];
 export default function RolesAccess() {
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
         {roles.map((role) => (
           <div
             key={role}
