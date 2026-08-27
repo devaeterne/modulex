@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "smoke": "npm run smoke:api && npm run smoke:db",
+    "smoke:api": "node scripts/api-smoke.mjs",
+    "smoke:db": "node scripts/run-db-smoke.mjs"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
