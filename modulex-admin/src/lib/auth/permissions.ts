@@ -108,7 +108,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "products.view",
     "pricing.view",
     "pricing.cost.view",
-    "customers.view",
     "orders.view",
     "approvals.view",
     "invoices.view",
@@ -146,7 +145,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Full system access, including protected Super Admin account management.",
   admin: "Full business and system administration, except protected Super Admin account actions.",
   sales: "Customer, order, invoice, shipment and installation workflows. Financial exceptions remain subject to approval.",
-  finance: "Invoices, collections, customer financial context, cost/margin visibility and finance reporting. No order editing, warehouse, QR, user or general system administration.",
+  finance: "Invoices, collections, order financial context, cost/margin visibility and finance reporting. No order editing, customer master-data editing, warehouse, QR, user or general system administration.",
   warehouse: "Stock, warehouse structure and QR operations, plus shipment execution where required for fulfillment.",
   shipping: "Shipment execution with inventory, warehouse-location and QR visibility. Customer commercial and order-financial screens stay restricted.",
 };
