@@ -9,7 +9,10 @@ export type NotificationEventType =
   | "stock_warehouse_problem"
   | "order_status_changed"
   | "price_review_required"
-  | "invoice_issued";
+  | "invoice_issued"
+  | "approval_requested"
+  | "approval_approved"
+  | "approval_rejected";
 
 export type NotificationSeverity =
   | "critical"
@@ -43,6 +46,9 @@ export const NOTIFICATION_ROLE_POLICY: Record<
   order_status_changed: [...ADMIN_ROLES, "sales", "warehouse", "shipping"],
   price_review_required: [...ADMIN_ROLES, "sales"],
   invoice_issued: [...ADMIN_ROLES, "sales"],
+  approval_requested: [...ADMIN_ROLES],
+  approval_approved: [...ADMIN_ROLES, "sales"],
+  approval_rejected: [...ADMIN_ROLES, "sales"],
 };
 
 export function canRoleSeeNotification(
@@ -62,4 +68,7 @@ export const NOTIFICATION_LABELS: Record<NotificationEventType, string> = {
   order_status_changed: "Order Status Changed",
   price_review_required: "Price Review Required",
   invoice_issued: "Invoice Issued",
+  approval_requested: "Approval Requested",
+  approval_approved: "Approval Approved",
+  approval_rejected: "Approval Rejected",
 };

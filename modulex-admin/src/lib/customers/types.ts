@@ -24,7 +24,7 @@ export type Customer = {
 };
 
 export type CustomerType = { id: string; system_key: string; name: string; sort_order: number; is_active: boolean; };
-export type PriceGroupLookup = { id: string; name: string; system_key: string; sort_order: number; is_base_price: boolean; is_active: boolean; };
+export type PriceGroupLookup = { id: string; name: string; system_key: string; sort_order: number; is_base_price: boolean; is_active: boolean; available_for_orders?: boolean; requires_approval?: boolean; internal_only?: boolean; };
 export type ProfileLookup = { id: string; full_name: string | null; email: string | null; role: string; is_active: boolean; };
 export type PaymentTerm = { id: string; system_key: string; name: string; days: number | null; sort_order: number; is_active: boolean; };
 export type PaymentMethod = { id: string; system_key: string; name: string; commission_percent: string | number; sort_order: number; is_active: boolean; };
@@ -62,9 +62,11 @@ export type CustomerOrderStatus =
   | "draft" | "confirmed" | "in_preparation" | "ready_for_shipment" | "shipped" | "delivered"
   | "installation_scheduled" | "installation_in_progress" | "completed" | "cancelled";
 
+export type OrderFulfillmentType = "pickup" | "delivery" | "delivery_installation";
+
 export type CustomerOrder = {
   id: string; order_number: string; customer_id: string; status: CustomerOrderStatus; order_date: string; expected_delivery_date: string | null;
-  price_group_id: string | null; price_group_name_snapshot: string | null; currency_code: string;
+  price_group_id: string | null; price_group_name_snapshot: string | null; currency_code: string; fulfillment_type: OrderFulfillmentType;
   payment_method_id: string | null; payment_method_name_snapshot: string | null;
   payment_commission_default_percent: string | number; payment_commission_percent: string | number; payment_commission_amount: string | number; grand_total: string | number;
   billing_address_id: string | null; shipping_address_id: string | null; billing_address_snapshot: Record<string, unknown> | null; shipping_address_snapshot: Record<string, unknown> | null;

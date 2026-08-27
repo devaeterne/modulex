@@ -59,9 +59,11 @@ export default function CustomerInvoiceDetail() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [settings, setSettings] = useState<GeneralSettings>(DEFAULT_GENERAL_SETTINGS);
   const [paidAmount, setPaidAmount] = useState("");
+  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   async function load() {
     setIsLoading(true);
@@ -79,11 +81,12 @@ export default function CustomerInvoiceDetail() {
       return;
     }
 
-    const [invoiceResult, itemsResult, customerResult, settingsResult] = await Promise.all([
+    const [invoiceResult, itemsResult, customerResult, settingsResult, approvalsResult] = await Promise.all([
       supabase.from("customer_invoices").select("*").eq("id", params.invoiceId).eq("customer_id", params.id).single(),
       supabase.from("customer_invoice_items").select("*").eq("invoice_id", params.invoiceId).order("line_no"),
       supabase.from("customers").select("*").eq("id", params.id).single(),
       supabase.from("general_settings").select("*").eq("id", 1).maybeSingle(),
+      supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("entity_type", "invoice").eq("entity_id", params.invoiceId).eq("status", "pending"),
     ]);
 
     const firstError = invoiceResult.error || itemsResult.error || customerResult.error;
@@ -99,6 +102,7 @@ export default function CustomerInvoiceDetail() {
     setCustomer(customerResult.data as Customer);
     if (!settingsResult.error && settingsResult.data) setSettings(settingsResult.data as GeneralSettings);
     setPaidAmount(String(Number(loadedInvoice.paid_amount ?? 0)));
+    setPendingApprovals(approvalsResult.error ? 0 : approvalsResult.count ?? 0);
     setIsLoading(false);
   }
 
@@ -114,6 +118,7 @@ export default function CustomerInvoiceDetail() {
   async function updateState(status?: CustomerInvoiceStatus, explicitPaid?: number) {
     if (!invoice || isSaving) return;
     setErrorMessage(null);
+    setSuccessMessage(null);
     setIsSaving(true);
 
     const amount = explicitPaid ?? (paidAmount.trim() ? Number(paidAmount) : null);
@@ -123,7 +128,7 @@ export default function CustomerInvoiceDetail() {
       return;
     }
 
-    const { error } = await supabase.rpc("update_customer_invoice_state", {
+    const { data, error } = await supabase.rpc("update_customer_invoice_state", {
       p_invoice_id: invoice.id,
       p_status: status ?? null,
       p_paid_amount: amount,
@@ -137,6 +142,7 @@ export default function CustomerInvoiceDetail() {
 
     setIsSaving(false);
     await load();
+    setSuccessMessage(data === "approval_requested" ? "Approval requested. The invoice was not changed yet." : "Invoice updated.");
   }
 
   if (isLoading) return <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"><div className="text-center"><div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500 dark:border-brand-500/20 dark:border-t-brand-400" /><p className="text-sm text-gray-500 dark:text-gray-400">Loading invoice...</p></div></div>;
@@ -150,6 +156,8 @@ export default function CustomerInvoiceDetail() {
 
   return <div className="space-y-5">
     {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
+    {successMessage && <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">{successMessage}</div>}
+    {pendingApprovals > 0 && <div className="flex flex-col gap-3 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400 sm:flex-row sm:items-center sm:justify-between"><span>{pendingApprovals} protected invoice change{pendingApprovals === 1 ? " is" : "s are"} waiting for approval.</span><Link href="/approvals" className="font-semibold underline underline-offset-2">Open Approvals</Link></div>}
 
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-wrap gap-2">
@@ -204,7 +212,7 @@ export default function CustomerInvoiceDetail() {
 
     <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div><h2 className="text-base font-semibold text-gray-800 dark:text-white/90">Invoice Controls</h2><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Issue the invoice, record payment progress, or void it. Invoices are never deleted.</p></div>
+        <div><h2 className="text-base font-semibold text-gray-800 dark:text-white/90">Invoice Controls</h2><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Issue the invoice, record payment progress, or void it. Protected Sales changes are sent to Admin approval instead of changing the invoice immediately.</p></div>
         <div className="flex flex-wrap items-end gap-2">
           {invoice.status === "draft" && <button disabled={isSaving} onClick={() => updateState("issued")} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-60">Issue Invoice</button>}
           {!['draft', 'void'].includes(invoice.status) && <><label><span className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Paid amount</span><input type="number" min="0" max={Number(invoice.total_amount)} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} className="h-10 w-40 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" /></label><button disabled={isSaving} onClick={() => updateState()} className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 disabled:opacity-60 dark:border-gray-700 dark:text-gray-300">Save Payment</button>{invoice.status !== "paid" && <button disabled={isSaving} onClick={() => updateState("paid", Number(invoice.total_amount))} className="h-10 rounded-lg bg-success-600 px-4 text-sm font-medium text-white disabled:opacity-60">Mark Paid</button>}</>}
