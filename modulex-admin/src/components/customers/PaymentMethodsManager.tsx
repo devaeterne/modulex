@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { hasPermission } from "@/lib/auth/permissions";
 import type { PaymentMethod } from "@/lib/customers/types";
 
 const inputClass =
@@ -66,7 +67,7 @@ export default function PaymentMethodsManager() {
         setIsLoading(false);
         return;
       }
-      setCanEdit(["super_admin", "admin"].includes(profile?.role ?? ""));
+      setCanEdit(hasPermission(profile?.role, "finance.manage"));
       await load();
     }
     init();
