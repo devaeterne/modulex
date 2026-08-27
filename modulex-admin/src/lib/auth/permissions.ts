@@ -71,7 +71,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "qr.manage": "Run QR / shelf operations",
   "reports.view": "View operational reports",
   "finance.view": "View financial data & reports",
-  "finance.manage": "Manage expenses & finance operations",
+  "finance.manage": "Manage finance operations",
   "settings.view": "View system settings",
   "settings.manage": "Manage system settings",
   "users.view": "View users",
@@ -121,7 +121,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   warehouse: [
     "dashboard.view",
     "products.view",
-    "orders.view",
     "shipments.view",
     "shipments.manage",
     "inventory.view",
@@ -134,8 +133,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   shipping: [
     "dashboard.view",
     "products.view",
-    "customers.view",
-    "orders.view",
     "shipments.view",
     "shipments.manage",
     "inventory.view",
@@ -149,9 +146,9 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Full system access, including protected Super Admin account management.",
   admin: "Full business and system administration, except protected Super Admin account actions.",
   sales: "Customer, order, invoice, shipment and installation workflows. Financial exceptions remain subject to approval.",
-  finance: "Invoices, collections, customer financial context, cost/margin visibility, finance reports and company expenses. No warehouse, QR, user or system-settings administration.",
-  warehouse: "Stock, warehouse structure and QR operations with the order/shipment visibility needed for fulfillment.",
-  shipping: "Shipment execution with read access to orders, customers, inventory and warehouse locations.",
+  finance: "Invoices, collections, customer financial context, cost/margin visibility and finance reporting. No order editing, warehouse, QR, user or general system administration.",
+  warehouse: "Stock, warehouse structure and QR operations, plus shipment execution where required for fulfillment.",
+  shipping: "Shipment execution with inventory, warehouse-location and QR visibility. Customer commercial and order-financial screens stay restricted.",
 };
 
 export function hasPermission(role: UserRole | null | undefined, permission: Permission) {
@@ -171,6 +168,8 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
   { match: (path) => path === "/users" || path.startsWith("/users/"), permission: "users.view" },
+  { match: (path) => path === "/settings/general/tax-rules" || path.startsWith("/settings/general/tax-rules/"), permission: "finance.manage" },
+  { match: (path) => path === "/settings/payment-methods" || path.startsWith("/settings/payment-methods/"), permission: "finance.manage" },
   { match: (path) => path === "/settings" || path.startsWith("/settings/"), permission: "settings.view" },
   { match: (path) => path === "/approvals" || path.startsWith("/approvals/"), permission: "approvals.view" },
   { match: (path) => path.includes("/invoices"), permission: "invoices.view" },
