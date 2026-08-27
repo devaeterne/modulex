@@ -1,23 +1,21 @@
-import React from "react";
 import Link from "next/link";
 
 export default function SidebarWidget() {
   return (
     <div className="mx-auto mb-10 w-full max-w-60 rounded-2xl bg-gray-50 px-4 py-5 text-center dark:bg-white/[0.03]">
       <h3 className="mb-2 font-semibold text-gray-900 dark:text-white">
-        Modulex ERP
+        Oakwell Cabinetry Admin
       </h3>
 
-      <p className="mb-4 text-gray-500 text-theme-sm dark:text-gray-400">
-        Manage products, inventory, warehouses, shelf locations, and QR-based
-        stock operations from one panel.
+      <p className="mb-4 text-theme-sm text-gray-500 dark:text-gray-400">
+        Need help with a workflow? Open the role-based training center for step-by-step operating guides.
       </p>
 
       <Link
-        href="/qr-labels"
-        className="flex items-center justify-center p-3 font-medium text-white rounded-lg bg-brand-500 text-theme-sm hover:bg-brand-600"
+        href="/training"
+        className="flex items-center justify-center rounded-lg bg-brand-500 p-3 text-theme-sm font-medium text-white hover:bg-brand-600"
       >
-        Print QR Labels
+        Help & Training
       </Link>
     </div>
   );
