@@ -5,6 +5,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Admin",
   sales: "Sales",
   finance: "Finance",
+  hr: "HR",
   warehouse: "Warehouse",
   shipping: "Shipping",
 };
@@ -37,6 +38,8 @@ export type Permission =
   | "reports.view"
   | "finance.view"
   | "finance.manage"
+  | "personnel.view"
+  | "personnel.manage"
   | "settings.view"
   | "settings.manage"
   | "users.view"
@@ -72,6 +75,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "reports.view": "View operational reports",
   "finance.view": "View financial data & reports",
   "finance.manage": "Manage finance operations",
+  "personnel.view": "View personnel records",
+  "personnel.manage": "Manage employees, departments & positions",
   "settings.view": "View system settings",
   "settings.manage": "Manage system settings",
   "users.view": "View users",
@@ -117,6 +122,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "finance.view",
     "finance.manage",
   ],
+  hr: [
+    "dashboard.view",
+    "personnel.view",
+    "personnel.manage",
+  ],
   warehouse: [
     "dashboard.view",
     "products.view",
@@ -144,6 +154,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   admin: "Full business and system administration, except protected Super Admin account actions.",
   sales: "Customer, order, invoice, shipment and installation workflows. Financial exceptions remain subject to approval.",
   finance: "Invoices, collections, order financial context, cost/margin visibility and finance reporting. No order editing, customer master-data editing, warehouse, QR, user or general system administration.",
+  hr: "Employee master data and organization structure. Payroll, tax, compensation and attendance permissions will be added as separate protected capabilities.",
   warehouse: "Stock, shipment and QR operations with read access to warehouse structure. Warehouse master data remains Admin-managed.",
   shipping: "Shipment execution with inventory, warehouse-location and QR-label visibility. General stock operations, customer commercial data and order-financial screens stay restricted.",
 };
@@ -165,6 +176,7 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
   { match: (path) => path === "/users" || path.startsWith("/users/"), permission: "users.view" },
+  { match: (path) => path === "/personnel" || path.startsWith("/personnel/"), permission: "personnel.view" },
   { match: (path) => path === "/settings/general/tax-rules" || path.startsWith("/settings/general/tax-rules/"), permission: "finance.manage" },
   { match: (path) => path === "/settings/payment-methods" || path.startsWith("/settings/payment-methods/"), permission: "finance.manage" },
   { match: (path) => path === "/settings" || path.startsWith("/settings/"), permission: "settings.view" },
