@@ -25,6 +25,7 @@ export default function CustomerOrderDetail() {
   const [items, setItems] = useState<CustomerOrderItem[]>([]);
   const [history, setHistory] = useState<CustomerOrderStatusHistory[]>([]);
   const [profiles, setProfiles] = useState<ProfileLookup[]>([]);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [newStatus, setNewStatus] = useState<CustomerOrderStatus>("draft");
   const [statusNote, setStatusNote] = useState("");
   const [canEdit, setCanEdit] = useState(false);
@@ -35,12 +36,13 @@ export default function CustomerOrderDetail() {
 
   async function load() {
     setIsLoading(true);
-    const [customerResult, orderResult, itemsResult, historyResult, profilesResult] = await Promise.all([
+    const [customerResult, orderResult, itemsResult, historyResult, profilesResult, approvalsResult] = await Promise.all([
       supabase.from("customers").select("*").eq("id", customerId).single(),
       supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
       supabase.from("customer_order_items").select("*").eq("order_id", orderId).order("line_no"),
       supabase.from("customer_order_status_history").select("*").eq("order_id", orderId).order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, full_name, email, role, is_active"),
+      supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("entity_type", "order").eq("entity_id", orderId).eq("status", "pending"),
     ]);
     const firstError = customerResult.error || orderResult.error || itemsResult.error || historyResult.error || profilesResult.error;
     if (firstError) { setErrorMessage(firstError.message); setIsLoading(false); return; }
@@ -50,6 +52,7 @@ export default function CustomerOrderDetail() {
     setItems((itemsResult.data ?? []) as CustomerOrderItem[]);
     setHistory((historyResult.data ?? []) as CustomerOrderStatusHistory[]);
     setProfiles((profilesResult.data ?? []) as ProfileLookup[]);
+    setPendingApprovals(approvalsResult.error ? 0 : approvalsResult.count ?? 0);
     setNewStatus(loadedOrder.status);
     setIsLoading(false);
   }
@@ -63,7 +66,7 @@ export default function CustomerOrderDetail() {
       if (!allowed) { setErrorMessage("You do not have access to customer orders."); setIsLoading(false); return; }
       await load();
     }
-    init();
+    void init();
   }, [customerId, orderId]);
 
   const profileMap = useMemo(() => new Map(profiles.map((p) => [p.id, p.full_name || p.email || "User"])), [profiles]);
@@ -71,9 +74,12 @@ export default function CustomerOrderDetail() {
   async function updateStatus() {
     if (!order || newStatus === order.status) return;
     setIsSaving(true); setErrorMessage(null); setSuccessMessage(null);
-    const { error } = await supabase.rpc("set_customer_order_status", { p_order_id: order.id, p_status: newStatus, p_note: statusNote.trim() || null });
+    const { data, error } = await supabase.rpc("set_customer_order_status", { p_order_id: order.id, p_status: newStatus, p_note: statusNote.trim() || null });
     if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
-    await load(); setStatusNote(""); setSuccessMessage("Order status updated."); setIsSaving(false);
+    await load();
+    setStatusNote("");
+    setSuccessMessage(data === "approval_requested" ? "Approval requested. The order status was not changed yet." : "Order status updated.");
+    setIsSaving(false);
   }
 
   if (isLoading) return <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"><div className="text-center"><div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" /><p className="text-sm text-gray-500 dark:text-gray-400">Loading order...</p></div></div>;
@@ -91,8 +97,9 @@ export default function CustomerOrderDetail() {
 
     {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
     {successMessage && <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">{successMessage}</div>}
+    {pendingApprovals > 0 && <div className="flex flex-col gap-3 rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400 sm:flex-row sm:items-center sm:justify-between"><span>{pendingApprovals} approval request{pendingApprovals === 1 ? " is" : "s are"} pending for this order. Protected changes remain unapplied until review.</span><Link href="/approvals" className="font-semibold underline underline-offset-2">Open Approvals</Link></div>}
 
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5"><Summary label="Grand Total" value={money(grandTotal, currency)} /><Summary label="Items" value={String(order.item_count)} /><Summary label="Price Group" value={order.price_group_name_snapshot || "—"} /><Summary label="Payment" value={order.payment_method_name_snapshot || "—"} /><Summary label="Expected Delivery" value={date(order.expected_delivery_date)} /></div>
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-6"><Summary label="Grand Total" value={money(grandTotal, currency)} /><Summary label="Items" value={String(order.item_count)} /><Summary label="Price Group" value={order.price_group_name_snapshot || "—"} /><Summary label="Fulfillment" value={titleCase(order.fulfillment_type || "delivery")} /><Summary label="Payment" value={order.payment_method_name_snapshot || "—"} /><Summary label="Expected Delivery" value={date(order.expected_delivery_date)} /></div>
 
     {canEdit && <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Update Status</h2><div className="mt-4 grid gap-3 md:grid-cols-[260px_1fr_auto]"><select value={newStatus} onChange={(e) => setNewStatus(e.target.value as CustomerOrderStatus)} className={selectClass}>{statuses.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}</select><input value={statusNote} onChange={(e) => setStatusNote(e.target.value)} placeholder="Optional status note" className={selectClass} /><button disabled={isSaving || newStatus === order.status} onClick={updateStatus} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-40">{isSaving ? "Saving..." : "Update"}</button></div></div>}
 

@@ -30,7 +30,7 @@ type PanelFeedRow = {
   label: string;
   severity: "info" | "success" | "warning" | "critical";
   sound_enabled: boolean;
-  entity_type: "order" | "invoice";
+  entity_type: "order" | "invoice" | "customer";
   entity_id: string;
   customer_id: string | null;
   reference: string | null;
@@ -60,6 +60,9 @@ function notificationIcon(notification: AppNotification) {
     order_status_changed: "ORD",
     price_review_required: "PRC",
     invoice_issued: "INV",
+    approval_requested: "APR",
+    approval_approved: "OK",
+    approval_rejected: "NO",
   };
   return <span className={base}>{labels[notification.type] ?? "!"}</span>;
 }
@@ -78,17 +81,24 @@ function relativeTime(value: string) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+function titleCase(value: string) {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function mapPanelType(eventType: string): NotificationEventType | null {
   if (eventType === "new_order") return "new_order_request";
   if (eventType === "order_status_changed") return "order_status_changed";
   if (eventType === "stock_review_required") return "stock_warehouse_problem";
   if (eventType === "price_review_required") return "price_review_required";
   if (eventType === "invoice_issued") return "invoice_issued";
+  if (eventType === "approval_requested") return "approval_requested";
+  if (eventType === "approval_approved") return "approval_approved";
+  if (eventType === "approval_rejected") return "approval_rejected";
   return null;
 }
 
 function panelDescription(row: PanelFeedRow) {
-  const reference = row.reference || (row.entity_type === "invoice" ? "Invoice" : "Order");
+  const reference = row.reference || (row.entity_type === "invoice" ? "Invoice" : row.entity_type === "customer" ? "Customer" : "Order");
   const customer = row.customer_name ? ` · ${row.customer_name}` : "";
   const payload = row.payload ?? {};
 
@@ -105,10 +115,18 @@ function panelDescription(row: PanelFeedRow) {
     const count = Array.isArray(payload.issues) ? payload.issues.length : 0;
     return `${reference}${customer} · ${count || "One or more"} price item${count === 1 ? "" : "s"} need review.`;
   }
+  if (row.event_type.startsWith("approval_")) {
+    const requestType = titleCase(String(payload.request_type || "approval request"));
+    const reason = String(payload.request_reason || "").trim();
+    const status = row.event_type === "approval_requested" ? "Needs review" : row.event_type === "approval_approved" ? "Approved" : "Rejected";
+    return `${reference}${customer} · ${status} · ${reason || requestType}`;
+  }
   return `${reference}${customer}`;
 }
 
 function panelHref(row: PanelFeedRow) {
+  if (row.event_type.startsWith("approval_")) return "/approvals";
+  if (row.entity_type === "customer") return `/customers/${row.entity_id}`;
   if (!row.customer_id) return row.entity_type === "invoice" ? "/customers/invoices" : "/customers/orders";
   return row.entity_type === "invoice"
     ? `/customers/${row.customer_id}/invoices/${row.entity_id}`

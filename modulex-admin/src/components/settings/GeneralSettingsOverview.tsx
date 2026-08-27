@@ -4,6 +4,7 @@ const sections = [
   { title: "Company", description: "Company identity, logo, legal details, contact information and address.", href: "/settings/general/company", icon: "CO" },
   { title: "Localization", description: "Default currency, locale and timezone used across the application.", href: "/settings/general/localization", icon: "LO" },
   { title: "Documents", description: "Order and invoice document titles, footer notes and customer-facing wording.", href: "/settings/general/documents", icon: "DO" },
+  { title: "Tax Rules", description: "Expected tax rates for Customer Pickup, Delivery and Delivery + Installation workflows.", href: "/settings/general/tax-rules", icon: "TX" },
   { title: "Email", description: "Sender identity, reply-to address, internal recipients and email delivery switches.", href: "/settings/general/email", icon: "EM" },
   { title: "Notifications", description: "Choose whether each operational event uses email, panel notification and sound.", href: "/settings/general/notifications", icon: "NT" },
   { title: "Email Delivery Log", description: "Review pending, sent, failed and skipped transactional emails and retry failures.", href: "/settings/general/email-notifications", icon: "LG" },
@@ -14,7 +15,7 @@ export default function GeneralSettingsOverview() {
   return <div className="space-y-5">
     <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
       <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">General Settings</h1>
-      <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">Settings are grouped by purpose so company data, documents, email and operational notifications can be managed without searching through one long page.</p>
+      <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">Settings are grouped by purpose so company data, documents, tax rules, email and operational notifications can be managed without searching through one long page.</p>
     </section>
 
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

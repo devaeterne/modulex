@@ -6,7 +6,7 @@ type EmailNotification = {
   id: string;
   event_type: string;
   audience: "customer" | "internal";
-  entity_type: "order" | "invoice";
+  entity_type: "order" | "invoice" | "customer";
   entity_id: string;
   event_key: string;
   payload: Record<string, unknown>;
@@ -67,14 +67,20 @@ function parseEmails(value: string | null | undefined) {
   return [...new Set(value.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter((item) => item.includes("@")))];
 }
 
+function siteUrl() {
+  return (process.env.NEXT_PUBLIC_SITE_URL || "https://admin.oakwellcabinetry.com").replace(/\/$/, "");
+}
+
 function adminOrderUrl(customerId: string, orderId: string) {
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://admin.oakwellcabinetry.com").replace(/\/$/, "");
-  return `${siteUrl}/customers/${customerId}/orders/${orderId}`;
+  return `${siteUrl()}/customers/${customerId}/orders/${orderId}`;
 }
 
 function adminInvoiceUrl(customerId: string, invoiceId: string) {
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || "https://admin.oakwellcabinetry.com").replace(/\/$/, "");
-  return `${siteUrl}/customers/${customerId}/invoices/${invoiceId}`;
+  return `${siteUrl()}/customers/${customerId}/invoices/${invoiceId}`;
+}
+
+function adminApprovalsUrl() {
+  return `${siteUrl()}/approvals`;
 }
 
 function shell(settings: GeneralSettings, title: string, body: string, footer = "Automated notification") {
@@ -146,18 +152,58 @@ function internalRecipients(settings: GeneralSettings, eventType: string) {
   return [...new Set(emails)];
 }
 
-function isEnabled(settings: GeneralSettings, notification: EmailNotification) {
+async function isEnabled(settings: GeneralSettings, notification: EmailNotification) {
   if (notification.audience === "customer") {
     return notification.entity_type === "invoice"
       ? settings.send_customer_invoice_emails
       : settings.send_customer_order_emails;
   }
+
+  const { data: rule } = await supabaseAdmin
+    .from("notification_delivery_rules")
+    .select("internal_email_enabled")
+    .eq("event_type", notification.event_type)
+    .maybeSingle();
+  if (rule) return Boolean(rule.internal_email_enabled);
+
   if (notification.event_type === "new_order") return settings.notify_internal_new_order;
   if (notification.event_type === "order_status_changed") return settings.notify_internal_order_status;
   if (notification.event_type === "stock_review_required") return settings.notify_internal_stock_alerts;
   if (notification.event_type === "price_review_required") return settings.notify_internal_price_alerts;
   if (notification.event_type === "invoice_issued") return settings.notify_internal_invoice_issued;
   return true;
+}
+
+async function renderApproval(notification: EmailNotification, settings: GeneralSettings) {
+  const payload = notification.payload ?? {};
+  const entityLabel = String(payload.entity_label || titleCase(notification.entity_type));
+  const requestType = titleCase(String(payload.request_type || "approval_request"));
+  const requestReason = String(payload.request_reason || "A protected action requires review.");
+  const decision = notification.event_type === "approval_approved"
+    ? "Approved"
+    : notification.event_type === "approval_rejected"
+      ? "Rejected"
+      : "Pending Review";
+  const riskSummary = payload.risk_summary && typeof payload.risk_summary === "object"
+    ? payload.risk_summary as Record<string, unknown>
+    : {};
+  const reasons = Array.isArray(riskSummary.reasons)
+    ? riskSummary.reasons as Array<Record<string, unknown>>
+    : [];
+  const reasonsHtml = reasons.length
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top:20px;">${reasons.map((reason) => `<tr><td style="padding:10px 12px;border-bottom:1px solid #eeeeee;font-size:13px;color:#444444;">${escapeHtml(reason.label || titleCase(String(reason.type || "exception")))}${reason.sku ? ` · ${escapeHtml(reason.sku)}` : ""}</td></tr>`).join("")}</table>`
+    : "";
+
+  const title = notification.event_type === "approval_requested"
+    ? `Approval required – ${entityLabel}`
+    : `Approval ${decision.toLowerCase()} – ${entityLabel}`;
+  const html = shell(
+    settings,
+    title,
+    `${paragraph(escapeHtml(requestReason))}${detailRows([["Record", entityLabel], ["Request", requestType], ["Status", decision]])}${reasonsHtml}${button(notification.event_type === "approval_requested" ? "Review approval" : "Open approvals", adminApprovalsUrl())}`,
+    "Internal approval notification"
+  );
+  return { customerId: "", subject: title, html };
 }
 
 async function renderOrder(notification: EmailNotification, settings: GeneralSettings) {
@@ -276,17 +322,19 @@ async function sendWithResend(params: { from: string; to: string; replyTo?: stri
 }
 
 async function processOne(notification: EmailNotification, settings: GeneralSettings) {
-  if (!isEnabled(settings, notification)) {
-    await supabaseAdmin.from("email_notifications").update({ status: "skipped", processed_at: new Date().toISOString(), updated_at: new Date().toISOString(), last_error: "Notification is disabled in General Settings." }).eq("id", notification.id);
+  if (!(await isEnabled(settings, notification))) {
+    await supabaseAdmin.from("email_notifications").update({ status: "skipped", processed_at: new Date().toISOString(), updated_at: new Date().toISOString(), last_error: "Notification email is disabled by the delivery rule." }).eq("id", notification.id);
     return { id: notification.id, status: "skipped" as const };
   }
 
-  const rendered = notification.entity_type === "order"
-    ? await renderOrder(notification, settings)
-    : await renderInvoice(notification, settings);
+  const rendered = notification.event_type.startsWith("approval_")
+    ? await renderApproval(notification, settings)
+    : notification.entity_type === "order"
+      ? await renderOrder(notification, settings)
+      : await renderInvoice(notification, settings);
 
   const recipients = notification.audience === "customer"
-    ? await customerRecipients(rendered.customerId, notification.entity_type)
+    ? await customerRecipients(rendered.customerId, notification.entity_type === "invoice" ? "invoice" : "order")
     : internalRecipients(settings, notification.event_type);
 
   if (!recipients.length) {
