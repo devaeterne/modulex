@@ -4,6 +4,7 @@ export type UserRole =
   | "super_admin"
   | "admin"
   | "sales"
+  | "finance"
   | "warehouse"
   | "shipping";
 
@@ -21,10 +22,6 @@ export type Profile = {
 const PROFILE_CACHE_TTL_MS = 30_000;
 
 async function loadCurrentProfile() {
-  // The browser client already maintains and refreshes the authenticated session.
-  // Reading that session is local and avoids an extra /auth/v1/user round-trip before
-  // every profile lookup. Authorization is still enforced by the access token + RLS
-  // when the profile row is requested from PostgREST.
   const {
     data: { session },
     error: sessionError,
