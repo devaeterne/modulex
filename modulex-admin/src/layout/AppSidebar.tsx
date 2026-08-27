@@ -57,7 +57,6 @@ const navItems: NavItem[] = [
       { name: "Pricing Dashboard", path: "/pricing/dashboard", permission: "pricing.view" },
       { name: "Product Prices", path: "/pricing/products", permission: "pricing.view" },
       { name: "Price Groups", path: "/pricing/groups", permission: "pricing.manage" },
-      { name: "Cost & Margin", path: "/pricing/cost-margin", permission: "pricing.cost.view" },
     ],
   },
   {
@@ -67,8 +66,6 @@ const navItems: NavItem[] = [
       { name: "Dashboard", path: "/customers/dashboard", permission: "customers.view" },
       { name: "Customer List", path: "/customers", permission: "customers.view", exact: true },
       { name: "Orders", path: "/customers/orders", permission: "orders.view" },
-      { name: "Approvals", path: "/approvals", permission: "approvals.view", new: true },
-      { name: "Invoices", path: "/customers/invoices", permission: "invoices.view" },
       { name: "Shipments", path: "/customers/shipments", permission: "shipments.view" },
       { name: "Installations", path: "/customers/installations", permission: "installations.view" },
     ],
@@ -104,6 +101,17 @@ const navItems: NavItem[] = [
 
 const managementItems: NavItem[] = [
   {
+    icon: <DollarLineIcon />,
+    name: "Finance",
+    subItems: [
+      { name: "Invoices", path: "/customers/invoices", permission: "invoices.view" },
+      { name: "Approvals", path: "/approvals", permission: "approvals.view", new: true },
+      { name: "Cost & Margin", path: "/pricing/cost-margin", permission: "pricing.cost.view" },
+      { name: "Tax Rules", path: "/settings/general/tax-rules", permission: "finance.manage" },
+      { name: "Payment Methods", path: "/settings/payment-methods", permission: "finance.manage" },
+    ],
+  },
+  {
     icon: <PieChartIcon />,
     name: "Reports",
     subItems: [
@@ -127,11 +135,9 @@ const managementItems: NavItem[] = [
       { name: "Company", path: "/settings/general/company", permission: "settings.view" },
       { name: "Localization", path: "/settings/general/localization", permission: "settings.view" },
       { name: "Documents", path: "/settings/general/documents", permission: "settings.view" },
-      { name: "Tax Rules", path: "/settings/general/tax-rules", permission: "finance.manage", new: true },
       { name: "Email", path: "/settings/general/email", permission: "settings.view" },
       { name: "Notifications", path: "/settings/general/notifications", permission: "settings.view" },
       { name: "Email Delivery Log", path: "/settings/general/email-notifications", permission: "settings.view" },
-      { name: "Payment Methods", path: "/settings/payment-methods", permission: "finance.manage" },
     ],
   },
   {
