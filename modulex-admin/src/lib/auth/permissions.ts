@@ -136,7 +136,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "inventory.view",
     "warehouse.view",
     "qr.view",
-    "qr.manage",
   ],
 };
 
@@ -146,7 +145,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   sales: "Customer, order, invoice, shipment and installation workflows. Financial exceptions remain subject to approval.",
   finance: "Invoices, collections, order financial context, cost/margin visibility and finance reporting. No order editing, customer master-data editing, warehouse, QR, user or general system administration.",
   warehouse: "Stock, shipment and QR operations with read access to warehouse structure. Warehouse master data remains Admin-managed.",
-  shipping: "Shipment execution with inventory, warehouse-location and QR visibility. Customer commercial and order-financial screens stay restricted.",
+  shipping: "Shipment execution with inventory, warehouse-location and QR-label visibility. General stock operations, customer commercial data and order-financial screens stay restricted.",
 };
 
 export function hasPermission(role: UserRole | null | undefined, permission: Permission) {
