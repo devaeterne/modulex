@@ -97,18 +97,26 @@ export default function AdminLayout({
     };
   }, [router]);
 
+  useEffect(() => {
+    if (role === "hr" && pathname === "/") {
+      router.replace("/personnel");
+    }
+  }, [pathname, role, router]);
+
   const mainContentMargin = isMobileOpen
     ? "ml-0"
     : isExpanded || isHovered
       ? "lg:ml-[290px]"
       : "lg:ml-[90px]";
 
-  if (isCheckingAuth || !role) {
+  if (isCheckingAuth || !role || (role === "hr" && pathname === "/")) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-900">
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">Checking session...</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {role === "hr" && pathname === "/" ? "Opening Personnel..." : "Checking session..."}
+          </p>
         </div>
       </div>
     );
@@ -138,6 +146,9 @@ export default function AdminLayout({
 }
 
 function AccessDenied({ role }: { role: UserRole }) {
+  const homeHref = role === "hr" ? "/personnel" : "/";
+  const homeLabel = role === "hr" ? "Back to Personnel" : "Back to Dashboard";
+
   return (
     <div className="mx-auto mt-10 max-w-2xl rounded-2xl border border-error-200 bg-white p-8 text-center shadow-theme-xs dark:border-error-500/30 dark:bg-white/[0.03]">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-error-50 text-lg font-semibold text-error-600 dark:bg-error-500/10 dark:text-error-400">!</div>
@@ -145,8 +156,8 @@ function AccessDenied({ role }: { role: UserRole }) {
       <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-gray-500 dark:text-gray-400">
         Your {ROLE_LABELS[role]} role does not have permission to open this page. Page access and database permissions are enforced independently.
       </p>
-      <Link href="/" className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
-        Back to Dashboard
+      <Link href={homeHref} className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
+        {homeLabel}
       </Link>
     </div>
   );
