@@ -12,6 +12,7 @@ const VALID_ROLES: UserRole[] = [
   "admin",
   "sales",
   "finance",
+  "hr",
   "warehouse",
   "shipping",
 ];
