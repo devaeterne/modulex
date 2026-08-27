@@ -40,6 +40,7 @@ export type Permission =
   | "finance.manage"
   | "personnel.view"
   | "personnel.manage"
+  | "training.view"
   | "settings.view"
   | "settings.manage"
   | "users.view"
@@ -77,6 +78,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "finance.manage": "Manage finance operations",
   "personnel.view": "View personnel records",
   "personnel.manage": "Manage employees and HR operations",
+  "training.view": "View help and training center",
   "settings.view": "View system settings",
   "settings.manage": "Manage system settings",
   "users.view": "View users",
@@ -107,6 +109,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "installations.manage",
     "inventory.view",
     "reports.view",
+    "training.view",
   ],
   finance: [
     "dashboard.view",
@@ -121,10 +124,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "reports.view",
     "finance.view",
     "finance.manage",
+    "training.view",
   ],
   hr: [
     "personnel.view",
     "personnel.manage",
+    "training.view",
   ],
   warehouse: [
     "dashboard.view",
@@ -136,6 +141,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "warehouse.view",
     "qr.view",
     "qr.manage",
+    "training.view",
   ],
   shipping: [
     "dashboard.view",
@@ -145,6 +151,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "inventory.view",
     "warehouse.view",
     "qr.view",
+    "training.view",
   ],
 };
 
@@ -172,6 +179,7 @@ export function isAdminRole(role: UserRole | null | undefined) {
 }
 
 const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Permission }> = [
+  { match: (path) => path === "/training" || path.startsWith("/training/"), permission: "training.view" },
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
   { match: (path) => path === "/users" || path.startsWith("/users/"), permission: "users.view" },
