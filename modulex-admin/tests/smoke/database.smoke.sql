@@ -26,6 +26,7 @@ create temp table smoke_ctx (
   customer_id uuid,
   contact_id uuid,
   address_id uuid,
+  delete_address_id uuid,
   price_group_id uuid,
   delete_price_group_id uuid,
   product_id uuid,
@@ -215,8 +216,9 @@ with x as (
   insert into public.customer_addresses(customer_id,address_name,address_line_1,city,state_region,country_code,address_type)
   values ((select customer_id from smoke_ctx),'Smoke Disposable','101 Smoke Test Ave','New York','NY','US','shipping') returning id
 )
-delete from public.customer_addresses where id=(select id from x);
-select 1 as "PASS address delete";
+update smoke_ctx set delete_address_id=(select id from x);
+delete from public.customer_addresses where id=(select delete_address_id from smoke_ctx);
+select 1 / case when not exists (select 1 from public.customer_addresses where id=(select delete_address_id from smoke_ctx)) then 1 else 0 end as "PASS address delete";
 
 \echo '[09] Warehouse / Zone / Location create-read-update'
 with x as (
