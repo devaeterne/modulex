@@ -123,7 +123,6 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "finance.manage",
   ],
   hr: [
-    "dashboard.view",
     "personnel.view",
     "personnel.manage",
   ],
