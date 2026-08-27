@@ -338,7 +338,19 @@ select 1 / case when exists (
 
 select public.update_customer_order(
   p_order_id => (select order_id from smoke_ctx),
-  p_items => jsonb_build_array(jsonb_build_object('product_id',(select product_id from smoke_ctx),'quantity',1,'discount_percent',0)),
+  p_items => jsonb_build_array(jsonb_build_object(
+    'product_id',(select product_id from smoke_ctx),
+    'quantity',1,
+    'unit_price',(
+      select unit_price
+      from public.customer_order_items
+      where order_id=(select order_id from smoke_ctx)
+        and product_id=(select product_id from smoke_ctx)
+      order by line_no
+      limit 1
+    ),
+    'discount_percent',0
+  )),
   p_price_group_id => (select price_group_id from smoke_ctx),
   p_billing_address_id => (select address_id from smoke_ctx),
   p_shipping_address_id => (select address_id from smoke_ctx),
@@ -353,7 +365,15 @@ select public.update_customer_order(
   p_revision_reason => 'Smoke update',
   p_fulfillment_type => 'delivery_installation'
 );
-select 1 / case when exists (select 1 from public.customer_orders where id=(select order_id from smoke_ctx) and customer_reference='SMOKE-UPDATED') then 1 else 0 end as "PASS order update";
+select 1 / case when exists (
+  select 1 from public.customer_orders o
+  join public.customer_order_items oi on oi.order_id=o.id
+  where o.id=(select order_id from smoke_ctx)
+    and o.customer_reference='SMOKE-UPDATED'
+    and oi.product_id=(select product_id from smoke_ctx)
+    and oi.unit_price=105
+    and oi.price_source='price_group'
+) then 1 else 0 end as "PASS order update + price preservation";
 
 select public.set_customer_order_status((select order_id from smoke_ctx),'confirmed','Smoke confirm');
 select 1 / case when exists (select 1 from public.customer_orders where id=(select order_id from smoke_ctx) and status='confirmed') then 1 else 0 end as "PASS order confirm";
