@@ -5,6 +5,15 @@ function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
 
+const EMAIL_QUEUE_ROLES = new Set([
+  "super_admin",
+  "admin",
+  "sales",
+  "finance",
+  "warehouse",
+  "shipping",
+]);
+
 async function requireActiveStaff(request: Request) {
   if (!isSupabaseAdminConfigured) {
     return { response: jsonError("Server email processing is not configured.", 503) };
@@ -33,6 +42,10 @@ async function requireActiveStaff(request: Request) {
 
   if (profileError || !profile || !profile.is_active) {
     return { response: jsonError("Active staff access is required.", 403) };
+  }
+
+  if (!EMAIL_QUEUE_ROLES.has(String(profile.role))) {
+    return { response: jsonError("Email queue access is not available for this role.", 403) };
   }
 
   return { response: null };

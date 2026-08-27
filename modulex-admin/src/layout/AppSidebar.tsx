@@ -101,6 +101,16 @@ const navItems: NavItem[] = [
 
 const managementItems: NavItem[] = [
   {
+    icon: <UserCircleIcon />,
+    name: "Personnel",
+    subItems: [
+      { name: "Overview", path: "/personnel", permission: "personnel.view", exact: true },
+      { name: "Employees", path: "/personnel/employees", permission: "personnel.view", new: true },
+      { name: "Departments", path: "/personnel/departments", permission: "personnel.manage" },
+      { name: "Positions", path: "/personnel/positions", permission: "personnel.manage" },
+    ],
+  },
+  {
     icon: <DollarLineIcon />,
     name: "Finance",
     subItems: [
