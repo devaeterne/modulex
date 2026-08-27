@@ -1,4 +1,5 @@
 import type { UserRole } from "@/lib/supabase/profile";
+import { hasPermission, type Permission } from "@/lib/auth/permissions";
 
 export type NotificationEventType =
   | "low_stock"
@@ -31,31 +32,29 @@ export type AppNotification = {
   timeLabel: string;
 };
 
-const ADMIN_ROLES: UserRole[] = ["super_admin", "admin"];
-
-export const NOTIFICATION_ROLE_POLICY: Record<
+const NOTIFICATION_PERMISSION_POLICY: Record<
   NotificationEventType,
-  UserRole[]
+  Permission
 > = {
-  low_stock: [...ADMIN_ROLES, "warehouse"],
-  new_order_request: [...ADMIN_ROLES, "sales"],
-  new_dealer_application: [...ADMIN_ROLES],
-  order_ready_for_shipment: ["shipping"],
-  order_cancellation: [...ADMIN_ROLES, "sales", "warehouse"],
-  stock_warehouse_problem: [...ADMIN_ROLES, "warehouse"],
-  order_status_changed: [...ADMIN_ROLES, "sales", "warehouse", "shipping"],
-  price_review_required: [...ADMIN_ROLES, "sales"],
-  invoice_issued: [...ADMIN_ROLES, "sales"],
-  approval_requested: [...ADMIN_ROLES],
-  approval_approved: [...ADMIN_ROLES, "sales"],
-  approval_rejected: [...ADMIN_ROLES, "sales"],
+  low_stock: "inventory.view",
+  new_order_request: "orders.view",
+  new_dealer_application: "settings.manage",
+  order_ready_for_shipment: "shipments.manage",
+  order_cancellation: "orders.view",
+  stock_warehouse_problem: "inventory.manage",
+  order_status_changed: "orders.view",
+  price_review_required: "pricing.view",
+  invoice_issued: "invoices.view",
+  approval_requested: "approvals.view",
+  approval_approved: "approvals.view",
+  approval_rejected: "approvals.view",
 };
 
 export function canRoleSeeNotification(
   role: UserRole,
   type: NotificationEventType
 ) {
-  return NOTIFICATION_ROLE_POLICY[type].includes(role);
+  return hasPermission(role, NOTIFICATION_PERMISSION_POLICY[type]);
 }
 
 export const NOTIFICATION_LABELS: Record<NotificationEventType, string> = {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import PermissionVisible from "@/components/auth/PermissionVisible";
 import CustomerOrderDetail from "@/components/customers/CustomerOrderDetail";
 import CustomerOrderEditActions from "@/components/customers/CustomerOrderEditActions";
 import CustomerOrderRevisionHistory from "@/components/customers/CustomerOrderRevisionHistory";
@@ -17,11 +18,19 @@ export default function CustomerOrderDetailPage() {
     <div>
       <PageBreadcrumb pageTitle="Order Detail" />
       <div className="mb-5 flex flex-wrap justify-end gap-2">
-        <CreateShipmentFromOrderButton />
-        <CreateInvoiceFromOrderButton />
+        <PermissionVisible permission="shipments.manage">
+          <CreateShipmentFromOrderButton />
+        </PermissionVisible>
+        <PermissionVisible permission="invoices.manage">
+          <CreateInvoiceFromOrderButton />
+        </PermissionVisible>
       </div>
-      <CreateInstallationFromOrder />
-      <CustomerOrderEditActions />
+      <PermissionVisible permission="installations.manage">
+        <CreateInstallationFromOrder />
+      </PermissionVisible>
+      <PermissionVisible permission="orders.manage">
+        <CustomerOrderEditActions />
+      </PermissionVisible>
       <CustomerOrderDetail />
       <CustomerOrderRevisionHistory />
     </div>

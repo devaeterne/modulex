@@ -11,6 +11,7 @@ const roles: UserRole[] = [
   "super_admin",
   "admin",
   "sales",
+  "finance",
   "warehouse",
   "shipping",
 ];
@@ -20,7 +21,7 @@ const permissions = Object.keys(PERMISSION_LABELS) as Permission[];
 export default function RolesAccess() {
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {roles.map((role) => (
           <div
             key={role}
@@ -42,7 +43,7 @@ export default function RolesAccess() {
             Permission Matrix
           </h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            This matrix is the central access policy used by Modulex. Super Admin remains protected from regular Admin privilege escalation.
+            This matrix is the central UI access policy. Database RLS and protected RPCs remain the enforcement layer for business data and mutations.
           </p>
         </div>
 
@@ -87,8 +88,8 @@ export default function RolesAccess() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-        Role definitions are intentionally centralized in code so the sidebar, pages and API authorization can use the same policy instead of drifting into separate permission rules.
+      <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5 text-sm leading-6 text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
+        Page visibility is not treated as security. Direct URL access is checked separately, and Supabase policies/RPC role checks protect the underlying records even if a client request is crafted manually.
       </div>
     </div>
   );

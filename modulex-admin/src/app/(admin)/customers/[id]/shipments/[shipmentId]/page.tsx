@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import CustomerShipmentDetail from "@/components/customers/CustomerShipmentDetail";
+import CustomerShipmentDetailRBAC from "@/components/customers/CustomerShipmentDetailRBAC";
 
 export const metadata: Metadata = {
   title: "Shipment Detail | Modulex Admin",
@@ -11,7 +11,7 @@ export default function CustomerShipmentDetailPage() {
   return (
     <div>
       <PageBreadcrumb pageTitle="Shipment Detail" />
-      <CustomerShipmentDetail />
+      <CustomerShipmentDetailRBAC />
     </div>
   );
 }
