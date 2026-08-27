@@ -5,6 +5,7 @@ export type UserRole =
   | "admin"
   | "sales"
   | "finance"
+  | "hr"
   | "warehouse"
   | "shipping";
 
