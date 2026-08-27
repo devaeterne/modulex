@@ -120,6 +120,13 @@ const managementItems: NavItem[] = [
       { name: "Payment Methods", path: "/settings/payment-methods" },
     ],
   },
+  {
+    icon: <PageIcon />,
+    name: "System",
+    subItems: [
+      { name: "API Test", path: "/api-test" },
+    ],
+  },
 ];
 
 const AppSidebar: React.FC = () => {
