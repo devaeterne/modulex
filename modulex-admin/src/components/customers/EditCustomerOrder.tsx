@@ -5,9 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import OrderProductPicker, { type OrderPickerProduct } from "@/components/customers/OrderProductPicker";
 import type { Customer, CustomerAddress, CustomerOrder, CustomerOrderItem, PaymentMethod, PriceGroupLookup } from "@/lib/customers/types";
 
-type Product = { id: string; sku: string; name: string; status: string };
+type Product = OrderPickerProduct;
 type PriceRow = { product_id: string; amount: string | number };
 type DraftItem = { product_id: string; quantity: string; unit_price: string; discount_percent: string };
 
@@ -45,6 +46,7 @@ export default function EditCustomerOrder() {
   const [orderDiscount, setOrderDiscount] = useState("0");
   const [revisionReason, setRevisionReason] = useState("");
 
+  const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -66,7 +68,7 @@ export default function EditCustomerOrder() {
         supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("address_name"),
         supabase.from("price_groups").select("id, name, system_key, sort_order, is_base_price, is_active").eq("is_active", true).order("sort_order"),
         supabase.from("payment_methods").select("id, system_key, name, commission_percent, sort_order, is_active").eq("is_active", true).order("sort_order"),
-        supabase.from("products").select("id, sku, name, status").in("status", ["active", "inactive"]).order("sku"),
+        supabase.from("products").select("id, sku, name, barcode, status, brand, category, brand_id, category_id").in("status", ["active", "inactive"]).order("sku"),
       ]);
 
       const firstError = customerResult.error || orderResult.error || itemsResult.error || addressesResult.error || groupsResult.error || methodsResult.error || productsResult.error;
@@ -132,7 +134,14 @@ export default function EditCustomerOrder() {
     return () => { active = false; };
   }, [priceGroupId, order]);
 
+  const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const activeProducts = useMemo(() => products.filter((product) => product.status === "active"), [products]);
   const priceMap = useMemo(() => new Map(prices.map((p) => [p.product_id, Number(p.amount)])), [prices]);
+  const selectedQuantities = useMemo(() => {
+    const values = new Map<string, number>();
+    for (const item of items) values.set(item.product_id, (values.get(item.product_id) ?? 0) + Number(item.quantity || 0));
+    return values;
+  }, [items]);
   const selectedPaymentMethod = useMemo(() => paymentMethods.find((m) => m.id === paymentMethodId) ?? null, [paymentMethods, paymentMethodId]);
 
   const preview = useMemo(() => {
@@ -156,9 +165,23 @@ export default function EditCustomerOrder() {
     setItems((current) => current.map((item, i) => i === index ? { ...item, ...values } : item));
   }
 
-  function selectProduct(index: number, productId: string) {
-    const groupPrice = priceMap.get(productId);
-    updateItem(index, { product_id: productId, unit_price: groupPrice !== undefined ? String(groupPrice) : "0" });
+  function addProduct(product: Product) {
+    setItems((current) => {
+      const existingIndex = current.findIndex((item) => item.product_id === product.id);
+      if (existingIndex >= 0) {
+        return current.map((item, index) => index === existingIndex
+          ? { ...item, quantity: String(Number(item.quantity || 0) + 1) }
+          : item);
+      }
+
+      const groupPrice = priceMap.get(product.id);
+      return [...current, {
+        product_id: product.id,
+        quantity: "1",
+        unit_price: groupPrice !== undefined ? String(groupPrice) : "0",
+        discount_percent: "0",
+      }];
+    });
   }
 
   function useGroupPrice(index: number) {
@@ -236,8 +259,8 @@ export default function EditCustomerOrder() {
     </div>
 
     <div className="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800"><div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Products</h2><p className="mt-1 text-sm text-gray-500">Add, remove, change quantity, discount or unit price.</p></div><button type="button" onClick={() => setItems((current) => [...current, { product_id: "", quantity: "1", unit_price: "0", discount_percent: "0" }])} className="h-9 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">Add Line</button></div>
-      <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Product","Qty","Unit Price","Discount %","Line Total",""].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">{items.map((item, index) => { const total = Number(item.quantity || 0) * Number(item.unit_price || 0) * (1 - Number(item.discount_percent || 0) / 100); return <tr key={index}><td className="min-w-[340px] px-4 py-3"><select value={item.product_id} onChange={(e) => selectProduct(index, e.target.value)} className={inputClass}><option value="">Select product</option>{products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}{p.status !== "active" ? " (Inactive)" : ""}</option>)}</select></td><td className="w-[110px] px-4 py-3"><input value={item.quantity} onChange={(e) => updateItem(index, { quantity: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="min-w-[190px] px-4 py-3"><div className="flex gap-2"><input value={item.unit_price} onChange={(e) => updateItem(index, { unit_price: e.target.value })} inputMode="decimal" className={inputClass} /><button type="button" disabled={!priceMap.has(item.product_id)} onClick={() => useGroupPrice(index)} className="whitespace-nowrap rounded-lg border border-gray-300 px-2 text-xs font-medium text-gray-600 disabled:opacity-30 dark:border-gray-700 dark:text-gray-300">Group Price</button></div></td><td className="w-[130px] px-4 py-3"><input value={item.discount_percent} onChange={(e) => updateItem(index, { discount_percent: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="px-4 py-3 text-sm font-semibold text-gray-800 dark:text-white/90">{money(total)}</td><td className="px-4 py-3 text-right"><button type="button" disabled={items.length === 1} onClick={() => setItems((current) => current.filter((_, i) => i !== index))} className="text-xs font-medium text-error-600 disabled:opacity-30">Remove</button></td></tr>; })}</tbody></table></div>
+      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800"><div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Products</h2><p className="mt-1 text-sm text-gray-500">Search and add products, then adjust quantity, discount or unit price.</p></div><button type="button" onClick={() => setIsProductPickerOpen(true)} className="inline-flex h-9 items-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white shadow-theme-xs hover:bg-brand-600">Add Products</button></div>
+      <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Product","Qty","Unit Price","Discount %","Line Total",""].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">{items.length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No products added. Use <span className="font-medium text-gray-700 dark:text-gray-300">Add Products</span> to select items.</td></tr> : items.map((item, index) => { const product = productMap.get(item.product_id); const total = Number(item.quantity || 0) * Number(item.unit_price || 0) * (1 - Number(item.discount_percent || 0) / 100); return <tr key={item.product_id}><td className="min-w-[340px] px-4 py-3"><div className="flex items-center gap-2"><span className="text-sm font-semibold text-gray-800 dark:text-white/90">{product?.sku ?? "Unknown product"}</span>{product?.status === "inactive" && <span className="rounded-full bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">Inactive</span>}</div><div className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{product?.name ?? item.product_id}</div></td><td className="w-[110px] px-4 py-3"><input value={item.quantity} onChange={(e) => updateItem(index, { quantity: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="min-w-[190px] px-4 py-3"><div className="flex gap-2"><input value={item.unit_price} onChange={(e) => updateItem(index, { unit_price: e.target.value })} inputMode="decimal" className={inputClass} /><button type="button" disabled={!priceMap.has(item.product_id)} onClick={() => useGroupPrice(index)} className="whitespace-nowrap rounded-lg border border-gray-300 px-2 text-xs font-medium text-gray-600 disabled:opacity-30 dark:border-gray-700 dark:text-gray-300">Group Price</button></div></td><td className="w-[130px] px-4 py-3"><input value={item.discount_percent} onChange={(e) => updateItem(index, { discount_percent: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="px-4 py-3 text-sm font-semibold text-gray-800 dark:text-white/90">{money(total)}</td><td className="px-4 py-3 text-right"><button type="button" onClick={() => setItems((current) => current.filter((_, i) => i !== index))} className="text-xs font-medium text-error-600">Remove</button></td></tr>; })}</tbody></table></div>
     </div>
 
     <div className="grid gap-5 xl:grid-cols-12">
@@ -247,6 +270,16 @@ export default function EditCustomerOrder() {
       </div>
       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 xl:col-span-4"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Revised Total</h2><div className="mt-4 space-y-3 text-sm"><Row label="Lines after discount" value={money(preview.subtotal)} /><Row label="Order discount" value={`-${money(Number(orderDiscount || 0))}`} /><Row label="Tax" value={money(preview.tax)} /><Row label="Order Total" value={money(preview.orderTotal)} />{preview.commission > 0 && <Row label={`Payment Commission (${Number(appliedCommission || 0).toFixed(2)}%)`} value={money(preview.commission)} />}<div className="border-t border-gray-200 pt-3 dark:border-gray-800"><Row label="Grand Total" value={money(preview.grandTotal)} strong /></div></div><button type="button" disabled={isSaving || isLoadingPrices || order.status === "cancelled"} onClick={saveRevision} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-40">{isSaving ? "Saving Revision..." : "Save Revision"}</button></div>
     </div>
+
+    <OrderProductPicker
+      isOpen={isProductPickerOpen}
+      onClose={() => setIsProductPickerOpen(false)}
+      products={activeProducts}
+      selectedQuantities={selectedQuantities}
+      priceMap={priceMap}
+      onAdd={addProduct}
+      currencyCode={order.currency_code}
+    />
   </div>;
 }
 
