@@ -4,11 +4,18 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { hasPermission } from "@/lib/auth/permissions";
 import type { CustomerShipment, CustomerShipmentStatus } from "@/lib/customers/shipment-types";
 
 type ShipmentRow = CustomerShipment & {
   customer_name?: string | null;
   order_number?: string | null;
+};
+
+type ShipmentReference = {
+  shipment_id: string;
+  customer_name: string | null;
+  order_number: string | null;
 };
 
 const statuses: Array<"all" | CustomerShipmentStatus> = [
@@ -22,7 +29,7 @@ const statuses: Array<"all" | CustomerShipmentStatus> = [
 ];
 
 function titleCase(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function date(value: string | null | undefined) {
@@ -46,19 +53,23 @@ export default function CustomerShipmentsList({ customerId }: { customerId?: str
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
+
     async function load() {
       setIsLoading(true);
       setErrorMessage(null);
 
       const { profile, error: profileError } = await getCurrentProfile();
-      if (profileError) {
-        setErrorMessage(profileError.message);
+      if (!mounted) return;
+
+      if (profileError || !profile) {
+        setErrorMessage(profileError?.message ?? "User profile could not be loaded.");
         setIsLoading(false);
         return;
       }
 
-      if (!["super_admin", "admin", "sales"].includes(profile?.role ?? "")) {
-        setErrorMessage("You do not have access to customer shipments.");
+      if (!hasPermission(profile.role, "shipments.view")) {
+        setErrorMessage("You do not have permission to view customer shipments.");
         setIsLoading(false);
         return;
       }
@@ -71,44 +82,46 @@ export default function CustomerShipmentsList({ customerId }: { customerId?: str
       if (customerId) shipmentsQuery = shipmentsQuery.eq("customer_id", customerId);
 
       const { data: shipments, error: shipmentsError } = await shipmentsQuery;
+      if (!mounted) return;
       if (shipmentsError) {
         setErrorMessage(shipmentsError.message);
         setIsLoading(false);
         return;
       }
 
-      const customerIds = [...new Set((shipments ?? []).map((s) => s.customer_id))];
-      const orderIds = [...new Set((shipments ?? []).map((s) => s.order_id))];
+      const shipmentRows = (shipments ?? []) as CustomerShipment[];
+      const ids = shipmentRows.map((shipment) => shipment.id);
+      let references: ShipmentReference[] = [];
 
-      const [customersResult, ordersResult] = await Promise.all([
-        customerIds.length
-          ? supabase.from("customers").select("id,name").in("id", customerIds)
-          : Promise.resolve({ data: [], error: null }),
-        orderIds.length
-          ? supabase.from("customer_orders").select("id,order_number").in("id", orderIds)
-          : Promise.resolve({ data: [], error: null }),
-      ]);
+      if (ids.length > 0) {
+        const { data, error } = await supabase.rpc("get_customer_shipment_references", {
+          p_shipment_ids: ids,
+        });
 
-      if (customersResult.error || ordersResult.error) {
-        setErrorMessage(customersResult.error?.message || ordersResult.error?.message || "Failed to load shipment references.");
-        setIsLoading(false);
-        return;
+        if (error) {
+          setErrorMessage(error.message);
+          setIsLoading(false);
+          return;
+        }
+
+        references = (data ?? []) as ShipmentReference[];
       }
 
-      const customerMap = new Map((customersResult.data ?? []).map((c) => [c.id, c.name]));
-      const orderMap = new Map((ordersResult.data ?? []).map((o) => [o.id, o.order_number]));
-
+      const referenceMap = new Map(references.map((reference) => [reference.shipment_id, reference]));
       setRows(
-        ((shipments ?? []) as CustomerShipment[]).map((shipment) => ({
+        shipmentRows.map((shipment) => ({
           ...shipment,
-          customer_name: customerMap.get(shipment.customer_id) ?? null,
-          order_number: orderMap.get(shipment.order_id) ?? null,
+          customer_name: referenceMap.get(shipment.id)?.customer_name ?? null,
+          order_number: referenceMap.get(shipment.id)?.order_number ?? null,
         }))
       );
       setIsLoading(false);
     }
 
-    load();
+    void load();
+    return () => {
+      mounted = false;
+    };
   }, [customerId]);
 
   const filtered = useMemo(() => {
@@ -140,13 +153,13 @@ export default function CustomerShipmentsList({ customerId }: { customerId?: str
         <div className="grid gap-3 md:grid-cols-[1fr_220px]">
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => setQuery(event.target.value)}
             placeholder="Search shipment, customer, order, carrier or tracking"
             className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value as "all" | CustomerShipmentStatus)}
+            onChange={(event) => setStatus(event.target.value as "all" | CustomerShipmentStatus)}
             className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
           >
             {statuses.map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}
@@ -168,24 +181,17 @@ export default function CustomerShipmentsList({ customerId }: { customerId?: str
               {filtered.map((row) => (
                 <tr key={row.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                   <td className="px-4 py-4">
-                    <Link href={`/customers/${row.customer_id}/shipments/${row.id}`} className="text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">
-                      {row.shipment_number}
-                    </Link>
+                    <Link href={`/customers/${row.customer_id}/shipments/${row.id}`} className="text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300">{row.shipment_number}</Link>
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">{row.customer_name || "—"}</td>
                   <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">{row.order_number || "—"}</td>
                   <td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(row.status)}`}>{titleCase(row.status)}</span></td>
-                  <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
-                    <div>{row.carrier || "—"}</div>
-                    {row.tracking_number && <div className="mt-1 text-xs text-gray-400 dark:text-gray-500">{row.tracking_number}</div>}
-                  </td>
+                  <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400"><div>{row.carrier || "—"}</div>{row.tracking_number && <div className="mt-1 text-xs text-gray-400 dark:text-gray-500">{row.tracking_number}</div>}</td>
                   <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{date(row.shipped_at)}</td>
                   <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">{date(row.delivered_at)}</td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No shipments found.</td></tr>
-              )}
+              {filtered.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No shipments found.</td></tr>}
             </tbody>
           </table>
         </div>
