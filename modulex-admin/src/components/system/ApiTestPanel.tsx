@@ -119,10 +119,10 @@ export default function ApiTestPanel() {
       setResults([
         ...nextResults,
         { name: definition.name, group: definition.group, status: "running" },
-        ...definitions.slice(nextResults.length + 1).map((check) => ({
+        ...definitions.slice(nextResults.length + 1).map((check): CheckResult => ({
           name: check.name,
           group: check.group,
-          status: "idle" as const,
+          status: "idle",
         })),
       ]);
 
@@ -193,12 +193,12 @@ export default function ApiTestPanel() {
       </div>
 
       {groups.map((group) => {
-        const groupResults = results.length
+        const groupResults: CheckResult[] = results.length
           ? results.filter((item) => item.group === group)
-          : definitions.filter((item) => item.group === group).map((item) => ({
+          : definitions.filter((item) => item.group === group).map((item): CheckResult => ({
               name: item.name,
               group: item.group,
-              status: "idle" as const,
+              status: "idle",
             }));
 
         return (
