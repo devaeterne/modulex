@@ -27,6 +27,7 @@ create temp table phase1_ctx (
   lead_id uuid,
   marketing_tracking_before boolean
 ) on commit drop;
+insert into phase1_ctx default values;
 grant select, insert, update, delete on phase1_ctx to authenticated, anon;
 
 select set_config('request.jwt.claim.sub', :'phase1_admin_user_id', true);
