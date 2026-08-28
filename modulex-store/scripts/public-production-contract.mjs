@@ -75,6 +75,20 @@ for (const requiredDisallow of ["/api/", "/account/", "/dealer/"]) {
   }
 }
 
+for (const layoutPath of ["src/app/account/layout.tsx", "src/app/dealer/layout.tsx"]) {
+  let layoutSource;
+  try {
+    layoutSource = await readFile(path.join(root, layoutPath), "utf8");
+  } catch {
+    failures.push(`Portal namespace must define route-level robots metadata: ${layoutPath}`);
+    continue;
+  }
+
+  if (!/robots\s*:\s*\{[^}]*index\s*:\s*false[^}]*follow\s*:\s*false/s.test(layoutSource)) {
+    failures.push(`${layoutPath}: portal namespace must be noindex, nofollow`);
+  }
+}
+
 if (failures.length > 0) {
   console.error("Public production contract failed:\n");
   for (const failure of failures) console.error(`- ${failure}`);
