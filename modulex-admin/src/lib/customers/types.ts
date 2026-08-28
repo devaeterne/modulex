@@ -55,7 +55,7 @@ export type CustomerPortalUser = {
 };
 
 export type CustomerNote = { id: string; customer_id: string; note: string; category: string | null; is_pinned: boolean; created_by: string | null; created_at: string; updated_at: string; };
-export type CustomerDocument = { id: string; customer_id: string; document_type: string | null; file_name: string; storage_bucket: string; storage_path: string; mime_type: string | null; file_size_bytes: number | null; description: string | null; is_active: boolean; created_at: string; };
+export type CustomerDocument = { id: string; customer_id: string; document_type: string | null; file_name: string; storage_bucket: string; storage_path: string; mime_type: string | null; file_size_bytes: number | null; description: string | null; is_active: boolean; portal_visible: boolean; created_at: string; };
 export type CustomerActivity = { id: string; customer_id: string; activity_type: string; title: string; description: string | null; metadata: Record<string, unknown>; actor_user_id: string | null; created_at: string; };
 
 export type CustomerOrderStatus =
