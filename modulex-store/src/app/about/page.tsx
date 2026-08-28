@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
+import {
+  getStorePublicCompanyProfile,
+  type StorePublicCompanyProfile,
+} from "@/lib/store/company/queries";
 
 export const revalidate = 900;
 
@@ -15,7 +18,7 @@ function phoneHref(phone: string) {
 }
 
 export default async function About() {
-  let company = null;
+  let company: StorePublicCompanyProfile | null = null;
 
   try {
     company = await getStorePublicCompanyProfile();
@@ -29,7 +32,7 @@ export default async function About() {
     company?.addressLine2,
     [company?.city, company?.stateRegion, company?.postalCode].filter(Boolean).join(", "),
     company?.countryCode,
-  ].filter(Boolean);
+  ].filter((line): line is string => Boolean(line));
 
   return (
     <>
