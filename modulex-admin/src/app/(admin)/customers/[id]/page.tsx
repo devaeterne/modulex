@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import CustomerCard from "@/components/customers/CustomerCard";
+import CustomerDocumentsPanel from "@/components/customers/CustomerDocumentsPanel";
 import CustomerOrderActions from "@/components/customers/CustomerOrderActions";
 import DealerPortalAccessCard from "@/components/customers/DealerPortalAccessCard";
 
@@ -23,6 +24,7 @@ export default async function CustomerCardPage({
       <div className="mb-5">
         <DealerPortalAccessCard customerId={id} />
       </div>
+      <CustomerDocumentsPanel customerId={id} />
       <style>{`
         .legacy-customer-card > div > div:first-child > div:nth-child(2) button:nth-child(6) {
           display: none;
