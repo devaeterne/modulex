@@ -19,8 +19,8 @@ const migrationContracts = [
   "pg_advisory_xact_lock",
   "converted_to_customer",
   "created_from_dealer_application",
-  "portal_enabled",
-  "false",
+  "portal_enabled,\n    created_by",
+  "v_lead.assigned_to,\n    false,\n    v_actor",
   "grant usage on schema private to authenticated, service_role",
   "grant execute on function public.convert_store_dealer_lead_to_customer(uuid) to authenticated, service_role",
 ];
