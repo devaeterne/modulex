@@ -23,6 +23,7 @@ declare
   v_order_a uuid;
   v_order_b uuid;
   v_product uuid;
+  v_content uuid;
   v_result jsonb;
   v_variant jsonb;
   v_suffix text := substr(replace(gen_random_uuid()::text, '-', ''), 1, 10);
@@ -69,8 +70,13 @@ begin
 
   insert into public.products(sku,name,status,base_product_code,color_code,color_name)
   values ('P15-SKU-'||v_suffix,'P1.5 Priced Product','active','P15-BASE-'||v_suffix,'WH','White') returning id into v_product;
-  insert into public.store_product_content(base_product_code,slug,display_name,is_published)
-  values ('P15-BASE-'||v_suffix,'p15-product-'||v_suffix,'P1.5 Priced Product',true);
+  insert into public.store_product_content(base_product_code,slug,display_name,short_description,is_published)
+  values ('P15-BASE-'||v_suffix,'p15-product-'||v_suffix,'P1.5 Priced Product','Published smoke product',false)
+  returning id into v_content;
+  insert into public.store_product_media(product_content_id,media_type,url,is_primary)
+  values (v_content,'image','https://example.com/p15-smoke.jpg',true);
+  update public.store_product_content set is_published=true where id=v_content;
+
   insert into public.product_prices(product_id,price_group_id,amount,currency_code,valid_from,is_active)
   values (v_product,v_group_good,123.45,'USD',now()-interval '1 day',true);
 
@@ -92,6 +98,9 @@ begin
   if v_variant is null or coalesce((v_variant->>'priceAvailable')::boolean,false) is not true or (v_variant->>'price')::numeric <> 123.45 then
     raise exception 'assigned-tier price missing or incorrect: %',v_result;
   end if;
+
+  v_result := public.get_store_dealer_product_by_slug('p15-product-'||v_suffix);
+  if coalesce((v_result->>'ok')::boolean,false) is not true then raise exception 'Dealer product slug detail unavailable: %',v_result; end if;
 
   v_result := public.get_store_dealer_order(v_order_a);
   if coalesce((v_result->>'ok')::boolean,false) is not true or not ((v_result->'order') ? 'total_amount') then raise exception 'priced Dealer order missing approved amount: %',v_result; end if;
@@ -115,7 +124,7 @@ begin
 
   update public.customers set price_group_id=v_group_good where id=v_dealer_a;
   update public.product_prices set is_active=false where product_id=v_product and price_group_id=v_group_good;
-  v_result := public.get_store_dealer_catalog_products(null,null,48,0);
+  v_result := public.get_store_dealer_catalog_products('P1.5 Priced Product',null,48,0);
   select value into v_variant from jsonb_array_elements(v_result->'products'->0->'variants') value where value->>'sku'='P15-SKU-'||v_suffix limit 1;
   if v_variant is null or coalesce((v_variant->>'priceAvailable')::boolean,false) then raise exception 'missing assigned-tier price did not become unavailable: %',v_result; end if;
   if v_variant ? 'price' and v_variant->'price' <> 'null'::jsonb then raise exception 'missing tier price fell back to another amount: %',v_variant; end if;
