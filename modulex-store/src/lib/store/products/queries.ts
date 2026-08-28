@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { callPublicRpc } from "@/lib/supabase/public-rest";
 import type {
   StoreCatalogProduct,
@@ -88,16 +89,16 @@ export async function getAllStoreCatalogProducts(
   return products;
 }
 
-export async function getStoreProductBySlug(
-  slug: string
-): Promise<StoreProductDetail | null> {
-  const normalizedSlug = slug.trim().toLowerCase();
+export const getStoreProductBySlug = cache(
+  async (slug: string): Promise<StoreProductDetail | null> => {
+    const normalizedSlug = slug.trim().toLowerCase();
 
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
-    return null;
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
+      return null;
+    }
+
+    return callPublicRpc<StoreProductDetail | null>("get_store_product_by_slug", {
+      p_slug: normalizedSlug,
+    });
   }
-
-  return callPublicRpc<StoreProductDetail | null>("get_store_product_by_slug", {
-    p_slug: normalizedSlug,
-  });
-}
+);
