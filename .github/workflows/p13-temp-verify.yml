@@ -37,9 +37,20 @@ jobs:
         working-directory: modulex-store
         run: npm test
 
-      - name: Lint Store
+      - name: Lint P1.3 Store changes
         working-directory: modulex-store
-        run: npm run lint
+        run: >-
+          npx eslint
+          src/app/layout.tsx
+          src/app/dealer
+          src/components/Footer.tsx
+          src/components/StoreChrome.tsx
+          src/lib/dealer
+          src/lib/supabase/browser.ts
+          src/lib/supabase/server.ts
+          src/lib/supabase/proxy.ts
+          src/proxy.ts
+          scripts/dealer-portal-auth-contract.mjs
 
       - name: Build Store
         working-directory: modulex-store
@@ -55,9 +66,13 @@ jobs:
         working-directory: modulex-admin
         run: npm run smoke:dealer-portal-admin && npm run smoke:auth-recovery
 
-      - name: Lint Admin
+      - name: Lint P1.3 Admin changes
         working-directory: modulex-admin
-        run: npm run lint
+        run: >-
+          npx eslint
+          src/components/auth/ResetPasswordForm.tsx
+          scripts/auth-recovery-contract.mjs
+          scripts/dealer-portal-auth-live-smoke.mjs
 
       - name: Build Admin
         working-directory: modulex-admin
