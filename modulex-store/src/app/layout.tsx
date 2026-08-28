@@ -11,7 +11,12 @@ import Footer from "@/components/Footer";
 import BackToTop from "@/components/BackToTop";
 import ThemeToggle from "@/components/ThemeToggle";
 import GalleryLightbox from "@/components/GalleryLightbox";
+import JsonLd from "@/components/seo/JsonLd";
 import { siteConfig } from "@/config/site";
+import {
+  createOrganizationJsonLd,
+  createWebSiteJsonLd,
+} from "@/lib/seo/structured-data";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -55,8 +60,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang={siteConfig.language}>
       <body>
+        <JsonLd data={[createOrganizationJsonLd(), createWebSiteJsonLd()]} />
         <Navbar />
         <main>
           {children}
