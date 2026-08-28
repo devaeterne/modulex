@@ -21,6 +21,11 @@ type CatalogRpcRow = {
   updated_at: string;
 };
 
+type StoreCatalogBatchQuery = Omit<StoreCatalogQuery, "limit" | "offset"> & {
+  batchSize?: number;
+  maxItems?: number;
+};
+
 function mapCatalogRow(row: CatalogRpcRow): StoreCatalogProduct {
   return {
     id: row.id,
@@ -52,6 +57,35 @@ export async function getStoreCatalogProducts(
   );
 
   return rows.map(mapCatalogRow);
+}
+
+export async function getAllStoreCatalogProducts(
+  params: StoreCatalogBatchQuery = {}
+): Promise<StoreCatalogProduct[]> {
+  const batchSize = Math.min(Math.max(params.batchSize ?? 100, 1), 100);
+  const maxItems = Math.min(Math.max(params.maxItems ?? 1000, 1), 5000);
+  const products: StoreCatalogProduct[] = [];
+  let offset = 0;
+
+  while (products.length < maxItems) {
+    const limit = Math.min(batchSize, maxItems - products.length);
+    const batch = await getStoreCatalogProducts({
+      query: params.query,
+      colorCode: params.colorCode,
+      limit,
+      offset,
+    });
+
+    products.push(...batch);
+
+    if (batch.length < limit) {
+      break;
+    }
+
+    offset += batch.length;
+  }
+
+  return products;
 }
 
 export async function getStoreProductBySlug(
