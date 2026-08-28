@@ -12,6 +12,7 @@ import StoreChrome from "@/components/StoreChrome";
 import { siteConfig } from "@/config/site";
 import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
 import { getStoreMarketingSettings } from "@/lib/store/marketing/queries";
+import { getStoreSiteSettings } from "@/lib/store/site/queries";
 import {
   createOrganizationJsonLd,
   createWebSiteJsonLd,
@@ -57,11 +58,13 @@ export default async function RootLayout({
 }>) {
   let company = null;
   let marketing = null;
+  let siteSettings = null;
 
   try {
-    [company, marketing] = await Promise.all([
+    [company, marketing, siteSettings] = await Promise.all([
       getStorePublicCompanyProfile(),
       getStoreMarketingSettings(),
+      getStoreSiteSettings(),
     ]);
   } catch (error) {
     console.error("Unable to load public Store shell settings", error);
@@ -73,6 +76,8 @@ export default async function RootLayout({
         <AnalyticsProvider settings={marketing} />
         <JsonLd data={[createOrganizationJsonLd(), createWebSiteJsonLd()]} />
         <StoreChrome
+          company={company}
+          siteSettings={siteSettings}
           companyName={company?.companyName || siteConfig.name}
           logoUrl={company?.logoUrl}
         >
