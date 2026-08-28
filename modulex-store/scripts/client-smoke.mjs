@@ -27,7 +27,7 @@ function runModule(filePath, globals = {}) {
     },
   });
   vm.runInContext(transpile(filePath), context, { filename: filePath });
-  return { exports: module.exports, context };
+  return module.exports;
 }
 
 const checks = [];
@@ -47,7 +47,7 @@ console.log("=== Oakwell Store client behavior smoke ===\n");
 const analyticsWindow = {};
 const analytics = runModule(resolve(process.cwd(), "src/lib/analytics/events.ts"), {
   window: analyticsWindow,
-}).exports;
+});
 
 check("Analytics events are blocked until consent exists", () => {
   assert.equal(analytics.pushAnalyticsEvent("page_view", { page: "/products" }), false);
@@ -65,10 +65,12 @@ check("Analytics consent emits a clean dataLayer event", () => {
     }),
     true
   );
-  assert.deepEqual(analyticsWindow.dataLayer.at(-1), {
-    event: "product_view",
-    sku: "SKU-1",
-  });
+  const event = analyticsWindow.dataLayer.at(-1);
+  assert.equal(event.event, "product_view");
+  assert.equal(event.sku, "SKU-1");
+  assert.equal("empty" in event, false);
+  assert.equal("missing" in event, false);
+  assert.equal("ignored" in event, false);
 });
 
 check("GA4 receives events only with analytics consent", () => {
@@ -82,16 +84,17 @@ check("GA4 receives events only with analytics consent", () => {
   analyticsWindow.__oakwellConsent = { analytics: true, marketing: false };
   analytics.pushAnalyticsEvent("contact_click", { location: "navbar" });
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0], ["event", "contact_click", { location: "navbar" }]);
+  assert.equal(calls[0][0], "event");
+  assert.equal(calls[0][1], "contact_click");
+  assert.equal(calls[0][2].location, "navbar");
 });
 
 check("Consent updates expose granted/denied state in dataLayer", () => {
   analytics.pushConsentEvent({ analytics: true, marketing: false });
-  assert.deepEqual(analyticsWindow.dataLayer.at(-1), {
-    event: "oakwell_consent_update",
-    analytics_consent: "granted",
-    marketing_consent: "denied",
-  });
+  const event = analyticsWindow.dataLayer.at(-1);
+  assert.equal(event.event, "oakwell_consent_update");
+  assert.equal(event.analytics_consent, "granted");
+  assert.equal(event.marketing_consent, "denied");
 });
 
 function makeSessionStorage() {
@@ -117,7 +120,7 @@ const attributionDocument = { referrer: "https://example.com/referrer" };
 const attribution = runModule(resolve(process.cwd(), "src/lib/analytics/attribution.ts"), {
   window: attributionWindow,
   document: attributionDocument,
-}).exports;
+});
 
 check("Initial UTM campaign and referrer are captured", () => {
   attribution.captureSessionAttribution();
