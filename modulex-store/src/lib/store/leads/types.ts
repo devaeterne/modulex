@@ -28,6 +28,7 @@ export type StoreLeadSubmission = {
   landing_page?: string;
   referrer?: string;
   website_hp?: string;
+  document_upload_token?: string;
 };
 
 export type StoreLeadSubmissionResult = {

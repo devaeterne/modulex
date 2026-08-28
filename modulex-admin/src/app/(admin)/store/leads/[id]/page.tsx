@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import StoreLeadDetail from "@/components/store/StoreLeadDetail";
+import StoreLeadDocuments from "@/components/store/StoreLeadDocuments";
 
 export const metadata: Metadata = {
   title: "Store Lead | Modulex Admin",
@@ -13,6 +14,7 @@ export default async function StoreLeadPage({ params }: { params: Promise<{ id: 
     <div>
       <PageBreadcrumb pageTitle="Store Lead" />
       <StoreLeadDetail id={id} />
+      <StoreLeadDocuments id={id} />
     </div>
   );
 }
