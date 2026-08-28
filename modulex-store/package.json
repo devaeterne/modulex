@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "npm run smoke",
-    "smoke": "npm run smoke:client && npm run smoke:api && npm run smoke:dealer-activation && npm run smoke:dealer-auth && npm run smoke:store-portal && npm run smoke:portal-experience && npm run smoke:portal-auth-rpc-guard",
+    "smoke": "npm run smoke:client && npm run smoke:api && npm run smoke:dealer-activation && npm run smoke:dealer-auth && npm run smoke:store-portal && npm run smoke:portal-experience && npm run smoke:portal-auth-rpc-guard && npm run smoke:portal-public-navbar",
     "smoke:client": "node scripts/client-smoke.mjs",
     "smoke:api": "node scripts/smoke.mjs",
     "smoke:dealer-activation": "node scripts/dealer-portal-activation-contract.mjs",
@@ -16,6 +16,7 @@
     "smoke:store-portal": "node scripts/store-portal-contract.mjs",
     "smoke:portal-experience": "node scripts/portal-experience-contract.mjs",
     "smoke:portal-auth-rpc-guard": "node scripts/portal-auth-rpc-guard-contract.mjs",
+    "smoke:portal-public-navbar": "node scripts/portal-public-navbar-contract.mjs",
     "export": "next build"
   },
   "dependencies": {

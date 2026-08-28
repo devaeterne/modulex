@@ -23,7 +23,12 @@ export default function StoreChrome({ children, company, siteSettings, companyNa
   const isAccountRoute = pathname === "/account" || pathname.startsWith("/account/");
 
   if (isDealerRoute || isAccountRoute) {
-    return <main>{children}</main>;
+    return (
+      <>
+        <Navbar companyName={companyName} logoUrl={logoUrl} />
+        <main>{children}</main>
+      </>
+    );
   }
 
   return (
