@@ -8,10 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "test": "npm run smoke",
-    "smoke": "npm run smoke:client && npm run smoke:api && npm run smoke:dealer-activation",
+    "smoke": "npm run smoke:client && npm run smoke:api && npm run smoke:dealer-activation && npm run smoke:dealer-auth",
     "smoke:client": "node scripts/client-smoke.mjs",
     "smoke:api": "node scripts/smoke.mjs",
     "smoke:dealer-activation": "node scripts/dealer-portal-activation-contract.mjs",
+    "smoke:dealer-auth": "node scripts/dealer-portal-auth-contract.mjs",
     "export": "next build"
   },
   "dependencies": {
