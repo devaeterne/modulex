@@ -17,7 +17,8 @@
     "smoke:dealer-onboarding": "node scripts/dealer-onboarding-contract.mjs",
     "smoke:dealer-onboarding:db": "node scripts/run-dealer-onboarding-db-smoke.mjs",
     "smoke:dealer-portal-admin": "node scripts/dealer-portal-admin-contract.mjs",
-    "smoke:auth-recovery": "node scripts/auth-recovery-contract.mjs"
+    "smoke:auth-recovery": "node scripts/auth-recovery-contract.mjs",
+    "smoke:dealer-portal-auth-live": "node scripts/dealer-portal-auth-live-smoke.mjs"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
