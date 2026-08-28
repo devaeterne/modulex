@@ -6,13 +6,9 @@ import "@/css/style.css";
 import "@/css/media-queries.css";
 import "@/css/dark-mode.css";
 import "@/css/panorama.css";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import BackToTop from "@/components/BackToTop";
-import ThemeToggle from "@/components/ThemeToggle";
-import GalleryLightbox from "@/components/GalleryLightbox";
 import AnalyticsProvider from "@/components/analytics/AnalyticsProvider";
 import JsonLd from "@/components/seo/JsonLd";
+import StoreChrome from "@/components/StoreChrome";
 import { siteConfig } from "@/config/site";
 import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
 import { getStoreMarketingSettings } from "@/lib/store/marketing/queries";
@@ -76,12 +72,12 @@ export default async function RootLayout({
       <body>
         <AnalyticsProvider settings={marketing} />
         <JsonLd data={[createOrganizationJsonLd(), createWebSiteJsonLd()]} />
-        <Navbar companyName={company?.companyName || siteConfig.name} logoUrl={company?.logoUrl} />
-        <main>{children}</main>
-        <Footer />
-        <BackToTop />
-        <GalleryLightbox />
-        <ThemeToggle />
+        <StoreChrome
+          companyName={company?.companyName || siteConfig.name}
+          logoUrl={company?.logoUrl}
+        >
+          {children}
+        </StoreChrome>
       </body>
     </html>
   );
