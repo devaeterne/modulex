@@ -1,18 +1,12 @@
-import { products } from "@/data/products";
-import ShopClient from "./ShopClient";
+import { permanentRedirect } from "next/navigation";
 
-export async function generateStaticParams() {
-  return products.map((product) => ({
-    slug: product.slug,
-  }));
-}
-
-interface ShopDetailProps {
+interface LegacyShopDetailProps {
   params: Promise<{
     slug: string;
   }>;
 }
 
-export default function Page({ params }: ShopDetailProps) {
-  return <ShopClient params={params} />;
+export default async function LegacyShopDetail({ params }: LegacyShopDetailProps) {
+  const { slug } = await params;
+  permanentRedirect(`/products/${slug}`);
 }
