@@ -8,14 +8,15 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "npm run smoke",
-    "smoke": "npm run smoke:rbac && npm run smoke:api && npm run smoke:phase1 && npm run smoke:db && npm run smoke:db:phase1 && npm run smoke:dealer-onboarding && npm run smoke:dealer-onboarding:db",
+    "smoke": "npm run smoke:rbac && npm run smoke:api && npm run smoke:phase1 && npm run smoke:db && npm run smoke:db:phase1 && npm run smoke:dealer-onboarding && npm run smoke:dealer-onboarding:db && npm run smoke:dealer-portal-admin",
     "smoke:rbac": "node scripts/rbac-smoke.mjs",
     "smoke:api": "node scripts/api-smoke.mjs",
     "smoke:phase1": "node scripts/phase1-api-smoke.mjs",
     "smoke:db": "node scripts/run-db-smoke.mjs",
     "smoke:db:phase1": "node scripts/run-phase1-db-smoke.mjs",
     "smoke:dealer-onboarding": "node scripts/dealer-onboarding-contract.mjs",
-    "smoke:dealer-onboarding:db": "node scripts/run-dealer-onboarding-db-smoke.mjs"
+    "smoke:dealer-onboarding:db": "node scripts/run-dealer-onboarding-db-smoke.mjs",
+    "smoke:dealer-portal-admin": "node scripts/dealer-portal-admin-contract.mjs"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
