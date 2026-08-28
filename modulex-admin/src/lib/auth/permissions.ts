@@ -16,6 +16,8 @@ export type Permission =
   | "products.manage"
   | "store.view"
   | "store.manage"
+  | "leads.view"
+  | "leads.manage"
   | "pricing.view"
   | "pricing.cost.view"
   | "pricing.manage"
@@ -56,6 +58,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "products.manage": "Manage products, brands & categories",
   "store.view": "View Store content",
   "store.manage": "Manage Store content & publishing",
+  "leads.view": "View website leads & dealer applications",
+  "leads.manage": "Manage website leads & dealer applications",
   "pricing.view": "View selling prices",
   "pricing.cost.view": "View cost & margin",
   "pricing.manage": "Manage prices & price groups",
@@ -99,6 +103,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   sales: [
     "dashboard.view",
     "products.view",
+    "leads.view",
+    "leads.manage",
     "pricing.view",
     "customers.view",
     "customers.manage",
@@ -162,7 +168,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Full system access, including protected Super Admin account management.",
   admin: "Full business and system administration, except protected Super Admin account actions.",
-  sales: "Customer, order, invoice, shipment and installation workflows. Financial exceptions remain subject to approval.",
+  sales: "Customer, website lead, dealer application, order, invoice, shipment and installation workflows. Financial exceptions remain subject to approval.",
   finance: "Invoices, collections, cost/margin visibility and payroll processing. Compensation setup is read-only; employee HR master data stays restricted.",
   hr: "Full personnel lifecycle management including attendance, leave, compensation, payroll, benefits, documents, compliance, onboarding/offboarding and performance.",
   warehouse: "Stock, shipment and QR operations with read access to warehouse structure. Warehouse master data remains Admin-managed.",
@@ -187,7 +193,9 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
   { match: (path) => path === "/users" || path.startsWith("/users/"), permission: "users.view" },
-  { match: (path) => path === "/store/products" || path === "/store/colors", permission: "store.view" },
+  { match: (path) => path === "/store/leads", permission: "leads.view" },
+  { match: (path) => path.startsWith("/store/leads/"), permission: "leads.manage" },
+  { match: (path) => path === "/store/products" || path === "/store/colors" || path === "/store/content", permission: "store.view" },
   { match: (path) => path.startsWith("/store/products/") || path.startsWith("/store/colors/"), permission: "store.manage" },
   { match: (path) => path === "/store" || path.startsWith("/store/"), permission: "store.view" },
   { match: (path) => path === "/personnel" || path.startsWith("/personnel/"), permission: "personnel.view" },
