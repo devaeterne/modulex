@@ -29,7 +29,7 @@ export default function TrackedLink({
 }: Props) {
   const onClick = () => pushAnalyticsEvent(event, payload);
 
-  if (target || /^https?:\/\//i.test(href)) {
+  if (target || /^(https?:|mailto:|tel:)/i.test(href)) {
     return (
       <a href={href} className={className} target={target} rel={rel} onClick={onClick}>
         {children}
