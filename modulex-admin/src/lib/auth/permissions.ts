@@ -14,6 +14,8 @@ export type Permission =
   | "dashboard.view"
   | "products.view"
   | "products.manage"
+  | "store.view"
+  | "store.manage"
   | "pricing.view"
   | "pricing.cost.view"
   | "pricing.manage"
@@ -52,6 +54,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "dashboard.view": "View dashboard",
   "products.view": "View products",
   "products.manage": "Manage products, brands & categories",
+  "store.view": "View Store content",
+  "store.manage": "Manage Store content & publishing",
   "pricing.view": "View selling prices",
   "pricing.cost.view": "View cost & margin",
   "pricing.manage": "Manage prices & price groups",
@@ -183,6 +187,9 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
   { match: (path) => path === "/users" || path.startsWith("/users/"), permission: "users.view" },
+  { match: (path) => path === "/store/products" || path === "/store/colors", permission: "store.view" },
+  { match: (path) => path.startsWith("/store/products/") || path.startsWith("/store/colors/"), permission: "store.manage" },
+  { match: (path) => path === "/store" || path.startsWith("/store/"), permission: "store.view" },
   { match: (path) => path === "/personnel" || path.startsWith("/personnel/"), permission: "personnel.view" },
   { match: (path) => path === "/finance" || path.startsWith("/finance/"), permission: "finance.view" },
   { match: (path) => path === "/settings/general/tax-rules" || path.startsWith("/settings/general/tax-rules/"), permission: "finance.manage" },
