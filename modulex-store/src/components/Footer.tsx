@@ -63,7 +63,7 @@ export default async function Footer() {
           <h3>Company</h3>
           <ul>
             <li><Link href="/about">About Us</Link></li>
-            <li><Link href="/blog">News & Insights</Link></li>
+            <li><Link href="/gallery">Gallery</Link></li>
             <li><Link href="/contact">Contact</Link></li>
           </ul>
         </div>
