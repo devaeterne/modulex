@@ -11,6 +11,7 @@ type Settings = {
   email_sender_email: string | null;
   email_reply_to: string | null;
   order_notification_emails: string | null;
+  lead_notification_emails: string | null;
   stock_notification_emails: string | null;
   pricing_notification_emails: string | null;
   invoice_notification_emails: string | null;
@@ -67,7 +68,7 @@ export default function EmailNotificationSettings() {
 
       const { data, error: settingsError } = await supabase
         .from("general_settings")
-        .select("company_name,email,email_sender_name,email_sender_email,email_reply_to,order_notification_emails,stock_notification_emails,pricing_notification_emails,invoice_notification_emails,send_customer_order_emails,send_customer_invoice_emails,notify_internal_new_order,notify_internal_order_status,notify_internal_stock_alerts,notify_internal_price_alerts,notify_internal_invoice_issued")
+        .select("company_name,email,email_sender_name,email_sender_email,email_reply_to,order_notification_emails,lead_notification_emails,stock_notification_emails,pricing_notification_emails,invoice_notification_emails,send_customer_order_emails,send_customer_invoice_emails,notify_internal_new_order,notify_internal_order_status,notify_internal_stock_alerts,notify_internal_price_alerts,notify_internal_invoice_issued")
         .eq("id", 1)
         .single();
 
@@ -92,6 +93,7 @@ export default function EmailNotificationSettings() {
 
     for (const [label, value] of [
       ["Order recipients", settings.order_notification_emails],
+      ["Store lead recipients", settings.lead_notification_emails],
       ["Stock recipients", settings.stock_notification_emails],
       ["Pricing recipients", settings.pricing_notification_emails],
       ["Invoice recipients", settings.invoice_notification_emails],
@@ -108,6 +110,7 @@ export default function EmailNotificationSettings() {
       email_sender_email: senderEmail,
       email_reply_to: replyTo,
       order_notification_emails: optional(settings.order_notification_emails),
+      lead_notification_emails: optional(settings.lead_notification_emails),
       stock_notification_emails: optional(settings.stock_notification_emails),
       pricing_notification_emails: optional(settings.pricing_notification_emails),
       invoice_notification_emails: optional(settings.invoice_notification_emails),
@@ -120,7 +123,7 @@ export default function EmailNotificationSettings() {
       notify_internal_invoice_issued: settings.notify_internal_invoice_issued,
     };
 
-    const { data, error: updateError } = await supabase.from("general_settings").update(payload).eq("id", 1).select("company_name,email,email_sender_name,email_sender_email,email_reply_to,order_notification_emails,stock_notification_emails,pricing_notification_emails,invoice_notification_emails,send_customer_order_emails,send_customer_invoice_emails,notify_internal_new_order,notify_internal_order_status,notify_internal_stock_alerts,notify_internal_price_alerts,notify_internal_invoice_issued").single();
+    const { data, error: updateError } = await supabase.from("general_settings").update(payload).eq("id", 1).select("company_name,email,email_sender_name,email_sender_email,email_reply_to,order_notification_emails,lead_notification_emails,stock_notification_emails,pricing_notification_emails,invoice_notification_emails,send_customer_order_emails,send_customer_invoice_emails,notify_internal_new_order,notify_internal_order_status,notify_internal_stock_alerts,notify_internal_price_alerts,notify_internal_invoice_issued").single();
 
     if (updateError) setError(updateError.message);
     else {
@@ -136,7 +139,7 @@ export default function EmailNotificationSettings() {
   const disabled = !canEdit || saving;
 
   return <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-base font-semibold text-gray-800 dark:text-white/90">Email & Notifications</h2><p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">Transactional order, stock, pricing and invoice emails. Customer-facing messages use the company identity and logo from General Settings.</p></div>{canEdit && <button type="button" onClick={save} disabled={disabled} className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">{saving ? "Saving..." : "Save Email Settings"}</button>}</div>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-base font-semibold text-gray-800 dark:text-white/90">Email & Notifications</h2><p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">Transactional order, Store lead, stock, pricing and invoice emails. Customer-facing messages use the company identity and logo from General Settings.</p></div>{canEdit && <button type="button" onClick={save} disabled={disabled} className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">{saving ? "Saving..." : "Save Email Settings"}</button>}</div>
 
     {error && <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{error}</div>}
     {success && <div className="mt-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">{success}</div>}
@@ -144,7 +147,7 @@ export default function EmailNotificationSettings() {
 
     <div className="mt-6"><h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Sender</h3><div className="mt-3 grid gap-4 md:grid-cols-3"><Field label="Sender Name" value={settings.email_sender_name} onChange={(value) => patch("email_sender_name", value)} disabled={disabled} placeholder={settings.company_name} /><Field label="Sender Email" value={settings.email_sender_email} onChange={(value) => patch("email_sender_email", value)} disabled={disabled} placeholder="no-reply@auth.example.com" hint="Must belong to a verified Resend sending domain." /><Field label="Reply-To" value={settings.email_reply_to} onChange={(value) => patch("email_reply_to", value)} disabled={disabled} placeholder={settings.email || "sales@example.com"} /></div></div>
 
-    <div className="mt-7"><h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Internal Recipients</h3><p className="mt-1 text-xs text-gray-500">Use commas to send a notification to multiple addresses.</p><div className="mt-3 grid gap-4 md:grid-cols-2"><Field label="Order Notifications" value={settings.order_notification_emails} onChange={(value) => patch("order_notification_emails", value)} disabled={disabled} placeholder="orders@example.com" /><Field label="Stock Alerts" value={settings.stock_notification_emails} onChange={(value) => patch("stock_notification_emails", value)} disabled={disabled} placeholder="warehouse@example.com" /><Field label="Pricing Alerts" value={settings.pricing_notification_emails} onChange={(value) => patch("pricing_notification_emails", value)} disabled={disabled} placeholder="sales@example.com" /><Field label="Invoice Notifications" value={settings.invoice_notification_emails} onChange={(value) => patch("invoice_notification_emails", value)} disabled={disabled} placeholder="accounting@example.com" /></div></div>
+    <div className="mt-7"><h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Internal Recipients</h3><p className="mt-1 text-xs text-gray-500">Use commas to send a notification to multiple addresses.</p><div className="mt-3 grid gap-4 md:grid-cols-2"><Field label="Order Notifications" value={settings.order_notification_emails} onChange={(value) => patch("order_notification_emails", value)} disabled={disabled} placeholder="orders@example.com" /><Field label="Store Lead Notifications" value={settings.lead_notification_emails} onChange={(value) => patch("lead_notification_emails", value)} disabled={disabled} placeholder="sales@example.com" hint="Website inquiries and dealer applications." /><Field label="Stock Alerts" value={settings.stock_notification_emails} onChange={(value) => patch("stock_notification_emails", value)} disabled={disabled} placeholder="warehouse@example.com" /><Field label="Pricing Alerts" value={settings.pricing_notification_emails} onChange={(value) => patch("pricing_notification_emails", value)} disabled={disabled} placeholder="sales@example.com" /><Field label="Invoice Notifications" value={settings.invoice_notification_emails} onChange={(value) => patch("invoice_notification_emails", value)} disabled={disabled} placeholder="accounting@example.com" /></div></div>
 
     <div className="mt-7"><h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Delivery Rules</h3><div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3"><Toggle label="Customer order emails" description="Send confirmations and status changes to the customer's order contact." checked={settings.send_customer_order_emails} onChange={(value) => patch("send_customer_order_emails", value)} disabled={disabled} /><Toggle label="Customer invoice emails" description="Send issued invoice notifications to the customer's billing contact." checked={settings.send_customer_invoice_emails} onChange={(value) => patch("send_customer_invoice_emails", value)} disabled={disabled} /><Toggle label="New order notification" description="Notify the configured internal order recipients when a new order is created." checked={settings.notify_internal_new_order} onChange={(value) => patch("notify_internal_new_order", value)} disabled={disabled} /><Toggle label="Internal order status notification" description="Optionally notify internal order recipients for every status change." checked={settings.notify_internal_order_status} onChange={(value) => patch("notify_internal_order_status", value)} disabled={disabled} /><Toggle label="Stock shortage alerts" description="Notify warehouse recipients when sellable available stock is below requested quantity." checked={settings.notify_internal_stock_alerts} onChange={(value) => patch("notify_internal_stock_alerts", value)} disabled={disabled} /><Toggle label="Price review alerts" description="Notify pricing recipients when an order has a manual, missing or mismatched current price." checked={settings.notify_internal_price_alerts} onChange={(value) => patch("notify_internal_price_alerts", value)} disabled={disabled} /><Toggle label="Invoice issued notification" description="Notify internal invoice recipients when an invoice becomes issued." checked={settings.notify_internal_invoice_issued} onChange={(value) => patch("notify_internal_invoice_issued", value)} disabled={disabled} /></div></div>
   </section>;

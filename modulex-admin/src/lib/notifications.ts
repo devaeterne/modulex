@@ -4,6 +4,7 @@ import { hasPermission, type Permission } from "@/lib/auth/permissions";
 export type NotificationEventType =
   | "low_stock"
   | "new_order_request"
+  | "new_store_lead"
   | "new_dealer_application"
   | "order_ready_for_shipment"
   | "order_cancellation"
@@ -38,7 +39,8 @@ const NOTIFICATION_PERMISSION_POLICY: Record<
 > = {
   low_stock: "inventory.view",
   new_order_request: "orders.view",
-  new_dealer_application: "settings.manage",
+  new_store_lead: "leads.view",
+  new_dealer_application: "leads.view",
   order_ready_for_shipment: "shipments.manage",
   order_cancellation: "orders.view",
   stock_warehouse_problem: "inventory.manage",
@@ -60,6 +62,7 @@ export function canRoleSeeNotification(
 export const NOTIFICATION_LABELS: Record<NotificationEventType, string> = {
   low_stock: "Low / Critical Stock",
   new_order_request: "New Order Request",
+  new_store_lead: "New Store Lead",
   new_dealer_application: "New Dealer Application",
   order_ready_for_shipment: "Ready for Shipment",
   order_cancellation: "Order Cancellation",
