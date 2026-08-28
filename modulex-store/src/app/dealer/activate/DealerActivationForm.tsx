@@ -38,7 +38,7 @@ export default function DealerActivationForm() {
 
   useEffect(() => {
     const config = getConfig();
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const token = params.get("token_hash") || "";
     const type = params.get("type") || "";
 
