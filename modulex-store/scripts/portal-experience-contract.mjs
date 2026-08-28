@@ -30,6 +30,26 @@ for (const file of [
 }
 
 for (const file of [
+  "src/app/account/(auth)/login/AccountLoginForm.tsx",
+  "src/app/account/(auth)/forgot-password/AccountForgotPasswordForm.tsx",
+  "src/app/account/(auth)/reset-password/AccountResetPasswordForm.tsx",
+  "src/app/account/activate/AccountActivationForm.tsx",
+  "src/app/dealer/(auth)/login/DealerLoginForm.tsx",
+  "src/app/dealer/(auth)/forgot-password/DealerForgotPasswordForm.tsx",
+  "src/app/dealer/(auth)/reset-password/DealerResetPasswordForm.tsx",
+  "src/app/dealer/activate/DealerActivationForm.tsx",
+]) {
+  const source = read(file);
+  assert.match(source, /portal-input/, `${file} must use Oakwell portal inputs`);
+  assert.match(source, /portal-button--primary/, `${file} must use Oakwell portal buttons`);
+  assert.doesNotMatch(source, /className=["'][^"']*\bform-control\b/, `${file} must not rely on Bootstrap form-control`);
+}
+
+const storeChrome = read("src/components/StoreChrome.tsx");
+assert.match(storeChrome, /pathname\.startsWith\(["']\/account\/["']\)/, "all account routes must use standalone portal chrome");
+assert.match(storeChrome, /pathname\.startsWith\(["']\/dealer\/["']\)/, "all dealer routes must use standalone portal chrome");
+
+for (const file of [
   "src/app/account/(portal)/layout.tsx",
   "src/app/dealer/(portal)/layout.tsx",
 ]) {
