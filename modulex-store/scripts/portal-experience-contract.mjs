@@ -12,6 +12,7 @@ assert.equal(exists("src/components/portal/PortalNavigation.tsx"), true);
 assert.equal(exists("src/app/portal.css"), true);
 
 const themeToggle = read("src/components/ThemeToggle.tsx");
+assert.match(themeToggle, /localStorage\.getItem\(["']oakwell-theme["']/);
 assert.match(themeToggle, /localStorage\.setItem\(["']theme["']/);
 assert.doesNotMatch(themeToggle, /localStorage\.setItem\(["']oakwell-theme["']/);
 
@@ -28,7 +29,20 @@ for (const file of [
   assert.match(read(file), /PortalAuthShell/);
 }
 
-assert.match(read("src/app/account/(portal)/layout.tsx"), /PortalShell/);
-assert.match(read("src/app/dealer/(portal)/layout.tsx"), /PortalShell/);
+for (const file of [
+  "src/app/account/(portal)/layout.tsx",
+  "src/app/dealer/(portal)/layout.tsx",
+]) {
+  const source = read(file);
+  assert.match(source, /PortalShell/);
+  assert.doesNotMatch(source, /bg-light|bg-white/);
+}
+
+for (const file of [
+  "src/components/portal/PortalOrderList.tsx",
+  "src/components/portal/PortalOrderDetail.tsx",
+]) {
+  assert.match(read(file), /portal-/);
+}
 
 console.log("P1.5 portal experience contract PASS");
