@@ -55,9 +55,13 @@ export async function readDealerPortalSession(): Promise<DealerPortalSession> {
 export async function requireDealerPortalContext(): Promise<DealerPortalContext> {
   const session = await readDealerPortalSession();
 
-  if (!session.context) {
+  if (session.context) {
+    return session.context;
+  }
+
+  if (session.hasAuthenticatedClaims) {
     redirect("/dealer/session/clear");
   }
 
-  return session.context;
+  redirect("/dealer/login");
 }
