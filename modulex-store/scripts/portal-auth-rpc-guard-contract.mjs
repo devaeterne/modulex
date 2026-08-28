@@ -36,6 +36,13 @@ for (const { file, factory, guard, expectedFactoryCalls } of cases) {
     `${file} must authorize before creating the protected Supabase client`,
   );
 
+  const serverClientCalls = source.match(/createServerSupabaseClient\(\)/g) ?? [];
+  assert.equal(
+    serverClientCalls.length,
+    1,
+    `${file} must create the protected Supabase client only inside ${factory}`,
+  );
+
   const directClientCreations = source.match(/await createServerSupabaseClient\(\)/g) ?? [];
   assert.equal(
     directClientCreations.length,
