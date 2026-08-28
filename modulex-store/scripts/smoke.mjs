@@ -180,11 +180,15 @@ if (storeBaseUrl) {
   await check("Lead endpoint rejects oversized request", async () => {
     const response = await fetch(`${storeBaseUrl}/api/leads`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Content-Length": String(33 * 1024),
-      },
-      body: JSON.stringify({ lead_type: "contact" }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lead_type: "contact",
+        first_name: "Smoke",
+        last_name: "Oversized",
+        email: "smoke.oversized@example.com",
+        privacy_accepted: true,
+        message: "x".repeat(33 * 1024),
+      }),
     });
     if (response.status !== 413) throw new Error(`expected 413, received ${response.status}`);
     return "413 size guard response";
