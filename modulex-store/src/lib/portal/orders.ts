@@ -1,3 +1,4 @@
+import { requireStorePortalContext } from "@/lib/portal/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type PortalOrderSummary = {
@@ -33,8 +34,13 @@ type OrderResponse = {
   order?: PortalOrderDetail;
 };
 
+async function createAuthorizedPortalClient() {
+  await requireStorePortalContext();
+  return createServerSupabaseClient();
+}
+
 export async function getPortalOrders(limit = 25, offset = 0): Promise<PortalOrderSummary[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedPortalClient();
   const { data, error } = await supabase.rpc("get_store_portal_orders", {
     p_limit: limit,
     p_offset: offset,
@@ -46,7 +52,7 @@ export async function getPortalOrders(limit = 25, offset = 0): Promise<PortalOrd
 }
 
 export async function getPortalOrder(orderId: string): Promise<PortalOrderDetail | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedPortalClient();
   const { data, error } = await supabase.rpc("get_store_portal_order", { p_order_id: orderId });
   if (error) throw new Error("Unable to load order.");
   const response = data as OrderResponse | null;
