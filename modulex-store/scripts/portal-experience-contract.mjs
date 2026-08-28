@@ -72,4 +72,27 @@ for (const forbidden of ["source_warehouse_id", "source_location_id", "stock_ded
 }
 assert.doesNotMatch(fulfillmentMigration, /'internal_notes'/, "portal fulfillment payload must not emit internal notes");
 
+const fulfillmentHelper = read("src/lib/portal/fulfillment.ts");
+for (const fn of ["getPortalShipments", "getPortalShipment", "getPortalInstallations", "getPortalInstallation", "getPortalDashboardSummary"]) {
+  assert.match(fulfillmentHelper, new RegExp(fn), `Store helper must define ${fn}`);
+}
+for (const forbidden of ["internal_notes", "source_warehouse_id", "source_location_id", "stock_deducted_at", "assigned_to"]) {
+  assert.doesNotMatch(fulfillmentHelper, new RegExp(forbidden), `Store fulfillment types must not expose ${forbidden}`);
+}
+
+for (const file of [
+  "src/app/account/(portal)/shipments/page.tsx",
+  "src/app/account/(portal)/shipments/[id]/page.tsx",
+  "src/app/account/(portal)/installations/page.tsx",
+  "src/app/account/(portal)/installations/[id]/page.tsx",
+  "src/app/dealer/(portal)/shipments/page.tsx",
+  "src/app/dealer/(portal)/shipments/[id]/page.tsx",
+  "src/app/dealer/(portal)/installations/page.tsx",
+  "src/app/dealer/(portal)/installations/[id]/page.tsx",
+]) assert.equal(exists(file), true, `${file} must exist`);
+
+for (const file of ["src/app/account/(portal)/page.tsx", "src/app/dealer/(portal)/page.tsx"]) {
+  assert.match(read(file), /getPortalDashboardSummary/, `${file} must use the scoped dashboard summary`);
+}
+
 console.log("P1.5 portal experience contract PASS");
