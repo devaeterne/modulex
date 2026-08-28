@@ -6,6 +6,27 @@ Current phase: **Phase 2.0 — Production Truth & Cleanup**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
 
+## Mandatory Session & Change Tracking Protocol
+
+These rules are mandatory for all future Modulex Store work:
+
+1. **Every new conversation/session that touches `modulex-store` must read this file first**, before planning or implementation.
+2. The current phase, next action, completed history, blockers, and changed assumptions in this file take precedence over older chat summaries or remembered plans.
+3. **Every material Store change must be reflected in this file in the same workstream/PR** before that work is considered complete.
+4. When a roadmap task is started, mark it `[~]`. When verified complete, mark it `[x]`. If blocked, mark it `[!]` and record the blocker briefly.
+5. Do not mark work complete merely because code was written. Completion requires the task's stated done criteria plus the relevant lint/build/smoke/live verification.
+6. If implementation reveals that the roadmap is wrong or incomplete, update the roadmap first or in the same PR; do not silently diverge from it.
+7. New work that is not yet listed must be added to the appropriate phase before or alongside implementation.
+8. Completed capabilities remain in **Completed Foundation History** so future sessions do not rediscover or rebuild them.
+9. At the end of each meaningful Store work package, update:
+   - `Last reviewed`
+   - `Main baseline` when applicable
+   - `Current phase`
+   - task checkboxes
+   - blockers/decisions
+   - `Next Action`
+10. If a change spans Store and Admin, **both `modulex-store/STORE_ROADMAP.md` and `modulex-admin/ADMIN_ROADMAP.md` must be reviewed and updated where affected**.
+
 ## Status Legend
 
 - [ ] Not started
