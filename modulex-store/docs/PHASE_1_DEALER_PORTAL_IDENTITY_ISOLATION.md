@@ -14,6 +14,14 @@ A dealer portal request is authorized only when all of these conditions are true
 
 If any condition fails, the caller receives a generic access-denied result. The resolver must not reveal whether the missing condition was an unknown user, suspended user, or disabled customer.
 
+## Auth account boundary
+
+Dealer Auth users are not internal Modulex staff users. Any server-side dealer invitation/creation flow must set the server-controlled Auth app metadata marker `account_type = dealer_portal`.
+
+The existing `auth.users` creation trigger is guarded so accounts carrying that marker do not receive a `public.profiles` row and therefore cannot inherit the default internal `sales` role. Unmarked Auth users preserve the existing internal provisioning behavior.
+
+`raw_user_meta_data` must not be used for this boundary because users can control user metadata. P1.2 invitation code must set the marker through the trusted admin/server Auth API.
+
 ## Isolation rules
 
 - One Auth user may map to at most one portal customer.
@@ -40,8 +48,10 @@ It must not expose price group, tax/registration identifiers, internal notes, cr
 - `private.current_store_dealer_customer_id()` is a `SECURITY DEFINER`, `STABLE` helper with `search_path = ''` and fully qualified relations. It returns the caller's authorized customer ID or `NULL`.
 - `private.get_store_dealer_portal_context()` is a `SECURITY DEFINER`, `STABLE` helper that returns the minimized JSON context or a generic `portal_access_denied` result.
 - `public.get_store_dealer_portal_context()` is a `SECURITY INVOKER` wrapper exposed only to `authenticated`.
-- Private helpers explicitly revoke `PUBLIC` execution and grant only the minimum required access.
+- `anon`/`PUBLIC` execution is explicitly revoked from the public portal RPC.
+- Private helpers explicitly revoke `PUBLIC`/`anon` execution and expose only the minimum call path required by authenticated portal requests.
 - A partial unique index on `customer_portal_users(auth_user_id)` enforces one customer mapping per linked Auth user.
+- `public.handle_new_user()` uses `search_path = ''` and skips internal-profile provisioning only for the trusted dealer app-metadata marker.
 
 ## Out of scope
 
@@ -54,7 +64,7 @@ It must not expose price group, tax/registration identifiers, internal notes, cr
 
 ## Acceptance tests
 
-A rollback-only database smoke test must prove:
+Rollback-only database smoke tests must prove:
 
 1. An active portal user on an enabled customer resolves the correct customer context.
 2. The returned JSON contains only the approved fields plus `ok`/`reason`.
@@ -63,4 +73,6 @@ A rollback-only database smoke test must prove:
 5. An authenticated Auth user with no portal mapping is denied.
 6. A caller cannot create a second portal mapping for the same `auth_user_id`.
 7. A portal caller cannot directly read `customers` or `customer_portal_users` through existing RLS.
-8. Existing internal customer-read access remains intact.
+8. A dealer Auth account does not receive an internal profile or role.
+9. Existing unmarked internal Auth-user provisioning remains intact.
+10. The public portal RPC is executable by `authenticated` and not by `anon`.
