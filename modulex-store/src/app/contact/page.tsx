@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import LeadForm from "@/components/leads/LeadForm";
 import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
 
 export const revalidate = 900;
@@ -108,15 +109,26 @@ export default async function Contact() {
           </div>
 
           {!hasDirectContact ? (
-            <div className="py-5 text-center">
-              <h2 className="h4 mb-3">Contact details are being updated</h2>
-              <p className="text-muted mb-0">Please check back shortly for official Oakwell Cabinetry contact information.</p>
+            <div className="py-4 text-center">
+              <p className="text-muted mb-0">Official direct contact details are being updated. You can still send an inquiry below.</p>
             </div>
           ) : null}
 
+          <div className="row justify-content-center mt-5">
+            <div className="col-xl-9 col-lg-10">
+              <div className="contact-form-wrapper">
+                <div className="mb-4">
+                  <h3>Send an Inquiry</h3>
+                  <p className="text-muted mb-0">Use this form for product questions, specifications, availability information, or general support.</p>
+                </div>
+                <LeadForm type="contact" />
+              </div>
+            </div>
+          </div>
+
           <div className="mt-5 text-center">
-            <p className="text-muted mb-3">Online inquiry and dealer application forms are being prepared.</p>
-            <Link href="/products" className="btn-primary">Explore Products</Link>
+            <p className="text-muted mb-3">Interested in representing Oakwell Cabinetry?</p>
+            <Link href="/dealers/apply" className="btn-primary">Apply to Become a Dealer</Link>
           </div>
         </div>
       </section>

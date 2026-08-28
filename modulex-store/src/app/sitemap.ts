@@ -8,6 +8,7 @@ const staticRoutes = [
   "/products",
   "/gallery",
   "/contact",
+  "/dealers/apply",
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
