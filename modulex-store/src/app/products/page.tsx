@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import AnalyticsEventOnView from "@/components/analytics/AnalyticsEventOnView";
+import TrackedLink from "@/components/analytics/TrackedLink";
 import ProductCard from "@/components/products/ProductCard";
 import { getAllStoreCatalogProducts } from "@/lib/store/products/queries";
 import type { StoreCatalogProduct } from "@/lib/store/products/types";
@@ -183,9 +184,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             and dealer support.
           </p>
           <div className="cta-buttons">
-            <Link href="/contact" className="btn-white">
+            <TrackedLink
+              href="/contact"
+              className="btn-white"
+              event="contact_click"
+              payload={{ context: "products_page_cta" }}
+            >
               Contact Us
-            </Link>
+            </TrackedLink>
           </div>
         </div>
       </section>
