@@ -16,7 +16,10 @@ export default async function Footer() {
   const settings = settingsResult.status === "fulfilled" ? settingsResult.value : null;
   const companyName = company?.companyName || "Oakwell Cabinetry";
   const addressLine = [company?.addressLine1, company?.addressLine2].filter(Boolean).join(", ");
-  const localityLine = [company?.city, company?.stateRegion, company?.postalCode].filter(Boolean).join(", ");
+  const hasUsableLocality = Boolean(company?.city && (company?.stateRegion || company?.postalCode));
+  const localityLine = hasUsableLocality
+    ? [company?.city, company?.stateRegion, company?.postalCode].filter(Boolean).join(", ")
+    : "";
   const socials = [
     ["Facebook", settings?.facebookUrl, "bi-facebook"],
     ["Instagram", settings?.instagramUrl, "bi-instagram"],
