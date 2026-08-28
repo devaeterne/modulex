@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import TrackedLink from "@/components/analytics/TrackedLink";
 import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
 import { getStoreSiteSettings } from "@/lib/store/site/queries";
 
@@ -58,7 +59,11 @@ export default async function Footer() {
           <ul>
             <li><Link href="/products">Product Catalog</Link></li>
             <li><Link href="/gallery">Projects & Inspiration</Link></li>
-            <li><Link href="/contact">Product Support</Link></li>
+            <li>
+              <TrackedLink href="/contact" event="contact_click" payload={{ context: "footer_product_support" }}>
+                Product Support
+              </TrackedLink>
+            </li>
           </ul>
         </div>
 
@@ -67,20 +72,40 @@ export default async function Footer() {
           <ul>
             <li><Link href="/about">About Us</Link></li>
             <li><Link href="/gallery">Gallery</Link></li>
-            <li><Link href="/contact">Contact</Link></li>
+            <li>
+              <TrackedLink href="/contact" event="contact_click" payload={{ context: "footer_company" }}>
+                Contact
+              </TrackedLink>
+            </li>
           </ul>
         </div>
 
         <div className="footer-links">
           <h3>Contact</h3>
           <ul>
-            {company?.email ? <li><a href={`mailto:${company.email}`}>{company.email}</a></li> : null}
-            {company?.phone ? <li><a href={phoneHref(company.phone)}>{company.phone}</a></li> : null}
+            {company?.email ? (
+              <li>
+                <TrackedLink href={`mailto:${company.email}`} event="email_click" payload={{ context: "footer" }}>
+                  {company.email}
+                </TrackedLink>
+              </li>
+            ) : null}
+            {company?.phone ? (
+              <li>
+                <TrackedLink href={phoneHref(company.phone)} event="phone_click" payload={{ context: "footer" }}>
+                  {company.phone}
+                </TrackedLink>
+              </li>
+            ) : null}
             {addressLine ? <li><span>{addressLine}</span></li> : null}
             {localityLine ? <li><span>{localityLine}</span></li> : null}
             {company?.website ? <li><a href={company.website} target="_blank" rel="noopener noreferrer">Website</a></li> : null}
             {!company?.email && !company?.phone && !addressLine && !localityLine ? (
-              <li><Link href="/contact">Contact Oakwell Cabinetry</Link></li>
+              <li>
+                <TrackedLink href="/contact" event="contact_click" payload={{ context: "footer_fallback" }}>
+                  Contact Oakwell Cabinetry
+                </TrackedLink>
+              </li>
             ) : null}
           </ul>
         </div>
