@@ -30,7 +30,7 @@ type PanelFeedRow = {
   label: string;
   severity: "info" | "success" | "warning" | "critical";
   sound_enabled: boolean;
-  entity_type: "order" | "invoice" | "customer";
+  entity_type: "order" | "invoice" | "customer" | "store_lead";
   entity_id: string;
   customer_id: string | null;
   reference: string | null;
@@ -53,6 +53,7 @@ function notificationIcon(notification: AppNotification) {
   const labels: Partial<Record<NotificationEventType, string>> = {
     low_stock: "STK",
     new_order_request: "ORD",
+    new_store_lead: "LEAD",
     new_dealer_application: "DLR",
     order_ready_for_shipment: "SHP",
     order_cancellation: "CAN",
@@ -87,6 +88,7 @@ function titleCase(value: string) {
 
 function mapPanelType(eventType: string): NotificationEventType | null {
   if (eventType === "new_order") return "new_order_request";
+  if (eventType === "new_store_lead") return "new_store_lead";
   if (eventType === "order_status_changed") return "order_status_changed";
   if (eventType === "stock_review_required") return "stock_warehouse_problem";
   if (eventType === "price_review_required") return "price_review_required";
@@ -98,10 +100,23 @@ function mapPanelType(eventType: string): NotificationEventType | null {
 }
 
 function panelDescription(row: PanelFeedRow) {
-  const reference = row.reference || (row.entity_type === "invoice" ? "Invoice" : row.entity_type === "customer" ? "Customer" : "Order");
+  const fallbackReference = row.entity_type === "invoice"
+    ? "Invoice"
+    : row.entity_type === "customer"
+      ? "Customer"
+      : row.entity_type === "store_lead"
+        ? "Store lead"
+        : "Order";
+  const reference = row.reference || fallbackReference;
   const customer = row.customer_name ? ` · ${row.customer_name}` : "";
   const payload = row.payload ?? {};
 
+  if (row.event_type === "new_store_lead") {
+    const leadType = String(payload.lead_type || "contact");
+    const label = leadType === "dealer_application" ? "Dealer application" : "Website inquiry";
+    const location = [payload.city, payload.country_code].map((value) => String(value || "").trim()).filter(Boolean).join(", ");
+    return `${reference}${customer} · ${label}${location ? ` · ${location}` : ""}`;
+  }
   if (row.event_type === "order_status_changed") {
     const from = String(payload.from_status || "").replaceAll("_", " ");
     const to = String(payload.to_status || "").replaceAll("_", " ");
@@ -126,6 +141,7 @@ function panelDescription(row: PanelFeedRow) {
 
 function panelHref(row: PanelFeedRow) {
   if (row.event_type.startsWith("approval_")) return "/approvals";
+  if (row.entity_type === "store_lead") return `/store/leads/${row.entity_id}`;
   if (row.entity_type === "customer") return `/customers/${row.entity_id}`;
   if (!row.customer_id) return row.entity_type === "invoice" ? "/customers/invoices" : "/customers/orders";
   return row.entity_type === "invoice"
