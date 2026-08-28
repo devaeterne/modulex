@@ -14,7 +14,8 @@ const admin = createClient(url, adminKey, {
 });
 
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-const password = `P1.3-${crypto.randomUUID()}-Aa1!`;
+const initialPassword = `P1.3-${crypto.randomUUID()}-Aa1!`;
+const resetPassword = `P1.3-reset-${crypto.randomUUID()}-Bb2!`;
 const createdUserIds = [];
 const createdPortalUserIds = [];
 const createdCustomerIds = [];
@@ -33,7 +34,7 @@ async function createAuthUser(name, appMetadata) {
   const email = emailFor(name);
   const { data, error } = await admin.auth.admin.createUser({
     email,
-    password,
+    password: initialPassword,
     email_confirm: true,
     app_metadata: appMetadata,
   });
@@ -77,7 +78,7 @@ async function linkDealer(user, customer, status) {
   return data.id;
 }
 
-async function signInAndContext(email) {
+async function signInAndContext(email, password = initialPassword) {
   const client = publicClient();
   const { error: signInError } = await client.auth.signInWithPassword({ email, password });
   if (signInError) throw signInError;
@@ -92,7 +93,7 @@ async function signInAndContext(email) {
   return { claims: claimData.claims, context };
 }
 
-async function verifyRecovery(email) {
+async function recoverySession(email) {
   const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
     type: "recovery",
     email,
@@ -116,25 +117,64 @@ async function verifyRecovery(email) {
   const { data: context, error: contextError } = await client.rpc("get_store_dealer_portal_context");
   if (contextError) throw contextError;
 
-  const accountType = verified.user.app_metadata?.account_type;
-  await client.auth.signOut({ scope: "local" });
-  return { accountType, context };
+  return {
+    client,
+    accountType: verified.user.app_metadata?.account_type,
+    context,
+  };
+}
+
+async function assertNoDatabaseFixtures() {
+  if (createdPortalUserIds.length) {
+    const { count, error } = await admin
+      .from("customer_portal_users")
+      .select("id", { count: "exact", head: true })
+      .in("id", createdPortalUserIds);
+    if (error) throw error;
+    assert.equal(count, 0, "portal user fixtures must be removed");
+  }
+
+  if (createdCustomerIds.length) {
+    const { count, error } = await admin
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .in("id", createdCustomerIds);
+    if (error) throw error;
+    assert.equal(count, 0, "customer fixtures must be removed");
+  }
 }
 
 async function cleanup() {
+  const failures = [];
+
   if (createdPortalUserIds.length) {
     const { error } = await admin.from("customer_portal_users").delete().in("id", createdPortalUserIds);
-    if (error) console.error("live smoke portal cleanup failed", error.message);
+    if (error) failures.push(`portal cleanup: ${error.message}`);
   }
 
   if (createdCustomerIds.length) {
     const { error } = await admin.from("customers").delete().in("id", createdCustomerIds);
-    if (error) console.error("live smoke customer cleanup failed", error.message);
+    if (error) failures.push(`customer cleanup: ${error.message}`);
   }
 
   for (const userId of createdUserIds) {
     const { error } = await admin.auth.admin.deleteUser(userId);
-    if (error) console.error("live smoke Auth cleanup failed", error.message);
+    if (error) failures.push(`Auth cleanup ${userId}: ${error.message}`);
+  }
+
+  try {
+    await assertNoDatabaseFixtures();
+  } catch (error) {
+    failures.push(`database cleanup verification: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  for (const userId of createdUserIds) {
+    const { data, error } = await admin.auth.admin.getUserById(userId);
+    if (!error && data.user) failures.push(`Auth fixture still exists: ${userId}`);
+  }
+
+  if (failures.length) {
+    throw new Error(`Live smoke cleanup failed: ${failures.join("; ")}`);
   }
 }
 
@@ -157,20 +197,35 @@ try {
   assert.equal(activeResult.context?.ok, true);
   assert.equal(activeResult.context?.customer_id, activeCustomer.id);
 
-  for (const fixture of [suspended, disabled, internal]) {
-    const result = await signInAndContext(fixture.email);
-    assert.deepEqual(result.context, { ok: false, reason: "portal_access_denied" });
+  const suspendedResult = await signInAndContext(suspended.email);
+  const disabledResult = await signInAndContext(disabled.email);
+  const internalResult = await signInAndContext(internal.email);
+  assert.deepEqual(suspendedResult.context, { ok: false, reason: "portal_access_denied" });
+  assert.deepEqual(disabledResult.context, { ok: false, reason: "portal_access_denied" });
+  assert.deepEqual(internalResult.context, { ok: false, reason: "portal_access_denied" });
+  assert.notEqual(internalResult.claims?.app_metadata?.account_type, "dealer_portal");
+
+  const activeRecovery = await recoverySession(active.email);
+  assert.equal(activeRecovery.accountType, "dealer_portal");
+  assert.equal(activeRecovery.context?.ok, true);
+  const { error: passwordUpdateError } = await activeRecovery.client.auth.updateUser({ password: resetPassword });
+  if (passwordUpdateError) throw passwordUpdateError;
+  await activeRecovery.client.auth.signOut({ scope: "global" });
+
+  const resetLogin = await signInAndContext(active.email, resetPassword);
+  assert.equal(resetLogin.context?.ok, true, "active Dealer must sign in with the reset password");
+
+  for (const fixture of [suspended, disabled]) {
+    const recovery = await recoverySession(fixture.email);
+    assert.equal(recovery.accountType, "dealer_portal");
+    assert.deepEqual(recovery.context, { ok: false, reason: "portal_access_denied" });
+    await recovery.client.auth.signOut({ scope: "local" });
   }
 
-  assert.notEqual((await signInAndContext(internal.email)).claims?.app_metadata?.account_type, "dealer_portal");
-
-  const dealerRecovery = await verifyRecovery(active.email);
-  assert.equal(dealerRecovery.accountType, "dealer_portal");
-  assert.equal(dealerRecovery.context?.ok, true);
-
-  const internalRecovery = await verifyRecovery(internal.email);
+  const internalRecovery = await recoverySession(internal.email);
   assert.notEqual(internalRecovery.accountType, "dealer_portal");
   assert.deepEqual(internalRecovery.context, { ok: false, reason: "portal_access_denied" });
+  await internalRecovery.client.auth.signOut({ scope: "local" });
 
   console.log("dealer portal live auth smoke: ok");
 } finally {
