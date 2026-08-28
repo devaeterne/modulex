@@ -14,6 +14,8 @@ import {
   type NotificationSeverity,
 } from "@/lib/notifications";
 
+const NOTIFICATION_POLL_INTERVAL_MS = 60_000;
+
 type InventoryAlertRow = {
   inventory_id: string;
   sku: string;
@@ -165,83 +167,104 @@ export default function NotificationDropdown() {
   useEffect(() => {
     let mounted = true;
     let interval: ReturnType<typeof setInterval> | null = null;
+    let inFlight = false;
+    let currentProfile: Awaited<ReturnType<typeof getCurrentProfile>>["profile"] | null = null;
 
     async function loadNotifications(initial = false) {
-      if (initial) setIsLoading(true);
+      if (!initial && document.visibilityState !== "visible") return;
+      if (!currentProfile || inFlight) return;
+
+      inFlight = true;
+      try {
+        if (initial) setIsLoading(true);
+        const profile = currentProfile;
+        const next: AppNotification[] = [];
+        const [panelResult, stockResult] = await Promise.all([
+          supabase.rpc("get_panel_notification_feed", { p_limit: 30 }),
+          canRoleSeeNotification(profile.role, "low_stock")
+            ? supabase.rpc("search_stock", { p_query: "", p_limit: 100 })
+            : Promise.resolve({ data: [] as InventoryAlertRow[] }),
+        ]);
+
+        const panelRows = ((panelResult.data as PanelFeedRow[] | null) ?? []);
+        const currentPanelIds = new Set(panelRows.map((row) => row.id));
+        const previousPanelIds = panelIdsRef.current;
+        if (previousPanelIds) {
+          const hasNewSoundEvent = panelRows.some((row) => row.sound_enabled && !previousPanelIds.has(row.id));
+          if (hasNewSoundEvent) queueNotificationChime();
+        }
+        panelIdsRef.current = currentPanelIds;
+
+        for (const row of panelRows) {
+          const type = mapPanelType(row.event_type);
+          if (!type || !canRoleSeeNotification(profile.role, type)) continue;
+          next.push({
+            id: `event:${row.id}`,
+            type,
+            title: row.label,
+            description: panelDescription(row),
+            severity: row.severity,
+            href: panelHref(row),
+            timeLabel: relativeTime(row.created_at),
+          });
+        }
+
+        const lowStockRows = (((stockResult as { data?: InventoryAlertRow[] | null }).data ?? []) as InventoryAlertRow[])
+          .filter((row) => row.stock_status === "LOW_STOCK")
+          .sort((a, b) => Number(a.available_quantity ?? 0) - Number(b.available_quantity ?? 0))
+          .slice(0, 8);
+
+        for (const row of lowStockRows) {
+          const available = Number(row.available_quantity ?? 0);
+          next.push({
+            id: `low-stock:${row.inventory_id}:${available}`,
+            type: "low_stock",
+            title: available <= 1 ? "Critical stock level" : "Low stock detected",
+            description: `${row.sku} · ${row.product_name} has ${available.toLocaleString("en-US")} available at ${row.warehouse_code} / ${row.location_code}.`,
+            severity: available <= 1 ? "critical" : "warning",
+            href: "/inventory",
+            timeLabel: "Current stock",
+          });
+        }
+
+        if (!mounted) return;
+        setNotifications(next);
+        setIsLoading(false);
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    async function bootstrap() {
       const { profile } = await getCurrentProfile();
       if (!mounted || !profile) return;
-
+      currentProfile = profile;
       setRole(profile.role);
       setUserId(profile.id);
 
-      if (initial) {
-        try {
-          const stored = window.localStorage.getItem(readStorageKey(profile.id));
-          if (stored) setReadIds(new Set(JSON.parse(stored) as string[]));
-        } catch {
-          setReadIds(new Set());
-        }
+      try {
+        const stored = window.localStorage.getItem(readStorageKey(profile.id));
+        if (stored) setReadIds(new Set(JSON.parse(stored) as string[]));
+      } catch {
+        setReadIds(new Set());
       }
 
-      const next: AppNotification[] = [];
-      const [panelResult, stockResult] = await Promise.all([
-        supabase.rpc("get_panel_notification_feed", { p_limit: 30 }),
-        canRoleSeeNotification(profile.role, "low_stock")
-          ? supabase.rpc("search_stock", { p_query: "", p_limit: 100 })
-          : Promise.resolve({ data: [] as InventoryAlertRow[] }),
-      ]);
-
-      const panelRows = ((panelResult.data as PanelFeedRow[] | null) ?? []);
-      const currentPanelIds = new Set(panelRows.map((row) => row.id));
-      const previousPanelIds = panelIdsRef.current;
-      if (previousPanelIds) {
-        const hasNewSoundEvent = panelRows.some((row) => row.sound_enabled && !previousPanelIds.has(row.id));
-        if (hasNewSoundEvent) queueNotificationChime();
-      }
-      panelIdsRef.current = currentPanelIds;
-
-      for (const row of panelRows) {
-        const type = mapPanelType(row.event_type);
-        if (!type || !canRoleSeeNotification(profile.role, type)) continue;
-        next.push({
-          id: `event:${row.id}`,
-          type,
-          title: row.label,
-          description: panelDescription(row),
-          severity: row.severity,
-          href: panelHref(row),
-          timeLabel: relativeTime(row.created_at),
-        });
-      }
-
-      const lowStockRows = (((stockResult as { data?: InventoryAlertRow[] | null }).data ?? []) as InventoryAlertRow[])
-        .filter((row) => row.stock_status === "LOW_STOCK")
-        .sort((a, b) => Number(a.available_quantity ?? 0) - Number(b.available_quantity ?? 0))
-        .slice(0, 8);
-
-      for (const row of lowStockRows) {
-        const available = Number(row.available_quantity ?? 0);
-        next.push({
-          id: `low-stock:${row.inventory_id}:${available}`,
-          type: "low_stock",
-          title: available <= 1 ? "Critical stock level" : "Low stock detected",
-          description: `${row.sku} · ${row.product_name} has ${available.toLocaleString("en-US")} available at ${row.warehouse_code} / ${row.location_code}.`,
-          severity: available <= 1 ? "critical" : "warning",
-          href: "/inventory",
-          timeLabel: "Current stock",
-        });
-      }
-
+      await loadNotifications(true);
       if (!mounted) return;
-      setNotifications(next);
-      setIsLoading(false);
+      interval = setInterval(() => void loadNotifications(false), NOTIFICATION_POLL_INTERVAL_MS);
     }
 
-    void loadNotifications(true);
-    interval = setInterval(() => void loadNotifications(false), 20_000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void loadNotifications(false);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    void bootstrap();
+
     return () => {
       mounted = false;
       if (interval) clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
