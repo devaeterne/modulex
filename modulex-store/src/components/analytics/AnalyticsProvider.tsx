@@ -98,6 +98,10 @@ function storeConsent(consent: AnalyticsConsentState) {
   }
 }
 
+function notifyConsentChanged() {
+  window.dispatchEvent(new Event("oakwell:consent-changed"));
+}
+
 export default function AnalyticsProvider({
   settings,
 }: {
@@ -156,6 +160,7 @@ export default function AnalyticsProvider({
 
     if (!consent.analytics && !consent.marketing) {
       window.__oakwellAnalyticsMode = "disabled";
+      notifyConsentChanged();
       return;
     }
 
@@ -166,6 +171,8 @@ export default function AnalyticsProvider({
     } else {
       window.__oakwellAnalyticsMode = "disabled";
     }
+
+    notifyConsentChanged();
 
     if (consent.analytics && lastPageView.current !== pathname) {
       lastPageView.current = pathname;
