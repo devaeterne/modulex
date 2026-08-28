@@ -58,7 +58,6 @@ export default function Footer({
           <h3>Products</h3>
           <ul>
             <li><Link href="/products">Product Catalog</Link></li>
-            <li><Link href="/gallery">Projects & Inspiration</Link></li>
             <li>
               <TrackedLink href="/contact" event="contact_click" payload={{ context: "footer_product_support" }}>
                 Product Support
@@ -71,7 +70,6 @@ export default function Footer({
           <h3>Company</h3>
           <ul>
             <li><Link href="/about">About Us</Link></li>
-            <li><Link href="/gallery">Gallery</Link></li>
             <li>
               <TrackedLink href="/contact" event="contact_click" payload={{ context: "footer_company" }}>
                 Contact
