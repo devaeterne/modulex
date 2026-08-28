@@ -10,20 +10,20 @@ export default function AccountLoginForm() {
   const [state, formAction, pending] = useActionState(accountLoginAction, initialAccountLoginState);
 
   return (
-    <form action={formAction}>
-      {state.error ? <div className="alert alert-warning" role="alert">{state.error}</div> : null}
-      <div className="mb-3">
-        <label className="form-label" htmlFor="account-email">Email</label>
-        <input id="account-email" className="form-control" type="email" name="email" autoComplete="email" disabled={pending} required />
+    <form action={formAction} className="portal-form">
+      {state.error ? <div className="portal-alert portal-alert--error" role="alert">{state.error}</div> : null}
+      <div className="portal-field">
+        <label className="portal-label" htmlFor="account-email">Email</label>
+        <input id="account-email" className="portal-input" type="email" name="email" autoComplete="email" disabled={pending} required />
       </div>
-      <div className="mb-3">
-        <label className="form-label" htmlFor="account-password">Password</label>
-        <input id="account-password" className="form-control" type="password" name="password" autoComplete="current-password" disabled={pending} required />
+      <div className="portal-field">
+        <label className="portal-label" htmlFor="account-password">Password</label>
+        <input id="account-password" className="portal-input" type="password" name="password" autoComplete="current-password" disabled={pending} required />
       </div>
-      <div className="d-flex justify-content-end mb-4">
-        <Link href="/account/forgot-password" className="small account-auth-muted-link">Forgot password?</Link>
+      <div className="portal-form__aside">
+        <Link href="/account/forgot-password" className="portal-link">Forgot password?</Link>
       </div>
-      <button className="btn btn-dark w-100" type="submit" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
+      <button className="portal-button portal-button--primary portal-button--full" type="submit" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
     </form>
   );
 }
