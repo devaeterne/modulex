@@ -221,5 +221,6 @@ $$;
 revoke all on function private.convert_store_dealer_lead_to_customer(uuid) from public;
 revoke all on function public.convert_store_dealer_lead_to_customer(uuid) from public;
 
+grant usage on schema private to authenticated, service_role;
 grant execute on function private.convert_store_dealer_lead_to_customer(uuid) to authenticated;
 grant execute on function public.convert_store_dealer_lead_to_customer(uuid) to authenticated, service_role;
