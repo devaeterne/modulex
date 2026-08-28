@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { callPublicRpc } from "@/lib/supabase/public-rest";
 import type {
   StoreCatalogProduct,
@@ -19,6 +20,11 @@ type CatalogRpcRow = {
   primary_image_url: string | null;
   variants: StoreProductVariant[] | null;
   updated_at: string;
+};
+
+type StoreCatalogBatchQuery = Omit<StoreCatalogQuery, "limit" | "offset"> & {
+  batchSize?: number;
+  maxItems?: number;
 };
 
 function mapCatalogRow(row: CatalogRpcRow): StoreCatalogProduct {
@@ -54,16 +60,45 @@ export async function getStoreCatalogProducts(
   return rows.map(mapCatalogRow);
 }
 
-export async function getStoreProductBySlug(
-  slug: string
-): Promise<StoreProductDetail | null> {
-  const normalizedSlug = slug.trim().toLowerCase();
+export async function getAllStoreCatalogProducts(
+  params: StoreCatalogBatchQuery = {}
+): Promise<StoreCatalogProduct[]> {
+  const batchSize = Math.min(Math.max(params.batchSize ?? 100, 1), 100);
+  const maxItems = Math.min(Math.max(params.maxItems ?? 1000, 1), 5000);
+  const products: StoreCatalogProduct[] = [];
+  let offset = 0;
 
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
-    return null;
+  while (products.length < maxItems) {
+    const limit = Math.min(batchSize, maxItems - products.length);
+    const batch = await getStoreCatalogProducts({
+      query: params.query,
+      colorCode: params.colorCode,
+      limit,
+      offset,
+    });
+
+    products.push(...batch);
+
+    if (batch.length < limit) {
+      break;
+    }
+
+    offset += batch.length;
   }
 
-  return callPublicRpc<StoreProductDetail | null>("get_store_product_by_slug", {
-    p_slug: normalizedSlug,
-  });
+  return products;
 }
+
+export const getStoreProductBySlug = cache(
+  async (slug: string): Promise<StoreProductDetail | null> => {
+    const normalizedSlug = slug.trim().toLowerCase();
+
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(normalizedSlug)) {
+      return null;
+    }
+
+    return callPublicRpc<StoreProductDetail | null>("get_store_product_by_slug", {
+      p_slug: normalizedSlug,
+    });
+  }
+);

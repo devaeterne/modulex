@@ -42,6 +42,33 @@ This document tracks the technical foundation work required before Oakwell Cabin
 - [x] Audited the live Supabase product/customer/order/pricing schema
 - [x] Audited current RLS policies for future public/portal access
 
+## Completed in foundation package 3 — data foundation
+
+- [x] Confirmed 462 SKU rows map to 154 base products across NB / NT / WH variants
+- [x] Added explicit Store presentation tables for product content, media, and color options
+- [x] Seeded 154 unpublished base-product content records
+- [x] Added read-only public catalog/product/company RPCs
+- [x] Kept prices, costs, inventory, reservations, customers, and orders outside the public contract
+- [x] Revoked anonymous direct table access to Store presentation tables
+- [x] Added native server-side public RPC data-access utilities
+- [x] Versioned and applied the Store catalog Supabase migrations
+
+## Completed in foundation package 4 — product catalog transition
+
+- [x] Added server-rendered `/products` catalog route backed by the Store DAL
+- [x] Added server-rendered `/products/[slug]` product detail route
+- [x] Added product search by product code / SKU through the existing public RPC
+- [x] Added batch reads so the 100-row RPC safety cap does not truncate the 154-product catalog
+- [x] Added dynamic product metadata and canonical URLs
+- [x] Added BreadcrumbList structured data on product detail pages
+- [x] Added published product URLs to the sitemap
+- [x] Added optimized Supabase Storage image support through `next/image`
+- [x] Replaced `/shop` and `/shop/[slug]` with permanent redirects to `/products`
+- [x] Removed the dummy ecommerce product dataset
+- [x] Removed price, sale price, quantity, cart, shipping, wishlist, and fake review UI from the product experience
+- [x] Updated Navbar and Home hero product links to `/products`
+- [x] Kept the public Store DAL server-only and request-deduplicated product-detail reads
+
 ## Supabase findings
 
 The existing Modulex database already contains useful B2B foundations:
@@ -55,33 +82,20 @@ The existing Modulex database already contains useful B2B foundations:
 
 ### Security boundary
 
-Current RLS policies correctly restrict the master product, pricing, customer and order tables to authenticated internal roles. There is no anonymous/public product policy yet.
+Master product, pricing, customer, and order tables remain internal. Anonymous Store access is limited to explicit read-only public RPC projections. `product_prices` is not anonymously readable. Portal access must later be scoped to the authenticated portal user's own customer record and orders rather than granting generic `authenticated` access.
 
-Store architecture must therefore introduce a deliberately narrow public catalog surface. `product_prices` must never become anonymously readable. Portal access must be scoped to the authenticated portal user's own customer record and orders rather than granting generic `authenticated` access.
+### Store presentation model
 
-### Store schema gaps to solve before catalog migration
+Store-specific content is kept outside the operational `products.metadata` JSON and managed through explicit presentation tables. This separates marketing/SEO/media concerns from operational SKU data.
 
-The master `products` table currently does not contain dedicated Store presentation fields such as:
-
-- public SEO slug
-- publication state / publish scheduling
-- primary marketing image and gallery ordering
-- SEO title / description / Open Graph image
-- marketing copy separate from operational product description
-- downloadable catalog/datasheet relationships
-- featured/collection placement
-
-These fields should not be silently packed into the existing generic `metadata` JSON. Store-specific content should have an explicit CMS/presentation model managed by Modulex Admin and linked to the master product record.
-
-The requested dealer price visibility policy is also not yet represented by a dedicated global/customer-level setting. It will be introduced later as an explicit policy rather than inferred from `price_group_id`.
+The requested dealer price visibility policy is not yet represented by a dedicated global/customer-level setting. It will be introduced later as an explicit policy rather than inferred from `price_group_id`.
 
 ## Legacy/theme inventory
 
-The current theme contains functionality and content that must not become production behavior by accident.
+The current theme still contains functionality and content that must not become production behavior by accident.
 
 ### Replace with dynamic data
 
-- `src/data/products.ts` — placeholder products and prices
 - Home page services/content blocks
 - Fake project statistics
 - Fake testimonials
@@ -89,17 +103,7 @@ The current theme contains functionality and content that must not become produc
 - Placeholder contact information
 - Placeholder social links
 - Placeholder CTA telephone number
-- EmailJS placeholder configuration
-
-### Remove from product experience
-
-- Public prices
-- Sale prices
-- Quantity selector
-- Add to cart
-- Shipping messaging
-- Fake ratings/reviews
-- Ecommerce-oriented product behavior
+- Temporary EmailJS transport
 
 ### Performance review required
 
@@ -117,17 +121,19 @@ The current theme contains functionality and content that must not become produc
 - Route preloader removed
 - Pannellum/WebGL no longer initializes during the initial mobile experience
 - Hero fallback migrated to `next/image`
+- Product catalog imagery uses `next/image`
 
 ## Remaining Phase 0 work
 
-1. Add Supabase SSR/browser client utilities using pinned `@supabase/ssr` + `@supabase/supabase-js` packages once the lockfile can be regenerated and verified.
-2. Establish concrete public product/CMS data-access implementations after the Store presentation schema is approved.
-3. Add Breadcrumb and Product structured data when real dynamic routes are introduced; Product JSON-LD must not expose fake prices/offers.
-4. Replace raw `<img>` usage incrementally with `next/image` on routes that will survive the template migration.
+1. Add Modulex Admin management screens for Store product content, media, publish state, SEO fields, and color presentation.
+2. Add Supabase SSR/browser auth utilities when portal/auth work begins and package lock regeneration can be verified.
+3. Add Product structured data after published catalog content contains sufficient real product information; do not expose fake prices/offers.
+4. Replace remaining raw `<img>` usage incrementally with `next/image` on routes that will survive the template migration.
 5. Audit and remove unused global CSS/assets after visual verification on Vercel.
 6. Remove dead `locomotive-scroll` dependency after regenerating `package-lock.json`.
 7. Create Lighthouse/PageSpeed checkpoints for Home, Products, Product Detail and Dealer Application.
-8. Verify production canonical URL, sitemap and robots output once the Vercel/domain URL is available.
+8. Verify production canonical URL, sitemap and robots output against the manual Vercel deployment and final domain.
+9. Replace remaining theme placeholders with Admin-managed Oakwell content and company settings.
 
 ## Product rule
 
