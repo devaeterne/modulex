@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 type Theme = "light" | "dark";
 
@@ -12,8 +12,6 @@ function applyTheme(theme: Theme) {
 }
 
 export default function AccountThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("light");
-
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     const initial: Theme = saved === "dark" || saved === "light"
@@ -21,13 +19,11 @@ export default function AccountThemeToggle() {
       : window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light";
-    setTheme(initial);
     applyTheme(initial);
   }, []);
 
   const toggleTheme = () => {
-    const next: Theme = theme === "dark" ? "light" : "dark";
-    setTheme(next);
+    const next: Theme = document.body.classList.contains("dark") ? "light" : "dark";
     window.localStorage.setItem(STORAGE_KEY, next);
     applyTheme(next);
   };
@@ -37,10 +33,10 @@ export default function AccountThemeToggle() {
       type="button"
       className="account-theme-toggle"
       onClick={toggleTheme}
-      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-      title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+      aria-label="Toggle color theme"
+      title="Toggle color theme"
     >
-      <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+      <span aria-hidden="true">◐</span>
     </button>
   );
 }
