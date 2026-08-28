@@ -1,0 +1,46 @@
+name: P1.4 Portal Hotfix Verification
+
+on:
+  push:
+    branches:
+      - fix/p14-portal-auth-login-theme
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Store install
+        working-directory: modulex-store
+        run: npm ci
+      - name: Store smoke
+        working-directory: modulex-store
+        run: npm test
+      - name: Store hotfix lint
+        working-directory: modulex-store
+        run: >-
+          npx eslint
+          'src/app/account/(auth)/login/actions.ts'
+          'src/app/account/(auth)/login/AccountLoginForm.tsx'
+          'src/app/account/(auth)/login/AccountThemeToggle.tsx'
+          'src/app/account/(auth)/login/page.tsx'
+          src/app/layout.tsx
+      - name: Store production build
+        working-directory: modulex-store
+        run: npm run build
+      - name: Admin install
+        working-directory: modulex-admin
+        run: npm ci
+      - name: Admin portal contracts
+        working-directory: modulex-admin
+        run: npm run smoke:store-portal-admin && npm run smoke:dealer-portal-admin && npm run smoke:auth-recovery
+      - name: Admin portal lint
+        working-directory: modulex-admin
+        run: npx eslint 'src/app/api/admin/dealer-portal/route.ts' src/lib/email/dealer-portal.ts
+      - name: Admin production build
+        working-directory: modulex-admin
+        run: npm run build
