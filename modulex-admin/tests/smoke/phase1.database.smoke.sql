@@ -27,7 +27,7 @@ create temp table phase1_ctx (
   lead_id uuid,
   marketing_tracking_before boolean
 ) on commit drop;
-grant select, insert, update, delete on phase1_ctx to authenticated;
+grant select, insert, update, delete on phase1_ctx to authenticated, anon;
 
 select set_config('request.jwt.claim.sub', :'phase1_admin_user_id', true);
 select set_config(
@@ -155,19 +155,27 @@ select 1 / case when exists (
     and internal_email_enabled = true
 ) then 1 else 0 end as "PASS new_store_lead delivery rule";
 
-\echo '[05] Store lead -> activity -> notification lifecycle'
-with inserted as (
-  insert into public.store_leads(
-    lead_type, first_name, last_name, email, company_name,
-    country_code, city, privacy_accepted, source, utm_source, utm_campaign
-  ) values (
-    'dealer_application', 'Smoke', 'Lead',
-    'smoke-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12) || '@example.com',
-    'Smoke Cabinetry LLC', 'US', 'New York', true, 'smoke_test', 'smoke', 'phase1'
-  ) returning id
+\echo '[05] Store lead RPC -> activity -> notification lifecycle'
+set local role anon;
+with submitted as (
+  select id
+  from public.submit_store_lead(jsonb_build_object(
+    'lead_type', 'dealer_application',
+    'first_name', 'Smoke',
+    'last_name', 'Lead',
+    'email', 'smoke-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12) || '@example.com',
+    'company_name', 'Smoke Cabinetry LLC',
+    'country_code', 'US',
+    'city', 'New York',
+    'privacy_accepted', true,
+    'source', 'smoke_test',
+    'utm_source', 'smoke',
+    'utm_campaign', 'phase1'
+  ))
 )
-update phase1_ctx set lead_id = (select id from inserted);
+update phase1_ctx set lead_id = (select id from submitted);
 
+set local role authenticated;
 select 1 / case when exists (
   select 1 from public.store_lead_activity
   where lead_id = (select lead_id from phase1_ctx)
@@ -206,7 +214,8 @@ reset role;
 select 1 / case when not has_table_privilege('anon', 'public.store_leads', 'SELECT')
   and not has_table_privilege('anon', 'public.store_leads', 'INSERT')
   and not has_table_privilege('anon', 'public.store_marketing_settings', 'SELECT')
-then 1 else 0 end as "PASS anon direct Store table access revoked";
+  and not has_function_privilege('authenticated', 'public.submit_store_lead(jsonb)', 'EXECUTE')
+then 1 else 0 end as "PASS hardened direct Store writes";
 
 select 1 / case when has_function_privilege('anon', 'public.submit_store_lead(jsonb)', 'EXECUTE')
   and has_function_privilege('anon', 'public.get_store_marketing_settings()', 'EXECUTE')
