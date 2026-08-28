@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
-// import emailjs from "@emailjs/browser"; // We'll lazy load this
+import { useRef, useState } from "react";
+
+const EMAILJS_SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID;
+const EMAILJS_PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY;
 
 export default function Contact() {
   const form = useRef<HTMLFormElement>(null);
@@ -37,54 +40,56 @@ export default function Contact() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setStatus({ type: null, message: "" });
 
     if (!form.current) return;
 
-    // Replace these with your EmailJS service ID, template ID, and public key
-    const serviceID = "YOUR_SERVICE_ID";
-    const templateID = "YOUR_TEMPLATE_ID";
-    const publicKey = "YOUR_PUBLIC_KEY";
-
-    import("@emailjs/browser")
-      .then((module) => {
-        const emailjs = module.default;
-        return emailjs.sendForm(serviceID, templateID, form.current!, {
-          publicKey: publicKey,
-        });
-      })
-      .then(
-        () => {
-          setStatus({
-            type: "success",
-            message: "Thank you! We will contact you within 24 hours.",
-          });
-          setFormData({
-            firstName: "",
-            lastName: "",
-            email: "",
-            phone: "",
-            projectType: "",
-            budget: "",
-            message: "",
-            newsletter: false,
-          });
-        }
-      )
-      .catch((error) => {
-        setStatus({
-          type: "error",
-          message: "Something went wrong. Please try again.",
-        });
-        console.error("FAILED...", error);
-        alert("EmailJS Error: " + JSON.stringify(error));
-      })
-      .finally(() => {
-        setIsSubmitting(false);
+    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
+      setStatus({
+        type: "error",
+        message:
+          "Online form delivery is not configured yet. Please contact Oakwell directly.",
       });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { default: emailjs } = await import("@emailjs/browser");
+
+      await emailjs.sendForm(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        form.current,
+        { publicKey: EMAILJS_PUBLIC_KEY }
+      );
+
+      setStatus({
+        type: "success",
+        message: "Thank you! Your message has been sent successfully.",
+      });
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        projectType: "",
+        budget: "",
+        message: "",
+        newsletter: false,
+      });
+    } catch (error) {
+      console.error("Contact form delivery failed", error);
+      setStatus({
+        type: "error",
+        message: "We could not send your message. Please try again later.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -183,6 +188,8 @@ export default function Contact() {
             {status.message && (
               <div
                 className="form-notif"
+                role="status"
+                aria-live="polite"
                 style={{
                   display: "block",
                   opacity: 1,
