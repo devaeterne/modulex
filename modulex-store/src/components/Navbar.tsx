@@ -18,7 +18,8 @@ export default function Navbar({
   const lastYRef = useRef(0);
 
   useEffect(() => {
-    setIsMobileOpen(false);
+    const timeout = window.setTimeout(() => setIsMobileOpen(false), 0);
+    return () => window.clearTimeout(timeout);
   }, [pathname]);
 
   useEffect(() => {
