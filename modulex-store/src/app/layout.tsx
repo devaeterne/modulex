@@ -61,10 +61,8 @@ export default function RootLayout({
       <body>
         <JsonLd data={[createOrganizationJsonLd(), createWebSiteJsonLd()]} />
         <Navbar />
-        <main>
-          {children}
-          <Footer />
-        </main>
+        <main>{children}</main>
+        <Footer />
         <BackToTop />
         <GalleryLightbox />
         <ThemeToggle />
