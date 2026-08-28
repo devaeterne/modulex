@@ -1,0 +1,25 @@
+name: P1.5 Inline Verification
+
+on:
+  push:
+    branches:
+      - phase-1/portal-experience-fulfillment
+
+env:
+  NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
+
+jobs:
+  store:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Store install
+        working-directory: modulex-store
+        run: npm ci
+      - name: Store smoke
+        working-directory: modulex-store
+        run: npm test
+      - name: Store production build
+        working-directory: modulex-store
+        run: npm run build
