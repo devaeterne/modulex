@@ -20,6 +20,9 @@ jobs:
       - name: Store smoke
         working-directory: modulex-store
         run: npm test
+      - name: Store P1.5 scoped lint
+        working-directory: modulex-store
+        run: npx eslint src/components/ThemeToggle.tsx src/components/StoreChrome.tsx src/components/portal src/app/account src/app/dealer src/app/layout.tsx
       - name: Store production build
         working-directory: modulex-store
         run: npm run build
