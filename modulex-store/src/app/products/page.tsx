@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ProductCard from "@/components/products/ProductCard";
 import { getAllStoreCatalogProducts } from "@/lib/store/products/queries";
+import type { StoreCatalogProduct } from "@/lib/store/products/types";
 
 export const revalidate = 300;
 
@@ -33,7 +34,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       ? resolvedSearchParams.q.trim()
       : "";
 
-  let products = [];
+  let products: StoreCatalogProduct[] = [];
   let loadError = false;
 
   try {
