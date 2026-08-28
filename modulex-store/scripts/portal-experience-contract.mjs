@@ -34,13 +34,9 @@ for (const file of [
 const storeChrome = read("src/components/StoreChrome.tsx");
 assert.match(storeChrome, /pathname\.startsWith\(["']\/account\/["']\)/);
 assert.match(storeChrome, /pathname\.startsWith\(["']\/dealer\/["']\)/);
-
 for (const file of ["src/app/account/(portal)/layout.tsx", "src/app/dealer/(portal)/layout.tsx"]) {
-  const source = read(file);
-  assert.match(source, /PortalShell/);
-  assert.doesNotMatch(source, /bg-light|bg-white/);
+  const source = read(file); assert.match(source, /PortalShell/); assert.doesNotMatch(source, /bg-light|bg-white/);
 }
-
 for (const file of ["src/components/portal/PortalOrderList.tsx", "src/components/portal/PortalOrderDetail.tsx"]) assert.match(read(file), /portal-/);
 
 const fulfillmentMigrationPath = "supabase/migrations/20260828222000_store_portal_fulfillment_visibility.sql";
@@ -53,7 +49,6 @@ assert.doesNotMatch(fulfillmentMigration, /'internal_notes'/);
 const fulfillmentHelper = read("src/lib/portal/fulfillment.ts");
 for (const fn of ["getPortalShipments", "getPortalShipment", "getPortalInstallations", "getPortalInstallation", "getPortalDashboardSummary"]) assert.match(fulfillmentHelper, new RegExp(fn));
 for (const forbidden of ["internal_notes", "source_warehouse_id", "source_location_id", "stock_deducted_at", "assigned_to"]) assert.doesNotMatch(fulfillmentHelper, new RegExp(forbidden));
-
 for (const file of [
   "src/app/account/(portal)/shipments/page.tsx","src/app/account/(portal)/shipments/[id]/page.tsx","src/app/account/(portal)/installations/page.tsx","src/app/account/(portal)/installations/[id]/page.tsx",
   "src/app/dealer/(portal)/shipments/page.tsx","src/app/dealer/(portal)/shipments/[id]/page.tsx","src/app/dealer/(portal)/installations/page.tsx","src/app/dealer/(portal)/installations/[id]/page.tsx",
@@ -73,9 +68,20 @@ const dealerHelper = read("src/lib/portal/dealer.ts");
 for (const fn of ["getDealerPricingContext", "getDealerCatalogProducts", "getDealerProductBySlug", "getDealerOrder"]) assert.match(dealerHelper, new RegExp(fn));
 assert.doesNotMatch(dealerHelper, /customer_id|price_group_id/);
 for (const forbidden of ["current_cost", "margin", "profit", "payment_commission", "internal_notes"]) assert.doesNotMatch(dealerHelper, new RegExp(forbidden, "i"));
-const dealerCatalog = read("src/components/portal/DealerCatalog.tsx");
-assert.match(dealerCatalog, /Contact sales for pricing/);
+assert.match(read("src/components/portal/DealerCatalog.tsx"), /Contact sales for pricing/);
 assert.match(read("src/app/dealer/(portal)/orders/[id]/page.tsx"), /getDealerOrder/);
 assert.match(read("src/components/portal/PortalOrderDetail.tsx"), /kind:\s*["']dealer["']/);
+
+const documentsMigrationPath = "supabase/migrations/20260828224000_store_dealer_documents_account.sql";
+assert.equal(exists(documentsMigrationPath), true, "P1.5C Dealer documents/account migration must exist");
+const documentsMigration = read(documentsMigrationPath);
+assert.match(documentsMigration, /portal_visible\s+boolean\s+not\s+null\s+default\s+false/i);
+assert.match(documentsMigration, /customer-documents/);
+assert.match(documentsMigration, /get_store_dealer_documents/);
+assert.match(documentsMigration, /get_store_dealer_document/);
+assert.match(documentsMigration, /get_store_dealer_account/);
+assert.match(documentsMigration, /portal_visible/);
+assert.match(documentsMigration, /is_active/);
+assert.doesNotMatch(documentsMigration, /'sales_rep_id'|'credit_hold'|'internal_notes'/i);
 
 console.log("P1.5 portal experience contract PASS");
