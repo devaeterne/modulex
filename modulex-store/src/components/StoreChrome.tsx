@@ -17,17 +17,12 @@ type StoreChromeProps = {
   logoUrl?: string | null;
 };
 
-export default function StoreChrome({
-  children,
-  company,
-  siteSettings,
-  companyName,
-  logoUrl,
-}: StoreChromeProps) {
+export default function StoreChrome({ children, company, siteSettings, companyName, logoUrl }: StoreChromeProps) {
   const pathname = usePathname();
   const isDealerRoute = pathname === "/dealer" || pathname.startsWith("/dealer/");
+  const isProtectedAccountRoute = pathname === "/account" || pathname.startsWith("/account/orders") || pathname.startsWith("/account/session/");
 
-  if (isDealerRoute) {
+  if (isDealerRoute || isProtectedAccountRoute) {
     return <main>{children}</main>;
   }
 
