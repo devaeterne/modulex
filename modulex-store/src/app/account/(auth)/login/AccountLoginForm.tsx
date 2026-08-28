@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { accountLoginAction, initialAccountLoginState } from "./actions";
+import { accountLoginAction, type AccountLoginState } from "./actions";
+
+const initialAccountLoginState: AccountLoginState = { error: null };
 
 export default function AccountLoginForm() {
   const [state, formAction, pending] = useActionState(accountLoginAction, initialAccountLoginState);
@@ -19,7 +21,7 @@ export default function AccountLoginForm() {
         <input id="account-password" className="form-control" type="password" name="password" autoComplete="current-password" disabled={pending} required />
       </div>
       <div className="d-flex justify-content-end mb-4">
-        <Link href="/account/forgot-password" className="small text-secondary">Forgot password?</Link>
+        <Link href="/account/forgot-password" className="small account-auth-muted-link">Forgot password?</Link>
       </div>
       <button className="btn btn-dark w-100" type="submit" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
     </form>
