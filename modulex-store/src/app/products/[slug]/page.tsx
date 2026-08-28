@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { siteConfig } from "@/config/site";
 import { getStoreProductBySlug } from "@/lib/store/products/queries";
+import type { StoreProductDetail } from "@/lib/store/products/types";
 
 export const revalidate = 300;
 
@@ -78,7 +80,7 @@ export default async function ProductDetailPage({
 }: ProductDetailPageProps) {
   const { slug } = await params;
 
-  let product;
+  let product: StoreProductDetail | null;
 
   try {
     product = await getStoreProductBySlug(slug);
@@ -104,19 +106,19 @@ export default async function ProductDetailPage({
         "@type": "ListItem",
         position: 1,
         name: "Home",
-        item: "/",
+        item: new URL("/", siteConfig.url).toString(),
       },
       {
         "@type": "ListItem",
         position: 2,
         name: "Products",
-        item: "/products",
+        item: new URL("/products", siteConfig.url).toString(),
       },
       {
         "@type": "ListItem",
         position: 3,
         name: product.displayName,
-        item: `/products/${product.slug}`,
+        item: new URL(`/products/${product.slug}`, siteConfig.url).toString(),
       },
     ],
   };
@@ -172,7 +174,7 @@ export default async function ProductDetailPage({
                     style={{ objectFit: "cover" }}
                   />
                 ) : (
-                  <div className="position-absolute inset-0 h-100 d-flex align-items-center justify-content-center text-muted text-center px-4">
+                  <div className="position-absolute top-0 start-0 h-100 w-100 d-flex align-items-center justify-content-center text-muted text-center px-4">
                     Product imagery is being prepared.
                   </div>
                 )}
