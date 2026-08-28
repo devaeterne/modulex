@@ -18,11 +18,12 @@ const [route, panel, customerPage, mailer, migration] = await Promise.all([
 ]);
 
 assert.match(route, /requireAdmin\(request\)/, "dealer portal API must use the Admin gate");
-assert.match(route, /account_type:\s*["']dealer_portal["']/, "dealer Auth users must get trusted dealer app metadata");
-assert.match(route, /auth\.admin\.createUser/, "dealer Auth users must be created server-side");
-assert.match(route, /auth\.admin\.generateLink/, "dealer activation links must be generated server-side");
+assert.match(route, /dealer_portal/, "dealer customers must still map to trusted dealer app metadata");
+assert.match(route, /accountType/, "portal Auth metadata must be derived server-side");
+assert.match(route, /auth\.admin\.createUser/, "portal Auth users must be created server-side");
+assert.match(route, /auth\.admin\.generateLink/, "portal activation links must be generated server-side");
 assert.match(route, /type:\s*["']recovery["']/, "activation must use an action token for the already-created trusted Auth user");
-assert.doesNotMatch(route, /inviteUserByEmail/, "dealer activation must not rely on user_metadata-only inviteUserByEmail");
+assert.doesNotMatch(route, /inviteUserByEmail/, "portal activation must not rely on user_metadata-only inviteUserByEmail");
 assert.match(route, /portal_enabled/, "invite flow must guard disabled customers");
 assert.match(route, /never_invited/, "new portal users must start never_invited");
 assert.match(route, /suspended/, "lifecycle must support suspension");
@@ -41,8 +42,8 @@ assert.match(panel, /Set Primary/, "Admin UI must expose primary-user management
 assert.match(panel, /Remove Draft/, "only never-invited drafts should be removable");
 
 assert.match(migration, /revoke insert, update, delete on table public\.customer_portal_users from authenticated/i, "browser-authenticated users must not mutate portal lifecycle rows directly");
-assert.match(mailer, /RESEND_API_KEY/, "dealer activation mail must remain server-side");
+assert.match(mailer, /RESEND_API_KEY/, "portal activation mail must remain server-side");
 assert.match(mailer, /token_hash/, "email must route through the controlled Store token-hash activation page");
-assert.match(mailer, /activation/i, "dealer mail must contain activation copy");
+assert.match(mailer, /activation/i, "portal mail must contain activation copy");
 
 console.log("dealer portal admin contract: ok");

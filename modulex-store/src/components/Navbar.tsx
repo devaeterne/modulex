@@ -18,7 +18,8 @@ export default function Navbar({
   const lastYRef = useRef(0);
 
   useEffect(() => {
-    setIsMobileOpen(false);
+    const timeout = window.setTimeout(() => setIsMobileOpen(false), 0);
+    return () => window.clearTimeout(timeout);
   }, [pathname]);
 
   useEffect(() => {
@@ -91,7 +92,22 @@ export default function Navbar({
           <li className="nav-item"><Link className="nav-link" href="/dealers/apply" onClick={handleLinkClick}>Dealers</Link></li>
         </ul>
 
-        <Link href="/contact" className="cta-nav" onClick={handleContactClick}>Contact Us</Link>
+        <div className="d-flex align-items-center gap-2">
+          <Link
+            href="/account"
+            aria-label="Account"
+            title="Account"
+            onClick={handleLinkClick}
+            className="d-inline-flex align-items-center justify-content-center text-decoration-none"
+            style={{ width: 42, height: 42, borderRadius: "50%", border: "1px solid currentColor", color: "inherit" }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M4.5 20c.8-3.7 3.2-5.5 7.5-5.5s6.7 1.8 7.5 5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </Link>
+          <Link href="/contact" className="cta-nav" onClick={handleContactClick}>Contact Us</Link>
+        </div>
         <button
           type="button"
           className={`burger-menu ${isMobileOpen ? "open" : ""}`}
