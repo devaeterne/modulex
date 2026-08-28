@@ -17,9 +17,17 @@ export default function AnalyticsEventOnView({
   const sent = useRef(false);
 
   useEffect(() => {
-    if (sent.current) return;
-    sent.current = true;
-    pushAnalyticsEvent(event, payload);
+    const trySend = () => {
+      if (sent.current) return;
+      if (pushAnalyticsEvent(event, payload)) {
+        sent.current = true;
+        window.removeEventListener("oakwell:consent-changed", trySend);
+      }
+    };
+
+    trySend();
+    if (!sent.current) window.addEventListener("oakwell:consent-changed", trySend);
+    return () => window.removeEventListener("oakwell:consent-changed", trySend);
   }, [event, payload]);
 
   return null;
