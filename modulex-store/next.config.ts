@@ -2,10 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
-  output: 'export',
-  trailingSlash: true,
+  poweredByHeader: false,
+  compress: true,
   images: {
-    unoptimized: true,
+    formats: ["image/avif", "image/webp"],
   },
 };
 

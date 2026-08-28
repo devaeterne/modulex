@@ -1,46 +1,45 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useScrollStore } from "@/store/useScrollStore";
 
 export default function BackToTop() {
-  const scroll = useScrollStore((state) => state.scroll);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    if (!scroll) return;
+    let ticking = false;
 
-    const handleScroll = ({ scroll: s }: any) => {
-      setIsVisible(s.y > 300);
+    const updateVisibility = () => {
+      setIsVisible(window.scrollY > 300);
+      ticking = false;
     };
 
-    scroll.on("scroll", handleScroll);
-    
-    return () => {
-      // Cleanup if needed
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateVisibility);
+        ticking = true;
+      }
     };
-  }, [scroll]);
 
-  const scrollToTop = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (scroll) {
-      scroll.scrollTo(0, {
-        duration: 1000,
-        easing: [0.25, 0.0, 0.35, 1.0],
-      });
-    } else {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+    updateVisibility();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
-    <a 
-      id="backToTop" 
+    <button
+      id="backToTop"
+      type="button"
       className={`back-to-top ${isVisible ? "show" : ""}`}
       onClick={scrollToTop}
-      href="#"
+      aria-label="Back to top"
+      style={{ border: 0 }}
     >
-      <i className="bi bi-arrow-up"></i>
-    </a>
+      <i className="bi bi-arrow-up" aria-hidden="true"></i>
+    </button>
   );
 }

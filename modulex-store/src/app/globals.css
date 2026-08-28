@@ -1,3 +1,33 @@
-/* @tailwind base;
-@tailwind components;
-@tailwind utilities; */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+}
+
+/* Legacy theme compatibility: the old preloader toggled body.loaded.
+   Keep the page visible while the preloader implementation is removed. */
+body:not(.loaded) {
+  opacity: 1;
+  visibility: visible;
+}
+
+#preloader {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

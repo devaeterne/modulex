@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useLightboxStore } from "@/store/useLightboxStore";
 
 export default function VirtualTour() {
@@ -20,20 +21,26 @@ export default function VirtualTour() {
           <div className="col-lg-12 tour-container">
             <div className="tour-main">
               <div className="tour-video">
-                <img
+                <Image
                   src="/assets/images/img(5).jpg"
                   alt="Virtual Tour Preview"
+                  width={1600}
+                  height={900}
+                  sizes="(max-width: 991px) 100vw, 92vw"
                 />
                 <button
+                  type="button"
                   className="play-button"
                   onClick={() => openLightbox("pano", "/index-360.html")}
                   style={{ border: "none", background: "transparent" }}
+                  aria-label="Open 360 degree virtual tour"
                 >
                   <svg
                     width="80"
                     height="80"
                     viewBox="0 0 80 80"
                     fill="none"
+                    aria-hidden="true"
                   >
                     <circle
                       cx="40"
