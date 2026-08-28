@@ -1,0 +1,16 @@
+name: P1.4 Contract RED
+
+on:
+  push:
+    branches:
+      - phase-1/unified-account-order-access
+
+jobs:
+  contract-red:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Store P1.4 contract
+        run: node modulex-store/scripts/store-portal-contract.mjs
+      - name: Admin P1.4 contract
+        run: node modulex-admin/scripts/store-portal-admin-contract.mjs
