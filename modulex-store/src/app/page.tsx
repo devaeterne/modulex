@@ -1,288 +1,178 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import Hero from "@/components/Home/Hero";
-import RecentProjects from "@/components/Home/RecentProjects";
-import Stats from "@/components/Home/Stats";
+import Hero, { type HomeHeroContent } from "@/components/Home/Hero";
 import VirtualTour from "@/components/Home/VirtualTour";
-import Testimonials from "@/components/Home/Testimonials";
-import FAQ from "@/components/Home/FAQ";
-import Contact from "@/components/Home/Contact";
+import ProductCard from "@/components/products/ProductCard";
+import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
+import { getStoreCatalogProducts } from "@/lib/store/products/queries";
+import { getStoreHomeFeatures, getStoreSiteSettings, type StoreSiteSettings } from "@/lib/store/site/queries";
 
-export default function Home() {
+export const revalidate = 300;
+
+const FALLBACK_SETTINGS: StoreSiteSettings = {
+  homepageEyebrow: "Oakwell Cabinetry",
+  homepageTitle: "Cabinetry Built for Everyday Living",
+  homepageHighlight: "Designed to Perform",
+  homepageSubtitle: "Explore cabinet product families, finish options, and resources from Oakwell Cabinetry.",
+  heroPrimaryLabel: "View Products",
+  heroPrimaryHref: "/products",
+  heroSecondaryLabel: "Contact Us",
+  heroSecondaryHref: "/contact",
+  heroPosterUrl: "/assets/images/img(3).jpg",
+  heroPanoramaUrl: "/assets/images/panorama/image2.jpg",
+  heroPanoramaEnabled: true,
+  showFeatures: true,
+  showFeaturedProducts: true,
+  showVirtualTour: false,
+  showDealerCta: true,
+  featuredProductsEyebrow: "Oakwell Cabinetry",
+  featuredProductsTitle: "Featured Products",
+  featuredProductsDescription: "Explore selected cabinet product families and available finish variants.",
+  dealerCtaTitle: "Interested in becoming an Oakwell dealer?",
+  dealerCtaDescription: "Connect with Oakwell Cabinetry to learn more about dealer opportunities and product support.",
+  dealerCtaLabel: "Contact Us",
+  dealerCtaHref: "/contact",
+  footerDescription: "Cabinet products, finish options, resources, and dealer support from Oakwell Cabinetry.",
+  facebookUrl: null,
+  instagramUrl: null,
+  linkedinUrl: null,
+  pinterestUrl: null,
+  tiktokUrl: null,
+  youtubeUrl: null,
+  homepageSeoTitle: "Oakwell Cabinetry | Cabinet Products & Dealer Support",
+  homepageSeoDescription: "Explore Oakwell Cabinetry products, finish options, resources, and dealer information.",
+  homepageOgImageUrl: null,
+  updatedAt: null,
+};
+
+async function loadSiteSettings() {
+  try {
+    return (await getStoreSiteSettings()) ?? FALLBACK_SETTINGS;
+  } catch (error) {
+    console.error("Unable to load Store site settings", error);
+    return FALLBACK_SETTINGS;
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await loadSiteSettings();
+  const title = settings.homepageSeoTitle || "Oakwell Cabinetry";
+  const description = settings.homepageSeoDescription || FALLBACK_SETTINGS.homepageSeoDescription || undefined;
+
+  return {
+    title: { absolute: title },
+    description,
+    alternates: { canonical: "/" },
+    openGraph: {
+      title,
+      description,
+      url: "/",
+      images: settings.homepageOgImageUrl ? [{ url: settings.homepageOgImageUrl }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: settings.homepageOgImageUrl ? [settings.homepageOgImageUrl] : undefined,
+    },
+  };
+}
+
+export default async function Home() {
+  const settings = await loadSiteSettings();
+  const [companyResult, featuresResult, productResult] = await Promise.allSettled([
+    getStorePublicCompanyProfile(),
+    settings.showFeatures ? getStoreHomeFeatures() : Promise.resolve([]),
+    settings.showFeaturedProducts ? getStoreCatalogProducts({ limit: 12 }) : Promise.resolve([]),
+  ]);
+
+  const company = companyResult.status === "fulfilled" ? companyResult.value : null;
+  const features = featuresResult.status === "fulfilled" ? featuresResult.value : [];
+  const featuredProducts = productResult.status === "fulfilled"
+    ? productResult.value.filter((product) => product.isFeatured).slice(0, 6)
+    : [];
+
+  const heroContent: HomeHeroContent = {
+    eyebrow: settings.homepageEyebrow || company?.companyName || "Oakwell Cabinetry",
+    title: settings.homepageTitle,
+    highlight: settings.homepageHighlight,
+    subtitle: settings.homepageSubtitle,
+    primaryLabel: settings.heroPrimaryLabel,
+    primaryHref: settings.heroPrimaryHref,
+    secondaryLabel: settings.heroSecondaryLabel,
+    secondaryHref: settings.heroSecondaryHref,
+    posterUrl: settings.heroPosterUrl || FALLBACK_SETTINGS.heroPosterUrl || "/assets/images/img(3).jpg",
+    panoramaUrl: settings.heroPanoramaUrl,
+    panoramaEnabled: settings.heroPanoramaEnabled,
+  };
+
   return (
     <>
-      {/* Hero Section */}
-      <Hero />
+      <Hero content={heroContent} />
 
-      {/* Services Section */}
-      <section className="services" id="services">
-        <div className="container">
-          <div className="section-header text-center">
-            <span className="section-tag">Our Services</span>
-            <h2>What We Offer</h2>
-            <p>
-              From concept to completion, we provide comprehensive interior
-              design solutions tailored to your vision
-            </p>
-          </div>
-          <div className="services-grid">
-            <div className="service-card">
-              <div className="service-icon">
-                <i className="bi bi-house-door"></i>
-              </div>
-              <h3>Residential Design</h3>
-              <p>
-                Create your dream home with personalized interior solutions
-                that blend comfort, style, and functionality.
-              </p>
-              <a href="#" className="service-link">
-                Learn more <i className="bi bi-chevron-right"></i>
-              </a>
+      {settings.showFeatures && features.length > 0 ? (
+        <section className="services" aria-labelledby="why-oakwell-heading">
+          <div className="container">
+            <div className="section-header text-center">
+              <span className="section-tag">Oakwell Cabinetry</span>
+              <h2 id="why-oakwell-heading">Why Oakwell</h2>
+              <p>Explore product information and support built around the Oakwell cabinet catalog.</p>
             </div>
-            <div className="service-card">
-              <div className="service-icon">
-                <i className="bi bi-building"></i>
-              </div>
-              <h3>Commercial Spaces</h3>
-              <p>
-                Transform offices, retail spaces, and hospitality venues into
-                inspiring environments that drive success.
-              </p>
-              <a href="#" className="service-link">
-                Learn more <i className="bi bi-chevron-right"></i>
-              </a>
-            </div>
-            <div className="service-card">
-              <div className="service-icon">
-                <i className="bi bi-stars"></i>
-              </div>
-              <h3>Renovation</h3>
-              <p>
-                Breathe new life into existing spaces with thoughtful
-                redesigns that maximize potential and value.
-              </p>
-              <a href="#" className="service-link">
-                Learn more <i className="bi bi-chevron-right"></i>
-              </a>
-            </div>
-            <div className="service-card">
-              <div className="service-icon">
-                <i className="bi bi-palette"></i>
-              </div>
-              <h3>Color Consultation</h3>
-              <p>
-                Expert guidance on color palettes and finishes to create the
-                perfect mood and atmosphere.
-              </p>
-              <a href="#" className="service-link">
-                Learn more <i className="bi bi-chevron-right"></i>
-              </a>
-            </div>
-            <div className="service-card">
-              <div className="service-icon">
-                <i className="bi bi-lamp"></i>
-              </div>
-              <h3>Furniture Selection</h3>
-              <p>
-                Curated furniture and decor pieces that perfectly complement
-                your space and lifestyle.
-              </p>
-              <a href="#" className="service-link">
-                Learn more <i className="bi bi-chevron-right"></i>
-              </a>
-            </div>
-            <div className="service-card">
-              <div className="service-icon">
-                <i className="bi bi-bounding-box"></i>
-              </div>
-              <h3>Space Planning</h3>
-              <p>
-                Optimize your layout with strategic planning that enhances
-                flow, function, and aesthetics.
-              </p>
-              <a href="#" className="service-link">
-                Learn more <i className="bi bi-chevron-right"></i>
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Enhanced Stats Section */}
-      <Stats />
-
-      {/* Portfolio Section */}
-      <RecentProjects />
-
-      {/* Banner */}
-      <section className="banner-section">
-        <div className="container">
-          <div className="banner-container">
-            <div className="banner-content">
-              <div className="banner-text">
-                <h3>Special Offer: Get 20% Off Your First Project</h3>
-                <p>
-                  Limited time offer for new clients. Transform your space
-                  with our award-winning designs.
-                </p>
-              </div>
-              <a href="#contact" className="banner-btn">
-                Claim Offer Now
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Virtual Tour Section */}
-      <VirtualTour />
-
-      {/* Testimonials Section */}
-      <Testimonials />
-
-      {/* FAQ Section */}
-      <FAQ />
-
-      {/* Contact Section */}
-      <Contact />
-
-      {/* CTA Section */}
-      <section className="cta-section">
-        <div className="cta-content">
-          <h2>Ready to Transform Your Space?</h2>
-          <p>
-            Let&apos;s create something extraordinary together. Schedule a
-            free consultation and turn your vision into a thoughtfully
-            designed reality.
-          </p>
-          <div className="cta-buttons">
-            <a href="#contact" className="btn-white">
-              Schedule Consultation
-            </a>
-            <a href="tel:+15551234567" className="btn-outline">
-              Call Us Now
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Blog */}
-      <section id="blog">
-        <div className="container">
-          <div className="section-header text-center">
-            <span className="section-tag">Our Blog</span>
-            <h2>Design Insights & Inspiration</h2>
-            <p>
-              Explore the latest trends, tips, and stories from the world of
-              interior design
-            </p>
-          </div>
-          <div className="row">
-            <div className="col-lg-4 col-md-6 mb-4">
-              <article className="blog-card">
-                <div className="blog-image">
-                  <img
-                    src="/assets/images/img(4).jpg"
-                    alt="Minimalist Living Room"
-                  />
-                  <span className="blog-category">Design Trends</span>
-                </div>
-                <div className="blog-content">
-                  <div className="blog-meta">
-                    <span>
-                      <i className="bi bi-calendar3"></i> Jan 15, 2026
-                    </span>
-                    <span>
-                      <i className="bi bi-clock"></i> 5 min read
-                    </span>
-                  </div>
-                  <h3 className="blog-title">
-                    <Link href="/blog-detail">
-                      Embracing Minimalism: Less is More in 2026
+            <div className="services-grid">
+              {features.map((feature) => (
+                <article className="service-card" key={feature.id}>
+                  <div className="service-icon" aria-hidden="true"><i className="bi bi-grid"></i></div>
+                  <h3>{feature.title}</h3>
+                  <p>{feature.description}</p>
+                  {feature.linkLabel && feature.linkHref ? (
+                    <Link href={feature.linkHref} className="service-link">
+                      {feature.linkLabel} <i className="bi bi-chevron-right" aria-hidden="true"></i>
                     </Link>
-                  </h3>
-                  <p className="blog-excerpt">
-                    Discover how minimalist design continues to evolve,
-                    creating serene spaces that prioritize function and beauty
-                    without the clutter.
-                  </p>
-                  <Link href="/blog-detail" className="blog-link">
-                    Read More <i className="bi bi-chevron-right"></i>
-                  </Link>
-                </div>
-              </article>
-            </div>
-
-            <div className="col-lg-4 col-md-6 mb-4">
-              <article className="blog-card">
-                <div className="blog-image">
-                  <img
-                    src="/assets/images/floating(3).jpg"
-                    alt="Sustainable Materials"
-                  />
-                  <span className="blog-category">Sustainability</span>
-                </div>
-                <div className="blog-content">
-                  <div className="blog-meta">
-                    <span>
-                      <i className="bi bi-calendar3"></i> Jan 10, 2026
-                    </span>
-                    <span>
-                      <i className="bi bi-clock"></i> 7 min read
-                    </span>
-                  </div>
-                  <h3 className="blog-title">
-                    <Link href="/blog-detail">
-                      Sustainable Materials: Building a Greener Home
-                    </Link>
-                  </h3>
-                  <p className="blog-excerpt">
-                    Learn about eco-friendly materials and sustainable
-                    practices that can transform your home while protecting
-                    our planet.
-                  </p>
-                  <Link href="/blog-detail" className="blog-link">
-                    Read More <i className="bi bi-chevron-right"></i>
-                  </Link>
-                </div>
-              </article>
-            </div>
-
-            <div className="col-lg-4 col-md-6 mb-4">
-              <article className="blog-card">
-                <div className="blog-image">
-                  <img
-                    src="/assets/images/img(6).jpg"
-                    alt="Color Psychology"
-                  />
-                  <span className="blog-category">Color Theory</span>
-                </div>
-                <div className="blog-content">
-                  <div className="blog-meta">
-                    <span>
-                      <i className="bi bi-calendar3"></i> Jan 5, 2026
-                    </span>
-                    <span>
-                      <i className="bi bi-clock"></i> 6 min read
-                    </span>
-                  </div>
-                  <h3 className="blog-title">
-                    <Link href="/blog-detail">
-                      The Psychology of Color in Interior Design
-                    </Link>
-                  </h3>
-                  <p className="blog-excerpt">
-                    Understand how different colors affect mood and behavior,
-                    and how to use this knowledge in your design projects.
-                  </p>
-                  <Link href="/blog-detail" className="blog-link">
-                    Read More <i className="bi bi-chevron-right"></i>
-                  </Link>
-                </div>
-              </article>
+                  ) : null}
+                </article>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
+
+      {settings.showFeaturedProducts && featuredProducts.length > 0 ? (
+        <section className="shop-section pb-5" aria-labelledby="featured-products-heading">
+          <div className="container">
+            <div className="section-header text-center">
+              {settings.featuredProductsEyebrow ? <span className="section-tag">{settings.featuredProductsEyebrow}</span> : null}
+              <h2 id="featured-products-heading">{settings.featuredProductsTitle || "Featured Products"}</h2>
+              {settings.featuredProductsDescription ? <p>{settings.featuredProductsDescription}</p> : null}
+            </div>
+            <div className="row g-4">
+              {featuredProducts.map((product) => (
+                <div className="col-xl-4 col-md-6" key={product.id}>
+                  <ProductCard product={product} />
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 text-center">
+              <Link href="/products" className="btn-primary">View All Products</Link>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {settings.showVirtualTour ? <VirtualTour /> : null}
+
+      {settings.showDealerCta && settings.dealerCtaTitle ? (
+        <section className="cta-section">
+          <div className="cta-content">
+            <h2>{settings.dealerCtaTitle}</h2>
+            {settings.dealerCtaDescription ? <p>{settings.dealerCtaDescription}</p> : null}
+            {settings.dealerCtaLabel && settings.dealerCtaHref ? (
+              <div className="cta-buttons">
+                <Link href={settings.dealerCtaHref} className="btn-white">{settings.dealerCtaLabel}</Link>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }
