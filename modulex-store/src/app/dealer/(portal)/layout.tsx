@@ -21,9 +21,10 @@ export default async function DealerPortalLayout({ children }: { children: React
       </header>
 
       <div className="container py-5">
-        <div className="mb-4">
+        <nav className="d-flex gap-3 mb-4">
           <Link href="/dealer" className="text-decoration-none small text-secondary">Dealer home</Link>
-        </div>
+          <Link href="/dealer/orders" className="text-decoration-none small text-secondary">Orders</Link>
+        </nav>
         {children}
       </div>
     </section>
