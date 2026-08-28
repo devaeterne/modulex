@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `16257885c5278fddb078a6460bd8518f5255d794`
+Main baseline: `73df18db1705324cf152722f74f8610ff384be4b`
 Current phase: **Phase 2.0 — Production Truth & Cleanup**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -53,54 +53,54 @@ These rules are mandatory for all future Modulex Store work:
 
 ## 2.0.1 Public route audit and truth cleanup
 
-- [ ] Replace or temporarily remove template content from `/about`.
+- [~] Replace or temporarily remove template content from `/about`.
   - Remove invented people, biographies, awards, unsupported company history, fake claims, and fake phone numbers.
   - Replace with verified Oakwell company content or a minimal factual page fed from approved settings/CMS data.
   - **Done when:** page contains no unsupported company claims and all contact data comes from approved source data.
 
-- [ ] Replace or remove template content from `/services`.
+- [~] Replace or remove template content from `/services`.
   - Remove generic interior-design packages and placeholder service claims that do not describe Oakwell Cabinetry.
   - Decide whether the final route should become Product Support / Dealer Support / Cabinet Solutions, or be removed from navigation.
   - **Done when:** route purpose matches the actual Oakwell business and all links resolve to real Store routes.
 
-- [ ] Replace or remove template content from `/services/residential`.
+- [~] Replace or remove template content from `/services/residential`.
   - Remove Manhattan/Brooklyn projects, fake testimonials, demo 360 links, fake phone number, and design-studio language.
   - **Done when:** route is production-truthful or permanently redirected/removed.
 
-- [ ] Replace or temporarily disable `/blog` until a real content source exists.
+- [~] Replace or temporarily disable `/blog` until a real content source exists.
   - Remove fake articles, dates, categories, duplicate cards, placeholder pagination, and dead links.
   - **Done when:** route either renders real published content or returns a deliberate redirect/not-found behavior.
 
-- [ ] Replace or temporarily disable `/blog/[slug]` demo content.
+- [~] Replace or temporarily disable `/blog/[slug]` demo content.
   - Remove fake author profiles, comments, categories, recent posts, forms, and placeholder social links.
   - **Done when:** only real published article content can resolve a slug.
 
-- [ ] Replace Gallery template dataset with approved Oakwell project/media content.
+- [~] Replace Gallery template dataset with approved Oakwell project/media content.
   - Remove invented project names/categories/locations and fake CTA phone number.
   - Preserve lightbox behavior only for real media.
   - **Done when:** every visible gallery item maps to approved source data.
 
-- [ ] Audit and remove legacy/demo routes such as `/index-premium` and any other unused template variants.
+- [~] Audit and remove legacy/demo routes such as `/index-premium` and any other unused template variants.
   - Prefer deletion or permanent redirect over leaving discoverable stale pages.
   - **Done when:** no demo marketing page can be reached from a normal URL without an intentional redirect/not-found.
 
-- [ ] Remove all production placeholders across Store.
+- [~] Remove all production placeholders across Store.
   - Search for `+1555`, `href="#"`, `.html` legacy links, fake offers, demo author/testimonial names, and template-only copy.
   - **Done when:** automated contract test passes with zero blocked placeholder patterns.
 
 ## 2.0.2 Indexing and route exposure hardening
 
-- [ ] Review sitemap routes after public cleanup.
+- [~] Review sitemap routes after public cleanup.
   - Only include production-ready public routes.
   - Exclude disabled Blog/Services/Gallery routes if they are not production-ready.
 
-- [ ] Harden `robots.ts` for portal/auth namespaces.
+- [~] Harden `robots.ts` for portal/auth namespaces.
   - Explicitly disallow `/dealer/`, `/account/`, and `/api/`.
   - Keep route-level `noindex` metadata as a second layer.
 
 - [ ] Verify all Customer and Dealer auth/portal layouts have `noindex, nofollow` coverage.
 
-- [ ] Add a public-production content contract.
+- [~] Add a public-production content contract.
   - Fail on fake phone numbers, placeholder `href="#"`, legacy `.html` links, known demo names/claims, or accidentally indexable portal routes.
   - Add it to `npm run smoke`.
 
@@ -503,12 +503,13 @@ The items below are already present in the current Store architecture. Keep them
 
 # Next Action
 
-Start with **Phase 2.0 — Production Truth & Cleanup**.
+Verify the **Phase 2.0 production-truth cleanup package** on branch `fix/store-production-truth-cleanup`.
 
-Recommended first implementation package:
+Required verification before marking the in-progress items complete:
 
-1. Add the public-production content contract.
-2. Remove/disable demo routes and placeholder links.
-3. Replace `/about` with a minimal factual Oakwell page using existing company profile data.
-4. Decide temporary treatment for `/services`, `/blog`, and `/gallery` until their CMS-backed replacements are ready.
-5. Rebuild sitemap/robots coverage and run full Store verification.
+1. Run `npm run smoke:public-production` and confirm the new contract passes.
+2. Run full `npm run smoke`.
+3. Run `npm run lint`.
+4. Run `npm run build`.
+5. Verify the preview deployment returns deliberate not-found behavior for disabled demo routes and that `/about`, navigation, sitemap, and robots are production-safe.
+6. After verification, mark the completed Phase 2.0 items `[x]` and continue with the remaining portal `noindex, nofollow` audit.
