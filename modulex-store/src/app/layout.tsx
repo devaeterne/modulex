@@ -56,18 +56,18 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  let company = null;
-  let marketing = null;
-  let siteSettings = null;
+  const [companyResult, marketingResult, siteSettingsResult] = await Promise.allSettled([
+    getStorePublicCompanyProfile(),
+    getStoreMarketingSettings(),
+    getStoreSiteSettings(),
+  ]);
 
-  try {
-    [company, marketing, siteSettings] = await Promise.all([
-      getStorePublicCompanyProfile(),
-      getStoreMarketingSettings(),
-      getStoreSiteSettings(),
-    ]);
-  } catch (error) {
-    console.error("Unable to load public Store shell settings", error);
+  const company = companyResult.status === "fulfilled" ? companyResult.value : null;
+  const marketing = marketingResult.status === "fulfilled" ? marketingResult.value : null;
+  const siteSettings = siteSettingsResult.status === "fulfilled" ? siteSettingsResult.value : null;
+
+  if (companyResult.status === "rejected" || marketingResult.status === "rejected" || siteSettingsResult.status === "rejected") {
+    console.error("Unable to load one or more public Store shell settings");
   }
 
   return (
