@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "npm run smoke",
-    "smoke": "node scripts/smoke.mjs",
+    "smoke": "npm run smoke:client && npm run smoke:api",
+    "smoke:client": "node scripts/client-smoke.mjs",
+    "smoke:api": "node scripts/smoke.mjs",
     "export": "next build"
   },
   "dependencies": {
