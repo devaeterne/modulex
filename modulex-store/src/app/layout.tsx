@@ -1,27 +1,23 @@
-import { Suspense } from "react";
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
-import "@/css/locomotive-scroll.min.css";
 import "@/css/bootstrap.min.css";
 import "@/css/bootstrap-icons.css";
 import "@/css/style.css";
 import "@/css/media-queries.css";
 import "@/css/dark-mode.css";
 import "@/css/panorama.css";
-import Preloader from "@/components/Preloader";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BackToTop from "@/components/BackToTop";
 import ThemeToggle from "@/components/ThemeToggle";
 import GalleryLightbox from "@/components/GalleryLightbox";
-import SmoothScroll from "@/components/SmoothScroll";
-import { getSiteUrl, siteConfig } from "@/config/site";
+import { siteConfig } from "@/config/site";
 
 export const metadata: Metadata = {
-  metadataBase: getSiteUrl(),
+  metadataBase: new URL(siteConfig.url),
   title: {
-    default: "Oakwell Cabinetry",
-    template: "%s | Oakwell Cabinetry",
+    default: siteConfig.name,
+    template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
   applicationName: siteConfig.name,
@@ -30,15 +26,14 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    locale: siteConfig.locale,
-    url: "/",
     siteName: siteConfig.name,
-    title: "Oakwell Cabinetry",
+    title: siteConfig.name,
     description: siteConfig.description,
+    url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Oakwell Cabinetry",
+    title: siteConfig.name,
     description: siteConfig.description,
   },
   robots: {
@@ -54,36 +49,22 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  themeColor: "#ffffff",
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang={siteConfig.language}>
+    <html lang="en">
       <body>
-        <Suspense fallback={null}>
-          <Preloader />
-        </Suspense>
         <Navbar />
-        <Suspense fallback={null}>
-          <SmoothScroll />
-        </Suspense>
-        <main data-scroll-container>
+        <main>
           {children}
           <Footer />
         </main>
         <BackToTop />
         <GalleryLightbox />
-        <Suspense fallback={null}>
-          <ThemeToggle />
-        </Suspense>
+        <ThemeToggle />
       </body>
     </html>
   );
