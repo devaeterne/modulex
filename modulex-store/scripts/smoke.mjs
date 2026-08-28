@@ -197,7 +197,7 @@ const failed = checks.filter((item) => !item.ok);
 console.log(`\nResult: ${checks.length - failed.length}/${checks.length} checks passed.`);
 if (failed.length) {
   console.error("Failed checks:");
-  for (const item of failed) console.error(` - ${item.name}: ${item.detail}`));
+  for (const item of failed) console.error(` - ${item.name}: ${item.detail}`);
   process.exit(1);
 }
 
