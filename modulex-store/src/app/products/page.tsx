@@ -82,8 +82,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 </h2>
                 <p className="mb-0">
                   Browse published Oakwell product families and their available
-                  finish variants. Product availability and specifications are
-                  managed centrally through Modulex.
+                  finish variants. Product information and specifications are
+                  maintained by Oakwell Cabinetry.
                 </p>
               </div>
             </div>
@@ -125,7 +125,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
               <p className="text-muted mb-4">
                 {query
                   ? `No published products matched “${query}”.`
-                  : "Products will appear here as they are reviewed and published from the admin platform."}
+                  : "Products will appear here as catalog content is reviewed and published."}
               </p>
               {query && (
                 <Link href="/products" className="btn-link">
