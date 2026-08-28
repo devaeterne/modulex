@@ -8,6 +8,7 @@ on:
 env:
   NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
+  NEXT_PUBLIC_SITE_URL: https://oakwell-phi.vercel.app
 
 jobs:
   store:
@@ -25,4 +26,21 @@ jobs:
         run: npx eslint src/components/ThemeToggle.tsx src/components/StoreChrome.tsx src/components/portal src/app/account src/app/dealer src/app/layout.tsx
       - name: Store production build
         working-directory: modulex-store
+        run: npm run build
+
+  admin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Admin install
+        working-directory: modulex-admin
+        run: npm ci
+      - name: Admin portal contracts
+        working-directory: modulex-admin
+        run: npm run smoke:store-portal-admin
+      - name: Admin P1.5 scoped lint
+        working-directory: modulex-admin
+        run: npx eslint src/components/customers/CustomerDocumentsPanel.tsx src/app/'(admin)'/customers/'[id]'/page.tsx src/lib/customers/types.ts
+      - name: Admin production build
+        working-directory: modulex-admin
         run: npm run build
