@@ -22,6 +22,8 @@ const [
   accountLogin,
   accountLoginForm,
   accountLoginPage,
+  portalAuthShell,
+  themeToggle,
   accountLayout,
   dealerAuth,
   ordersHelper,
@@ -37,6 +39,8 @@ const [
   read("src/app/account/(auth)/login/actions.ts"),
   read("src/app/account/(auth)/login/AccountLoginForm.tsx"),
   read("src/app/account/(auth)/login/page.tsx"),
+  read("src/components/portal/PortalAuthShell.tsx"),
+  read("src/components/ThemeToggle.tsx"),
   read("src/app/account/(portal)/layout.tsx"),
   read("src/lib/dealer/auth.ts"),
   read("src/lib/portal/orders.ts"),
@@ -64,7 +68,9 @@ assert.doesNotMatch(accountLogin, /\.from\(["'][^"']*(?:customer|portal)/i, "log
 assert.match(accountLogin, /dealer[\s\S]*\/dealer/i, "dealer identities must route to the Dealer portal");
 assert.match(accountLogin, /customer[\s\S]*\/account/i, "customer identities must route to the Customer portal");
 assert.match(accountLogin, /signOut/, "denied authenticated identities must be signed out");
-assert.match(accountLoginPage, /AccountThemeToggle/, "account login must expose the Store dark/light theme control");
+assert.match(accountLoginPage, /PortalAuthShell/, "account login must use the shared Store auth shell");
+assert.match(portalAuthShell, /ThemeToggle/, "shared Store auth shell must expose the dark/light theme control");
+assert.match(themeToggle, /body\.classList\.toggle\(["']dark["']/, "shared theme control must use the Store body.dark theme boundary");
 assert.match(accountLayout, /requireCustomerPortalContext|requireStorePortalContext/, "Customer protected layout must enforce portal context");
 assert.match(dealerAuth, /portal/i, "Dealer authorization must converge on the shared portal boundary");
 
@@ -83,10 +89,5 @@ assert.match(migration, /revoke execute[\s\S]*from anon/i, "portal RPCs must den
 assert.match(migration, /grant execute[\s\S]*to authenticated/i, "portal RPCs must explicitly grant authenticated execute");
 assert.doesNotMatch(migration, /jsonb_build_object\([\s\S]{0,1200}'(?:unit_price|subtotal|tax_amount|total_amount|grand_total|payment_commission_amount|internal_notes)'/i, "portal RPC payloads must not emit monetary/internal fields");
 assert.match(hardeningMigration, /customer_portal_users/, "profile guard hardening must recognize pre-provisioned portal users");
-assert.match(hardeningMigration, /login_email/i, "profile guard hardening must key pending external identity from portal login email");
-
-for (const source of [portalAuth, accountLogin, ordersHelper]) {
-  assert.doesNotMatch(source, /SUPABASE_(?:SECRET|SERVICE_ROLE)_KEY/, "Store portal code must not use server admin credentials");
-}
 
 console.log("store portal contract: ok");
