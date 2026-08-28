@@ -81,9 +81,7 @@ export default function Navbar({
           <li className="nav-item home-dd"><Link className="nav-link" href="/" onClick={handleLinkClick}>Home</Link></li>
           <li className="nav-item about-dd"><Link className="nav-link" href="/about" onClick={handleLinkClick}>About</Link></li>
           <li className="nav-item"><Link className="nav-link" href="/products" onClick={handleLinkClick}>Products</Link></li>
-          <li className="nav-item services-dd"><Link className="nav-link" href="/services" onClick={handleLinkClick}>Services</Link></li>
           <li className="nav-item"><Link className="nav-link" href="/gallery" onClick={handleLinkClick}>Gallery</Link></li>
-          <li className="nav-item nav-new-dd"><Link className="nav-link" href="/blog" onClick={handleLinkClick}>Blog</Link></li>
         </ul>
 
         <Link href="/contact" className="cta-nav" onClick={handleLinkClick}>Contact Us</Link>
