@@ -79,85 +79,117 @@ update dealer_smoke_ctx
 set result = public.convert_store_dealer_lead_to_customer(lead_id)
 where fixture = 'approved_dealer';
 
-select 1 / case when (
-  select result->>'ok' = 'true'
-     and result->>'created' = 'true'
-     and result->>'reason' = 'converted'
-     and coalesce(result->>'customer_id', '') <> ''
-  from dealer_smoke_ctx where fixture = 'approved_dealer'
-) then 1 else 0 end as "PASS approved dealer converts";
+do $$
+begin
+  if not (
+    select result->>'ok' = 'true'
+       and result->>'created' = 'true'
+       and result->>'reason' = 'converted'
+       and coalesce(result->>'customer_id', '') <> ''
+    from dealer_smoke_ctx where fixture = 'approved_dealer'
+  ) then
+    raise exception 'approved dealer conversion failed';
+  end if;
 
-select 1 / case when exists (
-  select 1
-  from dealer_smoke_ctx s
-  join public.store_leads l on l.id = s.lead_id
-  join public.customers c on c.id = l.converted_customer_id
-  join public.customer_types ct on ct.id = c.customer_type_id
-  where s.fixture = 'approved_dealer'
-    and l.status = 'closed'
-    and ct.system_key = 'dealer'
-    and c.status = 'prospect'
-    and c.portal_enabled = false
-) then 1 else 0 end as "PASS dealer customer remains portal disabled";
+  if not exists (
+    select 1
+    from dealer_smoke_ctx s
+    join public.store_leads l on l.id = s.lead_id
+    join public.customers c on c.id = l.converted_customer_id
+    join public.customer_types ct on ct.id = c.customer_type_id
+    where s.fixture = 'approved_dealer'
+      and l.status = 'closed'
+      and ct.system_key = 'dealer'
+      and c.status = 'prospect'
+      and c.portal_enabled = false
+  ) then
+    raise exception 'dealer customer contract failed';
+  end if;
 
-select 1 / case when exists (
-  select 1
-  from dealer_smoke_ctx s
-  join public.store_leads l on l.id = s.lead_id
-  join public.customer_contacts cc on cc.customer_id = l.converted_customer_id
-  where s.fixture = 'approved_dealer'
-    and cc.is_primary = true
-    and cc.is_order_contact = true
-) then 1 else 0 end as "PASS primary dealer contact created";
+  if not exists (
+    select 1
+    from dealer_smoke_ctx s
+    join public.store_leads l on l.id = s.lead_id
+    join public.customer_contacts cc on cc.customer_id = l.converted_customer_id
+    where s.fixture = 'approved_dealer'
+      and cc.is_primary = true
+      and cc.is_order_contact = true
+  ) then
+    raise exception 'primary dealer contact was not created';
+  end if;
 
-select 1 / case when exists (
-  select 1
-  from dealer_smoke_ctx s
-  join public.store_lead_activity a on a.lead_id = s.lead_id
-  where s.fixture = 'approved_dealer'
-    and a.action = 'converted_to_customer'
-    and a.to_status = 'closed'
-) then 1 else 0 end as "PASS lead conversion activity logged";
+  if not exists (
+    select 1
+    from dealer_smoke_ctx s
+    join public.store_lead_activity a on a.lead_id = s.lead_id
+    where s.fixture = 'approved_dealer'
+      and a.action = 'converted_to_customer'
+      and a.to_status = 'closed'
+  ) then
+    raise exception 'lead conversion activity was not logged';
+  end if;
 
-select 1 / case when exists (
-  select 1
-  from dealer_smoke_ctx s
-  join public.store_leads l on l.id = s.lead_id
-  join public.customer_activity a on a.customer_id = l.converted_customer_id
-  where s.fixture = 'approved_dealer'
-    and a.activity_type = 'created_from_dealer_application'
-) then 1 else 0 end as "PASS customer origin activity logged";
+  if not exists (
+    select 1
+    from dealer_smoke_ctx s
+    join public.store_leads l on l.id = s.lead_id
+    join public.customer_activity a on a.customer_id = l.converted_customer_id
+    where s.fixture = 'approved_dealer'
+      and a.activity_type = 'created_from_dealer_application'
+  ) then
+    raise exception 'customer origin activity was not logged';
+  end if;
+end
+$$;
 
 update dealer_smoke_ctx
 set result = public.convert_store_dealer_lead_to_customer(lead_id)
 where fixture = 'approved_dealer';
 
-select 1 / case when (
-  select result->>'ok' = 'true'
-     and result->>'created' = 'false'
-     and result->>'reason' = 'already_converted'
-  from dealer_smoke_ctx where fixture = 'approved_dealer'
-) then 1 else 0 end as "PASS conversion is idempotent";
+do $$
+begin
+  if not (
+    select result->>'ok' = 'true'
+       and result->>'created' = 'false'
+       and result->>'reason' = 'already_converted'
+    from dealer_smoke_ctx where fixture = 'approved_dealer'
+  ) then
+    raise exception 'dealer conversion is not idempotent';
+  end if;
+end
+$$;
 
 update dealer_smoke_ctx
 set result = public.convert_store_dealer_lead_to_customer(lead_id)
 where fixture = 'unapproved_dealer';
 
-select 1 / case when (
-  select result->>'ok' = 'false'
-     and result->>'reason' = 'lead_not_approved'
-  from dealer_smoke_ctx where fixture = 'unapproved_dealer'
-) then 1 else 0 end as "PASS unapproved dealer rejected";
+do $$
+begin
+  if not (
+    select result->>'ok' = 'false'
+       and result->>'reason' = 'lead_not_approved'
+    from dealer_smoke_ctx where fixture = 'unapproved_dealer'
+  ) then
+    raise exception 'unapproved dealer guard failed';
+  end if;
+end
+$$;
 
 update dealer_smoke_ctx
 set result = public.convert_store_dealer_lead_to_customer(lead_id)
 where fixture = 'approved_contact';
 
-select 1 / case when (
-  select result->>'ok' = 'false'
-     and result->>'reason' = 'not_dealer_application'
-  from dealer_smoke_ctx where fixture = 'approved_contact'
-) then 1 else 0 end as "PASS contact lead rejected";
+do $$
+begin
+  if not (
+    select result->>'ok' = 'false'
+       and result->>'reason' = 'not_dealer_application'
+    from dealer_smoke_ctx where fixture = 'approved_contact'
+  ) then
+    raise exception 'lead type guard failed';
+  end if;
+end
+$$;
 
 rollback;
 \echo '=== Controlled dealer onboarding DB smoke PASS ==='
