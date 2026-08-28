@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import TrackedLink from "@/components/analytics/TrackedLink";
 import LeadForm from "@/components/leads/LeadForm";
 import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
 
@@ -72,7 +73,11 @@ export default async function Contact() {
                 <div className="service-card h-100">
                   <div className="service-icon" aria-hidden="true"><i className="bi bi-envelope"></i></div>
                   <h3>Email</h3>
-                  <p><a href={`mailto:${company.email}`}>{company.email}</a></p>
+                  <p>
+                    <TrackedLink href={`mailto:${company.email}`} event="email_click" payload={{ context: "contact_page" }}>
+                      {company.email}
+                    </TrackedLink>
+                  </p>
                 </div>
               </div>
             ) : null}
@@ -82,7 +87,11 @@ export default async function Contact() {
                 <div className="service-card h-100">
                   <div className="service-icon" aria-hidden="true"><i className="bi bi-telephone"></i></div>
                   <h3>Phone</h3>
-                  <p><a href={phoneHref(company.phone)}>{company.phone}</a></p>
+                  <p>
+                    <TrackedLink href={phoneHref(company.phone)} event="phone_click" payload={{ context: "contact_page" }}>
+                      {company.phone}
+                    </TrackedLink>
+                  </p>
                 </div>
               </div>
             ) : null}

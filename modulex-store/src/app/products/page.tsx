@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import AnalyticsEventOnView from "@/components/analytics/AnalyticsEventOnView";
+import TrackedLink from "@/components/analytics/TrackedLink";
 import ProductCard from "@/components/products/ProductCard";
 import { getAllStoreCatalogProducts } from "@/lib/store/products/queries";
 import type { StoreCatalogProduct } from "@/lib/store/products/types";
@@ -27,6 +29,12 @@ interface ProductsPageProps {
   }>;
 }
 
+function analyticsSearchTerm(query: string) {
+  if (!query) return "";
+  const normalized = query.slice(0, 80);
+  return /^[a-z0-9 _.-]+$/i.test(normalized) ? normalized : "redacted";
+}
+
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {
   const resolvedSearchParams = await searchParams;
   const query =
@@ -49,6 +57,16 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
   return (
     <>
+      {query ? (
+        <AnalyticsEventOnView
+          event="search"
+          payload={{
+            search_term: analyticsSearchTerm(query),
+            result_count: products.length,
+          }}
+        />
+      ) : null}
+
       <section className="page-header">
         <div
           className="header-bg-image"
@@ -166,9 +184,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             and dealer support.
           </p>
           <div className="cta-buttons">
-            <Link href="/contact" className="btn-white">
+            <TrackedLink
+              href="/contact"
+              className="btn-white"
+              event="contact_click"
+              payload={{ context: "products_page_cta" }}
+            >
               Contact Us
-            </Link>
+            </TrackedLink>
           </div>
         </div>
       </section>

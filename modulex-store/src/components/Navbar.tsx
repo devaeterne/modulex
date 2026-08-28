@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { pushAnalyticsEvent } from "@/lib/analytics/events";
 
 export default function Navbar({
   companyName = "Oakwell Cabinetry",
@@ -66,6 +67,11 @@ export default function Navbar({
     setIsMobileOpen(false);
   };
 
+  const handleContactClick = () => {
+    pushAnalyticsEvent("contact_click", { context: "navbar" });
+    handleLinkClick();
+  };
+
   const lightLogo = logoUrl || "/assets/images/logo.png";
   const darkLogo = logoUrl || "/assets/images/logo-white.png";
 
@@ -85,7 +91,7 @@ export default function Navbar({
           <li className="nav-item"><Link className="nav-link" href="/dealers/apply" onClick={handleLinkClick}>Dealers</Link></li>
         </ul>
 
-        <Link href="/contact" className="cta-nav" onClick={handleLinkClick}>Contact Us</Link>
+        <Link href="/contact" className="cta-nav" onClick={handleContactClick}>Contact Us</Link>
         <button
           type="button"
           className={`burger-menu ${isMobileOpen ? "open" : ""}`}

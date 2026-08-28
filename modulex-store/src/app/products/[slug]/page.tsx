@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AnalyticsEventOnView from "@/components/analytics/AnalyticsEventOnView";
+import TrackedLink from "@/components/analytics/TrackedLink";
 import { siteConfig } from "@/config/site";
 import { getStoreProductBySlug } from "@/lib/store/products/queries";
 import type { StoreProductDetail } from "@/lib/store/products/types";
@@ -129,6 +131,15 @@ export default async function ProductDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c"),
+        }}
+      />
+      <AnalyticsEventOnView
+        event="product_view"
+        payload={{
+          product_code: product.baseProductCode,
+          product_name: product.displayName,
+          product_category: product.category,
+          product_brand: product.brand,
         }}
       />
 
@@ -265,9 +276,14 @@ export default async function ProductDetailPage({
                 </div>
 
                 <div className="d-grid gap-2">
-                  <Link href="/contact" className="btn btn-dark py-3">
+                  <TrackedLink
+                    href="/contact"
+                    className="btn btn-dark py-3"
+                    event="contact_click"
+                    payload={{ context: "product_detail", product_code: product.baseProductCode }}
+                  >
                     Request Product Information
-                  </Link>
+                  </TrackedLink>
                   <Link href="/products" className="btn btn-outline-secondary py-3">
                     Back to Products
                   </Link>
@@ -284,15 +300,20 @@ export default async function ProductDetailPage({
                   <div className="row g-3">
                     {documents.map((document) => (
                       <div className="col-lg-4 col-md-6" key={document.id}>
-                        <a
+                        <TrackedLink
                           href={document.url}
                           className="d-flex justify-content-between align-items-center border rounded-3 p-3 text-decoration-none text-dark"
                           target="_blank"
                           rel="noopener noreferrer"
+                          event="catalog_download"
+                          payload={{
+                            product_code: product.baseProductCode,
+                            document_title: document.title || "Product document",
+                          }}
                         >
                           <span>{document.title || "Product document"}</span>
                           <span aria-hidden="true">↗</span>
-                        </a>
+                        </TrackedLink>
                       </div>
                     ))}
                   </div>
@@ -311,9 +332,14 @@ export default async function ProductDetailPage({
             or dealer assistance for this product.
           </p>
           <div className="cta-buttons">
-            <Link href="/contact" className="btn-white">
+            <TrackedLink
+              href="/contact"
+              className="btn-white"
+              event="contact_click"
+              payload={{ context: "product_detail_cta", product_code: product.baseProductCode }}
+            >
               Contact Us
-            </Link>
+            </TrackedLink>
           </div>
         </div>
       </section>

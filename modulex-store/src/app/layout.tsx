@@ -11,9 +11,11 @@ import Footer from "@/components/Footer";
 import BackToTop from "@/components/BackToTop";
 import ThemeToggle from "@/components/ThemeToggle";
 import GalleryLightbox from "@/components/GalleryLightbox";
+import AnalyticsProvider from "@/components/analytics/AnalyticsProvider";
 import JsonLd from "@/components/seo/JsonLd";
 import { siteConfig } from "@/config/site";
 import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
+import { getStoreMarketingSettings } from "@/lib/store/marketing/queries";
 import {
   createOrganizationJsonLd,
   createWebSiteJsonLd,
@@ -58,15 +60,21 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   let company = null;
+  let marketing = null;
+
   try {
-    company = await getStorePublicCompanyProfile();
+    [company, marketing] = await Promise.all([
+      getStorePublicCompanyProfile(),
+      getStoreMarketingSettings(),
+    ]);
   } catch (error) {
-    console.error("Unable to load public company branding", error);
+    console.error("Unable to load public Store shell settings", error);
   }
 
   return (
     <html lang={siteConfig.language}>
       <body>
+        <AnalyticsProvider settings={marketing} />
         <JsonLd data={[createOrganizationJsonLd(), createWebSiteJsonLd()]} />
         <Navbar companyName={company?.companyName || siteConfig.name} logoUrl={company?.logoUrl} />
         <main>{children}</main>
