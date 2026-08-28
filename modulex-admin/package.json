@@ -8,13 +8,14 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "npm run smoke",
-    "smoke": "npm run smoke:rbac && npm run smoke:api && npm run smoke:phase1 && npm run smoke:db && npm run smoke:db:phase1 && npm run smoke:dealer-onboarding",
+    "smoke": "npm run smoke:rbac && npm run smoke:api && npm run smoke:phase1 && npm run smoke:db && npm run smoke:db:phase1 && npm run smoke:dealer-onboarding && npm run smoke:dealer-onboarding:db",
     "smoke:rbac": "node scripts/rbac-smoke.mjs",
     "smoke:api": "node scripts/api-smoke.mjs",
     "smoke:phase1": "node scripts/phase1-api-smoke.mjs",
     "smoke:db": "node scripts/run-db-smoke.mjs",
     "smoke:db:phase1": "node scripts/run-phase1-db-smoke.mjs",
-    "smoke:dealer-onboarding": "node scripts/dealer-onboarding-contract.mjs"
+    "smoke:dealer-onboarding": "node scripts/dealer-onboarding-contract.mjs",
+    "smoke:dealer-onboarding:db": "node scripts/run-dealer-onboarding-db-smoke.mjs"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
@@ -32,7 +33,7 @@
     "autoprefixer": "^10.4.22",
     "dotenv": "^17.4.2",
     "flatpickr": "^4.6.13",
-    "html5-qrcode": "^2.3.8",
+    "html5-qrcode": "^1.5.4",
     "next": "^16.1.6",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
