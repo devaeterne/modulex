@@ -1,0 +1,24 @@
+name: P1.3 Live Smoke Harness Verification
+
+on:
+  push:
+    branches:
+      - phase-1/dealer-login-protected-shell
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live-smoke-harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install Admin
+        working-directory: modulex-admin
+        run: npm ci
+      - name: Lint live smoke harness
+        working-directory: modulex-admin
+        run: npx eslint scripts/dealer-portal-auth-live-smoke.mjs
