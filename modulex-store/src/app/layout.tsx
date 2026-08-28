@@ -3,6 +3,7 @@ import "./globals.css";
 import "./portal.css";
 import "./portal-forms.css";
 import "./portal-fulfillment.css";
+import "./portal-dealer.css";
 import "@/css/bootstrap.min.css";
 import "@/css/bootstrap-icons.css";
 import "@/css/style.css";
