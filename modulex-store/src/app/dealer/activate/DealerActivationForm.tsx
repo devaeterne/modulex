@@ -52,7 +52,7 @@ export default function DealerActivationForm() {
       return;
     }
 
-    if (!token || type !== "invite") {
+    if (!token || type !== "recovery") {
       setMessage("Open the activation link from your dealer invitation email.");
       setState("error");
       return;
