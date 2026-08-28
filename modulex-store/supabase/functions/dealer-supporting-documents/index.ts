@@ -10,13 +10,19 @@ function json(body: Record<string, unknown>, status: number) {
 }
 
 function secretKey() {
-  const current = Deno.env.get("SUPABASE_SECRET_KEYS");
-  if (current) {
-    const keys = JSON.parse(current) as Record<string, string>;
-    if (keys.default) return keys.default;
-  }
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (legacy) return legacy;
+
+  const current = Deno.env.get("SUPABASE_SECRET_KEYS");
+  if (current) {
+    try {
+      const keys = JSON.parse(current) as Record<string, unknown>;
+      if (typeof keys.default === "string" && keys.default) return keys.default;
+    } catch {
+      // Ignore unknown/new secret serialization formats and fall through safely.
+    }
+  }
+
   throw new Error("Supabase server secret is unavailable");
 }
 
