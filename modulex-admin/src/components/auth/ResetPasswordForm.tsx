@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 
 export default function ResetPasswordForm() {
   const router = useRouter();
+  const [tokenHash, setTokenHash] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [ready, setReady] = useState(false);
@@ -14,32 +15,30 @@ export default function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let mounted = true;
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const token = params.get("token_hash") || "";
+    const type = params.get("type") || "";
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (mounted) {
-        setReady(Boolean(data.session));
-      }
-    });
+    window.history.replaceState({}, "", window.location.pathname);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || session) {
-        setReady(true);
-      }
-    });
+    if (token && type === "recovery") {
+      setTokenHash(token);
+      setReady(true);
+      return;
+    }
 
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    setError("Open this page from a valid password reset email.");
   }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setMessage(null);
+
+    if (!tokenHash) {
+      setError("This password reset link is invalid or expired.");
+      return;
+    }
 
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
@@ -52,18 +51,40 @@ export default function ResetPasswordForm() {
     }
 
     setBusy(true);
+    let verifiedSession = false;
 
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    try {
+      const { data: verified, error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: "recovery",
+      });
 
-    if (updateError) {
-      setError(updateError.message);
+      if (verifyError || !verified.user) {
+        throw new Error("This password reset link is invalid or expired.");
+      }
+
+      verifiedSession = true;
+
+      if (verified.user.app_metadata?.account_type === "dealer_portal") {
+        throw new Error("This password reset link cannot be used here.");
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) throw updateError;
+
+      setMessage("Password updated successfully. Redirecting to sign in...");
+      await supabase.auth.signOut({ scope: "global" });
+      router.replace("/signin");
+    } catch (caught) {
+      if (verifiedSession) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      }
+      setTokenHash("");
+      setReady(false);
+      setError(caught instanceof Error ? caught.message : "Unable to update password.");
+    } finally {
       setBusy(false);
-      return;
     }
-
-    setMessage("Password updated successfully. Redirecting to sign in...");
-    await supabase.auth.signOut();
-    router.replace("/signin");
   }
 
   return (
@@ -76,12 +97,6 @@ export default function ResetPasswordForm() {
           Choose a new password for your Modulex account.
         </p>
 
-        {!ready && (
-          <div className="mt-6 rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-            Open this page from a valid invitation or password reset email.
-          </div>
-        )}
-
         {error && (
           <div className="mt-6 rounded-lg border border-error-200 bg-error-50 p-4 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">
             {error}
@@ -89,7 +104,7 @@ export default function ResetPasswordForm() {
         )}
 
         {message && (
-          <div className="mt-6 rounded-lg border border-success-200 bg-success-50 p-4 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">
+          <div className="mt-6 rounded-lg border border-success-200 bg-success-50 p-4 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
             {message}
           </div>
         )}
