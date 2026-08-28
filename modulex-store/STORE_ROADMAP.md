@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `73df18db1705324cf152722f74f8610ff384be4b`
+Main baseline: `ed30e1bdd3807a21f2f9da2389df8549b3a45d05`
 Current phase: **Phase 2.0 — Production Truth & Cleanup**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -25,7 +25,7 @@ These rules are mandatory for all future Modulex Store work:
    - task checkboxes
    - blockers/decisions
    - `Next Action`
-10. If a change spans Store and Admin, **both `modulex-store/STORE_ROADMAP.md` and `modulex-admin/ADMIN_ROADMAP.md` must be reviewed and updated where affected**.
+10. If a change spans Store and Admin, **both `modulex-admin/ADMIN_ROADMAP.md` and `modulex-store/STORE_ROADMAP.md` must be reviewed and updated where affected**.
 
 ## Status Legend
 
@@ -98,7 +98,9 @@ These rules are mandatory for all future Modulex Store work:
   - Explicitly disallow `/dealer/`, `/account/`, and `/api/`.
   - Keep route-level `noindex` metadata as a second layer.
 
-- [ ] Verify all Customer and Dealer auth/portal layouts have `noindex, nofollow` coverage.
+- [~] Verify all Customer and Dealer auth/portal layouts have `noindex, nofollow` coverage.
+  - Dealer namespace already has root `noindex, nofollow` metadata.
+  - Customer `/account/*` root metadata is being added on `fix/store-account-noindex` and enforced by the public-production contract.
 
 - [~] Add a public-production content contract.
   - Fail on fake phone numbers, placeholder `href="#"`, legacy `.html` links, known demo names/claims, or accidentally indexable portal routes.
@@ -109,8 +111,8 @@ These rules are mandatory for all future Modulex Store work:
 - [ ] `npm run lint` passes.
 - [ ] `npm run build` passes.
 - [ ] `npm run smoke` passes.
-- [ ] Public route crawl shows no fake/demo content.
-- [ ] Sitemap contains only production-approved routes.
+- [~] Public route crawl shows no fake/demo content.
+- [x] Sitemap contains only production-approved routes.
 
 ---
 
@@ -503,13 +505,20 @@ The items below are already present in the current Store architecture. Keep them
 
 # Next Action
 
-Verify the **Phase 2.0 production-truth cleanup package** on branch `fix/store-production-truth-cleanup`.
+Verify the **Phase 2.0 portal indexing follow-up** on branch `fix/store-account-noindex`.
 
-Required verification before marking the in-progress items complete:
+Production verification already completed for merged PR #88 / main `ed30e1bdd3807a21f2f9da2389df8549b3a45d05`:
+- Vercel production build and TypeScript completed successfully.
+- `/about` returns the factual company-profile-backed page.
+- `/sitemap.xml` contains only approved public routes.
+- `/robots.txt` disallows `/api/`, `/account/`, and `/dealer/`.
+- disabled `/gallery`, `/services`, and `/blog` routes return deliberate 404 responses.
 
-1. Run `npm run smoke:public-production` and confirm the new contract passes.
+Required verification for the follow-up before closing Phase 2.0 items:
+
+1. Run `npm run smoke:public-production` and confirm account/dealer route-level robots metadata is enforced.
 2. Run full `npm run smoke`.
 3. Run `npm run lint`.
 4. Run `npm run build`.
-5. Verify the preview deployment returns deliberate not-found behavior for disabled demo routes and that `/about`, navigation, sitemap, and robots are production-safe.
-6. After verification, mark the completed Phase 2.0 items `[x]` and continue with the remaining portal `noindex, nofollow` audit.
+5. Deploy and verify `/account/login` and `/dealer/login` emit `noindex, nofollow` metadata.
+6. Mark verified Phase 2.0 tasks `[x]`; only then move the primary workstream to Phase 2.1.
