@@ -1,3 +1,5 @@
+import "server-only";
+
 type PublicRpcBody = Record<string, unknown>;
 
 type PublicRpcOptions = {
