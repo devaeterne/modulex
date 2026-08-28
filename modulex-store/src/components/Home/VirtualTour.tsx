@@ -20,14 +20,13 @@ export default function VirtualTour() {
           </div>
           <div className="col-lg-12 tour-container">
             <div className="tour-main">
-              <div className="tour-video" style={{ position: "relative" }}>
+              <div className="tour-video">
                 <Image
                   src="/assets/images/img(5).jpg"
                   alt="Virtual Tour Preview"
                   width={1600}
                   height={900}
                   sizes="(max-width: 991px) 100vw, 92vw"
-                  style={{ width: "100%", height: "auto" }}
                 />
                 <button
                   type="button"
