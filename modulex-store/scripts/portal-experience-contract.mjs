@@ -25,9 +25,7 @@ for (const file of [
   "src/app/dealer/(auth)/forgot-password/page.tsx",
   "src/app/dealer/(auth)/reset-password/page.tsx",
   "src/app/dealer/activate/page.tsx",
-]) {
-  assert.match(read(file), /PortalAuthShell/);
-}
+]) assert.match(read(file), /PortalAuthShell/);
 
 for (const file of [
   "src/app/account/(auth)/login/AccountLoginForm.tsx",
@@ -49,20 +47,29 @@ const storeChrome = read("src/components/StoreChrome.tsx");
 assert.match(storeChrome, /pathname\.startsWith\(["']\/account\/["']\)/, "all account routes must use standalone portal chrome");
 assert.match(storeChrome, /pathname\.startsWith\(["']\/dealer\/["']\)/, "all dealer routes must use standalone portal chrome");
 
-for (const file of [
-  "src/app/account/(portal)/layout.tsx",
-  "src/app/dealer/(portal)/layout.tsx",
-]) {
+for (const file of ["src/app/account/(portal)/layout.tsx", "src/app/dealer/(portal)/layout.tsx"]) {
   const source = read(file);
   assert.match(source, /PortalShell/);
   assert.doesNotMatch(source, /bg-light|bg-white/);
 }
 
-for (const file of [
-  "src/components/portal/PortalOrderList.tsx",
-  "src/components/portal/PortalOrderDetail.tsx",
-]) {
+for (const file of ["src/components/portal/PortalOrderList.tsx", "src/components/portal/PortalOrderDetail.tsx"]) {
   assert.match(read(file), /portal-/);
 }
+
+const fulfillmentMigrationPath = "supabase/migrations/20260828222000_store_portal_fulfillment_visibility.sql";
+assert.equal(exists(fulfillmentMigrationPath), true, "P1.5B fulfillment migration must exist");
+const fulfillmentMigration = read(fulfillmentMigrationPath);
+for (const fn of [
+  "get_store_portal_dashboard_summary",
+  "get_store_portal_shipments",
+  "get_store_portal_shipment",
+  "get_store_portal_installations",
+  "get_store_portal_installation",
+]) assert.match(fulfillmentMigration, new RegExp(fn), `fulfillment migration must define ${fn}`);
+for (const forbidden of ["source_warehouse_id", "source_location_id", "stock_deducted_at", "assigned_to"]) {
+  assert.doesNotMatch(fulfillmentMigration, new RegExp(`'${forbidden}'`), `portal payload must not emit ${forbidden}`);
+}
+assert.doesNotMatch(fulfillmentMigration, /'internal_notes'/, "portal fulfillment payload must not emit internal notes");
 
 console.log("P1.5 portal experience contract PASS");
