@@ -12,6 +12,7 @@ const salesChannels = ["Showroom", "Retail", "Trade / Contractor", "E-commerce",
 const productInterests = ["Kitchen Cabinets", "Vanities", "Tall Cabinets", "Accessories", "Full Product Line"];
 const allowedFileTypes = new Set(["application/pdf", "image/jpeg", "image/png"]);
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_DOCUMENTS = 4;
 
 export default function LeadForm({ type }: LeadFormProps) {
   const [submitting, setSubmitting] = useState(false);
@@ -29,7 +30,12 @@ export default function LeadForm({ type }: LeadFormProps) {
   }
 
   function selectDocuments(files: FileList | null) {
-    const selected = Array.from(files ?? []).slice(0, 4);
+    const selected = Array.from(files ?? []);
+    if (selected.length > MAX_DOCUMENTS) {
+      setDocuments([]);
+      setError(`You can upload up to ${MAX_DOCUMENTS} supporting documents.`);
+      return;
+    }
     const invalid = selected.find((file) => !allowedFileTypes.has(file.type) || file.size < 1 || file.size > MAX_FILE_BYTES);
     if (invalid) {
       setDocuments([]);
