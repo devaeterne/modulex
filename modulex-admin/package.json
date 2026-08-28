@@ -7,9 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "smoke": "npm run smoke:api && npm run smoke:db",
+    "test": "npm run smoke",
+    "smoke": "npm run smoke:rbac && npm run smoke:api && npm run smoke:phase1 && npm run smoke:db && npm run smoke:db:phase1",
+    "smoke:rbac": "node scripts/rbac-smoke.mjs",
     "smoke:api": "node scripts/api-smoke.mjs",
-    "smoke:db": "node scripts/run-db-smoke.mjs"
+    "smoke:phase1": "node scripts/phase1-api-smoke.mjs",
+    "smoke:db": "node scripts/run-db-smoke.mjs",
+    "smoke:db:phase1": "node scripts/run-phase1-db-smoke.mjs"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
