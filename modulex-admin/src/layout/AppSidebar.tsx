@@ -150,6 +150,14 @@ const managementItems: NavItem[] = [
     ],
   },
   {
+    icon: <PageIcon />,
+    name: "Store",
+    subItems: [
+      { name: "Product Content", path: "/store/products", permission: "store.view", exact: true },
+      { name: "Color Options", path: "/store/colors", permission: "store.manage", exact: true },
+    ],
+  },
+  {
     icon: <GridIcon />,
     name: "General Settings",
     subItems: [
