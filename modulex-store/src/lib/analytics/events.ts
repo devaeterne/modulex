@@ -41,11 +41,11 @@ function cleanPayload(payload: StoreAnalyticsPayload) {
 export function pushAnalyticsEvent(
   event: StoreAnalyticsEventName,
   payload: StoreAnalyticsPayload = {}
-) {
-  if (typeof window === "undefined") return;
+): boolean {
+  if (typeof window === "undefined") return false;
 
   const consent = window.__oakwellConsent;
-  if (!consent || (!consent.analytics && !consent.marketing)) return;
+  if (!consent || (!consent.analytics && !consent.marketing)) return false;
 
   const clean = cleanPayload(payload);
   window.dataLayer = window.dataLayer || [];
@@ -58,6 +58,8 @@ export function pushAnalyticsEvent(
   ) {
     window.gtag("event", event, clean);
   }
+
+  return true;
 }
 
 export function pushConsentEvent(consent: AnalyticsConsentState) {
