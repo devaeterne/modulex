@@ -1,5 +1,6 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { requireDealerPortalContext } from "@/lib/dealer/auth";
 import type { PortalOrderDetail } from "@/lib/portal/orders";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type DealerPricingContext = {
   pricing_enabled: boolean;
@@ -95,8 +96,13 @@ export type DealerAccount = {
 
 type RpcResponse<T> = { ok?: boolean } & T;
 
+async function createAuthorizedDealerClient() {
+  await requireDealerPortalContext();
+  return createServerSupabaseClient();
+}
+
 export async function getDealerPricingContext(): Promise<DealerPricingContext> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedDealerClient();
   const { data, error } = await supabase.rpc("get_store_dealer_pricing_context");
   if (error) throw new Error("Unable to load Dealer pricing context.");
   const response = data as RpcResponse<DealerPricingContext> | null;
@@ -109,7 +115,7 @@ export async function getDealerPricingContext(): Promise<DealerPricingContext> {
 }
 
 export async function getDealerCatalogProducts(query?: string): Promise<DealerCatalogProduct[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedDealerClient();
   const { data, error } = await supabase.rpc("get_store_dealer_catalog_products", {
     p_query: query?.trim() || null,
     p_color_code: null,
@@ -122,7 +128,7 @@ export async function getDealerCatalogProducts(query?: string): Promise<DealerCa
 }
 
 export async function getDealerProductBySlug(slug: string): Promise<DealerCatalogProduct | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedDealerClient();
   const { data, error } = await supabase.rpc("get_store_dealer_product_by_slug", { p_slug: slug });
   if (error) throw new Error("Unable to load Dealer product.");
   const response = data as RpcResponse<{ product?: DealerCatalogProduct }> | null;
@@ -130,7 +136,7 @@ export async function getDealerProductBySlug(slug: string): Promise<DealerCatalo
 }
 
 export async function getDealerOrder(id: string): Promise<DealerPortalOrderDetail | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedDealerClient();
   const { data, error } = await supabase.rpc("get_store_dealer_order", { p_order_id: id });
   if (error) throw new Error("Unable to load Dealer order.");
   const response = data as RpcResponse<{ pricing_enabled?: boolean; order?: Omit<DealerPortalOrderDetail, "pricing_enabled"> }> | null;
@@ -139,7 +145,7 @@ export async function getDealerOrder(id: string): Promise<DealerPortalOrderDetai
 }
 
 export async function getDealerDocuments(): Promise<DealerDocumentSummary[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedDealerClient();
   const { data, error } = await supabase.rpc("get_store_dealer_documents");
   if (error) throw new Error("Unable to load Dealer documents.");
   const response = data as RpcResponse<{ documents?: DealerDocumentSummary[] }> | null;
@@ -147,7 +153,7 @@ export async function getDealerDocuments(): Promise<DealerDocumentSummary[]> {
 }
 
 export async function getDealerDocumentDownload(id: string): Promise<DealerDocumentDownload | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedDealerClient();
   const { data, error } = await supabase.rpc("get_store_dealer_document", { p_document_id: id });
   if (error) throw new Error("Unable to authorize Dealer document.");
   const response = data as RpcResponse<{ document?: DealerDocumentDownload }> | null;
@@ -155,7 +161,7 @@ export async function getDealerDocumentDownload(id: string): Promise<DealerDocum
 }
 
 export async function getDealerAccount(): Promise<DealerAccount | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedDealerClient();
   const { data, error } = await supabase.rpc("get_store_dealer_account");
   if (error) throw new Error("Unable to load Dealer account.");
   const response = data as RpcResponse<{ account?: DealerAccount }> | null;
