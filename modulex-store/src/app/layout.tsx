@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./portal.css";
 import "@/css/bootstrap.min.css";
 import "@/css/bootstrap-icons.css";
 import "@/css/style.css";
