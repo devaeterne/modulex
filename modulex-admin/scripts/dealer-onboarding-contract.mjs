@@ -19,6 +19,8 @@ const migrationContracts = [
   "pg_advisory_xact_lock",
   "converted_to_customer",
   "created_from_dealer_application",
+  "portal_enabled",
+  "false",
   "grant usage on schema private to authenticated, service_role",
   "grant execute on function public.convert_store_dealer_lead_to_customer(uuid) to authenticated, service_role",
 ];
@@ -34,6 +36,7 @@ const uiContracts = [
   "View Customer",
   'lead.status === "approved"',
   "!lead.converted_customer_id",
+  "Portal access remains a separate controlled activation step.",
 ];
 
 for (const contract of uiContracts) {
