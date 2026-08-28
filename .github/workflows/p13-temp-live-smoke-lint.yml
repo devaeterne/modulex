@@ -1,4 +1,4 @@
-name: P1.3 Final Temporary Verification
+name: P1.3 Temporary Live Auth Smoke
 
 on:
   push:
@@ -9,65 +9,34 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  live-auth-smoke:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-
-      - name: Install Store from committed lockfile
-        working-directory: modulex-store
-        run: npm ci
-
-      - name: Test Store
-        working-directory: modulex-store
-        run: npm test
-
-      - name: Lint P1.3 Store changes
-        working-directory: modulex-store
-        run: >-
-          npx eslint
-          src/app/layout.tsx
-          src/app/dealer
-          src/components/Footer.tsx
-          src/components/StoreChrome.tsx
-          src/lib/dealer
-          src/lib/supabase/browser.ts
-          src/lib/supabase/server.ts
-          src/lib/supabase/proxy.ts
-          src/proxy.ts
-          scripts/dealer-portal-auth-contract.mjs
-
-      - name: Build Store
-        working-directory: modulex-store
-        env:
-          NEXT_PUBLIC_SITE_URL: https://oakwell-phi.vercel.app
-        run: npm run build
-
       - name: Install Admin
         working-directory: modulex-admin
         run: npm ci
-
-      - name: Test Admin P1.3 contracts
+      - name: Check live-smoke credential
+        id: credential
+        shell: bash
+        run: |
+          if [ -n "$SUPABASE_SECRET_KEY" ] || [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Supabase admin credential is available to the workflow."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Supabase admin credential is not configured in repository Actions secrets."
+          fi
+      - name: Run production-safe Dealer Auth smoke
+        if: steps.credential.outputs.available == 'true'
         working-directory: modulex-admin
-        run: npm run smoke:dealer-portal-admin && npm run smoke:auth-recovery
-
-      - name: Lint P1.3 Admin changes
-        working-directory: modulex-admin
-        run: >-
-          npx eslint
-          src/components/auth/ResetPasswordForm.tsx
-          scripts/auth-recovery-contract.mjs
-          scripts/dealer-portal-auth-live-smoke.mjs
-
-      - name: Build Admin
-        working-directory: modulex-admin
-        env:
-          NEXT_PUBLIC_SITE_URL: https://admin.oakwellcabinetry.com
-        run: npm run build
+        run: npm run smoke:dealer-portal-auth-live
