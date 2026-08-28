@@ -1,7 +1,18 @@
 import PortalOrderList from "@/components/portal/PortalOrderList";
+import PortalPageHeader from "@/components/portal/PortalPageHeader";
 import { getPortalOrders } from "@/lib/portal/orders";
 
 export default async function DealerOrdersPage() {
   const orders = await getPortalOrders();
-  return <div className="border rounded-4 bg-white p-4 p-md-5 shadow-sm"><h1 className="h3 mb-4">Orders</h1><PortalOrderList orders={orders} basePath="/dealer/orders" /></div>;
+
+  return (
+    <>
+      <PortalPageHeader
+        eyebrow="Dealer Portal"
+        title="Orders"
+        description="Review your Oakwell dealer orders and track their current status."
+      />
+      <PortalOrderList orders={orders} basePath="/dealer/orders" />
+    </>
+  );
 }

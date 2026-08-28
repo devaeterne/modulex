@@ -38,6 +38,11 @@ for (const file of ["src/app/account/(portal)/layout.tsx", "src/app/dealer/(port
   const source = read(file); assert.match(source, /PortalShell/); assert.doesNotMatch(source, /bg-light|bg-white/);
 }
 for (const file of ["src/components/portal/PortalOrderList.tsx", "src/components/portal/PortalOrderDetail.tsx"]) assert.match(read(file), /portal-/);
+for (const file of ["src/app/account/(portal)/orders/page.tsx", "src/app/dealer/(portal)/orders/page.tsx"]) {
+  const source = read(file);
+  assert.match(source, /PortalPageHeader/);
+  assert.doesNotMatch(source, /border rounded-4 bg-white/);
+}
 
 const fulfillmentMigrationPath = "supabase/migrations/20260828222000_store_portal_fulfillment_visibility.sql";
 assert.equal(exists(fulfillmentMigrationPath), true);
