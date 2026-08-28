@@ -120,7 +120,7 @@ export default function Hero() {
               <Link href="#contact" className="btn-primary">
                 Contact Us
               </Link>
-              <Link href="/shop" className="btn-secondary">
+              <Link href="/products" className="btn-secondary">
                 View Products
               </Link>
             </div>
