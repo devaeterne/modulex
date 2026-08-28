@@ -84,4 +84,22 @@ assert.match(documentsMigration, /portal_visible/);
 assert.match(documentsMigration, /is_active/);
 assert.doesNotMatch(documentsMigration, /'sales_rep_id'|'credit_hold'|'internal_notes'/i);
 
+for (const file of [
+  "src/app/dealer/(portal)/documents/page.tsx",
+  "src/app/dealer/(portal)/documents/[id]/download/route.ts",
+  "src/app/dealer/(portal)/account/page.tsx",
+]) assert.equal(exists(file), true, `${file} must exist`);
+for (const fn of ["getDealerDocuments", "getDealerDocumentDownload", "getDealerAccount"]) assert.match(dealerHelper, new RegExp(fn));
+const documentsPage = read("src/app/dealer/(portal)/documents/page.tsx");
+assert.match(documentsPage, /getDealerDocuments/);
+assert.doesNotMatch(documentsPage, /storage_bucket|storage_path/);
+const downloadRoute = read("src/app/dealer/(portal)/documents/[id]/download/route.ts");
+assert.match(downloadRoute, /readDealerPortalSession/);
+assert.match(downloadRoute, /getDealerDocumentDownload/);
+assert.match(downloadRoute, /createSignedUrl\([^,]+,\s*60\)/);
+assert.doesNotMatch(downloadRoute, /SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY/);
+const accountPage = read("src/app/dealer/(portal)/account/page.tsx");
+assert.match(accountPage, /getDealerAccount/);
+assert.doesNotMatch(accountPage, /sales_rep|credit_hold|internal_notes/i);
+
 console.log("P1.5 portal experience contract PASS");
