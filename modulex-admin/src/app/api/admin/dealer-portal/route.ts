@@ -89,10 +89,18 @@ async function logActivity(params: {
   if (error) throw new Error(error.message);
 }
 
+async function bestEffortActivity(params: Parameters<typeof logActivity>[0]) {
+  try {
+    await logActivity(params);
+  } catch (error) {
+    console.error("Dealer portal activity log failed", error);
+  }
+}
+
 async function generateActivationLink(email: string) {
   const redirectTo = storeActivationUrl();
   const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-    type: "invite",
+    type: "recovery",
     email,
     options: { redirectTo },
   });
@@ -198,18 +206,14 @@ export async function POST(request: Request) {
 
   if (error || !data) return jsonError(error?.message || "Unable to create portal user.", 400);
 
-  try {
-    await logActivity({
-      customerId,
-      actorUserId: auth.actor.user.id,
-      activityType: "portal_user_created",
-      title: "Dealer portal user created",
-      description: loginEmail,
-      portalUserId: data.id,
-    });
-  } catch (activityError) {
-    console.error("Dealer portal create activity failed", activityError);
-  }
+  await bestEffortActivity({
+    customerId,
+    actorUserId: auth.actor.user.id,
+    activityType: "portal_user_created",
+    title: "Dealer portal user created",
+    description: loginEmail,
+    portalUserId: data.id,
+  });
 
   return Response.json({ ok: true, portal_user: data });
 }
@@ -239,7 +243,7 @@ export async function PATCH(request: Request) {
       .update({ portal_enabled: enabled, updated_by: auth.actor.user.id })
       .eq("id", customerId);
     if (error) return jsonError(error.message, 400);
-    await logActivity({
+    await bestEffortActivity({
       customerId,
       actorUserId: auth.actor.user.id,
       activityType: enabled ? "portal_enabled" : "portal_disabled",
@@ -266,7 +270,7 @@ export async function PATCH(request: Request) {
       .eq("id", portalUserId)
       .eq("customer_id", customerId);
     if (error) return jsonError(error.message, 400);
-    await logActivity({ customerId, actorUserId: auth.actor.user.id, activityType: "portal_primary_changed", title: "Primary dealer portal user changed", portalUserId });
+    await bestEffortActivity({ customerId, actorUserId: auth.actor.user.id, activityType: "portal_primary_changed", title: "Primary dealer portal user changed", portalUserId });
     return Response.json({ ok: true });
   }
 
@@ -278,7 +282,7 @@ export async function PATCH(request: Request) {
       .eq("id", portalUserId)
       .eq("customer_id", customerId);
     if (error) return jsonError(error.message, 400);
-    await logActivity({ customerId, actorUserId: auth.actor.user.id, activityType: "portal_user_suspended", title: "Dealer portal user suspended", description: portalUser.login_email, portalUserId });
+    await bestEffortActivity({ customerId, actorUserId: auth.actor.user.id, activityType: "portal_user_suspended", title: "Dealer portal user suspended", description: portalUser.login_email, portalUserId });
     return Response.json({ ok: true });
   }
 
@@ -295,7 +299,7 @@ export async function PATCH(request: Request) {
       .eq("id", portalUserId)
       .eq("customer_id", customerId);
     if (error) return jsonError(error.message, 400);
-    await logActivity({ customerId, actorUserId: auth.actor.user.id, activityType: "portal_user_restored", title: "Dealer portal user restored", description: portalUser.login_email, portalUserId });
+    await bestEffortActivity({ customerId, actorUserId: auth.actor.user.id, activityType: "portal_user_restored", title: "Dealer portal user restored", description: portalUser.login_email, portalUserId });
     return Response.json({ ok: true, status: restoredStatus });
   }
 
@@ -356,7 +360,7 @@ export async function PATCH(request: Request) {
         throw mailError;
       }
 
-      await logActivity({
+      await bestEffortActivity({
         customerId,
         actorUserId: auth.actor.user.id,
         activityType: isResend ? "portal_invite_resent" : "portal_user_invited",
@@ -401,6 +405,6 @@ export async function DELETE(request: Request) {
     .eq("customer_id", customerId);
   if (error) return jsonError(error.message, 400);
 
-  await logActivity({ customerId, actorUserId: auth.actor.user.id, activityType: "portal_user_removed", title: "Dealer portal draft user removed", description: portalUser.login_email, portalUserId });
+  await bestEffortActivity({ customerId, actorUserId: auth.actor.user.id, activityType: "portal_user_removed", title: "Dealer portal draft user removed", description: portalUser.login_email, portalUserId });
   return Response.json({ ok: true });
 }
