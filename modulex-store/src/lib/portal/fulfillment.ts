@@ -1,3 +1,4 @@
+import { requireStorePortalContext } from "@/lib/portal/auth";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export type PortalAddressSnapshot = Record<string, unknown> | null;
@@ -67,8 +68,13 @@ export type PortalDashboardSummary = {
 type CollectionResponse<T> = { ok?: boolean } & T;
 type DetailResponse<T> = { ok?: boolean; reason?: string } & T;
 
+async function createAuthorizedPortalClient() {
+  await requireStorePortalContext();
+  return createServerSupabaseClient();
+}
+
 export async function getPortalShipments(limit = 25, offset = 0): Promise<PortalShipmentSummary[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedPortalClient();
   const { data, error } = await supabase.rpc("get_store_portal_shipments", { p_limit: limit, p_offset: offset });
   if (error) throw new Error("Unable to load shipments.");
   const response = data as CollectionResponse<{ shipments?: PortalShipmentSummary[] }> | null;
@@ -76,7 +82,7 @@ export async function getPortalShipments(limit = 25, offset = 0): Promise<Portal
 }
 
 export async function getPortalShipment(id: string): Promise<PortalShipmentDetailData | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedPortalClient();
   const { data, error } = await supabase.rpc("get_store_portal_shipment", { p_shipment_id: id });
   if (error) throw new Error("Unable to load shipment.");
   const response = data as DetailResponse<{ shipment?: PortalShipmentDetailData }> | null;
@@ -84,7 +90,7 @@ export async function getPortalShipment(id: string): Promise<PortalShipmentDetai
 }
 
 export async function getPortalInstallations(limit = 25, offset = 0): Promise<PortalInstallationSummary[]> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedPortalClient();
   const { data, error } = await supabase.rpc("get_store_portal_installations", { p_limit: limit, p_offset: offset });
   if (error) throw new Error("Unable to load installations.");
   const response = data as CollectionResponse<{ installations?: PortalInstallationSummary[] }> | null;
@@ -92,7 +98,7 @@ export async function getPortalInstallations(limit = 25, offset = 0): Promise<Po
 }
 
 export async function getPortalInstallation(id: string): Promise<PortalInstallationDetailData | null> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedPortalClient();
   const { data, error } = await supabase.rpc("get_store_portal_installation", { p_installation_id: id });
   if (error) throw new Error("Unable to load installation.");
   const response = data as DetailResponse<{ installation?: PortalInstallationDetailData }> | null;
@@ -100,7 +106,7 @@ export async function getPortalInstallation(id: string): Promise<PortalInstallat
 }
 
 export async function getPortalDashboardSummary(): Promise<PortalDashboardSummary> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createAuthorizedPortalClient();
   const { data, error } = await supabase.rpc("get_store_portal_dashboard_summary");
   if (error) throw new Error("Unable to load account overview.");
   const response = data as (PortalDashboardSummary & { ok?: boolean }) | null;
