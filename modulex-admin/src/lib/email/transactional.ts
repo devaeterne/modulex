@@ -6,7 +6,7 @@ type EmailNotification = {
   id: string;
   event_type: string;
   audience: "customer" | "internal";
-  entity_type: "order" | "invoice" | "customer";
+  entity_type: "order" | "invoice" | "customer" | "store_lead";
   entity_id: string;
   event_key: string;
   payload: Record<string, unknown>;
@@ -24,6 +24,7 @@ type GeneralSettings = {
   email_sender_email: string | null;
   email_reply_to: string | null;
   order_notification_emails: string | null;
+  lead_notification_emails: string | null;
   stock_notification_emails: string | null;
   pricing_notification_emails: string | null;
   invoice_notification_emails: string | null;
@@ -77,6 +78,10 @@ function adminOrderUrl(customerId: string, orderId: string) {
 
 function adminInvoiceUrl(customerId: string, invoiceId: string) {
   return `${siteUrl()}/customers/${customerId}/invoices/${invoiceId}`;
+}
+
+function adminStoreLeadUrl(leadId: string) {
+  return `${siteUrl()}/store/leads/${leadId}`;
 }
 
 function adminApprovalsUrl() {
@@ -142,7 +147,8 @@ async function customerRecipients(customerId: string, type: "order" | "invoice")
 
 function internalRecipients(settings: GeneralSettings, eventType: string) {
   let configured: string | null = null;
-  if (eventType === "stock_review_required") configured = settings.stock_notification_emails;
+  if (eventType === "new_store_lead") configured = settings.lead_notification_emails;
+  else if (eventType === "stock_review_required") configured = settings.stock_notification_emails;
   else if (eventType === "price_review_required") configured = settings.pricing_notification_emails;
   else if (eventType === "invoice_issued") configured = settings.invoice_notification_emails;
   else configured = settings.order_notification_emails;
@@ -204,6 +210,41 @@ async function renderApproval(notification: EmailNotification, settings: General
     "Internal approval notification"
   );
   return { customerId: "", subject: title, html };
+}
+
+async function renderStoreLead(notification: EmailNotification, settings: GeneralSettings) {
+  const { data: lead, error } = await supabaseAdmin
+    .from("store_leads")
+    .select("id,reference_code,lead_type,first_name,last_name,email,phone,company_name,country_code,city,business_type,created_at")
+    .eq("id", notification.entity_id)
+    .single();
+
+  if (error || !lead) throw new Error(error?.message || "Store lead was not found.");
+
+  const isDealer = lead.lead_type === "dealer_application";
+  const leadLabel = isDealer ? "Dealer application" : "Website inquiry";
+  const contactName = [lead.first_name, lead.last_name].map((value) => String(value || "").trim()).filter(Boolean).join(" ") || "—";
+  const location = [lead.city, lead.country_code].map((value) => String(value || "").trim()).filter(Boolean).join(", ") || "—";
+  const title = `${leadLabel} – ${lead.reference_code}`;
+  const rows: Array<[string, string]> = [
+    ["Reference", lead.reference_code],
+    ["Type", leadLabel],
+    ["Contact", contactName],
+    ["Company", lead.company_name || "—"],
+    ["Email", lead.email || "—"],
+    ["Phone", lead.phone || "—"],
+    ["Location", location],
+  ];
+  if (isDealer && lead.business_type) rows.push(["Business type", titleCase(String(lead.business_type))]);
+
+  const html = shell(
+    settings,
+    title,
+    `${paragraph(`A new <strong>${escapeHtml(leadLabel.toLowerCase())}</strong> was submitted through the Oakwell Store.`)}${detailRows(rows)}${button("Open Store lead", adminStoreLeadUrl(lead.id))}`,
+    "Internal Store lead notification"
+  );
+
+  return { customerId: "", subject: `${title}${lead.company_name ? ` · ${lead.company_name}` : ""}`, html };
 }
 
 async function renderOrder(notification: EmailNotification, settings: GeneralSettings) {
@@ -331,7 +372,11 @@ async function processOne(notification: EmailNotification, settings: GeneralSett
     ? await renderApproval(notification, settings)
     : notification.entity_type === "order"
       ? await renderOrder(notification, settings)
-      : await renderInvoice(notification, settings);
+      : notification.entity_type === "invoice"
+        ? await renderInvoice(notification, settings)
+        : notification.entity_type === "store_lead"
+          ? await renderStoreLead(notification, settings)
+          : (() => { throw new Error(`Unsupported notification entity type: ${notification.entity_type}`); })();
 
   const recipients = notification.audience === "customer"
     ? await customerRecipients(rendered.customerId, notification.entity_type === "invoice" ? "invoice" : "order")
