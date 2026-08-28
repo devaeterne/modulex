@@ -4,16 +4,13 @@
   gap: 1rem;
 }
 
-.portal-catalog-card {
-  overflow: hidden;
-}
-
-.portal-catalog-card__body {
-  padding: 1.25rem;
-}
+.portal-catalog-card { overflow: hidden; }
+.portal-catalog-card__body { padding: 1.25rem; }
 
 .portal-catalog-card h2,
-.portal-pricing-state h2 {
+.portal-pricing-state h2,
+.portal-document-card h2,
+.portal-account-card h2 {
   margin: 0 0 0.75rem;
   color: var(--portal-text);
   font-family: 'Playfair Display', serif;
@@ -35,16 +32,8 @@
   border-top: 1px solid var(--portal-border);
 }
 
-.portal-catalog-variant > div {
-  display: grid;
-  gap: 0.15rem;
-}
-
-.portal-price {
-  color: var(--portal-text);
-  font-weight: 700;
-  white-space: nowrap;
-}
+.portal-catalog-variant > div { display: grid; gap: 0.15rem; }
+.portal-price { color: var(--portal-text); font-weight: 700; white-space: nowrap; }
 
 .portal-pricing-state {
   display: flex;
@@ -54,13 +43,25 @@
   padding: 1.25rem;
 }
 
-.portal-order-commercial {
-  padding: 0 1.25rem 1.25rem;
+.portal-order-commercial { padding: 0 1.25rem 1.25rem; }
+
+.portal-document-list { display: grid; gap: 0.9rem; }
+.portal-document-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem;
 }
+.portal-document-meta { display: flex; flex-wrap: wrap; gap: 1rem; color: var(--portal-muted); font-size: 0.82rem; }
+.portal-account-card { padding: 0 1.25rem 1.25rem; }
+.portal-address-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.9rem; }
+.portal-address-card { display: grid; gap: 0.7rem; padding: 1rem; border: 1px solid var(--portal-border); border-radius: 14px; background: var(--portal-surface-soft); }
 
 @media (max-width: 700px) {
   .portal-catalog-variant,
-  .portal-pricing-state {
+  .portal-pricing-state,
+  .portal-document-card {
     align-items: flex-start;
     flex-direction: column;
   }
