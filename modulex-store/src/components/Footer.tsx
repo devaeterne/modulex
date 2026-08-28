@@ -1,20 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
-import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
-import { getStoreSiteSettings } from "@/lib/store/site/queries";
+import type { StorePublicCompanyProfile } from "@/lib/store/company/queries";
+import type { StoreSiteSettings } from "@/lib/store/site/queries";
 
 function phoneHref(phone: string) {
   return `tel:${phone.replace(/[^+\d]/g, "")}`;
 }
 
-export default async function Footer() {
-  const [companyResult, settingsResult] = await Promise.allSettled([
-    getStorePublicCompanyProfile(),
-    getStoreSiteSettings(),
-  ]);
-  const company = companyResult.status === "fulfilled" ? companyResult.value : null;
-  const settings = settingsResult.status === "fulfilled" ? settingsResult.value : null;
+export default function Footer({
+  company,
+  settings,
+}: {
+  company: StorePublicCompanyProfile | null;
+  settings: StoreSiteSettings | null;
+}) {
   const companyName = company?.companyName || "Oakwell Cabinetry";
   const addressLine = [company?.addressLine1, company?.addressLine2].filter(Boolean).join(", ");
   const hasUsableLocality = Boolean(company?.city && (company?.stateRegion || company?.postalCode));
