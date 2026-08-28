@@ -8,6 +8,11 @@ type AuthUser = {
   app_metadata?: Record<string, unknown>;
 };
 
+type VerifyResponse = {
+  access_token?: string;
+  user?: AuthUser;
+};
+
 function getConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -26,28 +31,21 @@ async function messageFrom(response: Response, fallback: string) {
 
 export default function DealerActivationForm() {
   const [state, setState] = useState<ActivationState>("loading");
-  const [accessToken, setAccessToken] = useState("");
+  const [tokenHash, setTokenHash] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     const config = getConfig();
-    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const token = params.get("access_token") || "";
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token_hash") || "";
     const type = params.get("type") || "";
-    const authError = params.get("error_description") || params.get("error");
 
     window.history.replaceState({}, "", window.location.pathname);
 
     if (!config) {
       setMessage("Dealer activation is not configured.");
-      setState("error");
-      return;
-    }
-
-    if (authError) {
-      setMessage("This invitation link is invalid or has expired. Ask your Oakwell administrator to resend it.");
       setState("error");
       return;
     }
@@ -58,7 +56,7 @@ export default function DealerActivationForm() {
       return;
     }
 
-    setAccessToken(token);
+    setTokenHash(token);
     setState("ready");
   }, []);
 
@@ -66,8 +64,8 @@ export default function DealerActivationForm() {
     event.preventDefault();
     const config = getConfig();
 
-    if (!config || !accessToken) {
-      setMessage("This invitation session is no longer available. Ask your Oakwell administrator to resend it.");
+    if (!config || !tokenHash) {
+      setMessage("This invitation token is no longer available. Ask your Oakwell administrator to resend it.");
       setState("error");
       return;
     }
@@ -84,20 +82,32 @@ export default function DealerActivationForm() {
 
     setMessage("");
     setState("submitting");
-
-    const headers = {
-      apikey: config.publishableKey,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    };
+    let accessToken = "";
 
     try {
-      const userResponse = await fetch(`${config.url}/auth/v1/user`, { headers, cache: "no-store" });
-      if (!userResponse.ok) throw new Error(await messageFrom(userResponse, "The invitation session is invalid."));
-      const user = (await userResponse.json()) as AuthUser;
-      if (user.app_metadata?.account_type !== "dealer_portal") {
+      const verifyResponse = await fetch(`${config.url}/auth/v1/verify`, {
+        method: "POST",
+        headers: {
+          apikey: config.publishableKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token_hash: tokenHash, type: "recovery" }),
+        cache: "no-store",
+      });
+      if (!verifyResponse.ok) throw new Error(await messageFrom(verifyResponse, "The invitation token is invalid or expired."));
+
+      const verified = (await verifyResponse.json()) as VerifyResponse;
+      accessToken = verified.access_token || "";
+      if (!accessToken) throw new Error("The invitation did not create a valid activation session.");
+      if (verified.user?.app_metadata?.account_type !== "dealer_portal") {
         throw new Error("This invitation is not a dealer portal invitation.");
       }
+
+      const headers = {
+        apikey: config.publishableKey,
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      };
 
       const passwordResponse = await fetch(`${config.url}/auth/v1/user`, {
         method: "PUT",
@@ -122,12 +132,22 @@ export default function DealerActivationForm() {
         headers,
       }).catch(() => undefined);
 
-      setAccessToken("");
+      setTokenHash("");
       setPassword("");
       setConfirmPassword("");
       setMessage("Your dealer account is activated. Sign-in access will be enabled with the dealer portal release.");
       setState("success");
     } catch (error) {
+      if (accessToken && config) {
+        await fetch(`${config.url}/auth/v1/logout`, {
+          method: "POST",
+          headers: {
+            apikey: config.publishableKey,
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }).catch(() => undefined);
+      }
+      setTokenHash("");
       setMessage(error instanceof Error ? error.message : "Unable to activate the dealer account.");
       setState("error");
     }
