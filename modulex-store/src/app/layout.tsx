@@ -13,6 +13,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import GalleryLightbox from "@/components/GalleryLightbox";
 import JsonLd from "@/components/seo/JsonLd";
 import { siteConfig } from "@/config/site";
+import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
 import {
   createOrganizationJsonLd,
   createWebSiteJsonLd,
@@ -51,16 +52,23 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let company = null;
+  try {
+    company = await getStorePublicCompanyProfile();
+  } catch (error) {
+    console.error("Unable to load public company branding", error);
+  }
+
   return (
     <html lang={siteConfig.language}>
       <body>
         <JsonLd data={[createOrganizationJsonLd(), createWebSiteJsonLd()]} />
-        <Navbar />
+        <Navbar companyName={company?.companyName || siteConfig.name} logoUrl={company?.logoUrl} />
         <main>{children}</main>
         <Footer />
         <BackToTop />
