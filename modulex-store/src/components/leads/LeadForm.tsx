@@ -1,7 +1,12 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import type { StoreLeadType } from "@/lib/store/leads/types";
+import {
+  captureSessionAttribution,
+  getSessionAttribution,
+} from "@/lib/analytics/attribution";
+import { pushAnalyticsEvent } from "@/lib/analytics/events";
 
 type LeadFormProps = {
   type: StoreLeadType;
@@ -14,8 +19,17 @@ export default function LeadForm({ type }: LeadFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [referenceCode, setReferenceCode] = useState<string | null>(null);
+  const started = useRef(false);
 
   const dealer = type === "dealer_application";
+
+  function markStarted() {
+    if (started.current) return;
+    started.current = true;
+    pushAnalyticsEvent(dealer ? "dealer_application_start" : "contact_form_start", {
+      form_type: type,
+    });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,6 +39,8 @@ export default function LeadForm({ type }: LeadFormProps) {
 
     const form = event.currentTarget;
     const data = new FormData(form);
+    captureSessionAttribution();
+    const attribution = getSessionAttribution();
     const params = new URLSearchParams(window.location.search);
     const showroomValue = String(data.get("has_showroom") || "");
 
@@ -47,13 +63,13 @@ export default function LeadForm({ type }: LeadFormProps) {
       privacy_accepted: data.get("privacy_accepted") === "on",
       marketing_consent: data.get("marketing_consent") === "on",
       website_hp: String(data.get("website_hp") || ""),
-      utm_source: params.get("utm_source") || "",
-      utm_medium: params.get("utm_medium") || "",
-      utm_campaign: params.get("utm_campaign") || "",
-      utm_content: params.get("utm_content") || "",
-      utm_term: params.get("utm_term") || "",
-      landing_page: window.location.href,
-      referrer: document.referrer,
+      utm_source: attribution?.utmSource || params.get("utm_source") || "",
+      utm_medium: attribution?.utmMedium || params.get("utm_medium") || "",
+      utm_campaign: attribution?.utmCampaign || params.get("utm_campaign") || "",
+      utm_content: attribution?.utmContent || params.get("utm_content") || "",
+      utm_term: attribution?.utmTerm || params.get("utm_term") || "",
+      landing_page: attribution?.landingPage || window.location.href,
+      referrer: attribution?.referrer || document.referrer,
     };
 
     try {
@@ -69,6 +85,9 @@ export default function LeadForm({ type }: LeadFormProps) {
       }
 
       setReferenceCode(result.referenceCode);
+      pushAnalyticsEvent(dealer ? "dealer_application_submit" : "contact_form_submit", {
+        form_type: type,
+      });
       form.reset();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to submit your request.");
@@ -78,7 +97,12 @@ export default function LeadForm({ type }: LeadFormProps) {
   }
 
   return (
-    <form className="contact-form" onSubmit={handleSubmit} noValidate={false}>
+    <form
+      className="contact-form"
+      onSubmit={handleSubmit}
+      onFocusCapture={markStarted}
+      noValidate={false}
+    >
       <div
         aria-hidden="true"
         style={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }}
