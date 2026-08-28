@@ -25,8 +25,7 @@ function controlledActivationUrl(actionLink: string) {
     "https://oakwell-phi.vercel.app"
   ).replace(/\/$/, "");
   const target = new URL(`${storeBase}/dealer/activate`);
-  target.searchParams.set("token_hash", tokenHash);
-  target.searchParams.set("type", "recovery");
+  target.hash = new URLSearchParams({ token_hash: tokenHash, type: "recovery" }).toString();
   return target.toString();
 }
 
