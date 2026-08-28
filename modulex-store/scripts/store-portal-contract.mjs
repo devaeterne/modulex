@@ -20,24 +20,30 @@ const [
   proxy,
   portalAuth,
   accountLogin,
+  accountLoginForm,
+  accountLoginPage,
   accountLayout,
   dealerAuth,
   ordersHelper,
   orderList,
   orderDetail,
   migration,
+  hardeningMigration,
 ] = await Promise.all([
   read("src/components/Navbar.tsx"),
   read("src/components/StoreChrome.tsx"),
   read("src/proxy.ts"),
   read("src/lib/portal/auth.ts"),
   read("src/app/account/(auth)/login/actions.ts"),
+  read("src/app/account/(auth)/login/AccountLoginForm.tsx"),
+  read("src/app/account/(auth)/login/page.tsx"),
   read("src/app/account/(portal)/layout.tsx"),
   read("src/lib/dealer/auth.ts"),
   read("src/lib/portal/orders.ts"),
   read("src/components/portal/PortalOrderList.tsx"),
   read("src/components/portal/PortalOrderDetail.tsx"),
   read("supabase/migrations/20260828213000_store_unified_portal_order_access.sql"),
+  read("supabase/migrations/20260828220500_portal_auth_profile_guard_hardening.sql"),
 ]);
 
 assert.match(navbar, /href=["']\/account["']/, "public navbar must expose one account entry");
@@ -52,10 +58,13 @@ assert.match(portalAuth, /get_store_portal_context/, "shared portal authorizatio
 assert.match(portalAuth, /dealer_portal/, "shared portal auth must support trusted dealer identities");
 assert.match(portalAuth, /customer_portal/, "shared portal auth must support trusted customer identities");
 assert.match(accountLogin, /signInWithPassword/, "unified account login must use password authentication");
+assert.doesNotMatch(accountLogin, /export\s+const\s+initialAccountLoginState/, '"use server" login module must not export a state object');
+assert.match(accountLoginForm, /initialAccountLoginState|\{\s*error:\s*null\s*\}/, "client login form must own its initial action state");
 assert.doesNotMatch(accountLogin, /\.from\(["'][^"']*(?:customer|portal)/i, "login must not pre-query email ownership");
 assert.match(accountLogin, /dealer[\s\S]*\/dealer/i, "dealer identities must route to the Dealer portal");
 assert.match(accountLogin, /customer[\s\S]*\/account/i, "customer identities must route to the Customer portal");
 assert.match(accountLogin, /signOut/, "denied authenticated identities must be signed out");
+assert.match(accountLoginPage, /AccountThemeToggle/, "account login must expose the Store dark/light theme control");
 assert.match(accountLayout, /requireCustomerPortalContext|requireStorePortalContext/, "Customer protected layout must enforce portal context");
 assert.match(dealerAuth, /portal/i, "Dealer authorization must converge on the shared portal boundary");
 
@@ -73,6 +82,8 @@ assert.match(migration, /revoke execute[\s\S]*from public/i, "portal RPCs must r
 assert.match(migration, /revoke execute[\s\S]*from anon/i, "portal RPCs must deny anon execute");
 assert.match(migration, /grant execute[\s\S]*to authenticated/i, "portal RPCs must explicitly grant authenticated execute");
 assert.doesNotMatch(migration, /jsonb_build_object\([\s\S]{0,1200}'(?:unit_price|subtotal|tax_amount|total_amount|grand_total|payment_commission_amount|internal_notes)'/i, "portal RPC payloads must not emit monetary/internal fields");
+assert.match(hardeningMigration, /customer_portal_users/, "profile guard hardening must recognize pre-provisioned portal users");
+assert.match(hardeningMigration, /login_email/i, "profile guard hardening must key pending external identity from portal login email");
 
 for (const source of [portalAuth, accountLogin, ordersHelper]) {
   assert.doesNotMatch(source, /SUPABASE_(?:SECRET|SERVICE_ROLE)_KEY/, "Store portal code must not use server admin credentials");
