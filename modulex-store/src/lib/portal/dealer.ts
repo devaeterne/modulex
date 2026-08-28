@@ -49,6 +49,50 @@ export type DealerPortalOrderDetail = Omit<PortalOrderDetail, "items"> & {
   items: DealerPortalOrderItem[];
 };
 
+export type DealerDocumentSummary = {
+  id: string;
+  document_type: string | null;
+  file_name: string;
+  mime_type: string | null;
+  file_size_bytes: number | null;
+  description: string | null;
+  created_at: string;
+};
+
+export type DealerDocumentDownload = DealerDocumentSummary & {
+  storage_bucket: string;
+  storage_path: string;
+};
+
+export type DealerAccountAddress = {
+  id: string;
+  address_name: string;
+  company_name: string | null;
+  contact_name: string | null;
+  address_line_1: string;
+  address_line_2: string | null;
+  postal_code: string | null;
+  city: string;
+  state_region: string | null;
+  country_code: string;
+  phone: string | null;
+  address_type: string;
+  is_default_billing: boolean;
+  is_default_shipping: boolean;
+};
+
+export type DealerAccount = {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  country_code: string | null;
+  currency_code: string;
+  customer_since: string | null;
+  price_group_name: string | null;
+  addresses: DealerAccountAddress[];
+};
+
 type RpcResponse<T> = { ok?: boolean } & T;
 
 export async function getDealerPricingContext(): Promise<DealerPricingContext> {
@@ -92,4 +136,28 @@ export async function getDealerOrder(id: string): Promise<DealerPortalOrderDetai
   const response = data as RpcResponse<{ pricing_enabled?: boolean; order?: Omit<DealerPortalOrderDetail, "pricing_enabled"> }> | null;
   if (!response?.ok || !response.order) return null;
   return { ...response.order, pricing_enabled: Boolean(response.pricing_enabled) };
+}
+
+export async function getDealerDocuments(): Promise<DealerDocumentSummary[]> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("get_store_dealer_documents");
+  if (error) throw new Error("Unable to load Dealer documents.");
+  const response = data as RpcResponse<{ documents?: DealerDocumentSummary[] }> | null;
+  return response?.ok && Array.isArray(response.documents) ? response.documents : [];
+}
+
+export async function getDealerDocumentDownload(id: string): Promise<DealerDocumentDownload | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("get_store_dealer_document", { p_document_id: id });
+  if (error) throw new Error("Unable to authorize Dealer document.");
+  const response = data as RpcResponse<{ document?: DealerDocumentDownload }> | null;
+  return response?.ok && response.document ? response.document : null;
+}
+
+export async function getDealerAccount(): Promise<DealerAccount | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("get_store_dealer_account");
+  if (error) throw new Error("Unable to load Dealer account.");
+  const response = data as RpcResponse<{ account?: DealerAccount }> | null;
+  return response?.ok && response.account ? response.account : null;
 }
