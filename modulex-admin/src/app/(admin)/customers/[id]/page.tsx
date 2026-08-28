@@ -23,7 +23,14 @@ export default async function CustomerCardPage({
       <div className="mb-5">
         <DealerPortalAccessCard customerId={id} />
       </div>
-      <CustomerCard />
+      <style>{`
+        .legacy-customer-card > div > div:first-child > div:nth-child(2) button:nth-child(6) {
+          display: none;
+        }
+      `}</style>
+      <div className="legacy-customer-card">
+        <CustomerCard />
+      </div>
     </div>
   );
 }
