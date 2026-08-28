@@ -14,7 +14,7 @@ const [page, form, migration] = await Promise.all([
 ]);
 
 assert.match(page, /DealerActivationForm/, "activation route must render the activation form");
-assert.match(form, /window\.location\.search/, "activation must read the controlled Store token URL");
+assert.match(form, /window\.location\.hash/, "activation must keep the controlled Store token out of request logs");
 assert.match(form, /token_hash/, "activation must use a token hash instead of embedding a direct Auth action link");
 assert.match(form, /\/auth\/v1\/verify/, "activation token must be consumed by an explicit POST verification");
 assert.match(form, /type:\s*["']recovery["']/, "activation must verify the expected recovery token type");
