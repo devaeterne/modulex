@@ -41,11 +41,7 @@ begin
   limit 1;
 
   if v_result is null then
-    return jsonb_build_object(
-      'ok', true,
-      'reason', 'authorized',
-      'pricing_enabled', false
-    );
+    return jsonb_build_object('ok', true, 'reason', 'authorized', 'pricing_enabled', false);
   end if;
 
   return v_result;
@@ -57,15 +53,8 @@ revoke execute on function private.get_store_dealer_pricing_context() from anon;
 grant execute on function private.get_store_dealer_pricing_context() to authenticated;
 
 create or replace function public.get_store_dealer_pricing_context()
-returns jsonb
-language sql
-stable
-security invoker
-set search_path = ''
-as $$
-  select private.get_store_dealer_pricing_context();
-$$;
-
+returns jsonb language sql stable security invoker set search_path = ''
+as $$ select private.get_store_dealer_pricing_context(); $$;
 revoke all on function public.get_store_dealer_pricing_context() from public;
 revoke execute on function public.get_store_dealer_pricing_context() from anon;
 grant execute on function public.get_store_dealer_pricing_context() to authenticated;
@@ -162,11 +151,8 @@ begin
         )
       end as product_json
     from public.store_product_content c
-    join public.products p
-      on p.base_product_code = c.base_product_code
-     and p.status = 'active'
-    left join public.store_color_options co
-      on co.code = p.color_code and co.is_active
+    join public.products p on p.base_product_code = c.base_product_code and p.status = 'active'
+    left join public.store_color_options co on co.code = p.color_code and co.is_active
     left join lateral (
       select pp1.amount
       from public.product_prices pp1
@@ -183,18 +169,15 @@ begin
     where c.is_published = true
       and (p_color_code is null or exists (
         select 1 from public.products px
-        where px.base_product_code = c.base_product_code
-          and px.status = 'active'
-          and px.color_code = p_color_code
+        where px.base_product_code = c.base_product_code and px.status = 'active' and px.color_code = p_color_code
       ))
       and (p_query is null or btrim(p_query) = '' or
         c.display_name ilike '%' || btrim(p_query) || '%' or
         c.base_product_code ilike '%' || btrim(p_query) || '%' or
+        c.slug ilike '%' || btrim(p_query) || '%' or
         exists (
           select 1 from public.products pq
-          where pq.base_product_code = c.base_product_code
-            and pq.status = 'active'
-            and pq.sku ilike '%' || btrim(p_query) || '%'
+          where pq.base_product_code = c.base_product_code and pq.status = 'active' and pq.sku ilike '%' || btrim(p_query) || '%'
         )
       )
     group by c.id
@@ -202,14 +185,7 @@ begin
     limit v_limit offset v_offset
   ) scoped;
 
-  return jsonb_build_object(
-    'ok', true,
-    'reason', 'authorized',
-    'pricing_enabled', v_pricing_enabled,
-    'products', v_products,
-    'limit', v_limit,
-    'offset', v_offset
-  );
+  return jsonb_build_object('ok', true, 'reason', 'authorized', 'pricing_enabled', v_pricing_enabled, 'products', v_products, 'limit', v_limit, 'offset', v_offset);
 end;
 $$;
 
@@ -217,33 +193,17 @@ revoke all on function private.get_store_dealer_catalog_products(text,text,integ
 revoke execute on function private.get_store_dealer_catalog_products(text,text,integer,integer) from anon;
 grant execute on function private.get_store_dealer_catalog_products(text,text,integer,integer) to authenticated;
 
-create or replace function public.get_store_dealer_catalog_products(
-  p_query text default null,
-  p_color_code text default null,
-  p_limit integer default 48,
-  p_offset integer default 0
-)
-returns jsonb
-language sql
-stable
-security invoker
-set search_path = ''
+create or replace function public.get_store_dealer_catalog_products(p_query text default null,p_color_code text default null,p_limit integer default 48,p_offset integer default 0)
+returns jsonb language sql stable security invoker set search_path = ''
 as $$ select private.get_store_dealer_catalog_products(p_query,p_color_code,p_limit,p_offset); $$;
-
 revoke all on function public.get_store_dealer_catalog_products(text,text,integer,integer) from public;
 revoke execute on function public.get_store_dealer_catalog_products(text,text,integer,integer) from anon;
 grant execute on function public.get_store_dealer_catalog_products(text,text,integer,integer) to authenticated;
 
 create or replace function private.get_store_dealer_product_by_slug(p_slug text)
-returns jsonb
-language plpgsql
-stable
-security definer
-set search_path = ''
+returns jsonb language plpgsql stable security definer set search_path = ''
 as $$
-declare
-  v_catalog jsonb;
-  v_product jsonb;
+declare v_catalog jsonb; v_product jsonb;
 begin
   v_catalog := private.get_store_dealer_catalog_products(p_slug, null, 100, 0);
   if coalesce((v_catalog ->> 'ok')::boolean, false) is not true then return v_catalog; end if;
@@ -252,7 +212,6 @@ begin
   return jsonb_build_object('ok', true, 'reason', 'authorized', 'pricing_enabled', v_catalog -> 'pricing_enabled', 'product', v_product);
 end;
 $$;
-
 revoke all on function private.get_store_dealer_product_by_slug(text) from public;
 revoke execute on function private.get_store_dealer_product_by_slug(text) from anon;
 grant execute on function private.get_store_dealer_product_by_slug(text) to authenticated;
@@ -265,11 +224,7 @@ revoke execute on function public.get_store_dealer_product_by_slug(text) from an
 grant execute on function public.get_store_dealer_product_by_slug(text) to authenticated;
 
 create or replace function private.get_store_dealer_order(p_order_id uuid)
-returns jsonb
-language plpgsql
-stable
-security definer
-set search_path = ''
+returns jsonb language plpgsql stable security definer set search_path = ''
 as $$
 declare
   v_context jsonb := private.get_store_portal_context();
@@ -295,8 +250,7 @@ begin
         'quantity',oi.quantity,'unit_price',oi.unit_price,'discount_percent',oi.discount_percent,'discount_amount',oi.discount_amount,
         'line_subtotal',oi.line_subtotal,'line_total',oi.line_total
       ) order by oi.line_no) from public.customer_order_items oi where oi.order_id=o.id),'[]'::jsonb)
-    ) into v_order
-    from public.customer_orders o where o.id=p_order_id and o.customer_id=v_customer_id limit 1;
+    ) into v_order from public.customer_orders o where o.id=p_order_id and o.customer_id=v_customer_id limit 1;
   else
     select jsonb_build_object(
       'id', o.id,'order_number',o.order_number,'status',o.status,'order_date',o.order_date,
@@ -305,15 +259,13 @@ begin
       'items',coalesce((select jsonb_agg(jsonb_build_object(
         'id',oi.id,'line_no',oi.line_no,'sku_snapshot',oi.sku_snapshot,'product_name_snapshot',oi.product_name_snapshot,'quantity',oi.quantity
       ) order by oi.line_no) from public.customer_order_items oi where oi.order_id=o.id),'[]'::jsonb)
-    ) into v_order
-    from public.customer_orders o where o.id=p_order_id and o.customer_id=v_customer_id limit 1;
+    ) into v_order from public.customer_orders o where o.id=p_order_id and o.customer_id=v_customer_id limit 1;
   end if;
 
   if v_order is null then return jsonb_build_object('ok', false, 'reason', 'order_unavailable'); end if;
   return jsonb_build_object('ok', true, 'reason', 'authorized', 'pricing_enabled', v_pricing_enabled, 'order', v_order);
 end;
 $$;
-
 revoke all on function private.get_store_dealer_order(uuid) from public;
 revoke execute on function private.get_store_dealer_order(uuid) from anon;
 grant execute on function private.get_store_dealer_order(uuid) to authenticated;
