@@ -130,6 +130,7 @@ export default function Navbar() {
           aria-expanded={isMobileOpen}
           aria-controls="mobileNav"
           aria-label={isMobileOpen ? "Close navigation menu" : "Open navigation menu"}
+          style={{ border: 0, background: "transparent", padding: 0 }}
         >
           <span className={isMobileOpen ? "rotate1" : ""}></span>
           <span className={isMobileOpen ? "fade" : ""}></span>
