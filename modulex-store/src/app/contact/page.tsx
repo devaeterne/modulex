@@ -28,10 +28,13 @@ export default async function Contact() {
   }
 
   const companyName = company?.companyName || "Oakwell Cabinetry";
+  const hasUsableLocality = Boolean(company?.city && (company?.stateRegion || company?.postalCode));
   const addressLines = [
     company?.addressLine1,
     company?.addressLine2,
-    [company?.city, company?.stateRegion, company?.postalCode].filter(Boolean).join(", "),
+    hasUsableLocality
+      ? [company?.city, company?.stateRegion, company?.postalCode].filter(Boolean).join(", ")
+      : null,
   ].filter(Boolean) as string[];
   const hasDirectContact = Boolean(company?.email || company?.phone || company?.website || addressLines.length > 0);
 
