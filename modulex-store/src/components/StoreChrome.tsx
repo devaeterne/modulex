@@ -20,9 +20,9 @@ type StoreChromeProps = {
 export default function StoreChrome({ children, company, siteSettings, companyName, logoUrl }: StoreChromeProps) {
   const pathname = usePathname();
   const isDealerRoute = pathname === "/dealer" || pathname.startsWith("/dealer/");
-  const isProtectedAccountRoute = pathname === "/account" || pathname.startsWith("/account/orders") || pathname.startsWith("/account/session/");
+  const isAccountRoute = pathname === "/account" || pathname.startsWith("/account/");
 
-  if (isDealerRoute || isProtectedAccountRoute) {
+  if (isDealerRoute || isAccountRoute) {
     return <main>{children}</main>;
   }
 

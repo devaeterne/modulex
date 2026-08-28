@@ -1,23 +1,29 @@
 import Link from "next/link";
-import { getPortalOrders } from "@/lib/portal/orders";
+import PortalOverview from "@/components/portal/PortalOverview";
+import { getDealerPricingContext } from "@/lib/portal/dealer";
+import { getPortalDashboardSummary } from "@/lib/portal/fulfillment";
 
 export default async function DealerPortalPage() {
-  const recentOrders = await getPortalOrders(5, 0);
+  const [summary, pricing] = await Promise.all([
+    getPortalDashboardSummary(),
+    getDealerPricingContext(),
+  ]);
+
   return (
-    <div className="row g-4">
-      <div className="col-12">
-        <div className="border rounded-4 bg-white p-4 p-md-5 shadow-sm">
-          <p className="text-uppercase small fw-semibold text-secondary mb-2">Dealer Portal</p>
-          <h1 className="h2 mb-3">Dealer dashboard</h1>
-          <p className="text-secondary mb-0">View orders associated with your dealer account. Pricing remains outside this release.</p>
+    <div className="d-grid gap-4">
+      <PortalOverview kind="dealer" summary={summary} />
+      <section className="portal-panel portal-pricing-state">
+        <div>
+          <p className="portal-kicker">Catalog pricing</p>
+          <h2>{pricing.pricing_enabled ? "Pricing available" : "Contact sales for pricing"}</h2>
+          <p className="portal-muted mb-0">
+            {pricing.pricing_enabled
+              ? "Your Dealer catalog uses the pricing assigned to this account."
+              : "Catalog products remain available even when account pricing is not enabled."}
+          </p>
         </div>
-      </div>
-      <div className="col-12">
-        <div className="border rounded-4 bg-white p-4 shadow-sm">
-          <div className="d-flex justify-content-between align-items-center mb-3"><h2 className="h5 mb-0">Recent orders</h2><Link href="/dealer/orders" className="small">View all</Link></div>
-          {recentOrders.length ? <ul className="list-group list-group-flush">{recentOrders.map((order)=><li key={order.id} className="list-group-item px-0 d-flex justify-content-between gap-3"><Link href={`/dealer/orders/${order.id}`}>{order.order_number}</Link><span className="text-secondary small">{order.status}</span></li>)}</ul> : <p className="text-secondary mb-0">No orders are available yet.</p>}
-        </div>
-      </div>
+        <Link className="portal-button portal-button--secondary" href="/dealer/catalog">Open catalog</Link>
+      </section>
     </div>
   );
 }
