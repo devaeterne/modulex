@@ -38,7 +38,9 @@ export async function POST(request: NextRequest) {
   const email = text(body.email, 320).toLowerCase();
   const companyName = text(body.company_name, 200);
   const privacyAccepted = body.privacy_accepted === true;
-  const supportingDocumentCount = Number.isInteger(body.supporting_document_count) ? Number(body.supporting_document_count) : 0;
+  const supportingDocumentCount = typeof body.supporting_document_count === "number" && Number.isInteger(body.supporting_document_count)
+    ? body.supporting_document_count
+    : 0;
 
   if (!(["contact", "dealer_application"] as StoreLeadType[]).includes(leadType)) return NextResponse.json({ error: "Invalid request type." }, { status: 400 });
   if (!firstName || !lastName) return NextResponse.json({ error: "First and last name are required." }, { status: 400 });
