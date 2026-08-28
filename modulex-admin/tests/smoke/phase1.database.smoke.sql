@@ -157,6 +157,9 @@ select 1 / case when exists (
 ) then 1 else 0 end as "PASS new_store_lead delivery rule";
 
 \echo '[05] Store lead RPC -> activity -> notification lifecycle'
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+select set_config('request.jwt.claims', jsonb_build_object('role', 'anon')::text, true);
 set local role anon;
 with submitted as (
   select id
@@ -176,7 +179,15 @@ with submitted as (
 )
 update phase1_ctx set lead_id = (select id from submitted);
 
+reset role;
+select set_config('request.jwt.claim.sub', :'phase1_admin_user_id', true);
+select set_config(
+  'request.jwt.claims',
+  jsonb_build_object('sub', :'phase1_admin_user_id', 'role', 'authenticated')::text,
+  true
+);
 set local role authenticated;
+
 select 1 / case when exists (
   select 1 from public.store_lead_activity
   where lead_id = (select lead_id from phase1_ctx)
@@ -210,17 +221,23 @@ select 1 / case when exists (
     and event_type = 'new_store_lead'
 ) then 1 else 0 end as "PASS Store lead appears in panel notification feed";
 
-\echo '[06] Anonymous Store hardening grants'
+\echo '[06] Store hardening grants'
 reset role;
 select 1 / case when not has_table_privilege('anon', 'public.store_leads', 'SELECT')
   and not has_table_privilege('anon', 'public.store_leads', 'INSERT')
   and not has_table_privilege('anon', 'public.store_marketing_settings', 'SELECT')
-  and not has_function_privilege('authenticated', 'public.submit_store_lead(jsonb)', 'EXECUTE')
-then 1 else 0 end as "PASS hardened direct Store writes";
+then 1 else 0 end as "PASS anon direct Store table access revoked";
+
+select 1 / case when has_column_privilege('authenticated', 'public.store_leads', 'status', 'UPDATE')
+  and has_column_privilege('authenticated', 'public.store_leads', 'assigned_to', 'UPDATE')
+  and has_column_privilege('authenticated', 'public.store_leads', 'internal_notes', 'UPDATE')
+  and not has_column_privilege('authenticated', 'public.store_leads', 'email', 'UPDATE')
+then 1 else 0 end as "PASS Store lead column update hardening";
 
 select 1 / case when has_function_privilege('anon', 'public.submit_store_lead(jsonb)', 'EXECUTE')
+  and has_function_privilege('authenticated', 'public.submit_store_lead(jsonb)', 'EXECUTE')
   and has_function_privilege('anon', 'public.get_store_marketing_settings()', 'EXECUTE')
-then 1 else 0 end as "PASS anon Store RPC execute grants";
+then 1 else 0 end as "PASS Store RPC execute grants";
 
 rollback;
 \echo '=== PHASE 1 DATABASE SMOKE PASS ==='
