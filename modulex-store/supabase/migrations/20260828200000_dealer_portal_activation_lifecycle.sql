@@ -1,3 +1,8 @@
+-- Dealer portal activation is caller-resolved and dealer writes remain narrow.
+-- Internal portal lifecycle mutations move to the server-side Admin API in P1.2.
+
+revoke insert, update, delete on table public.customer_portal_users from authenticated;
+
 create or replace function private.activate_store_dealer_portal_user()
 returns jsonb
 language plpgsql
