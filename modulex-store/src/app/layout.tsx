@@ -26,9 +26,6 @@ export const metadata: Metadata = {
   },
   description: siteConfig.description,
   applicationName: siteConfig.name,
-  alternates: {
-    canonical: "/",
-  },
   openGraph: {
     type: "website",
     siteName: siteConfig.name,
@@ -64,10 +61,8 @@ export default function RootLayout({
       <body>
         <JsonLd data={[createOrganizationJsonLd(), createWebSiteJsonLd()]} />
         <Navbar />
-        <main>
-          {children}
-          <Footer />
-        </main>
+        <main>{children}</main>
+        <Footer />
         <BackToTop />
         <GalleryLightbox />
         <ThemeToggle />
