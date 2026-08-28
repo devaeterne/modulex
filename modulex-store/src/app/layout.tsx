@@ -5,6 +5,7 @@ import "@/css/bootstrap-icons.css";
 import "@/css/style.css";
 import "@/css/media-queries.css";
 import "@/css/dark-mode.css";
+import "@/css/account-auth.css";
 import "@/css/panorama.css";
 import AnalyticsProvider from "@/components/analytics/AnalyticsProvider";
 import JsonLd from "@/components/seo/JsonLd";
