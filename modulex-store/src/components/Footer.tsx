@@ -1,116 +1,95 @@
+import Image from "next/image";
 import Link from "next/link";
+import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
+import { getStoreSiteSettings } from "@/lib/store/site/queries";
 
-export default function Footer() {
+function phoneHref(phone: string) {
+  return `tel:${phone.replace(/[^+\d]/g, "")}`;
+}
+
+export default async function Footer() {
+  const [companyResult, settingsResult] = await Promise.allSettled([
+    getStorePublicCompanyProfile(),
+    getStoreSiteSettings(),
+  ]);
+  const company = companyResult.status === "fulfilled" ? companyResult.value : null;
+  const settings = settingsResult.status === "fulfilled" ? settingsResult.value : null;
+  const companyName = company?.companyName || "Oakwell Cabinetry";
+  const addressLine = [company?.addressLine1, company?.addressLine2].filter(Boolean).join(", ");
+  const hasUsableLocality = Boolean(company?.city && (company?.stateRegion || company?.postalCode));
+  const localityLine = hasUsableLocality
+    ? [company?.city, company?.stateRegion, company?.postalCode].filter(Boolean).join(", ")
+    : "";
+  const socials = [
+    ["Facebook", settings?.facebookUrl, "bi-facebook"],
+    ["Instagram", settings?.instagramUrl, "bi-instagram"],
+    ["LinkedIn", settings?.linkedinUrl, "bi-linkedin"],
+    ["Pinterest", settings?.pinterestUrl, "bi-pinterest"],
+    ["TikTok", settings?.tiktokUrl, "bi-tiktok"],
+    ["YouTube", settings?.youtubeUrl, "bi-youtube"],
+  ].filter((item): item is [string, string, string] => Boolean(item[1]));
+
   return (
     <footer>
       <div className="footer-content">
-        {/* Brand */}
         <div className="footer-brand">
           <div className="logo mb-3">
-            <img
-              src="/assets/images/logo-white.png"
-              className="h-100"
-              alt="Oakwell"
-            />
+            {company?.logoUrl ? (
+              <Image src={company.logoUrl} width={180} height={64} className="h-100 w-auto object-contain" alt={companyName} />
+            ) : (
+              <Image src="/assets/images/logo-white.png" width={180} height={64} className="h-100 w-auto object-contain" alt={companyName} />
+            )}
           </div>
-          <p>
-            Award-winning interior design studio creating timeless spaces that
-            inspire and delight. Serving residential and commercial clients
-            worldwide.
-          </p>
+          {settings?.footerDescription ? <p>{settings.footerDescription}</p> : null}
 
-          <div className="social-links">
-            <a
-              href="https://facebook.com/"
-              target="_blank"
-              aria-label="Facebook"
-            >
-              <i className="bi bi-facebook"></i>
-            </a>
-            <a
-              href="https://instagram.com/"
-              target="_blank"
-              aria-label="Instagram"
-            >
-              <i className="bi bi-instagram"></i>
-            </a>
-            <a href="https://twitter.com/" target="_blank" aria-label="Twitter">
-              <i className="bi bi-twitter-x"></i>
-            </a>
-            <a
-              href="https://linkedin.com/"
-              target="_blank"
-              aria-label="LinkedIn"
-            >
-              <i className="bi bi-linkedin"></i>
-            </a>
-          </div>
+          {socials.length > 0 ? (
+            <div className="social-links">
+              {socials.map(([label, href, icon]) => (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label}>
+                  <i className={`bi ${icon}`} aria-hidden="true"></i>
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
-        {/* Services */}
+
         <div className="footer-links">
-          <h3>Services</h3>
+          <h3>Products</h3>
           <ul>
-            <li>
-              <Link href="/services/residential">Residential Interior</Link>
-            </li>
-            <li>
-              <Link href="/gallery">Commercial Projects</Link>
-            </li>
-            <li>
-              <Link href="/gallery">Renovation & Styling</Link>
-            </li>
-            <li>
-              <Link href="/index-360">360° Virtual Tour</Link>
-            </li>
+            <li><Link href="/products">Product Catalog</Link></li>
+            <li><Link href="/gallery">Projects & Inspiration</Link></li>
+            <li><Link href="/contact">Product Support</Link></li>
           </ul>
         </div>
-        {/* Company */}
+
         <div className="footer-links">
           <h3>Company</h3>
           <ul>
-            <li>
-              <Link href="/about">About Us</Link>
-            </li>
-            <li>
-              <Link href="/blog">Insights & Blog</Link>
-            </li>
-            <li>
-              <Link href="/gallery">Our Portfolio</Link>
-            </li>
-            <li>
-              <Link href="/contact">Contact</Link>
-            </li>
+            <li><Link href="/about">About Us</Link></li>
+            <li><Link href="/gallery">Gallery</Link></li>
+            <li><Link href="/contact">Contact</Link></li>
           </ul>
         </div>
-        {/* Contact */}
+
         <div className="footer-links">
           <h3>Contact</h3>
           <ul>
-            <li>
-              <a href="mailto:hello@Oakwell.design">hello@Oakwell.design</a>
-            </li>
-            <li>
-              <a href="tel:+15551234567">+1 (555) 123-4567</a>
-            </li>
-            <li>
-              <span>123 Design Street</span>
-            </li>
-            <li>
-              <span>New York, NY 10001</span>
-            </li>
+            {company?.email ? <li><a href={`mailto:${company.email}`}>{company.email}</a></li> : null}
+            {company?.phone ? <li><a href={phoneHref(company.phone)}>{company.phone}</a></li> : null}
+            {addressLine ? <li><span>{addressLine}</span></li> : null}
+            {localityLine ? <li><span>{localityLine}</span></li> : null}
+            {company?.website ? <li><a href={company.website} target="_blank" rel="noopener noreferrer">Website</a></li> : null}
+            {!company?.email && !company?.phone && !addressLine && !localityLine ? (
+              <li><Link href="/contact">Contact Oakwell Cabinetry</Link></li>
+            ) : null}
           </ul>
         </div>
       </div>
+
       <div className="footer-bottom">
         <p>
-          &copy; 2026 Oakwell Cabinetry Design. All rights reserved. Developed by{" "}
-          <a
-            href="https://www.dasoft.me/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Da Software
-          </a>
+          &copy; {new Date().getFullYear()} {companyName}. All rights reserved. Developed by{" "}
+          <a href="https://www.dasoft.me/" target="_blank" rel="noopener noreferrer">Da Software</a>
         </p>
       </div>
     </footer>

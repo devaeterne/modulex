@@ -153,6 +153,7 @@ const managementItems: NavItem[] = [
     icon: <PageIcon />,
     name: "Store",
     subItems: [
+      { name: "Site Content", path: "/store/content", permission: "store.manage", exact: true },
       { name: "Product Content", path: "/store/products", permission: "store.view", exact: true },
       { name: "Color Options", path: "/store/colors", permission: "store.manage", exact: true },
     ],

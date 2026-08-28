@@ -5,40 +5,66 @@ import Link from "next/link";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 
-const PANORAMA_IMAGE = "/assets/images/panorama/image2.jpg";
-const HERO_POSTER = "/assets/images/img(3).jpg";
+export type HomeHeroContent = {
+  eyebrow: string | null;
+  title: string;
+  highlight: string | null;
+  subtitle: string | null;
+  primaryLabel: string | null;
+  primaryHref: string | null;
+  secondaryLabel: string | null;
+  secondaryHref: string | null;
+  posterUrl: string;
+  panoramaUrl: string | null;
+  panoramaEnabled: boolean;
+};
 
-export default function Hero() {
+function renderTitle(title: string, highlight: string | null) {
+  if (!highlight) return title;
+  const index = title.toLowerCase().indexOf(highlight.toLowerCase());
+  if (index < 0) {
+    return (
+      <>
+        {title} <span className="highlight">{highlight}</span>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {title.slice(0, index)}
+      <span className="highlight">{title.slice(index, index + highlight.length)}</span>
+      {title.slice(index + highlight.length)}
+    </>
+  );
+}
+
+export default function Hero({ content }: { content: HomeHeroContent }) {
   const [shouldLoadPanorama, setShouldLoadPanorama] = useState(false);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const viewerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const desktopQuery = window.matchMedia("(min-width: 1024px)");
-    const reducedMotionQuery = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    );
+    if (!content.panoramaEnabled || !content.panoramaUrl) return;
 
+    const desktopQuery = window.matchMedia("(min-width: 1024px)");
+    const reducedMotionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (!desktopQuery.matches || reducedMotionQuery.matches) return;
 
-    const timer = window.setTimeout(() => {
-      setShouldLoadPanorama(true);
-    }, 1200);
-
+    const timer = window.setTimeout(() => setShouldLoadPanorama(true), 1200);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [content.panoramaEnabled, content.panoramaUrl]);
 
   useEffect(() => {
-    if (!shouldLoadPanorama || !isScriptLoaded || !containerRef.current) return;
-
+    if (!shouldLoadPanorama || !isScriptLoaded || !containerRef.current || !content.panoramaUrl) return;
     const pannellum = (window as any)?.pannellum;
     if (!pannellum) return;
 
     try {
       viewerRef.current = pannellum.viewer(containerRef.current, {
         type: "equirectangular",
-        panorama: PANORAMA_IMAGE,
+        panorama: content.panoramaUrl,
         autoLoad: true,
         showControls: false,
         hfov: 125,
@@ -61,105 +87,45 @@ export default function Hero() {
         viewerRef.current = null;
       }
     };
-  }, [isScriptLoaded, shouldLoadPanorama]);
+  }, [content.panoramaUrl, isScriptLoaded, shouldLoadPanorama]);
 
   return (
     <section className="hero" id="home">
       <div
         className="pano"
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100vh",
-          zIndex: 0,
-          overflow: "hidden",
-          backgroundColor: "#000",
-        }}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100vh", zIndex: 0, overflow: "hidden", backgroundColor: "#000" }}
       >
         <Image
-          src={HERO_POSTER}
+          src={content.posterUrl}
           alt="Oakwell Cabinetry interior"
           fill
           priority
           sizes="100vw"
           style={{ objectFit: "cover" }}
         />
-        <div
-          ref={containerRef}
-          aria-hidden="true"
-          style={{ position: "absolute", inset: 0, zIndex: 1 }}
-        />
+        {content.panoramaEnabled && content.panoramaUrl ? (
+          <div ref={containerRef} aria-hidden="true" style={{ position: "absolute", inset: 0, zIndex: 1 }} />
+        ) : null}
       </div>
 
-      {shouldLoadPanorama && !isScriptLoaded && (
-        <Script
-          src="/assets/js/mainpanorama.js"
-          strategy="lazyOnload"
-          onLoad={() => setIsScriptLoaded(true)}
-        />
-      )}
+      {shouldLoadPanorama && !isScriptLoaded ? (
+        <Script src="/assets/js/mainpanorama.js" strategy="lazyOnload" onLoad={() => setIsScriptLoaded(true)} />
+      ) : null}
 
-      <div className="hero-overlay"></div>
-
-      <div
-        className="container-fluid mx-5-auto px-5"
-        style={{ position: "relative", zIndex: 10 }}
-      >
+      <div className="hero-overlay" />
+      <div className="container-fluid mx-5-auto px-5" style={{ position: "relative", zIndex: 10 }}>
         <div className="hero-content">
           <div className="hero-text">
-            <h1>
-              QUALITY CABINETS AT
-              <br />
-              JUST THE <span className="highlight">RIGHT PRICE</span>
-            </h1>
-            <p>
-              9 DOOR STYLES READY IN JUST ONE BUSINESS DAY! <br />
-            </p>
+            {content.eyebrow ? <span className="section-tag">{content.eyebrow}</span> : null}
+            <h1>{renderTitle(content.title, content.highlight)}</h1>
+            {content.subtitle ? <p>{content.subtitle}</p> : null}
             <div className="hero-cta">
-              <Link href="#contact" className="btn-primary">
-                Contact Us
-              </Link>
-              <Link href="/products" className="btn-secondary">
-                View Products
-              </Link>
-            </div>
-          </div>
-          <div className="hero-image">
-            <div className="image-container">
-              <div className="floating-images">
-                <div className="float-img float-1">
-                  <Image
-                    src="/assets/images/floating(3).png"
-                    alt=""
-                    width={420}
-                    height={420}
-                    sizes="(max-width: 1023px) 35vw, 20vw"
-                  />
-                </div>
-                <div className="float-img float-2">
-                  <Image
-                    src="/assets/images/floating(2).jpg"
-                    alt=""
-                    width={420}
-                    height={420}
-                    sizes="(max-width: 1023px) 35vw, 20vw"
-                  />
-                </div>
-                <div className="float-img float-3">
-                  <Image
-                    src="/assets/images/floating(1).png"
-                    alt=""
-                    width={420}
-                    height={420}
-                    sizes="(max-width: 1023px) 35vw, 20vw"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="floating-badge">
-              <h1>200+</h1>
-              <p>Projects Completed</p>
+              {content.primaryLabel && content.primaryHref ? (
+                <Link href={content.primaryHref} className="btn-primary">{content.primaryLabel}</Link>
+              ) : null}
+              {content.secondaryLabel && content.secondaryHref ? (
+                <Link href={content.secondaryHref} className="btn-secondary">{content.secondaryLabel}</Link>
+              ) : null}
             </div>
           </div>
         </div>
