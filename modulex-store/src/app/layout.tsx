@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "@/css/locomotive-scroll.min.css";
 import "@/css/bootstrap.min.css";
@@ -8,7 +8,6 @@ import "@/css/style.css";
 import "@/css/media-queries.css";
 import "@/css/dark-mode.css";
 import "@/css/panorama.css";
-import Script from "next/script";
 import Preloader from "@/components/Preloader";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -16,10 +15,49 @@ import BackToTop from "@/components/BackToTop";
 import ThemeToggle from "@/components/ThemeToggle";
 import GalleryLightbox from "@/components/GalleryLightbox";
 import SmoothScroll from "@/components/SmoothScroll";
+import { getSiteUrl, siteConfig } from "@/config/site";
 
 export const metadata: Metadata = {
-  title: "Oakwell – Cabinetry",
-  description: "Cabinetry and Interior Design Studio",
+  metadataBase: getSiteUrl(),
+  title: {
+    default: "Oakwell Cabinetry",
+    template: "%s | Oakwell Cabinetry",
+  },
+  description: siteConfig.description,
+  applicationName: siteConfig.name,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: siteConfig.locale,
+    url: "/",
+    siteName: siteConfig.name,
+    title: "Oakwell Cabinetry",
+    description: siteConfig.description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Oakwell Cabinetry",
+    description: siteConfig.description,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -28,10 +66,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="icon" href="/assets/images/ico.png" type="image/x-icon" />
-      </head>
+    <html lang={siteConfig.language}>
       <body>
         <Suspense fallback={null}>
           <Preloader />
