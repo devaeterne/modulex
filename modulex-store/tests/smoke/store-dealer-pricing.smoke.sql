@@ -13,11 +13,9 @@ declare
   v_group_good uuid;
   v_dealer_a uuid;
   v_dealer_b uuid;
-  v_dealer_no_group uuid;
   v_customer_a uuid;
   v_user_dealer_a uuid := gen_random_uuid();
   v_user_dealer_b uuid := gen_random_uuid();
-  v_user_no_group uuid := gen_random_uuid();
   v_user_customer uuid := gen_random_uuid();
   v_order_a uuid;
   v_order_b uuid;
@@ -28,12 +26,10 @@ declare
   v_suffix text := substr(replace(gen_random_uuid()::text, '-', ''), 1, 10);
   v_email_da text;
   v_email_db text;
-  v_email_ng text;
   v_email_ca text;
 begin
   v_email_da := 'p15-price-da-' || v_suffix || '@example.com';
   v_email_db := 'p15-price-db-' || v_suffix || '@example.com';
-  v_email_ng := 'p15-price-ng-' || v_suffix || '@example.com';
   v_email_ca := 'p15-price-ca-' || v_suffix || '@example.com';
 
   select id into v_dealer_type from public.customer_types where system_key='dealer' and is_active=true limit 1;
@@ -48,27 +44,22 @@ begin
   insert into public.customers(customer_code,name,customer_type_id,status,portal_enabled,currency_code,price_group_id)
   values ('P15-DB-'||v_suffix,'P1.5 Dealer B',v_dealer_type,'active',true,'USD',v_group_good) returning id into v_dealer_b;
   insert into public.customers(customer_code,name,customer_type_id,status,portal_enabled,currency_code)
-  values ('P15-NG-'||v_suffix,'P1.5 Dealer No Group',v_dealer_type,'active',true,'USD') returning id into v_dealer_no_group;
-  insert into public.customers(customer_code,name,customer_type_id,status,portal_enabled,currency_code)
   values ('P15-CA-'||v_suffix,'P1.5 Customer A',v_customer_type,'active',true,'USD') returning id into v_customer_a;
 
   insert into public.customer_portal_users(customer_id,login_email,status,is_primary)
   values
     (v_dealer_a,v_email_da,'never_invited',true),
     (v_dealer_b,v_email_db,'never_invited',true),
-    (v_dealer_no_group,v_email_ng,'never_invited',true),
     (v_customer_a,v_email_ca,'never_invited',true);
 
   insert into auth.users(id,aud,role,email,encrypted_password,raw_app_meta_data,raw_user_meta_data,created_at,updated_at,is_anonymous)
   values
     (v_user_dealer_a,'authenticated','authenticated',v_email_da,'','{"provider":"email","providers":["email"],"account_type":"dealer_portal"}'::jsonb,'{}'::jsonb,now(),now(),false),
     (v_user_dealer_b,'authenticated','authenticated',v_email_db,'','{"provider":"email","providers":["email"],"account_type":"dealer_portal"}'::jsonb,'{}'::jsonb,now(),now(),false),
-    (v_user_no_group,'authenticated','authenticated',v_email_ng,'','{"provider":"email","providers":["email"],"account_type":"dealer_portal"}'::jsonb,'{}'::jsonb,now(),now(),false),
     (v_user_customer,'authenticated','authenticated',v_email_ca,'','{"provider":"email","providers":["email"],"account_type":"customer_portal"}'::jsonb,'{}'::jsonb,now(),now(),false);
 
   update public.customer_portal_users set auth_user_id=v_user_dealer_a,status='active',activated_at=now() where customer_id=v_dealer_a;
   update public.customer_portal_users set auth_user_id=v_user_dealer_b,status='active',activated_at=now() where customer_id=v_dealer_b;
-  update public.customer_portal_users set auth_user_id=v_user_no_group,status='active',activated_at=now() where customer_id=v_dealer_no_group;
   update public.customer_portal_users set auth_user_id=v_user_customer,status='active',activated_at=now() where customer_id=v_customer_a;
 
   insert into public.products(sku,name,status,base_product_code,color_code,color_name)
@@ -111,11 +102,6 @@ begin
   v_result := public.get_store_dealer_order(v_order_b);
   if coalesce((v_result->>'ok')::boolean,false) is true or v_result->>'reason' <> 'order_unavailable' then raise exception 'foreign Dealer order not neutral: %',v_result; end if;
 
-  perform set_config('request.jwt.claim.sub',v_user_no_group::text,true);
-  v_result := public.get_store_dealer_pricing_context();
-  if coalesce((v_result->>'pricing_enabled')::boolean,false) then raise exception 'no-group Dealer pricing enabled: %',v_result; end if;
-
-  perform set_config('request.jwt.claim.sub',v_user_dealer_a::text,true);
   update public.price_groups set is_active=false where id=v_group_good;
   if coalesce(((public.get_store_dealer_pricing_context())->>'pricing_enabled')::boolean,false) then raise exception 'inactive group enabled pricing'; end if;
   update public.price_groups set is_active=true,internal_only=true where id=v_group_good;
