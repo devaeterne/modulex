@@ -1,0 +1,39 @@
+name: A1.2B Roadmap Closeout Patch
+
+on:
+  push:
+    branches:
+      - docs/admin-a1-2b-production-acceptance
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact roadmap patch
+        run: node modulex-admin/scripts/apply-a12b-closeout.mjs
+      - name: Verify roadmap state
+        run: |
+          grep -F 'Current Admin next action: **A1.2C — define immutable vs editable fields by order lifecycle state**' modulex-admin/ADMIN_ROADMAP.md
+          grep -F -- '- [x] Verify create/edit/detail flows use one domain contract. (A1.2B)' modulex-admin/ADMIN_ROADMAP.md
+          grep -F -- '- [ ] Define immutable vs editable fields by order lifecycle state. (A1.2C)' modulex-admin/ADMIN_ROADMAP.md
+          grep -F 'dpl_EZnRkBzEpnU4quNdKPS2XAWaQy86' modulex-admin/ADMIN_ROADMAP.md
+          git diff --check
+      - name: Remove temporary patch helpers
+        run: |
+          rm .github/workflows/a12b-closeout-patch.yml
+          rm modulex-admin/scripts/apply-a12b-closeout.mjs
+      - name: Commit closeout
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add modulex-admin/ADMIN_ROADMAP.md .github/workflows/a12b-closeout-patch.yml modulex-admin/scripts/apply-a12b-closeout.mjs
+          git diff --cached --check
+          git commit -m 'docs(admin): close A1.2B production acceptance'
+          git push
