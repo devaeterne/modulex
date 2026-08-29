@@ -1,0 +1,28 @@
+name: A0.2 Warehouse mutation guard
+
+on:
+  push:
+    branches:
+      - hotfix/admin-warehouse-list-mutation-rbac
+    paths:
+      - modulex-admin/**
+      - .github/workflows/a0-2-warehouse-mutation-guard.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rbac:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - run: npm run smoke:rbac
