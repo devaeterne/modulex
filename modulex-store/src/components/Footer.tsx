@@ -70,6 +70,7 @@ export default function Footer({
           <h3>Company</h3>
           <ul>
             <li><Link href="/about">About Us</Link></li>
+            <li><Link href="/showroom">Showroom</Link></li>
             <li>
               <TrackedLink href="/contact" event="contact_click" payload={{ context: "footer_company" }}>
                 Contact
