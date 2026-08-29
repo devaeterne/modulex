@@ -13,6 +13,8 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export type Permission =
   | "dashboard.view"
   | "profile.view"
+  | "requests.view"
+  | "requests.manage"
   | "products.view"
   | "products.manage"
   | "store.view"
@@ -56,6 +58,8 @@ export type Permission =
 export const PERMISSION_LABELS: Record<Permission, string> = {
   "dashboard.view": "View dashboard",
   "profile.view": "View own profile",
+  "requests.view": "View and create own requests",
+  "requests.manage": "Manage all requests",
   "products.view": "View products",
   "products.manage": "Manage products, brands & categories",
   "store.view": "View Store content",
@@ -105,6 +109,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   sales: [
     "dashboard.view",
     "profile.view",
+    "requests.view",
     "products.view",
     "leads.view",
     "leads.manage",
@@ -127,6 +132,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   finance: [
     "dashboard.view",
     "profile.view",
+    "requests.view",
     "products.view",
     "pricing.view",
     "pricing.cost.view",
@@ -142,6 +148,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   hr: [
     "profile.view",
+    "requests.view",
     "personnel.view",
     "personnel.manage",
     "training.view",
@@ -149,6 +156,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   warehouse: [
     "dashboard.view",
     "profile.view",
+    "requests.view",
     "products.view",
     "shipments.view",
     "shipments.manage",
@@ -162,6 +170,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   shipping: [
     "dashboard.view",
     "profile.view",
+    "requests.view",
     "products.view",
     "shipments.view",
     "shipments.manage",
@@ -197,6 +206,7 @@ export function isAdminRole(role: UserRole | null | undefined) {
 
 const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Permission }> = [
   { match: (path) => path === "/profile" || path.startsWith("/profile/"), permission: "profile.view" },
+  { match: (path) => path === "/requests" || path.startsWith("/requests/"), permission: "requests.view" },
   { match: (path) => path === "/training" || path.startsWith("/training/"), permission: "training.view" },
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },

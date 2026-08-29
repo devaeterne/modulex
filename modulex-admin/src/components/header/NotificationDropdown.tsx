@@ -15,6 +15,11 @@ import {
 } from "@/lib/notifications";
 
 const NOTIFICATION_POLL_INTERVAL_MS = 60_000;
+const REQUEST_NOTIFICATION_TYPES = new Set<NotificationEventType>([
+  "request_created",
+  "request_updated",
+  "request_completed",
+]);
 
 type InventoryAlertRow = {
   inventory_id: string;
@@ -38,6 +43,18 @@ type PanelFeedRow = {
   reference: string | null;
   customer_name: string | null;
   payload: Record<string, unknown> | null;
+  created_at: string;
+};
+
+type UserNotificationRow = {
+  id: string;
+  event_type: string;
+  title: string;
+  description: string;
+  severity: "info" | "success" | "warning" | "critical";
+  href: string | null;
+  sound_enabled: boolean;
+  read_at: string | null;
   created_at: string;
 };
 
@@ -66,6 +83,9 @@ function notificationIcon(notification: AppNotification) {
     approval_requested: "APR",
     approval_approved: "OK",
     approval_rejected: "NO",
+    request_created: "REQ",
+    request_updated: "REQ",
+    request_completed: "REQ",
   };
   return <span className={base}>{labels[notification.type] ?? "!"}</span>;
 }
@@ -157,8 +177,10 @@ export default function NotificationDropdown() {
   const [userId, setUserId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [persistentReadIds, setPersistentReadIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const panelIdsRef = useRef<Set<string> | null>(null);
+  const userNotificationIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     armNotificationAudio();
@@ -179,11 +201,16 @@ export default function NotificationDropdown() {
         if (initial) setIsLoading(true);
         const profile = currentProfile;
         const next: AppNotification[] = [];
-        const [panelResult, stockResult] = await Promise.all([
+        const [panelResult, stockResult, userResult] = await Promise.all([
           supabase.rpc("get_panel_notification_feed", { p_limit: 30 }),
           canRoleSeeNotification(profile.role, "low_stock")
             ? supabase.rpc("search_stock", { p_query: "", p_limit: 100 })
             : Promise.resolve({ data: [] as InventoryAlertRow[] }),
+          supabase
+            .from("user_notifications")
+            .select("id,event_type,title,description,severity,href,sound_enabled,read_at,created_at")
+            .order("created_at", { ascending: false })
+            .limit(30),
         ]);
 
         const panelRows = ((panelResult.data as PanelFeedRow[] | null) ?? []);
@@ -227,7 +254,35 @@ export default function NotificationDropdown() {
           });
         }
 
+        const userRows = ((userResult.data as UserNotificationRow[] | null) ?? [])
+          .filter((row) => REQUEST_NOTIFICATION_TYPES.has(row.event_type as NotificationEventType));
+        const currentUserIds = new Set(userRows.map((row) => row.id));
+        const previousUserIds = userNotificationIdsRef.current;
+        if (previousUserIds) {
+          const hasNewRequestEvent = userRows.some((row) => row.sound_enabled && !previousUserIds.has(row.id));
+          if (hasNewRequestEvent) queueNotificationChime();
+        }
+        userNotificationIdsRef.current = currentUserIds;
+
+        const nextPersistentReadIds = new Set<string>();
+        for (const row of userRows) {
+          const type = row.event_type as NotificationEventType;
+          if (!canRoleSeeNotification(profile.role, type)) continue;
+          const id = `user:${row.id}`;
+          if (row.read_at) nextPersistentReadIds.add(id);
+          next.push({
+            id,
+            type,
+            title: row.title,
+            description: row.description,
+            severity: row.severity,
+            href: row.href ?? "/requests",
+            timeLabel: relativeTime(row.created_at),
+          });
+        }
+
         if (!mounted) return;
+        setPersistentReadIds(nextPersistentReadIds);
         setNotifications(next);
         setIsLoading(false);
       } finally {
@@ -269,7 +324,8 @@ export default function NotificationDropdown() {
   }, []);
 
   const visibleNotifications = useMemo(() => role ? notifications.filter((notification) => canRoleSeeNotification(role, notification.type)) : [], [notifications, role]);
-  const unreadCount = useMemo(() => visibleNotifications.filter((notification) => !readIds.has(notification.id)).length, [visibleNotifications, readIds]);
+  const isRead = (id: string) => id.startsWith("user:") ? persistentReadIds.has(id) : readIds.has(id);
+  const unreadCount = visibleNotifications.filter((notification) => notification.id.startsWith("user:") ? !persistentReadIds.has(notification.id) : !readIds.has(notification.id)).length;
 
   function persistReadIds(next: Set<string>) {
     setReadIds(next);
@@ -277,17 +333,28 @@ export default function NotificationDropdown() {
     try { window.localStorage.setItem(readStorageKey(userId), JSON.stringify(Array.from(next).slice(-500))); } catch { /* non-critical */ }
   }
 
-  function markAsRead(id: string) {
-    if (readIds.has(id)) return;
+  async function markAsRead(id: string) {
+    if (isRead(id)) return;
+    if (id.startsWith("user:")) {
+      setPersistentReadIds((current) => new Set(current).add(id));
+      await supabase.rpc("mark_user_notification_read", { p_notification_id: id.slice(5) });
+      return;
+    }
     const next = new Set(readIds);
     next.add(id);
     persistReadIds(next);
   }
 
-  function markAllAsRead() {
+  async function markAllAsRead() {
     const next = new Set(readIds);
-    visibleNotifications.forEach((notification) => next.add(notification.id));
+    visibleNotifications.filter((notification) => !notification.id.startsWith("user:")).forEach((notification) => next.add(notification.id));
     persistReadIds(next);
+    setPersistentReadIds((current) => {
+      const result = new Set(current);
+      visibleNotifications.filter((notification) => notification.id.startsWith("user:")).forEach((notification) => result.add(notification.id));
+      return result;
+    });
+    await supabase.rpc("mark_all_user_notifications_read");
   }
 
   return <div className="relative">
@@ -298,16 +365,16 @@ export default function NotificationDropdown() {
 
     <Dropdown isOpen={isOpen} onClose={() => setIsOpen(false)} className="absolute -right-[240px] mt-[17px] flex w-[360px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[400px] lg:right-0">
       <div className="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
-        <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><h5 className="text-base font-semibold text-gray-800 dark:text-white/90">Notifications</h5>{unreadCount > 0 && <span className="rounded-full bg-error-50 px-2 py-0.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400">{unreadCount} new</span>}</div><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Actionable updates for your assigned role</p></div><button type="button" onClick={() => setIsOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5" aria-label="Close notifications">×</button></div>
-        {unreadCount > 0 && <button type="button" onClick={markAllAsRead} className="mt-3 text-xs font-medium text-brand-500 hover:text-brand-600">Mark all as read</button>}
+        <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><h5 className="text-base font-semibold text-gray-800 dark:text-white/90">Notifications</h5>{unreadCount > 0 && <span className="rounded-full bg-error-50 px-2 py-0.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400">{unreadCount} new</span>}</div><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Actionable updates for your assigned role and requests</p></div><button type="button" onClick={() => setIsOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5" aria-label="Close notifications">×</button></div>
+        {unreadCount > 0 && <button type="button" onClick={() => void markAllAsRead()} className="mt-3 text-xs font-medium text-brand-500 hover:text-brand-600">Mark all as read</button>}
       </div>
 
       <div className="max-h-[430px] overflow-y-auto custom-scrollbar">
         {isLoading ? <div className="flex min-h-[180px] items-center justify-center px-5 py-8 text-sm text-gray-500">Loading notifications...</div> : visibleNotifications.length === 0 ? <div className="flex min-h-[200px] flex-col items-center justify-center px-6 py-8 text-center"><span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-success-50 text-success-600">✓</span><p className="text-sm font-medium text-gray-800 dark:text-white/90">You&apos;re all caught up</p></div> : <ul className="divide-y divide-gray-100 dark:divide-gray-800">
           {visibleNotifications.map((notification) => {
-            const unread = !readIds.has(notification.id);
+            const unread = !isRead(notification.id);
             const styles = severityStyles(notification.severity);
-            return <li key={notification.id}><DropdownItem tag="a" href={notification.href ?? "/"} onClick={() => markAsRead(notification.id)} onItemClick={() => setIsOpen(false)} baseClassName="block w-full text-left" className={`relative flex gap-3 px-4 py-4 transition hover:bg-gray-50 dark:hover:bg-white/[0.03] ${unread ? "bg-brand-50/30 dark:bg-brand-500/[0.03]" : ""}`}>{unread && <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-brand-500" />}{notificationIcon(notification)}<span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-2"><span className="block text-sm font-medium text-gray-800 dark:text-white/90">{notification.title}</span><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${styles.badge}`}>{styles.label}</span></span><span className="mt-1.5 block text-xs leading-5 text-gray-500 dark:text-gray-400">{notification.description}</span><span className="mt-2 flex items-center gap-2 text-[11px] text-gray-400"><span className={`h-1.5 w-1.5 rounded-full ${styles.dot}`} />{notification.timeLabel}</span></span></DropdownItem></li>;
+            return <li key={notification.id}><DropdownItem tag="a" href={notification.href ?? "/"} onClick={() => void markAsRead(notification.id)} onItemClick={() => setIsOpen(false)} baseClassName="block w-full text-left" className={`relative flex gap-3 px-4 py-4 transition hover:bg-gray-50 dark:hover:bg-white/[0.03] ${unread ? "bg-brand-50/30 dark:bg-brand-500/[0.03]" : ""}`}>{unread && <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-brand-500" />}{notificationIcon(notification)}<span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-2"><span className="block text-sm font-medium text-gray-800 dark:text-white/90">{notification.title}</span><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${styles.badge}`}>{styles.label}</span></span><span className="mt-1.5 block text-xs leading-5 text-gray-500 dark:text-gray-400">{notification.description}</span><span className="mt-2 flex items-center gap-2 text-[11px] text-gray-400"><span className={`h-1.5 w-1.5 rounded-full ${styles.dot}`} />{notification.timeLabel}</span></span></DropdownItem></li>;
           })}
         </ul>}
       </div>
