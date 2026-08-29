@@ -97,7 +97,6 @@ export default function Footer({
             ) : null}
             {addressLine ? <li><span>{addressLine}</span></li> : null}
             {localityLine ? <li><span>{localityLine}</span></li> : null}
-            {company?.website ? <li><a href={company.website} target="_blank" rel="noopener noreferrer">Website</a></li> : null}
             {!company?.email && !company?.phone && !addressLine && !localityLine ? (
               <li>
                 <TrackedLink href="/contact" event="contact_click" payload={{ context: "footer_fallback" }}>

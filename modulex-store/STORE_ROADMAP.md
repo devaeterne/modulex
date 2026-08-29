@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `6cbd27198d930cb129b912fa4faece3bf967e292`
+Main baseline: `23e5d365876dc65dae9a46645f0627d8f38bc683`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -98,6 +98,11 @@ These rules are mandatory for all future Modulex Store work:
   - Search for `+1555`, `href="#"`, `.html` legacy links, fake offers, demo author/testimonial names, and template-only copy.
   - **Done when:** automated contract test passes with zero blocked placeholder patterns.
   - Verified by the public-production contract in the passing Store smoke chain; no blocked production placeholder pattern remains in the guarded surface.
+
+- [x] Remove redundant Oakwell website self-links from public contact surfaces.
+  - Contact no longer treats the canonical website as a contact method; About and Footer do not render a link back to the same Oakwell site the visitor is already using.
+  - `company.website` remains part of the canonical company profile for legitimate metadata/structured-data or other non-redundant consumers.
+  - Guarded by the Store public-content contract.
 
 ## 2.0.2 Indexing and route exposure hardening
 
@@ -576,16 +581,15 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 
 The user-approved active workstream is the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Review and merge the **GC-1 source content/media manifest** package.
-2. After GC-1 merge, begin **GC-2 — Media library & optimization pipeline** from latest `main`.
-3. GC-2 owns source-byte acquisition, verified dimensions/bytes/MIME, SHA-256 exact deduplication, optional perceptual duplicate review, EXIF/GPS stripping, conservative resize/encoding, Supabase Storage upload, reusable media records and the Admin media-management surface required for ongoing operation.
-4. Do not publish or hard-code Granite source values/media; source URLs remain provenance and all public content continues to follow GC-0 attribution/publication rules.
-5. Keep Phase 2.1 Gallery/Projects marked `[~]` until approved real Gallery/Project content is published and live readiness is accepted; GC-5 may provide the curated content required to close that blocker.
-6. Package D — configurable Navbar/Footer remains an open Phase 2.1 capability and must follow the same Admin-managed dynamic-content rule.
-7. Before every new package, re-read current `main` and both roadmaps because parallel Modulex PRs may have landed.
+1. Begin **GC-2 — Media library & optimization pipeline** from latest `main` after the bounded public self-link cleanup is merged.
+2. GC-2 owns source-byte acquisition, verified dimensions/bytes/MIME, SHA-256 exact deduplication, optional perceptual duplicate review, EXIF/GPS stripping, conservative resize/encoding, Supabase Storage upload, reusable media records and the Admin media-management surface required for ongoing operation.
+3. Do not publish or hard-code Granite source values/media; source URLs remain provenance and all public content continues to follow GC-0 attribution/publication rules.
+4. Keep Phase 2.1 Gallery/Projects marked `[~]` until approved real Gallery/Project content is published and live readiness is accepted; GC-5 may provide the curated content required to close that blocker.
+5. Package D — configurable Navbar/Footer remains an open Phase 2.1 capability and must follow the same Admin-managed dynamic-content rule.
+6. Before every new package, re-read current `main` and both roadmaps because parallel Modulex PRs may have landed.
 
 **Package C branch verification:** GitHub Actions run `33244098018` passed the Phase 2.1C public-content contract, public-production contract, full Store smoke, lint, and Next.js/TypeScript build.
 
-**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending → Granite roadmap #104 merged → GC-0 #105 merged → dynamic-content architecture/ownership #108 merged → GC-1 source manifest complete for review → GC-2 next after merge.
+**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending → Granite roadmap #104 merged → GC-0 #105 merged → dynamic-content architecture/ownership #108 merged → GC-1 source manifest merged via #110 → public Contact self-link cleanup merged via #111 → GC-2 next after this bounded self-link follow-up.
 
 **Admin coordination:** GC-1 started from current main `6cbd27198d930cb129b912fa4faece3bf967e292`, which includes parallel Admin dashboard-truth PR #107 and dynamic-content PR #108. Primary Admin A0 cleanup remains independent; Granite work only adds coordinated A4/A5 CMS/settings responsibilities and must not overwrite parallel Admin roadmap progress.

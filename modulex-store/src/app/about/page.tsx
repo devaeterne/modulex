@@ -145,7 +145,7 @@ export default async function About() {
         </div>
       </section>
 
-      {company?.email || company?.phone || addressLines.length > 0 || company?.website ? (
+      {company?.email || company?.phone || addressLines.length > 0 ? (
         <section className="process-section">
           <div className="container py-5">
             <div className="section-header text-center">
@@ -173,13 +173,6 @@ export default async function About() {
                         <div key={line}>{line}</div>
                       ))}
                     </address>
-                  ) : null}
-                  {company?.website ? (
-                    <p>
-                      <a href={company.website} target="_blank" rel="noopener noreferrer">
-                        Company Website
-                      </a>
-                    </p>
                   ) : null}
                 </div>
               </div>
