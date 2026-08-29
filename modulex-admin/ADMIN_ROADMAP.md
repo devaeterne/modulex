@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `be710a72b1b69c0cdc41f39f08e6223ce646328b`
+Main baseline: `01d3fe68b35e346aced37f13fb3baadbd741c955`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
-Current cross-roadmap package: **Store Phase 2.1C — public About/Gallery implementation verified; merge/deploy and live content acceptance pending**
+Current cross-roadmap package: **Store Phase 2.1C — About live accepted; Gallery/Projects content acceptance pending**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -238,7 +238,7 @@ These rules are mandatory for all future Modulex Admin work:
   - Package B adds dedicated `/store/pages` and `/store/projects` management rather than extending the large existing Site Content editor.
   - Implemented with `store.manage` route/sidebar enforcement, admin/super_admin mutation controls, and existing production RLS as the real write boundary.
   - Verification: targeted secondary CMS Admin contract, lint, deterministic Admin contracts, and build passed in GitHub Actions run `33243001683`.
-  - Package C Store consumer implementation is verified in Store run `33244098018`: published-only About/Gallery queries, fail-closed Gallery readiness, conditional Navbar/sitemap exposure, and project media rendering now consume the Package A/B CMS foundation. No new Admin schema or production database change is required for Package C.
+  - Package C Store consumer implementation is verified in Store run `33244098018`: published-only About/Gallery queries, fail-closed Gallery readiness, conditional Navbar/sitemap exposure, and project media rendering now consume the Package A/B CMS foundation. No new Admin schema or production database change is required for Package C. About production content is now published and live-accepted; Gallery remains intentionally closed until approved real project content exists.
 - [x] Add draft/published workflow where required.
   - Pages and Projects expose separate Save draft / Publish / Unpublish actions; uploads do not auto-publish.
 - [x] Add SEO/OG/media fields with validation.
