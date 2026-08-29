@@ -2,6 +2,59 @@
 -- Preserve the existing project CMS while making reviewed Media Library assets
 -- the authoritative publication source for project imagery.
 
+-- Reconcile Store authorization with PR #143 without making this migration
+-- depend on production-only RBAC SQL. When user_roles exists, effective roles
+-- participate; clean replay safely falls back to the active legacy profile role.
+create or replace function private.store_current_user_has_any_role(allowed_roles text[])
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_has_role boolean := false;
+begin
+  if auth.uid() is null then
+    return false;
+  end if;
+
+  if pg_catalog.to_regclass('public.user_roles') is not null then
+    execute $sql$
+      select exists (
+        select 1
+        from public.user_roles ur
+        join public.profiles p on p.id = ur.user_id
+        where ur.user_id = $1
+          and p.is_active
+          and ur.role::text = any($2)
+      )
+    $sql$
+    into v_has_role
+    using auth.uid(), allowed_roles;
+
+    if v_has_role then
+      return true;
+    end if;
+  end if;
+
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.is_active
+      and p.role::text = any(allowed_roles)
+  )
+  into v_has_role;
+
+  return coalesce(v_has_role, false);
+end;
+$$;
+
+revoke all on function private.store_current_user_has_any_role(text[]) from public;
+revoke all on function private.store_current_user_has_any_role(text[]) from anon;
+grant execute on function private.store_current_user_has_any_role(text[]) to authenticated, service_role;
+
 alter table public.store_projects
   add column if not exists cover_media_asset_id uuid references public.store_media_assets(id) on delete restrict,
   add column if not exists attribution_classification text not null default 'oakwell_owned',
@@ -320,24 +373,24 @@ for each row execute function private.protect_published_project_media_asset();
 drop policy if exists store_projects_internal_read on public.store_projects;
 create policy store_projects_internal_read
 on public.store_projects for select to authenticated
-using ((select private.current_user_has_any_role(array['super_admin', 'admin', 'sales']::text[])));
+using ((select private.store_current_user_has_any_role(array['super_admin', 'admin', 'sales']::text[])));
 
 drop policy if exists store_projects_admin_all on public.store_projects;
 create policy store_projects_admin_all
 on public.store_projects for all to authenticated
-using ((select private.current_user_has_any_role(array['super_admin', 'admin']::text[])))
-with check ((select private.current_user_has_any_role(array['super_admin', 'admin']::text[])));
+using ((select private.store_current_user_has_any_role(array['super_admin', 'admin']::text[])))
+with check ((select private.store_current_user_has_any_role(array['super_admin', 'admin']::text[])));
 
 drop policy if exists store_project_media_internal_read on public.store_project_media;
 create policy store_project_media_internal_read
 on public.store_project_media for select to authenticated
-using ((select private.current_user_has_any_role(array['super_admin', 'admin', 'sales']::text[])));
+using ((select private.store_current_user_has_any_role(array['super_admin', 'admin', 'sales']::text[])));
 
 drop policy if exists store_project_media_admin_all on public.store_project_media;
 create policy store_project_media_admin_all
 on public.store_project_media for all to authenticated
-using ((select private.current_user_has_any_role(array['super_admin', 'admin']::text[])))
-with check ((select private.current_user_has_any_role(array['super_admin', 'admin']::text[])));
+using ((select private.store_current_user_has_any_role(array['super_admin', 'admin']::text[])))
+with check ((select private.store_current_user_has_any_role(array['super_admin', 'admin']::text[])));
 
 revoke all on table public.store_projects from anon;
 revoke all on table public.store_project_media from anon;
