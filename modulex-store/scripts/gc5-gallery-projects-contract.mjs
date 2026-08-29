@@ -70,6 +70,17 @@ assert.match(
   "A project using parent-attributed assets must itself publish as parent-attributed",
 );
 
+assert.match(
+  migration,
+  /protect_published_project_media_asset[\s\S]*new\.public_path\s+is\s+distinct\s+from\s+old\.public_path/i,
+  "A Media Library object path must be immutable while referenced by a published project",
+);
+assert.match(
+  migration,
+  /protect_published_project_media_asset[\s\S]*new\.attribution_classification\s+is\s+distinct\s+from\s+old\.attribution_classification/i,
+  "Referenced asset attribution classification must not change behind a published project",
+);
+
 for (const fn of ["get_store_public_projects", "get_store_public_project", "get_store_public_project_media"]) {
   const publicFunction = migration.match(new RegExp(`create\\s+or\\s+replace\\s+function\\s+public\\.${fn}[\\s\\S]*?(?=create\\s+or\\s+replace\\s+function|revoke|grant|$)`, "i"))?.[0] ?? "";
   assert.ok(publicFunction, `GC-5 migration must replace public.${fn}`);
