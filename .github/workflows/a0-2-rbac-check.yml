@@ -1,0 +1,29 @@
+name: A0.2 RBAC check
+
+on:
+  push:
+    branches:
+      - phase-a0/admin-rbac-truth
+    paths:
+      - modulex-admin/scripts/rbac-smoke.mjs
+      - modulex-admin/src/lib/auth/permissions.ts
+      - .github/workflows/a0-2-rbac-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  rbac:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - run: npm run smoke:rbac
