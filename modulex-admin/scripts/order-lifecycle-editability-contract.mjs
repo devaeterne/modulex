@@ -7,6 +7,7 @@ const domain = fs.readFileSync(path.join(root, "src/lib/customers/order-domain.t
 const editOrder = fs.readFileSync(path.join(root, "src/components/customers/EditCustomerOrder.tsx"), "utf8");
 const editActions = fs.readFileSync(path.join(root, "src/components/customers/CustomerOrderEditActions.tsx"), "utf8");
 const sqlPath = path.join(root, "sql/customer-order-lifecycle-editability.sql");
+const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
 function assert(condition, message) {
   if (!condition) {
@@ -44,5 +45,8 @@ assert(sql.includes("v_revision_mode = 'approval'"), "DB update wrapper must pre
 for (const status of ["shipped", "delivered", "installation_scheduled", "installation_in_progress", "completed", "cancelled"]) {
   assert(sql.includes(`'${status}'`), `DB lock contract must include ${status}`);
 }
+
+assert(pkg.scripts?.["smoke:order-lifecycle"] === "node scripts/order-lifecycle-editability-contract.mjs", "package.json must expose smoke:order-lifecycle");
+assert(pkg.scripts?.smoke?.includes("smoke:order-lifecycle"), "main Admin smoke chain must include smoke:order-lifecycle");
 
 console.log("PASS: order lifecycle editability contract");
