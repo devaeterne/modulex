@@ -1,0 +1,23 @@
+name: A1.2A directory view contract
+
+on:
+  push:
+    branches:
+      - phase-a1/order-list-consistency
+
+permissions:
+  contents: read
+
+jobs:
+  order-list-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run A1.2A contract
+        run: node scripts/order-list-consistency-contract.mjs
