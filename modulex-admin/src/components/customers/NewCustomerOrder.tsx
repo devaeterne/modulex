@@ -3,15 +3,20 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
-import { getCurrentProfile } from "@/lib/supabase/profile";
 import OrderProductPicker, { type OrderPickerProduct } from "@/components/customers/OrderProductPicker";
+import {
+  createCustomerOrder,
+  loadCreateOrderContext,
+  loadOrderPrices,
+  type OrderPriceRow,
+  type OrderTaxRule,
+} from "@/lib/customers/order-domain";
 import type { Customer, CustomerAddress, OrderFulfillmentType, PaymentMethod, PriceGroupLookup } from "@/lib/customers/types";
 
 type Product = OrderPickerProduct;
-type PriceRow = { product_id: string; price_group_id: string; amount: string | number };
+type PriceRow = OrderPriceRow;
 type DraftItem = { product_id: string; quantity: string; discount_percent: string };
-type TaxRule = { fulfillment_type: OrderFulfillmentType; tax_rate: string | number | null; is_active: boolean };
+type TaxRule = OrderTaxRule;
 
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
 
@@ -52,58 +57,42 @@ export default function NewCustomerOrder() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     async function load() {
-      const { profile, error: profileError } = await getCurrentProfile();
-      if (profileError) {
-        setErrorMessage(profileError.message);
-        setIsLoading(false);
-        return;
+      try {
+        const context = await loadCreateOrderContext(customerId);
+        if (!active) return;
+
+        const loadedCustomer = context.customer;
+        const loadedAddresses = context.addresses;
+        const loadedGroups = context.priceGroups;
+        const loadedMethods = context.paymentMethods;
+        const defaultMethod = loadedMethods.find((m) => m.system_key === "cash") ?? loadedMethods[0] ?? null;
+        const defaultGroup = loadedGroups.find((group) => group.id === loadedCustomer.price_group_id) ?? loadedGroups.find((group) => group.is_base_price) ?? loadedGroups[0] ?? null;
+
+        setCustomer(loadedCustomer);
+        setAddresses(loadedAddresses);
+        setPriceGroups(loadedGroups);
+        setPaymentMethods(loadedMethods);
+        setProducts(context.products as Product[]);
+        setTaxRules(context.taxRules);
+        setPriceGroupId(defaultGroup?.id || "");
+        setFulfillmentType(defaultGroup?.system_key === "pickup_level" ? "pickup" : "delivery");
+        setPaymentMethodId(defaultMethod?.id || "");
+        setPaymentCommissionPercent(String(Number(defaultMethod?.commission_percent ?? 0)));
+        setBillingAddressId(loadedAddresses.find((a) => a.is_default_billing)?.id || "");
+        setShippingAddressId(loadedAddresses.find((a) => a.is_default_shipping)?.id || "");
+      } catch (error) {
+        if (!active) return;
+        setErrorMessage(error instanceof Error ? error.message : "Unable to prepare order.");
+      } finally {
+        if (active) setIsLoading(false);
       }
-      if (!["super_admin", "admin", "sales"].includes(profile?.role ?? "")) {
-        setErrorMessage("You do not have permission to create orders.");
-        setIsLoading(false);
-        return;
-      }
-
-      const [customerResult, addressesResult, groupsResult, methodsResult, productsResult, taxRulesResult] = await Promise.all([
-        supabase.from("customers").select("*").eq("id", customerId).single(),
-        supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("address_name"),
-        supabase.from("price_groups").select("id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only").eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
-        supabase.from("payment_methods").select("id, system_key, name, commission_percent, sort_order, is_active").eq("is_active", true).order("sort_order"),
-        supabase.from("products").select("id, sku, name, barcode, status, brand, category, brand_id, category_id").eq("status", "active").order("sku"),
-        supabase.from("order_tax_rules").select("fulfillment_type, tax_rate, is_active"),
-      ]);
-
-      const firstError = customerResult.error || addressesResult.error || groupsResult.error || methodsResult.error || productsResult.error || taxRulesResult.error;
-      if (firstError) {
-        setErrorMessage(firstError.message);
-        setIsLoading(false);
-        return;
-      }
-
-      const loadedCustomer = customerResult.data as Customer;
-      const loadedAddresses = (addressesResult.data ?? []) as CustomerAddress[];
-      const loadedGroups = (groupsResult.data ?? []) as PriceGroupLookup[];
-      const loadedMethods = (methodsResult.data ?? []) as PaymentMethod[];
-      const defaultMethod = loadedMethods.find((m) => m.system_key === "cash") ?? loadedMethods[0] ?? null;
-      const defaultGroup = loadedGroups.find((group) => group.id === loadedCustomer.price_group_id) ?? loadedGroups.find((group) => group.is_base_price) ?? loadedGroups[0] ?? null;
-
-      setCustomer(loadedCustomer);
-      setAddresses(loadedAddresses);
-      setPriceGroups(loadedGroups);
-      setPaymentMethods(loadedMethods);
-      setProducts((productsResult.data ?? []) as Product[]);
-      setTaxRules((taxRulesResult.data ?? []) as TaxRule[]);
-      setPriceGroupId(defaultGroup?.id || "");
-      setFulfillmentType(defaultGroup?.system_key === "pickup_level" ? "pickup" : "delivery");
-      setPaymentMethodId(defaultMethod?.id || "");
-      setPaymentCommissionPercent(String(Number(defaultMethod?.commission_percent ?? 0)));
-      setBillingAddressId(loadedAddresses.find((a) => a.is_default_billing)?.id || "");
-      setShippingAddressId(loadedAddresses.find((a) => a.is_default_shipping)?.id || "");
-      setIsLoading(false);
     }
 
     void load();
+    return () => { active = false; };
   }, [customerId]);
 
   useEffect(() => {
@@ -120,27 +109,22 @@ export default function NewCustomerOrder() {
     let active = true;
     async function loadGroupPrices() {
       setIsLoadingPrices(true);
-      const { data, error } = await supabase
-        .from("product_prices")
-        .select("product_id, price_group_id, amount")
-        .eq("price_group_id", priceGroupId)
-        .eq("is_active", true)
-        .is("valid_to", null)
-        .eq("currency_code", "USD");
-
-      if (!active) return;
-      if (error) {
-        setErrorMessage(error.message);
+      try {
+        const data = await loadOrderPrices(priceGroupId, customer?.currency_code || "USD");
+        if (!active) return;
+        setPrices(data);
+      } catch (error) {
+        if (!active) return;
+        setErrorMessage(error instanceof Error ? error.message : "Unable to load order prices.");
         setPrices([]);
-      } else {
-        setPrices((data ?? []) as PriceRow[]);
+      } finally {
+        if (active) setIsLoadingPrices(false);
       }
-      setIsLoadingPrices(false);
     }
 
     void loadGroupPrices();
     return () => { active = false; };
-  }, [priceGroupId]);
+  }, [priceGroupId, customer?.currency_code]);
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const priceMap = useMemo(() => new Map(prices.map((p) => [p.product_id, Number(p.amount)])), [prices]);
@@ -221,37 +205,33 @@ export default function NewCustomerOrder() {
     }
 
     setIsSaving(true);
-    const payload = validItems.map((item) => ({
-      product_id: item.product_id,
-      quantity: Number(item.quantity),
-      discount_percent: Number(item.discount_percent || 0),
-    }));
-
-    const { data, error } = await supabase.rpc("create_customer_order", {
-      p_customer_id: customer.id,
-      p_items: payload,
-      p_price_group_id: priceGroupId,
-      p_billing_address_id: billingAddressId || null,
-      p_shipping_address_id: shippingAddressId || null,
-      p_expected_delivery_date: expectedDate || null,
-      p_customer_reference: reference.trim() || null,
-      p_customer_notes: customerNotes.trim() || null,
-      p_internal_notes: internalNotes.trim() || null,
-      p_tax_rate: Number(taxRate || 0),
-      p_order_discount_amount: Number(orderDiscount || 0),
-      p_payment_method_id: paymentMethodId,
-      p_payment_commission_percent: appliedCommissionPercent,
-      p_initial_status: initialStatus,
-      p_fulfillment_type: fulfillmentType,
-    });
-
-    if (error) {
-      setErrorMessage(error.message);
+    try {
+      const orderId = await createCustomerOrder({
+        customerId: customer.id,
+        items: validItems.map((item) => ({
+          productId: item.product_id,
+          quantity: item.quantity,
+          discountPercent: item.discount_percent,
+        })),
+        priceGroupId,
+        billingAddressId,
+        shippingAddressId,
+        expectedDeliveryDate: expectedDate,
+        customerReference: reference,
+        customerNotes,
+        internalNotes,
+        taxRate,
+        orderDiscountAmount: orderDiscount,
+        paymentMethodId,
+        paymentCommissionPercent: appliedCommissionPercent,
+        initialStatus,
+        fulfillmentType,
+      });
+      router.push(`/customers/${customer.id}/orders/${orderId}`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to create order.");
       setIsSaving(false);
-      return;
     }
-
-    router.push(`/customers/${customer.id}/orders/${data}`);
   }
 
   if (isLoading) return <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"><div className="text-center"><div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" /><p className="text-sm text-gray-500">Preparing order...</p></div></div>;
