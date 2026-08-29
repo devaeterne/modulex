@@ -9,12 +9,15 @@ permissions:
   contents: read
 
 jobs:
-  lint-admin:
+  verify-admin:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: modulex-admin
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,3 +31,7 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
+      - name: Deterministic smoke contracts
+        run: npm run smoke:rbac && npm run smoke:dealer-onboarding && npm run smoke:dealer-portal-admin && npm run smoke:store-portal-admin && npm run smoke:auth-recovery && npm run smoke:polling
+      - name: Build
+        run: npm run build
