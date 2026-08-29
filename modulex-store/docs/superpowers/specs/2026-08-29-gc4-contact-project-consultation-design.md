@@ -89,7 +89,9 @@ Add nullable/compatible fields:
 - `project_postal_code text`
 - `preferred_consultation_date date`
 
-`request_kind` is normalized so existing Contact records remain valid. The implementation may use a default/check constraint or migration backfill, but the final contract must make `general_inquiry` the deterministic Contact fallback and must reject consultation-only fields on Dealer Application submissions.
+`request_kind` is normalized so existing Contact records remain valid. The implementation may use a default/check constraint or migration backfill, but the final contract must make `general_inquiry` the deterministic Contact fallback.
+
+Consultation-only columns may be non-null only for `lead_type = 'contact'` with `request_kind = 'project_consultation'`. Non-empty consultation-only values submitted for General Inquiry or Dealer Application are rejected at the API/DB boundary rather than silently stored or reinterpreted.
 
 No new customer-upload token or document column is introduced for Contact/Project Consultation.
 
@@ -108,9 +110,11 @@ Introduce a small Admin-managed domain, planned as `store_lead_form_options`, wi
 The exact SQL naming/details may be refined during implementation to match current schema conventions, but the behavioral contract is fixed:
 
 - only the two approved option groups are allowed;
-- keys are stable identifiers, labels are mutable business copy;
+- keys are stable semantic identifiers and cannot be repurposed to mean something different;
+- labels are mutable presentation copy for the same stable semantic key;
 - active/inactive is business-managed;
 - ordering is business-managed;
+- ordinary Admin management uses activation/deactivation rather than destructive deletion so historical lead keys remain resolvable;
 - no business option rows are seeded by GC-4 without explicit approval;
 - ordinary option management must not require manual SQL.
 
@@ -179,7 +183,8 @@ If option projection loading fails, the form remains usable with the approved fi
 GC-4 extends its code-owned validation with bounded normalization for the new scalar fields. At minimum:
 
 - allow only `general_inquiry | project_consultation` for Contact;
-- reject/strip GC-4 project fields for Dealer Application according to the implementation's fail-closed validation contract;
+- treat an omitted Contact `request_kind` as `general_inquiry` for backward compatibility;
+- reject any non-empty GC-4 consultation-only field unless `lead_type = 'contact'` and `request_kind = 'project_consultation'`;
 - impose explicit maximum lengths on project address/city/postal/option keys;
 - parse preferred date strictly as a date-only value;
 - reject malformed dates;
@@ -194,6 +199,8 @@ The privileged submission implementation must independently validate the new con
 
 For `project_type` and `consultation_intent`, non-empty submitted keys are accepted only when a corresponding **active** Admin-managed option exists in the correct group. Disabled, unknown, cross-group or forged option keys fail closed.
 
+Consultation-only values are rejected unless the normalized submission is a Project Consultation Contact lead. This check exists independently of client behavior.
+
 The public caller must not gain direct write access to the option table or `store_leads` table as part of this validation.
 
 The existing public-wrapper/private-implementation RPC architecture must be retained or equivalently hardened. Any new privileged helper must follow the same explicit grant/revoke discipline and advisor review.
@@ -207,12 +214,14 @@ Existing `/store/leads` remains the operational lead queue.
 For a Project Consultation lead, the detail page adds a dedicated “Project Consultation” section showing:
 
 - request kind;
-- project type label/key as appropriate;
-- consultation intent label/key as appropriate;
+- project type current label plus stable key;
+- consultation intent current label plus stable key;
 - project address;
 - project city;
 - project postal code;
 - preferred consultation date.
+
+Inactive options remain available to authenticated Admin lead-detail lookups so historical keys still resolve after an option is deactivated. The stable key is always visible alongside the current label to preserve auditability if presentation copy changes.
 
 General Inquiry and Dealer Application detail behavior remains compatible.
 
@@ -230,9 +239,9 @@ It manages:
 - active state;
 - sort order.
 
-Configuration changes require Store-management-level authorization. Sales users may continue to review/manage leads according to the existing lead workflow but must not receive permission to edit public form configuration solely because they can read leads.
+Configuration changes require the existing `store.manage` authorization contract. Sales users may continue to review/manage leads according to the existing lead workflow but must not receive `store.manage` configuration capability solely because they can read leads.
 
-The Admin surface must enforce the same allowed groups and key/label constraints as the data layer and must not expose elevated credentials to the browser.
+The Admin surface supports create/edit/activate/deactivate/reorder; destructive delete is not an ordinary management action. It must enforce the same allowed groups and key/label constraints as the data layer and must not expose elevated credentials to the browser.
 
 ## 11. Backward compatibility
 
@@ -263,6 +272,7 @@ GC-4 acceptance requires all of the following to remain true:
 - business option tables are not broadly anonymous-readable/writable;
 - public option projection contains no private/admin metadata;
 - forged/inactive option keys fail closed at the DB submission boundary;
+- consultation-only values cannot be attached to General Inquiry or Dealer Application rows through the public submission path;
 - customer file upload is not introduced;
 - Dealer supporting-document privacy/isolation is unchanged.
 
@@ -281,17 +291,18 @@ Add deterministic tests covering:
 - public option projection empty-state behavior;
 - unknown/inactive option rejection contract;
 - malformed preferred date rejection;
-- Dealer Application rejection/isolation from GC-4 fields;
+- consultation fields rejected for General Inquiry and Dealer Application;
 - same-origin/body-size/privacy/honeypot/attribution regression coverage.
 
 ### 13.2 Admin contract tests
 
 Cover:
 
-- `/store/leads/form-options` authorization/navigation contract;
+- `/store/leads/form-options` `store.manage` authorization/navigation contract;
 - allowed option groups only;
-- active/sort-order management;
-- Project Consultation detail rendering;
+- create/edit/activate/deactivate/sort behavior without ordinary destructive delete;
+- Project Consultation detail rendering including stable keys;
+- inactive historical option resolution for authenticated Admin detail;
 - no loss of Dealer Application detail behavior;
 - Sales can review leads but cannot mutate form configuration.
 
@@ -300,12 +311,13 @@ Cover:
 Cover:
 
 - new columns/check constraints;
+- consultation-only row invariants;
 - option-domain RLS/grants;
 - narrow active public projection;
 - no unauthorized direct table writes;
 - active option-key validation inside the submission boundary;
 - legacy Contact fallback to `general_inquiry`;
-- Dealer Application isolation;
+- General Inquiry/Dealer Application isolation;
 - existing public submission spam guard remains effective;
 - explicit function grants/revokes after any function replacement.
 
@@ -339,6 +351,7 @@ GC-4 is complete only when production evidence shows:
 - a real Project Consultation can be submitted through the same native path using approved option keys when configured;
 - privacy, optional marketing consent, UTM/landing/referrer attribution and spam controls are preserved;
 - Project Consultation fields appear correctly in Admin;
+- inactive historical option keys remain resolvable in Admin;
 - Dealer Application and private dealer supporting documents are unaffected;
 - customer file upload remains absent;
 - no new GC-4 security/advisor warning remains open.
