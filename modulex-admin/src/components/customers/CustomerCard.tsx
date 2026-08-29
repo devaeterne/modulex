@@ -13,7 +13,6 @@ import type {
   CustomerContact,
   CustomerDocument,
   CustomerNote,
-  CustomerPortalUser,
   CustomerStatus,
   CustomerType,
   PaymentTerm,
@@ -21,7 +20,7 @@ import type {
   ProfileLookup,
 } from "@/lib/customers/types";
 
-const tabs = ["General", "Contacts", "Pricing", "Addresses", "Commercial", "Web / Portal", "Notes & Documents", "Activity"] as const;
+const tabs = ["General", "Contacts", "Pricing", "Addresses", "Commercial", "Notes & Documents", "Activity"] as const;
 type Tab = (typeof tabs)[number];
 
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs transition placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-gray-500";
@@ -56,11 +55,9 @@ export default function CustomerCard() {
   const [contacts, setContacts] = useState<CustomerContact[]>([]);
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [commercial, setCommercial] = useState<CustomerCommercialSettings | null>(null);
-  const [portalUsers, setPortalUsers] = useState<CustomerPortalUser[]>([]);
   const [notes, setNotes] = useState<CustomerNote[]>([]);
   const [documents, setDocuments] = useState<CustomerDocument[]>([]);
   const [activities, setActivities] = useState<CustomerActivity[]>([]);
-  const [canManagePortal, setCanManagePortal] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -69,7 +66,6 @@ export default function CustomerCard() {
 
   const [contactForm, setContactForm] = useState({ first_name: "", last_name: "", job_title: "", department: "", email: "", phone: "", mobile: "", is_primary: false, is_billing_contact: false, is_shipping_contact: false, is_order_contact: false });
   const [addressForm, setAddressForm] = useState({ address_name: "", company_name: "", contact_name: "", address_line_1: "", address_line_2: "", postal_code: "", city: "", state_region: "", country_code: "", phone: "", address_type: "shipping" as "billing" | "shipping" | "both", is_default_billing: false, is_default_shipping: false });
-  const [portalForm, setPortalForm] = useState({ full_name: "", login_email: "", portal_role: "buyer" as "admin" | "buyer" | "viewer", status: "never_invited" as "never_invited" | "invited" | "active" | "suspended", is_primary: false });
   const [noteForm, setNoteForm] = useState({ note: "", category: "", is_pinned: false });
 
   const typeMap = useMemo(() => new Map(customerTypes.map((item) => [item.id, item.name])), [customerTypes]);
@@ -87,7 +83,7 @@ export default function CustomerCard() {
   async function loadData() {
     setIsLoading(true);
     setErrorMessage(null);
-    const [customerResult, typesResult, groupsResult, profilesResult, termsResult, contactsResult, addressesResult, commercialResult, portalResult, notesResult, documentsResult, activityResult] = await Promise.all([
+    const [customerResult, typesResult, groupsResult, profilesResult, termsResult, contactsResult, addressesResult, commercialResult, notesResult, documentsResult, activityResult] = await Promise.all([
       supabase.from("customers").select("*").eq("id", customerId).single(),
       supabase.from("customer_types").select("id, system_key, name, sort_order, is_active").eq("is_active", true).order("sort_order"),
       supabase.from("price_groups").select("id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only").eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
@@ -96,12 +92,11 @@ export default function CustomerCard() {
       supabase.from("customer_contacts").select("*").eq("customer_id", customerId).order("is_primary", { ascending: false }).order("created_at"),
       supabase.from("customer_addresses").select("*").eq("customer_id", customerId).order("is_default_shipping", { ascending: false }).order("address_name"),
       supabase.from("customer_commercial_settings").select("*").eq("customer_id", customerId).maybeSingle(),
-      supabase.from("customer_portal_users").select("*").eq("customer_id", customerId).order("is_primary", { ascending: false }).order("created_at"),
       supabase.from("customer_notes").select("*").eq("customer_id", customerId).order("is_pinned", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("customer_documents").select("*").eq("customer_id", customerId).eq("is_active", true).order("created_at", { ascending: false }),
       supabase.from("customer_activity").select("*").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(100),
     ]);
-    const firstError = customerResult.error || typesResult.error || groupsResult.error || profilesResult.error || termsResult.error || contactsResult.error || addressesResult.error || commercialResult.error || portalResult.error || notesResult.error || documentsResult.error || activityResult.error;
+    const firstError = customerResult.error || typesResult.error || groupsResult.error || profilesResult.error || termsResult.error || contactsResult.error || addressesResult.error || commercialResult.error || notesResult.error || documentsResult.error || activityResult.error;
     if (firstError) { setErrorMessage(firstError.message); setIsLoading(false); return; }
     setCustomer(customerResult.data as Customer);
     setCustomerTypes((typesResult.data ?? []) as CustomerType[]);
@@ -111,7 +106,6 @@ export default function CustomerCard() {
     setContacts((contactsResult.data ?? []) as CustomerContact[]);
     setAddresses((addressesResult.data ?? []) as CustomerAddress[]);
     setCommercial((commercialResult.data ?? null) as CustomerCommercialSettings | null);
-    setPortalUsers((portalResult.data ?? []) as CustomerPortalUser[]);
     setNotes((notesResult.data ?? []) as CustomerNote[]);
     setDocuments((documentsResult.data ?? []) as CustomerDocument[]);
     setActivities((activityResult.data ?? []) as CustomerActivity[]);
@@ -123,24 +117,12 @@ export default function CustomerCard() {
       const { profile, error } = await getCurrentProfile();
       if (error) { setErrorMessage(error.message); setIsLoading(false); return; }
       setCanEdit(["super_admin", "admin", "sales"].includes(profile?.role ?? ""));
-      setCanManagePortal(["super_admin", "admin"].includes(profile?.role ?? ""));
       await loadData();
     }
     void initialize();
   }, [customerId]);
 
   function clearMessages() { setErrorMessage(null); setSuccessMessage(null); }
-
-  async function saveCustomer(fields: Partial<Customer>, activityTitle: string) {
-    if (!customer || !canEdit) return;
-    clearMessages(); setIsSaving(true);
-    const { data, error } = await supabase.from("customers").update(fields).eq("id", customer.id).select("*").single();
-    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
-    setCustomer(data as Customer);
-    await logActivity("customer_updated", activityTitle);
-    setSuccessMessage("Customer updated successfully.");
-    setIsSaving(false);
-  }
 
   async function saveCustomerMaster() {
     if (!customer || !canEdit) return;
@@ -230,26 +212,43 @@ export default function CustomerCard() {
   async function addAddress() {
     if (!addressForm.address_name.trim() || !addressForm.address_line_1.trim() || !addressForm.city.trim() || addressForm.country_code.trim().length !== 2) return setErrorMessage("Address name, address line, city and 2-letter country code are required.");
     clearMessages(); setIsSaving(true);
-    if (addressForm.is_default_billing) await supabase.from("customer_addresses").update({ is_default_billing: false }).eq("customer_id", customerId).eq("is_default_billing", true);
-    if (addressForm.is_default_shipping) await supabase.from("customer_addresses").update({ is_default_shipping: false }).eq("customer_id", customerId).eq("is_default_shipping", true);
-    const { error } = await supabase.from("customer_addresses").insert({ customer_id: customerId, ...addressForm, country_code: addressForm.country_code.toUpperCase(), company_name: addressForm.company_name.trim() || null, contact_name: addressForm.contact_name.trim() || null, address_line_2: addressForm.address_line_2.trim() || null, postal_code: addressForm.postal_code.trim() || null, state_region: addressForm.state_region.trim() || null, phone: addressForm.phone.trim() || null });
+    const { error } = await supabase.rpc("create_customer_address", {
+      p_customer_id: customerId,
+      p_address_name: addressForm.address_name.trim(),
+      p_company_name: addressForm.company_name.trim() || null,
+      p_contact_name: addressForm.contact_name.trim() || null,
+      p_address_line_1: addressForm.address_line_1.trim(),
+      p_address_line_2: addressForm.address_line_2.trim() || null,
+      p_postal_code: addressForm.postal_code.trim() || null,
+      p_city: addressForm.city.trim(),
+      p_state_region: addressForm.state_region.trim() || null,
+      p_country_code: addressForm.country_code.trim().toUpperCase(),
+      p_phone: addressForm.phone.trim() || null,
+      p_address_type: addressForm.address_type,
+      p_is_default_billing: addressForm.is_default_billing,
+      p_is_default_shipping: addressForm.is_default_shipping,
+    });
     if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
     setAddressForm({ address_name: "", company_name: "", contact_name: "", address_line_1: "", address_line_2: "", postal_code: "", city: "", state_region: "", country_code: "", phone: "", address_type: "shipping", is_default_billing: false, is_default_shipping: false });
-    await logActivity("address_added", "Address added"); await loadData(); setSuccessMessage("Address added."); setIsSaving(false);
+    await loadData(); setSuccessMessage("Address added."); setIsSaving(false);
   }
+
+  async function setAddressDefault(addressId: string, defaultKind: "billing" | "shipping") {
+    if (!canEdit) return;
+    clearMessages(); setIsSaving(true);
+    const { error } = await supabase.rpc("set_customer_address_default", {
+      p_customer_id: customerId,
+      p_address_id: addressId,
+      p_default_kind: defaultKind,
+    });
+    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
+    await loadData();
+    setSuccessMessage(defaultKind === "billing" ? "Default billing address updated." : "Default shipping address updated.");
+    setIsSaving(false);
+  }
+
   async function removeAddress(id: string) { if (!confirm("Remove this address?")) return; const { error } = await supabase.from("customer_addresses").delete().eq("id", id); if (error) return setErrorMessage(error.message); await logActivity("address_removed", "Address removed"); await loadData(); }
 
-  async function addPortalUser() {
-    if (!canManagePortal) return;
-    if (!portalForm.login_email.trim()) return setErrorMessage("Login email is required.");
-    clearMessages(); setIsSaving(true);
-    if (portalForm.is_primary) await supabase.from("customer_portal_users").update({ is_primary: false }).eq("customer_id", customerId).eq("is_primary", true);
-    const { error } = await supabase.from("customer_portal_users").insert({ customer_id: customerId, full_name: portalForm.full_name.trim() || null, login_email: portalForm.login_email.trim().toLowerCase(), portal_role: portalForm.portal_role, status: portalForm.status, is_primary: portalForm.is_primary });
-    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
-    setPortalForm({ full_name: "", login_email: "", portal_role: "buyer", status: "never_invited", is_primary: false });
-    await logActivity("portal_user_added", "Portal user added"); await loadData(); setSuccessMessage("Portal user added."); setIsSaving(false);
-  }
-  async function removePortalUser(id: string) { if (!canManagePortal || !confirm("Remove this portal user?")) return; const { error } = await supabase.from("customer_portal_users").delete().eq("id", id); if (error) return setErrorMessage(error.message); await logActivity("portal_user_removed", "Portal user removed"); await loadData(); }
 
   async function addNote() {
     if (!noteForm.note.trim()) return setErrorMessage("Note cannot be empty.");
@@ -295,11 +294,44 @@ export default function CustomerCard() {
 
     {activeTab === "Pricing" && <Section title="Pricing" description="Customer-specific price group assignment."><div className="grid gap-4 md:grid-cols-2"><Field label="Default Price Group"><select value={customer.price_group_id ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, price_group_id: e.target.value || null })} className={inputClass}><option value="">No price group</option>{priceGroups.map((item) => <option key={item.id} value={item.id}>{item.name}{item.is_base_price ? " (Base)" : ""}{item.requires_approval ? " · Approval" : ""}</option>)}</select></Field><Field label="Currency"><input value={customer.currency_code} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, currency_code: e.target.value.toUpperCase() })} className={inputClass} /></Field></div><div className="mt-4 rounded-xl border border-brand-100 bg-brand-25 p-4 text-sm text-gray-600 dark:border-brand-500/20 dark:bg-brand-500/[0.06] dark:text-gray-300">Store pricing resolves from the assigned order-eligible price group. For Sales users, changing the default price group is submitted to Admin approval; internal Cost pricing cannot be assigned.</div>{canEdit && <div className="mt-5 flex justify-end"><button onClick={() => void savePricing()} disabled={isSaving} className={primaryButtonClass}>{isSaving ? "Saving..." : "Save Pricing"}</button></div>}</Section>}
 
-    {activeTab === "Addresses" && <Section title="Billing & Shipping Addresses" description="Multiple operational addresses with billing and shipping defaults."><div className="grid gap-3 lg:grid-cols-2">{addresses.map((address) => <Card key={address.id}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-gray-800 dark:text-white/90">{address.address_name}</h3><Badge>{titleCase(address.address_type)}</Badge>{address.is_default_billing && <Badge>Default Billing</Badge>}{address.is_default_shipping && <Badge>Default Shipping</Badge>}</div><p className="mt-3 text-sm text-gray-700 dark:text-gray-300">{address.address_line_1}{address.address_line_2 ? `, ${address.address_line_2}` : ""}</p><p className="text-sm text-gray-500">{[address.postal_code, address.city, address.state_region, address.country_code].filter(Boolean).join(", ")}</p><p className="mt-2 text-xs text-gray-400">{address.contact_name || address.phone || ""}</p></div>{canEdit && <button onClick={() => void removeAddress(address.id)} className={dangerButtonClass}>Remove</button>}</div></Card>)}</div>{canEdit && <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]"><h3 className="mb-4 text-sm font-semibold text-gray-800 dark:text-white/90">Add Address</h3><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{(["address_name", "company_name", "contact_name", "address_line_1", "address_line_2", "postal_code", "city", "state_region", "country_code", "phone"] as const).map((key) => <Field key={key} label={titleCase(key)}><input value={addressForm[key]} maxLength={key === "country_code" ? 2 : undefined} onChange={(e) => setAddressForm({ ...addressForm, [key]: key === "country_code" ? e.target.value.toUpperCase() : e.target.value })} className={inputClass} /></Field>)}<Field label="Address Type"><select value={addressForm.address_type} onChange={(e) => setAddressForm({ ...addressForm, address_type: e.target.value as "billing" | "shipping" | "both" })} className={inputClass}><option value="billing">Billing</option><option value="shipping">Shipping</option><option value="both">Both</option></select></Field></div><div className="mt-4 flex gap-4"><Check label="Default Billing" checked={addressForm.is_default_billing} onChange={(v) => setAddressForm({ ...addressForm, is_default_billing: v })} /><Check label="Default Shipping" checked={addressForm.is_default_shipping} onChange={(v) => setAddressForm({ ...addressForm, is_default_shipping: v })} /></div><div className="mt-4 flex justify-end"><button onClick={() => void addAddress()} disabled={isSaving} className={primaryButtonClass}>Add Address</button></div></div>}</Section>}
+    {activeTab === "Addresses" && <Section title="Billing & Shipping Addresses" description="Multiple operational addresses with atomic billing and shipping defaults.">
+      <div className="grid gap-3 lg:grid-cols-2">
+        {addresses.map((address) => <Card key={address.id}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-gray-800 dark:text-white/90">{address.address_name}</h3>
+                <Badge>{titleCase(address.address_type)}</Badge>
+                {address.is_default_billing && <Badge>Default Billing</Badge>}
+                {address.is_default_shipping && <Badge>Default Shipping</Badge>}
+              </div>
+              <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">{address.address_line_1}{address.address_line_2 ? `, ${address.address_line_2}` : ""}</p>
+              <p className="text-sm text-gray-500">{[address.postal_code, address.city, address.state_region, address.country_code].filter(Boolean).join(", ")}</p>
+              <p className="mt-2 text-xs text-gray-400">{address.contact_name || address.phone || ""}</p>
+            </div>
+            {canEdit && <div className="flex max-w-[220px] flex-wrap justify-end gap-2">
+              {!address.is_default_billing && address.address_type !== "shipping" && <button disabled={isSaving} onClick={() => void setAddressDefault(address.id, "billing")} className={secondaryButtonClass}>Set Billing Default</button>}
+              {!address.is_default_shipping && address.address_type !== "billing" && <button disabled={isSaving} onClick={() => void setAddressDefault(address.id, "shipping")} className={secondaryButtonClass}>Set Shipping Default</button>}
+              <button disabled={isSaving} onClick={() => void removeAddress(address.id)} className={dangerButtonClass}>Remove</button>
+            </div>}
+          </div>
+        </Card>)}
+      </div>
+      {canEdit && <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+        <h3 className="mb-4 text-sm font-semibold text-gray-800 dark:text-white/90">Add Address</h3>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {(["address_name", "company_name", "contact_name", "address_line_1", "address_line_2", "postal_code", "city", "state_region", "country_code", "phone"] as const).map((key) => <Field key={key} label={titleCase(key)}><input value={addressForm[key]} maxLength={key === "country_code" ? 2 : undefined} onChange={(e) => setAddressForm({ ...addressForm, [key]: key === "country_code" ? e.target.value.toUpperCase() : e.target.value })} className={inputClass} /></Field>)}
+          <Field label="Address Type"><select value={addressForm.address_type} onChange={(e) => { const addressType = e.target.value as "billing" | "shipping" | "both"; setAddressForm({ ...addressForm, address_type: addressType, is_default_billing: addressType === "shipping" ? false : addressForm.is_default_billing, is_default_shipping: addressType === "billing" ? false : addressForm.is_default_shipping }); }} className={inputClass}><option value="billing">Billing</option><option value="shipping">Shipping</option><option value="both">Both</option></select></Field>
+        </div>
+        <div className="mt-4 flex gap-4">
+          {addressForm.address_type !== "shipping" && <Check label="Default Billing" checked={addressForm.is_default_billing} onChange={(v) => setAddressForm({ ...addressForm, is_default_billing: v })} />}
+          {addressForm.address_type !== "billing" && <Check label="Default Shipping" checked={addressForm.is_default_shipping} onChange={(v) => setAddressForm({ ...addressForm, is_default_shipping: v })} />}
+        </div>
+        <div className="mt-4 flex justify-end"><button onClick={() => void addAddress()} disabled={isSaving} className={primaryButtonClass}>Add Address</button></div>
+      </div>}
+    </Section>}
 
     {activeTab === "Commercial" && commercial && <Section title="Commercial" description="Payment terms, limits and order controls. Protected changes made by Sales require Admin approval."><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><Field label="Payment Terms"><select value={commercial.payment_term_id ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, payment_term_id: e.target.value || null })} className={inputClass}><option value="">None</option>{paymentTerms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Credit Limit"><input type="number" min="0" step="0.01" value={commercial.credit_limit ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, credit_limit: e.target.value || null })} className={inputClass} /></Field><Field label="Minimum Order"><input type="number" min="0" step="0.01" value={commercial.minimum_order_amount ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, minimum_order_amount: e.target.value || null })} className={inputClass} /></Field><Field label="Tax Exemption Number"><input value={commercial.tax_exemption_number ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, tax_exemption_number: e.target.value || null })} className={inputClass} /></Field><Field label="Credit Hold Reason"><input value={commercial.credit_hold_reason ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, credit_hold_reason: e.target.value || null })} className={inputClass} /></Field></div><div className="mt-4 flex gap-5"><Check label="Tax Exempt" checked={commercial.tax_exempt} disabled={!canEdit} onChange={(v) => setCommercial({ ...commercial, tax_exempt: v })} /><Check label="Credit Hold" checked={commercial.credit_hold} disabled={!canEdit} onChange={(v) => setCommercial({ ...commercial, credit_hold: v })} /></div><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Discount Notes"><textarea value={commercial.discount_notes ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, discount_notes: e.target.value || null })} className={textareaClass} /></Field><Field label="Order Notes"><textarea value={commercial.order_notes ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, order_notes: e.target.value || null })} className={textareaClass} /></Field></div>{canEdit && <div className="mt-5 flex justify-end"><button onClick={() => void saveCommercial()} disabled={isSaving} className={primaryButtonClass}>{isSaving ? "Saving..." : "Save Commercial"}</button></div>}</Section>}
-
-    {activeTab === "Web / Portal" && <Section title="Web / Portal" description="Portal access and users for the customer company."><div className="mb-5 flex items-center justify-between rounded-xl border border-gray-200 p-4 dark:border-gray-800"><div><p className="font-medium text-gray-800 dark:text-white/90">Customer Portal Access</p><p className="mt-1 text-sm text-gray-500">Controls whether this customer can use Modulex Store portal features.</p></div>{canManagePortal ? <button onClick={() => void saveCustomer({ portal_enabled: !customer.portal_enabled }, customer.portal_enabled ? "Customer portal disabled" : "Customer portal enabled")} className={customer.portal_enabled ? dangerButtonClass : primaryButtonClass}>{customer.portal_enabled ? "Disable Portal" : "Enable Portal"}</button> : <Badge>{customer.portal_enabled ? "Enabled" : "Disabled"}</Badge>}</div><div className="grid gap-3 lg:grid-cols-2">{portalUsers.map((user) => <Card key={user.id}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-gray-800 dark:text-white/90">{user.full_name || user.login_email}</h3>{user.is_primary && <Badge>Primary</Badge>}</div><p className="mt-1 text-sm text-gray-500">{user.login_email}</p><div className="mt-3 flex gap-2"><Badge>{titleCase(user.portal_role)}</Badge><Badge>{titleCase(user.status)}</Badge></div><p className="mt-3 text-xs text-gray-400">Last login: {dateTime(user.last_login_at)}</p></div>{canManagePortal && <button onClick={() => void removePortalUser(user.id)} className={dangerButtonClass}>Remove</button>}</div></Card>)}</div>{canManagePortal && <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]"><h3 className="mb-1 text-sm font-semibold text-gray-800 dark:text-white/90">Add Portal User</h3><p className="mb-4 text-xs text-gray-500">This creates portal metadata only. Auth invitation will be wired through a secure server action after integration testing.</p><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Field label="Full Name"><input value={portalForm.full_name} onChange={(e) => setPortalForm({ ...portalForm, full_name: e.target.value })} className={inputClass} /></Field><Field label="Login Email"><input type="email" value={portalForm.login_email} onChange={(e) => setPortalForm({ ...portalForm, login_email: e.target.value })} className={inputClass} /></Field><Field label="Role"><select value={portalForm.portal_role} onChange={(e) => setPortalForm({ ...portalForm, portal_role: e.target.value as "admin" | "buyer" | "viewer" })} className={inputClass}><option value="admin">Admin</option><option value="buyer">Buyer</option><option value="viewer">Viewer</option></select></Field><Field label="Status"><select value={portalForm.status} onChange={(e) => setPortalForm({ ...portalForm, status: e.target.value as typeof portalForm.status })} className={inputClass}><option value="never_invited">Never Invited</option><option value="invited">Invited</option><option value="active">Active</option><option value="suspended">Suspended</option></select></Field></div><div className="mt-4"><Check label="Primary Portal User" checked={portalForm.is_primary} onChange={(v) => setPortalForm({ ...portalForm, is_primary: v })} /></div><div className="mt-4 flex justify-end"><button onClick={() => void addPortalUser()} disabled={isSaving} className={primaryButtonClass}>Add Portal User</button></div></div>}</Section>}
 
     {activeTab === "Notes & Documents" && <Section title="Notes & Documents" description="Internal customer notes and document metadata."><div className="grid gap-6 xl:grid-cols-2"><div><h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Notes</h3><div className="space-y-3">{notes.map((note) => <Card key={note.id}><div className="flex items-start justify-between gap-3"><div>{note.is_pinned && <Badge>Pinned</Badge>}<p className="mt-2 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{note.note}</p><p className="mt-2 text-xs text-gray-400">{note.category || "General"} • {dateTime(note.created_at)}</p></div>{canEdit && <button onClick={() => void removeNote(note.id)} className={dangerButtonClass}>Remove</button>}</div></Card>)}</div>{canEdit && <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]"><Field label="New Note"><textarea value={noteForm.note} onChange={(e) => setNoteForm({ ...noteForm, note: e.target.value })} className={textareaClass} /></Field><div className="mt-3 grid gap-3 md:grid-cols-2"><Field label="Category"><input value={noteForm.category} onChange={(e) => setNoteForm({ ...noteForm, category: e.target.value })} className={inputClass} /></Field><div className="flex items-end pb-2"><Check label="Pin note" checked={noteForm.is_pinned} onChange={(v) => setNoteForm({ ...noteForm, is_pinned: v })} /></div></div><div className="mt-3 flex justify-end"><button onClick={() => void addNote()} className={primaryButtonClass}>Add Note</button></div></div>}</div><div><h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Documents</h3><div className="space-y-3">{documents.length === 0 ? <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">No documents uploaded yet.</div> : documents.map((document) => <Card key={document.id}><p className="font-medium text-gray-800 dark:text-white/90">{document.file_name}</p><p className="mt-1 text-xs text-gray-500">{document.document_type || "Document"} • {dateTime(document.created_at)}</p><p className="mt-2 break-all text-xs text-gray-400">{document.storage_path}</p></Card>)}</div><div className="mt-4 rounded-xl border border-brand-100 bg-brand-25 p-4 text-xs leading-5 text-gray-600 dark:border-brand-500/20 dark:bg-brand-500/[0.06] dark:text-gray-300">Document metadata is ready. File upload will be connected after the <strong>customer-documents</strong> Supabase Storage bucket and its policies are confirmed during integration testing.</div></div></div></Section>}
 
