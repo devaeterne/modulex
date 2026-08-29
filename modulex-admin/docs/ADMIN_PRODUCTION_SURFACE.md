@@ -31,6 +31,7 @@ These are not TailAdmin component demos. They remain in place for later roadmap 
 - `/personnel/*` — Phase A6 classification still required
 - `/finance/*` — Phase A6 classification still required
 - `/approvals` — Phase A6 decision still required
+- `/training` — Phase A6 decision still required
 
 Their presence is deliberate for now; future A6 work must classify each as production, planned, or remove.
 
