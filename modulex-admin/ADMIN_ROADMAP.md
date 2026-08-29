@@ -65,9 +65,11 @@ These rules are mandatory for all future Modulex Admin work:
   - Removed the `API Test` System navigation entry.
   - **Done when:** no generic TailAdmin sample page is reachable through normal Admin navigation unless explicitly required.
 
-- [~] Audit dashboard widgets for template/sample data.
+- [x] Audit dashboard widgets for template/sample data.
   - Existing Modulex dashboard KPIs and recent stock movements are sourced from production RPCs (`get_dashboard_kpis`, `get_recent_inventory_movements`); no invented metric values were found.
-  - Active package: make dashboard Quick Actions permission-aware through the existing direct-route authorization truth.
+  - Dashboard Quick Actions now resolve the active profile and reuse `canAccessPath()` so unauthorized/dead shortcuts fail closed while KPI loading remains independent.
+  - TDD evidence: Actions run `33253263982` failed on the missing profile/route guard before implementation; targeted GREEN run `33253331280` passed the expanded production-surface contract.
+  - Full package verification: `33253394213` passed production-surface, RBAC, secondary CMS, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, production build, and diff-check.
 
 - [ ] Audit placeholder links, sample text, fake metrics, dead buttons, and development-only controls across Admin.
 
