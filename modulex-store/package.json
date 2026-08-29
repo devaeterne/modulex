@@ -22,6 +22,8 @@
     "smoke:portal-public-navbar": "node scripts/portal-public-navbar-contract.mjs",
     "smoke:gc1-source-manifest": "node scripts/gc1-source-manifest-contract.mjs",
     "smoke:gc2-media-schema": "node scripts/gc2-media-schema-contract.mjs",
+    "smoke:gc2-media-importer": "node scripts/gc2-media/contract.mjs && node scripts/gc2-media/writer-contract.mjs",
+    "gc2:media:import": "node scripts/gc2-media/import.mjs",
     "export": "next build"
   },
   "dependencies": {
@@ -32,6 +34,7 @@
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "sharp": "0.35.4",
     "swiper": "^12.1.2",
     "zustand": "^5.0.11"
   },
