@@ -3,7 +3,7 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import CustomerCard from "@/components/customers/CustomerCard";
 import CustomerDocumentsPanel from "@/components/customers/CustomerDocumentsPanel";
 import CustomerOrderActions from "@/components/customers/CustomerOrderActions";
-import DealerPortalAccessCard from "@/components/customers/DealerPortalAccessCard";
+import CustomerPortalAccessCard from "@/components/customers/CustomerPortalAccessCard";
 
 export const metadata: Metadata = {
   title: "Customer Card | Modulex Admin",
@@ -21,17 +21,12 @@ export default async function CustomerCardPage({
     <div>
       <PageBreadcrumb pageTitle="Customer Card" />
       <CustomerOrderActions />
-      <div className="mb-5">
-        <DealerPortalAccessCard customerId={id} />
+      <CustomerCard />
+      <div className="mt-5">
+        <CustomerPortalAccessCard customerId={id} />
       </div>
-      <CustomerDocumentsPanel customerId={id} />
-      <style>{`
-        .legacy-customer-card > div > div:first-child > div:nth-child(2) button:nth-child(6) {
-          display: none;
-        }
-      `}</style>
-      <div className="legacy-customer-card">
-        <CustomerCard />
+      <div className="mt-5">
+        <CustomerDocumentsPanel customerId={id} />
       </div>
     </div>
   );

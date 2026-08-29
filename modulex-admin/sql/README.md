@@ -4,17 +4,20 @@ Until the project is moved to Supabase CLI migrations under `supabase/migrations
 
 1. `general-settings.sql`
 2. `customer-master-mutation.sql`
-3. `customer-orders.sql`
-4. `customer-order-payments.sql`
-5. `customer-order-payment-override.sql`
-6. `customer-order-editing.sql`
-7. `customer-invoices.sql`
-8. `customer-invoice-payment-terms.sql`
-9. `customer-shipments.sql`
-10. `customer-installations.sql`
-11. `performance-rls.sql`
+3. `customer-address-integrity.sql`
+4. `customer-orders.sql`
+5. `customer-order-payments.sql`
+6. `customer-order-payment-override.sql`
+7. `customer-order-editing.sql`
+8. `customer-invoices.sql`
+9. `customer-invoice-payment-terms.sql`
+10. `customer-shipments.sql`
+11. `customer-installations.sql`
+12. `performance-rls.sql`
 
 `customer-master-mutation.sql` hardens the existing customer master tables with validated status/type mutations and atomic audit logging. It assumes the base `customers`, `customer_types`, `customer_activity`, `profiles`, and role-helper objects already exist.
+
+`customer-address-integrity.sql` adds SECURITY INVOKER address RPCs that serialize per customer and keep default clearing, assignment/creation, and customer activity in one transaction while preserving existing RLS.
 
 `performance-rls.sql` is a query-planning hardening step. It preserves the existing RLS role rules while converting known stable role/permission helper predicates to one-time statement checks. Apply it after all schema files that create those policies. Existing environments can apply it once as the final performance migration.
 

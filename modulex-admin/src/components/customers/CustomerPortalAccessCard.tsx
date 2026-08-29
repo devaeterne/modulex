@@ -14,7 +14,7 @@ function titleCase(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-export default function DealerPortalAccessCard({ customerId }: { customerId: string }) {
+export default function CustomerPortalAccessCard({ customerId }: { customerId: string }) {
   const [canManage, setCanManage] = useState(false);
   const [portalEnabled, setPortalEnabled] = useState(false);
   const [users, setUsers] = useState<CustomerPortalUser[]>([]);
@@ -54,7 +54,7 @@ export default function DealerPortalAccessCard({ customerId }: { customerId: str
       body: body ? JSON.stringify(body) : undefined,
     });
     const payload = (await response.json().catch(() => ({}))) as { error?: string };
-    if (!response.ok) throw new Error(payload.error || "Dealer portal action failed.");
+    if (!response.ok) throw new Error(payload.error || "Store portal action failed.");
   }
 
   async function createUser() {
@@ -64,7 +64,7 @@ export default function DealerPortalAccessCard({ customerId }: { customerId: str
       await apiRequest("POST", { customer_id: customerId, ...form });
       setForm({ full_name: "", login_email: "", portal_role: "buyer", is_primary: false });
       await load();
-      setMessage("Dealer portal user created as Never Invited.");
+      setMessage("Portal user created as Never Invited.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create portal user.");
     } finally {
@@ -79,7 +79,7 @@ export default function DealerPortalAccessCard({ customerId }: { customerId: str
       await load();
       setMessage(actionName.replaceAll("_", " ").replace(/^./, (char) => char.toUpperCase()) + " completed.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Dealer portal action failed.");
+      setError(err instanceof Error ? err.message : "Store portal action failed.");
     } finally {
       setBusyId(null);
     }
@@ -106,7 +106,7 @@ export default function DealerPortalAccessCard({ customerId }: { customerId: str
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">Secure lifecycle</p>
-          <h2 className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">Dealer Portal Access</h2>
+          <h2 className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">Store Portal Access</h2>
           <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Invitation, activation and suspension are controlled by the Admin server. Status cannot be promoted manually.</p>
         </div>
         <button
