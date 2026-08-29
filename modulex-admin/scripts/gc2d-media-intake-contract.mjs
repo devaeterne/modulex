@@ -30,7 +30,8 @@ assert.doesNotMatch(route, /source[_-]?url\s*[:=]\s*(body|payload|request)/i, "C
 
 assert.match(intake, /CONTROLLED_CANDIDATES/, "Controlled intake must define a server-owned candidate allowlist");
 for (const candidateId of ["media-showroom-01", "media-kitchen-01", "media-kitchen-02", "media-kitchen-03"]) {
-  assert.match(intake, new RegExp(candidateId), `${candidateId} must remain in the controlled candidate allowlist`);
+  assert.match(intake, new RegExp(candidateId), `${candidateId} must remain in the controlled server candidate allowlist`);
+  assert.match(browserApi, new RegExp(candidateId), `${candidateId} must remain in the browser candidate ID union`);
 }
 assert.match(intake, /function getCandidate\(candidateId:\s*string\)/, "Controlled intake must resolve browser identifiers through the server-owned allowlist");
 assert.match(intake, /Unknown controlled media candidate/, "Unknown candidate identifiers must fail closed");
@@ -68,10 +69,10 @@ const pkg = JSON.parse(packageJson || "{}");
 assert.equal(pkg.dependencies?.sharp, "0.35.4", "Admin must pin the exact approved sharp@0.35.4 pipeline version");
 assert.match(pkg.scripts?.build || "", /next build\s+--webpack\b/, "Admin production build must use Webpack so Vercel traces sharp/libvips into the function runtime");
 
+assert.match(browserApi, /CONTROLLED_STORE_MEDIA_CANDIDATES/, "Media browser API must expose the controlled candidate set");
 assert.match(browserApi, /importStoreMediaCandidate/, "Media browser API must expose controlled intake");
 assert.match(browserApi, /\/api\/admin\/store-media\/import/, "Media browser API must call the server-side intake route");
-assert.match(manager, /media-showroom-01/, "Media Library must retain the controlled showroom intake option");
-assert.match(manager, /media-kitchen-01[\s\S]*media-kitchen-02[\s\S]*media-kitchen-03/, "Media Library must expose only the approved GC-5 kitchen candidate set alongside showroom");
+assert.match(manager, /CONTROLLED_STORE_MEDIA_CANDIDATES\.map/, "Media Library must render candidate options from the controlled browser set");
 assert.match(manager, /private staging/i, "Media Library must explain that intake does not publish the asset");
 
 console.log("Controlled server-side media intake contract: PASS");
