@@ -53,6 +53,21 @@ jobs:
 
           text = text.replace("private.current_user_has_any_role(", "private.store_current_user_has_any_role(")
 
+          attribution_helper_marker = "create or replace function private.store_project_requires_parent_attribution"
+          if attribution_helper_marker not in text:
+              insertion = """create or replace function private.store_project_requires_parent_attribution(p_project_id uuid)\nreturns boolean\nlanguage sql\nstable\nsecurity definer\nset search_path = ''\nas $$\n  select coalesce(\n    exists (\n      select 1\n      from public.store_projects p\n      join public.store_media_assets a on a.id = p.cover_media_asset_id\n      where p.id = p_project_id\n        and a.attribution_classification = 'parent_attributed'\n    )\n    or exists (\n      select 1\n      from public.store_project_media m\n      join public.store_media_assets a on a.id = m.media_asset_id\n      where m.project_id = p_project_id\n        and m.media_type = 'image'\n        and m.media_asset_id is not null\n        and a.attribution_classification = 'parent_attributed'\n    ),\n    false\n  );\n$$;\n\nrevoke all on function private.store_project_requires_parent_attribution(uuid) from public;\nrevoke all on function private.store_project_requires_parent_attribution(uuid) from anon, authenticated;\ngrant execute on function private.store_project_requires_parent_attribution(uuid) to service_role;\n\n"""
+              anchor = "create or replace function private.store_project_is_publishable(p_project_id uuid)"
+              if anchor not in text:
+                  raise SystemExit('Unable to locate project publishability helper anchor')
+              text = text.replace(anchor, insertion + anchor, 1)
+
+          old_attribution = """        and (\n          p.attribution_classification = 'oakwell_owned'\n          or (\n            p.attribution_classification = 'parent_attributed'\n            and nullif(btrim(p.attribution_text), '') is not null\n            and p.source_page_url ~* '^https://'\n          )\n        )"""
+          new_attribution = """        and (\n          (\n            p.attribution_classification = 'oakwell_owned'\n            and not private.store_project_requires_parent_attribution(p.id)\n          )\n          or (\n            p.attribution_classification = 'parent_attributed'\n            and nullif(btrim(p.attribution_text), '') is not null\n            and p.source_page_url ~* '^https://'\n          )\n        )"""
+          if old_attribution in text:
+              text = text.replace(old_attribution, new_attribution, 1)
+          elif new_attribution not in text:
+              raise SystemExit('Unable to reconcile project attribution publish guard')
+
           old = """  return coalesce(new, old);\nend;\n$$;\n\nrevoke all on function private.enforce_store_project_media_publishability()"""
           new = """  if tg_op = 'DELETE' then\n    return old;\n  end if;\n  return new;\nend;\n$$;\n\nrevoke all on function private.enforce_store_project_media_publishability()"""
           text = text.replace(old, new)
@@ -75,7 +90,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add modulex-store/supabase/migrations/*_gc5_gallery_projects_media_library.sql
-          git commit -m 'fix: reconcile GC-5 Store role authorization'
+          git commit -m 'fix: harden GC-5 project attribution guards'
           git push origin HEAD:feat/gc5-gallery-projects-media-library
 
   gc5-contracts:
@@ -135,6 +150,9 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
         run: npm run build
 
   store-verification:
