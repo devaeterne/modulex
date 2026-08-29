@@ -1,0 +1,48 @@
+name: A1.2A roadmap branch patch
+
+on:
+  push:
+    branches:
+      - repair/a12a-order-list-main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-roadmap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: repair/a12a-order-list-main
+      - name: Patch current roadmap without replacing parallel changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('modulex-admin/ADMIN_ROADMAP.md')
+          text = path.read_text()
+
+          baseline_old = 'Main baseline: `f40c44a7a317812eb6346a618fbb5f30969ae515`'
+          baseline_new = 'Main baseline: `08c8fdec5ee2ef0da88a575f9346061c903cc7b8`'
+          if baseline_old in text:
+              text = text.replace(baseline_old, baseline_new, 1)
+
+          old = '- [ ] Review global and customer-scoped order list consistency.'
+          new = '''- [~] Review global and customer-scoped order list consistency. (A1.2A)\n  - Both `/customers/orders` and `/customers/[id]/orders` remain on the shared `CustomerOrdersList` contract.\n  - Search, status filtering, exact filtered count, and page windows move to Supabase through a `security_invoker=true` `customer_order_directory` view; customer name/code search no longer fans out matching customer IDs into the browser.\n  - Route-scope summary cards use the `SECURITY INVOKER` `get_customer_order_list_summary(uuid)` RPC under existing customer/order RLS.\n  - Original PR #125 was merged into the already-closed #124 branch rather than `main`; `repair/a12a-order-list-main` replays the review-hardened package onto current `main` while preserving newer GC-2 work.\n  - Completion remains gated on repair PR merge, Admin production deploy, production SQL migration, live authenticated acceptance, and advisor review.'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new.splitlines()[0] not in text:
+              raise SystemExit('A1.2A roadmap anchor not found; refusing broad rewrite')
+
+          path.write_text(text)
+          PY
+          if git diff --quiet -- modulex-admin/ADMIN_ROADMAP.md; then
+            echo 'Roadmap already patched; no commit needed.'
+            exit 0
+          fi
+          git config user.name 'devaeterne'
+          git config user.email 'info@safaksariyildiz.com'
+          git add modulex-admin/ADMIN_ROADMAP.md
+          git commit -m 'docs(admin): track A1.2A main repair'
+          git push origin HEAD:repair/a12a-order-list-main
