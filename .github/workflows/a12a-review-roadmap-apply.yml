@@ -1,0 +1,32 @@
+name: A1.2A review roadmap apply
+
+on:
+  push:
+    branches:
+      - phase-a1/order-list-consistency
+
+permissions:
+  contents: write
+
+jobs:
+  apply-roadmap:
+    if: ${{ !contains(github.event.head_commit.message, '[skip a12a-roadmap]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply roadmap note
+        working-directory: modulex-admin
+        run: node scripts/apply-a12a-review-roadmap.mjs
+      - name: Commit roadmap note
+        run: |
+          if git diff --quiet -- modulex-admin/ADMIN_ROADMAP.md; then
+            exit 0
+          fi
+          git config user.name "devaeterne"
+          git config user.email "info@safaksariyildiz.com"
+          git add modulex-admin/ADMIN_ROADMAP.md
+          git commit -m "docs(admin): harden A1.2A query architecture note [skip a12a-roadmap]"
+          git push
