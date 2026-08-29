@@ -1,0 +1,15 @@
+name: A1.2C Auth Fail-Closed Contract
+
+on:
+  push:
+    branches:
+      - phase-a1/order-lifecycle-editability
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run A1.2C lifecycle contract
+        working-directory: modulex-admin
+        run: node scripts/order-lifecycle-editability-contract.mjs
