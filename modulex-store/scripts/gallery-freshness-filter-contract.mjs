@@ -46,6 +46,6 @@ assert.match(
   /entry\.project\.category\s*===\s*activeCategory/,
   "Gallery category filtering should use each project's CMS category",
 );
-assert.match(gallery, />All</, "Gallery should offer an All filter");
+assert.match(gallery, />\s*All\s*</, "Gallery should offer an All filter");
 
 console.log("Gallery freshness/filter contract: PASS");
