@@ -40,6 +40,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { icon: <GridIcon />, name: "Dashboard", path: "/", permission: "dashboard.view", exact: true },
+  { icon: <PageIcon />, name: "Request Center", path: "/requests", permission: "requests.view", exact: true },
   {
     icon: <BoxCubeIcon />,
     name: "Products",
