@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  generate-migration:
+  prepare-migration:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,21 +24,49 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if find modulex-store/supabase/migrations -maxdepth 1 -name '*_gc5_gallery_projects_media_library.sql' | grep -q .; then
-            echo 'GC-5 migration already exists.'
+          if ! find modulex-store/supabase/migrations -maxdepth 1 -name '*_gc5_gallery_projects_media_library.sql' | grep -q .; then
+            cd modulex-store
+            npx --yes supabase@latest migration new gc5_gallery_projects_media_library
+            cd ..
+          fi
+      - name: Apply deterministic migration robustness fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          matches = list(Path('modulex-store/supabase/migrations').glob('*_gc5_gallery_projects_media_library.sql'))
+          if len(matches) != 1:
+              raise SystemExit(f'Expected exactly one GC-5 migration, found {len(matches)}')
+          path = matches[0]
+          text = path.read_text()
+          old = """  return coalesce(new, old);\nend;\n$$;\n\nrevoke all on function private.enforce_store_project_media_publishability()"""
+          new = """  if tg_op = 'DELETE' then\n    return old;\n  end if;\n  return new;\nend;\n$$;\n\nrevoke all on function private.enforce_store_project_media_publishability()"""
+          text = text.replace(old, new)
+          old = """  if not v_referenced then\n    return coalesce(new, old);\n  end if;"""
+          new = """  if not v_referenced then\n    if tg_op = 'DELETE' then\n      return old;\n    end if;\n    return new;\n  end if;"""
+          text = text.replace(old, new)
+          old = """  select *\n  from store_api_private.get_store_public_projects_impl()\n  where slug = p_slug\n  limit 1;"""
+          new = """  select q.*\n  from store_api_private.get_store_public_projects_impl() q\n  where q.slug = p_slug\n  limit 1;"""
+          text = text.replace(old, new)
+          path.write_text(text)
+          PY
+      - name: Commit generated or hardened migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- modulex-store/supabase/migrations; then
+            echo 'Migration already prepared.'
             exit 0
           fi
-          cd modulex-store
-          npx --yes supabase@latest migration new gc5_gallery_projects_media_library
-          cd ..
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add modulex-store/supabase/migrations/*_gc5_gallery_projects_media_library.sql
-          git commit -m 'chore: generate GC-5 migration'
+          git commit -m 'fix: harden GC-5 migration guards'
           git push origin HEAD:feat/gc5-gallery-projects-media-library
 
   gc5-contracts:
-    needs: generate-migration
+    needs: prepare-migration
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -62,3 +90,65 @@ jobs:
         run: |
           test "${{ steps.store_contract.outcome }}" = "success"
           test "${{ steps.admin_contract.outcome }}" = "success"
+
+  admin-verification:
+    needs: prepare-migration
+    if: always()
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: GC-5 contract
+        run: npm run smoke:gc5-gallery-projects
+      - name: Secondary CMS regression
+        run: npm run smoke:secondary-cms-admin
+      - name: Media Library regression
+        run: npm run smoke:media-library-admin
+      - name: Controlled intake regression
+        run: npm run smoke:gc2d-media-intake
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+
+  store-verification:
+    needs: prepare-migration
+    if: always()
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-store
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-store/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: GC-5 contract
+        run: npm run smoke:gc5-gallery-projects
+      - name: Secondary CMS regression
+        run: npm run smoke:secondary-cms-contract
+      - name: Public content regression
+        run: npm run smoke:store-public-content
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
