@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "modulex-admin/src/components/dashboard/**"
+      - "modulex-admin/src/components/header/**"
       - "modulex-admin/src/layout/AppHeader.tsx"
       - "modulex-admin/src/layout/AppSidebar.tsx"
       - "modulex-admin/scripts/dashboard-shell-ui-contract.mjs"
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - "modulex-admin/src/components/dashboard/**"
+      - "modulex-admin/src/components/header/**"
       - "modulex-admin/src/layout/AppHeader.tsx"
       - "modulex-admin/src/layout/AppSidebar.tsx"
       - "modulex-admin/scripts/dashboard-shell-ui-contract.mjs"
