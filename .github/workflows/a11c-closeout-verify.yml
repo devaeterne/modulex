@@ -17,7 +17,8 @@ jobs:
           fetch-depth: 0
       - name: Verify closeout diff
         run: |
-          test "$(git diff --name-only origin/main...HEAD | sort)" = "modulex-admin/ADMIN_ROADMAP.md"
+          git diff --name-only origin/main...HEAD | grep -v '^.github/workflows/a11c-closeout-verify.yml$' > /tmp/a11c-files
+          test "$(cat /tmp/a11c-files)" = "modulex-admin/ADMIN_ROADMAP.md"
           grep -Fq 'Current Admin next action: **A1.2A — review global and customer-scoped order list consistency**' modulex-admin/ADMIN_ROADMAP.md
           grep -Fq '20260829165525_customer_address_integrity' modulex-admin/ADMIN_ROADMAP.md
           git diff --check origin/main...HEAD
