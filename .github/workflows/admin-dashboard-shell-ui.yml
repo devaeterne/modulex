@@ -1,0 +1,33 @@
+name: Admin Dashboard Shell UI
+
+on:
+  push:
+    paths:
+      - "modulex-admin/src/components/dashboard/**"
+      - "modulex-admin/src/layout/AppHeader.tsx"
+      - "modulex-admin/src/layout/AppSidebar.tsx"
+      - "modulex-admin/scripts/dashboard-shell-ui-contract.mjs"
+      - ".github/workflows/admin-dashboard-shell-ui.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/components/dashboard/**"
+      - "modulex-admin/src/layout/AppHeader.tsx"
+      - "modulex-admin/src/layout/AppSidebar.tsx"
+      - "modulex-admin/scripts/dashboard-shell-ui-contract.mjs"
+      - ".github/workflows/admin-dashboard-shell-ui.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  dashboard-shell-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Dashboard shell UI contract
+        run: node modulex-admin/scripts/dashboard-shell-ui-contract.mjs
