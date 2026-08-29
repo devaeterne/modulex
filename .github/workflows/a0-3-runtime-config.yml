@@ -6,7 +6,7 @@ on:
       - phase-a0/admin-runtime-config-cleanup
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -53,13 +53,3 @@ jobs:
         run: npm run build
       - name: Diff check
         run: git diff --check 7b19a5cf417092c6088aff91747e4c1da7c0019f...HEAD -- .
-      - name: Record verified A0.3 closeout
-        run: |
-          python3 scripts/a0-3-runtime-config-closeout.py "${{ github.run_id }}"
-          if ! git diff --quiet -- ADMIN_ROADMAP.md; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add ADMIN_ROADMAP.md
-            git commit -m "docs(admin): close A0.3 runtime config cleanup"
-            git push
-          fi
