@@ -55,6 +55,7 @@ assert.match(intake, /default_alt_text:\s*null/, "Approval alt text must remain 
 
 const pkg = JSON.parse(packageJson || "{}");
 assert.equal(pkg.dependencies?.sharp, "0.35.4", "Admin must pin the exact approved sharp@0.35.4 pipeline version");
+assert.match(pkg.scripts?.build || "", /next build\s+--webpack\b/, "Admin production build must use Webpack so Vercel traces sharp/libvips into the function runtime");
 
 assert.match(browserApi, /importStoreMediaCandidate/, "Media browser API must expose controlled intake");
 assert.match(browserApi, /\/api\/admin\/store-media\/import/, "Media browser API must call the server-side intake route");
