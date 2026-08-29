@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `98ca9f264fbae5a039ec117877842e0ca5287c0e`
+Main baseline: `ccb84ddc1758350f4fcc88a5078819600dc8c25f`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-2C Admin Media Library verified with zero production media intake; GC-2D controlled production intake next; Gallery/Projects content acceptance remains pending**
+Current cross-roadmap package: **Granite Center → Oakwell GC-2D controlled production intake in progress through an Admin/Vercel Node route using the logged-in Admin JWT + existing RLS; private-staging implementation is verified, production lifecycle acceptance remains pending, and Gallery/Projects content acceptance remains pending**
 Current Admin next action: **A1.2A — review global and customer-scoped order list consistency**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
@@ -331,7 +331,7 @@ These rules are mandatory for all future Modulex Admin work:
   - Package D design keeps route behavior/allowlists code-owned while ordinary business-editable navigation/footer labels, order, visibility and approved destinations become `store.manage` CMS/settings data.
   - Granite GC-8 is the natural final coordination point unless an earlier migration package needs shared chrome sooner.
 - [ ] Add/extend typed Store CMS domains as Granite packages require them.
-  - GC-2A/GC-2C now provide reusable media assets/provenance plus Admin review/publish lifecycle management; GC-2D still owns controlled production intake.
+  - GC-2A/GC-2C provide reusable media assets/provenance plus Admin review/publish lifecycle management; GC-2D now has a controlled Admin/Vercel Node intake path that uses the logged-in Admin JWT + existing RLS and writes only to private staging. Production import/review/publish lifecycle acceptance remains pending.
   - GC-3 may add structured contact/location/hours management around the existing company-profile domain.
   - GC-6 may add cabinet FAQ/process content domains.
   - GC-7 may add attributed reviews/testimonials.
@@ -582,6 +582,6 @@ Primary Admin roadmap work is **Phase A1 — Customer, Order & Fulfillment Opera
 2. Then start **A1.1B — Customer Master Mutation Contract**: validated customer status/type/master mutations plus mutation+audit atomicity.
 3. Follow with **A1.1C — Customer Detail & Address Integrity**: remove legacy action-hiding CSS, clarify detail action hierarchy, and make default-address changes atomic.
 
-**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1, GC-2A, GC-2B, and GC-2C are complete at their package gates; GC-2D controlled production intake is next. GC-2C leaves production at zero media asset/provenance rows and zero staging/public media objects, so GC-2D remains the only package authorized to introduce approved Granite media. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
+**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1, GC-2A, GC-2B, and GC-2C are complete at their package gates; GC-2D controlled production intake is in progress. The Admin/Vercel private-staging intake implementation is verified without a GitHub Supabase secret, while production import/review/publish/dedupe/unpublish-republish acceptance remains pending. Production still has zero media asset/provenance rows and zero staging/public media objects, so GC-2D remains the only package authorized to introduce approved Granite media. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
 
 **Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A1 or other concurrently merged Admin work is preserved rather than overwritten.

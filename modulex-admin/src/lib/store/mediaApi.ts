@@ -5,8 +5,39 @@ import type { StoreMediaAsset } from "@/lib/store/mediaLibrary";
 
 export type MediaLifecycleAction = "publish" | "unpublish";
 
+export type Gc2dMediaIntakeResult = {
+  status: "created" | "duplicate";
+  candidateId: string;
+  assetId: string;
+  source: {
+    url: string;
+    finalUrl: string;
+  };
+  original: {
+    mimeType: string;
+    width: number;
+    height: number;
+    bytes: number;
+    sha256: string;
+  };
+  optimized: {
+    mimeType: "image/webp";
+    width: number;
+    height: number;
+    bytes: number;
+    sha256: string;
+  };
+  staging: {
+    bucket: "store-media-staging";
+    originalPath: string | null;
+    optimizedPath: string | null;
+  };
+  published: boolean;
+};
+
 type MediaApiResponse = {
   asset?: StoreMediaAsset;
+  result?: Gc2dMediaIntakeResult;
   deleted?: boolean;
   error?: string;
 };
@@ -21,8 +52,23 @@ async function getAccessToken() {
 
 async function parseResponse(response: Response) {
   const payload = (await response.json().catch(() => ({}))) as MediaApiResponse;
-  if (!response.ok) throw new Error(payload.error ?? "Media lifecycle request failed.");
+  if (!response.ok) throw new Error(payload.error ?? "Media request failed.");
   return payload;
+}
+
+export async function importStoreMediaCandidate(candidateId: "media-showroom-01") {
+  const accessToken = await getAccessToken();
+  const response = await fetch("/api/admin/store-media/import", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ candidate_id: candidateId }),
+  });
+  const payload = await parseResponse(response);
+  if (!payload.result) throw new Error("Media intake response did not include a result.");
+  return payload.result;
 }
 
 export async function runMediaLifecycle(assetId: string, action: MediaLifecycleAction) {
