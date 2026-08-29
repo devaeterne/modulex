@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "npm run smoke",
-    "smoke": "npm run smoke:runtime-config && npm run smoke:rbac && npm run smoke:production-surface && npm run smoke:customer-directory && npm run smoke:customer-master && npm run smoke:customer-detail && npm run smoke:order-list && npm run smoke:secondary-cms-admin && npm run smoke:media-library-admin && npm run smoke:gc2d-media-intake && npm run smoke:api && npm run smoke:phase1 && npm run smoke:db && npm run smoke:db:phase1 && npm run smoke:dealer-onboarding && npm run smoke:dealer-onboarding:db && npm run smoke:dealer-portal-admin && npm run smoke:store-portal-admin && npm run smoke:auth-recovery && npm run smoke:polling",
+    "smoke": "npm run smoke:runtime-config && npm run smoke:rbac && npm run smoke:production-surface && npm run smoke:customer-directory && npm run smoke:customer-master && npm run smoke:customer-detail && npm run smoke:order-list && npm run smoke:secondary-cms-admin && npm run smoke:media-library-admin && npm run smoke:gc2d-media-intake && npm run smoke:gc3-company-admin && npm run smoke:api && npm run smoke:phase1 && npm run smoke:db && npm run smoke:db:phase1 && npm run smoke:dealer-onboarding && npm run smoke:dealer-onboarding:db && npm run smoke:dealer-portal-admin && npm run smoke:store-portal-admin && npm run smoke:auth-recovery && npm run smoke:polling",
     "smoke:runtime-config": "node scripts/runtime-config-contract.mjs",
     "smoke:rbac": "node scripts/rbac-smoke.mjs",
     "smoke:production-surface": "node scripts/admin-production-surface-contract.mjs",
@@ -29,7 +29,8 @@
     "smoke:polling": "node scripts/polling-contract.mjs",
     "smoke:dealer-portal-auth-live": "node scripts/dealer-portal-auth-live-smoke.mjs",
     "smoke:media-library-admin": "node scripts/media-library-admin-contract.mjs",
-    "smoke:gc2d-media-intake": "node scripts/gc2d-media-intake-contract.mjs"
+    "smoke:gc2d-media-intake": "node scripts/gc2d-media-intake-contract.mjs",
+    "smoke:gc3-company-admin": "node scripts/gc3-company-admin-contract.mjs"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
