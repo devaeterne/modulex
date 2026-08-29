@@ -6,8 +6,11 @@ on:
       - phase-2-1/b-admin-secondary-cms
 
 jobs:
-  contract:
+  verify:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
     defaults:
       run:
         working-directory: modulex-admin
@@ -19,4 +22,11 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
-      - run: npm run smoke:secondary-cms-admin
+      - name: Targeted secondary CMS contract
+        run: npm run smoke:secondary-cms-admin
+      - name: Lint
+        run: npm run lint
+      - name: Deterministic Admin contracts
+        run: npm run smoke:rbac && npm run smoke:dealer-onboarding && npm run smoke:dealer-portal-admin && npm run smoke:store-portal-admin && npm run smoke:auth-recovery && npm run smoke:polling
+      - name: Build
+        run: npm run build
