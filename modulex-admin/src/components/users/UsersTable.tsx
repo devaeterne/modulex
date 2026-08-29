@@ -11,6 +11,7 @@ type UserRow = {
   full_name: string | null;
   phone: string | null;
   role: UserRole;
+  roles: UserRole[];
   is_active: boolean;
   email_confirmed_at: string | null;
   last_sign_in_at: string | null;
@@ -21,6 +22,7 @@ type UserRow = {
 type Actor = {
   id: string;
   role: UserRole;
+  roles: UserRole[];
 };
 
 type ModalMode = "create" | "edit" | "password" | null;
@@ -29,7 +31,7 @@ type UserForm = {
   fullName: string;
   email: string;
   phone: string;
-  role: UserRole;
+  roles: UserRole[];
   createMode: "invite" | "password";
   password: string;
 };
@@ -49,7 +51,7 @@ const emptyForm: UserForm = {
   fullName: "",
   email: "",
   phone: "",
-  role: "warehouse",
+  roles: ["warehouse"],
   createMode: "invite",
   password: "",
 };
@@ -74,10 +76,23 @@ function initials(user: UserRow) {
   return user.email?.[0]?.toUpperCase() ?? "?";
 }
 
+function effectiveRoles(user: UserRow) {
+  return user.roles?.length ? user.roles : [user.role];
+}
+
+function actorRoles(actor: Actor | null) {
+  if (!actor) return [];
+  return actor.roles?.length ? actor.roles : [actor.role];
+}
+
 function canActorAssignRole(actor: Actor | null, role: UserRole) {
-  if (!actor) return false;
-  if (role === "super_admin") return actor.role === "super_admin";
-  return actor.role === "super_admin" || actor.role === "admin";
+  const roles = actorRoles(actor);
+  if (role === "super_admin") return roles.includes("super_admin");
+  return roles.includes("super_admin") || roles.includes("admin");
+}
+
+function isElevatedRole(role: UserRole) {
+  return role === "super_admin" || role === "admin";
 }
 
 export default function UsersTable() {
@@ -138,7 +153,8 @@ export default function UsersTable() {
         [user.full_name, user.email, user.phone].some((value) =>
           value?.toLowerCase().includes(q)
         );
-      const matchesRole = roleFilter === "all" || user.role === roleFilter;
+      const matchesRole =
+        roleFilter === "all" || effectiveRoles(user).includes(roleFilter);
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "active" ? user.is_active : !user.is_active);
@@ -151,14 +167,14 @@ export default function UsersTable() {
       total: users.length,
       active: users.filter((user) => user.is_active).length,
       inactive: users.filter((user) => !user.is_active).length,
-      finance: users.filter((user) => user.role === "finance").length,
+      finance: users.filter((user) => effectiveRoles(user).includes("finance")).length,
     }),
     [users]
   );
 
   function openCreate() {
     setSelected(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, roles: [...emptyForm.roles] });
     setModal("create");
     setError(null);
     setSuccess(null);
@@ -171,7 +187,7 @@ export default function UsersTable() {
       fullName: user.full_name ?? "",
       email: user.email ?? "",
       phone: user.phone ?? "",
-      role: user.role,
+      roles: [...effectiveRoles(user)],
     });
     setModal("edit");
     setError(null);
@@ -180,7 +196,7 @@ export default function UsersTable() {
 
   function openPassword(user: UserRow) {
     setSelected(user);
-    setForm({ ...emptyForm, password: "" });
+    setForm({ ...emptyForm, roles: [...emptyForm.roles], password: "" });
     setModal("password");
     setError(null);
     setSuccess(null);
@@ -189,7 +205,38 @@ export default function UsersTable() {
   function closeModal() {
     setModal(null);
     setSelected(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, roles: [...emptyForm.roles] });
+  }
+
+  function toggleRole(role: UserRole) {
+    setForm((current) => {
+      if (isElevatedRole(role)) {
+        return {
+          ...current,
+          roles: current.roles.includes(role) ? current.roles : [role],
+        };
+      }
+
+      const operationalRoles = current.roles.filter(
+        (currentRole) => !isElevatedRole(currentRole)
+      );
+
+      if (operationalRoles.includes(role)) {
+        if (operationalRoles.length === 1) {
+          return current;
+        }
+
+        return {
+          ...current,
+          roles: operationalRoles.filter((currentRole) => currentRole !== role),
+        };
+      }
+
+      return {
+        ...current,
+        roles: [...operationalRoles, role],
+      };
+    });
   }
 
   async function submitCreate(event: React.FormEvent) {
@@ -203,7 +250,7 @@ export default function UsersTable() {
           email: form.email,
           full_name: form.fullName,
           phone: form.phone,
-          role: form.role,
+          roles: form.roles,
           mode: form.createMode,
           password: form.password,
         }),
@@ -232,11 +279,11 @@ export default function UsersTable() {
           email: form.email,
           full_name: form.fullName,
           phone: form.phone,
-          role: form.role,
+          roles: form.roles,
         }),
       });
       closeModal();
-      setSuccess("User profile and role updated.");
+      setSuccess("User profile and roles updated.");
       await loadUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "User could not be updated.");
@@ -338,7 +385,7 @@ export default function UsersTable() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Users & Access</h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create accounts, assign roles and manage login access.</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create accounts, combine operational roles and manage login access.</p>
             </div>
             <button onClick={openCreate} className={buttonPrimary}>+ Add user</button>
           </div>
@@ -360,7 +407,7 @@ export default function UsersTable() {
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
             <thead className="bg-gray-50 dark:bg-white/[0.02]">
-              <tr>{["User", "Role", "Status", "Last sign in", "Created", "Actions"].map((label) => <th key={label} className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>)}</tr>
+              <tr>{["User", "Roles", "Status", "Last sign in", "Created", "Actions"].map((label) => <th key={label} className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
@@ -368,7 +415,8 @@ export default function UsersTable() {
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-500">No users found.</td></tr>
               ) : filtered.map((user) => {
-                const protectedTarget = user.role === "super_admin" && actor?.role !== "super_admin";
+                const roles = effectiveRoles(user);
+                const protectedTarget = roles.includes("super_admin") && !actorRoles(actor).includes("super_admin");
                 const ownAccount = user.id === actor?.id;
                 return (
                   <tr key={user.id}>
@@ -378,7 +426,13 @@ export default function UsersTable() {
                         <div><p className="text-sm font-medium text-gray-800 dark:text-white/90">{user.full_name || "Unnamed user"}</p><p className="text-xs text-gray-500">{user.email || "No email"}</p>{user.phone && <p className="text-xs text-gray-400">{user.phone}</p>}</div>
                       </div>
                     </td>
-                    <td className="px-5 py-4"><span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-white/[0.06] dark:text-gray-300">{ROLE_LABELS[user.role]}</span></td>
+                    <td className="px-5 py-4">
+                      <div className="flex max-w-xs flex-wrap gap-1.5">
+                        {roles.map((role) => (
+                          <span key={role} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-white/[0.06] dark:text-gray-300">{ROLE_LABELS[role]}</span>
+                        ))}
+                      </div>
+                    </td>
                     <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${user.is_active ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" : "bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"}`}>{user.is_active ? "Active" : "Inactive"}</span></td>
                     <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(user.last_sign_in_at)}</td>
                     <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(user.created_at)}</td>
@@ -417,7 +471,22 @@ export default function UsersTable() {
                 <Field label="Full name"><input className={inputClass} value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} /></Field>
                 <Field label="Email"><input className={inputClass} type="email" required value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></Field>
                 <Field label="Phone"><input className={inputClass} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} /></Field>
-                <Field label="Role"><select className={inputClass} value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as UserRole }))}>{assignableRoles.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}</select></Field>
+                <Field label="Roles">
+                  <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {assignableRoles.map((role) => {
+                        const checked = form.roles.includes(role);
+                        return (
+                          <label key={role} className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition ${checked ? "border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-300" : "border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]"}`}>
+                            <input type="checkbox" checked={checked} onChange={() => toggleRole(role)} className="h-4 w-4 rounded border-gray-300" />
+                            <span>{ROLE_LABELS[role]}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">Operational role permissions are combined. Admin and Super Admin are exclusive full-access roles and cannot be combined with other roles.</p>
+                  </div>
+                </Field>
 
                 {modal === "create" && (
                   <>

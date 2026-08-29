@@ -10,7 +10,7 @@ import Backdrop from "@/layout/Backdrop";
 import EmailNotificationPump from "@/components/email/EmailNotificationPump";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
-import { canAccessPath, ROLE_LABELS } from "@/lib/auth/permissions";
+import { canAccessPath, hasPermission, ROLE_LABELS } from "@/lib/auth/permissions";
 import {
   MODULEX_AUTH_CHANNEL,
   MODULEX_SIGNED_OUT_EVENT,
@@ -25,7 +25,7 @@ export default function AdminLayout({
   const pathname = usePathname();
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [roles, setRoles] = useState<UserRole[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -62,7 +62,7 @@ export default function AdminLayout({
       }
 
       if (mounted) {
-        setRole(profile.role);
+        setRoles(profile.roles);
         setIsCheckingAuth(false);
       }
     }
@@ -97,11 +97,16 @@ export default function AdminLayout({
     };
   }, [router]);
 
+  const hasDashboardAccess = hasPermission(roles, "dashboard.view");
+  const hasPersonnelAccess = hasPermission(roles, "personnel.view");
+  const shouldRedirectFromDashboard =
+    roles.length > 0 && pathname === "/" && !hasDashboardAccess && hasPersonnelAccess;
+
   useEffect(() => {
-    if (role === "hr" && pathname === "/") {
+    if (shouldRedirectFromDashboard) {
       router.replace("/personnel");
     }
-  }, [pathname, role, router]);
+  }, [router, shouldRedirectFromDashboard]);
 
   const mainContentMargin = isMobileOpen
     ? "ml-0"
@@ -109,26 +114,27 @@ export default function AdminLayout({
       ? "lg:ml-[290px]"
       : "lg:ml-[90px]";
 
-  if (isCheckingAuth || !role || (role === "hr" && pathname === "/")) {
+  if (isCheckingAuth || roles.length === 0 || shouldRedirectFromDashboard) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-900">
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {role === "hr" && pathname === "/" ? "Opening Personnel..." : "Checking session..."}
+            {shouldRedirectFromDashboard ? "Opening Personnel..." : "Checking session..."}
           </p>
         </div>
       </div>
     );
   }
 
-  const allowed = canAccessPath(role, pathname);
+  const allowed = canAccessPath(roles, pathname);
+  const isHrOnly = roles.length === 1 && roles[0] === "hr";
 
   return (
     <div className="min-h-screen xl:flex print:block print:min-h-0">
-      {role !== "hr" && <EmailNotificationPump />}
+      {!isHrOnly && <EmailNotificationPump />}
       <div className="print:hidden">
-        <AppSidebar role={role} />
+        <AppSidebar roles={roles} />
         <Backdrop />
       </div>
 
@@ -138,23 +144,30 @@ export default function AdminLayout({
         </div>
 
         <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6 print:max-w-none print:p-0">
-          {allowed ? children : <AccessDenied role={role} />}
+          {allowed ? children : <AccessDenied roles={roles} />}
         </div>
       </div>
     </div>
   );
 }
 
-function AccessDenied({ role }: { role: UserRole }) {
-  const homeHref = role === "hr" ? "/personnel" : "/";
-  const homeLabel = role === "hr" ? "Back to Personnel" : "Back to Dashboard";
+function AccessDenied({ roles }: { roles: UserRole[] }) {
+  const hasDashboardAccess = hasPermission(roles, "dashboard.view");
+  const hasPersonnelAccess = hasPermission(roles, "personnel.view");
+  const homeHref = hasDashboardAccess ? "/" : hasPersonnelAccess ? "/personnel" : "/profile";
+  const homeLabel = hasDashboardAccess
+    ? "Back to Dashboard"
+    : hasPersonnelAccess
+      ? "Back to Personnel"
+      : "Back to Profile";
+  const roleLabels = roles.map((role) => ROLE_LABELS[role]).join(" + ");
 
   return (
     <div className="mx-auto mt-10 max-w-2xl rounded-2xl border border-error-200 bg-white p-8 text-center shadow-theme-xs dark:border-error-500/30 dark:bg-white/[0.03]">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-error-50 text-lg font-semibold text-error-600 dark:bg-error-500/10 dark:text-error-400">!</div>
       <h1 className="mt-4 text-xl font-semibold text-gray-800 dark:text-white/90">Access restricted</h1>
       <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-gray-500 dark:text-gray-400">
-        Your {ROLE_LABELS[role]} role does not have permission to open this page. Page access and database permissions are enforced independently.
+        Your {roleLabels} role set does not have permission to open this page. Page access and database permissions are enforced independently.
       </p>
       <Link href={homeHref} className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">
         {homeLabel}

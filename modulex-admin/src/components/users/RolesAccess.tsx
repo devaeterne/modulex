@@ -22,6 +22,10 @@ const permissions = Object.keys(PERMISSION_LABELS) as Permission[];
 export default function RolesAccess() {
   return (
     <div className="space-y-5">
+      <div className="rounded-2xl border border-brand-200 bg-brand-50 p-5 text-sm leading-6 text-brand-800 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300">
+        Operational roles can be combined on one user. Their permissions are additive: for example, Finance + HR receives both Finance and Personnel access. Admin and Super Admin remain exclusive full-access roles and are not combined with operational roles.
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
         {roles.map((role) => (
           <div
@@ -44,7 +48,7 @@ export default function RolesAccess() {
             Permission Matrix
           </h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            This matrix is the central UI access policy. Database RLS and protected RPCs remain the enforcement layer for business data and mutations.
+            This matrix shows each role independently. When a user has multiple operational roles, the effective permission set is the union of every selected role. Database RLS and protected RPCs remain the enforcement layer for business data and mutations.
           </p>
         </div>
 

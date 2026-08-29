@@ -29,7 +29,7 @@ export default function TaxRulesSettings() {
       setIsLoading(false);
       return;
     }
-    setCanEdit(hasPermission(profile.role, "finance.manage"));
+    setCanEdit(hasPermission(profile.roles, "finance.manage"));
     const { data, error } = await supabase
       .from("order_tax_rules")
       .select("fulfillment_type, label, tax_rate, is_active, notes")

@@ -14,11 +14,11 @@ export default function CostMarginAccessView() {
     async function load() {
       const { profile } = await getCurrentProfile();
       if (!mounted) return;
-      if (!profile || !hasPermission(profile.role, "pricing.cost.view")) {
+      if (!profile || !hasPermission(profile.roles, "pricing.cost.view")) {
         setMode("denied");
         return;
       }
-      setMode(hasPermission(profile.role, "pricing.manage") ? "manage" : "readonly");
+      setMode(hasPermission(profile.roles, "pricing.manage") ? "manage" : "readonly");
     }
     void load();
     return () => { mounted = false; };

@@ -72,6 +72,15 @@ check("HR manages personnel without general dashboard access", () => {
   assert.equal(hasPermission("hr", "dashboard.view"), false);
 });
 
+check("Multiple roles union their permissions and route access", () => {
+  const roles = ["finance", "hr"];
+  assert.equal(hasPermission(roles, "finance.manage"), true);
+  assert.equal(hasPermission(roles, "personnel.manage"), true);
+  assert.equal(hasPermission(roles, "store.manage"), false);
+  assert.equal(canAccessPath(roles, "/finance"), true);
+  assert.equal(canAccessPath(roles, "/personnel/employees"), true);
+});
+
 check("Warehouse manages stock while Shipping cannot run general stock operations", () => {
   assert.equal(hasPermission("warehouse", "inventory.manage"), true);
   assert.equal(hasPermission("shipping", "inventory.manage"), false);

@@ -191,17 +191,24 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   shipping: "Shipment execution with inventory, warehouse-location and QR-label visibility. General stock operations, customer commercial data and order-financial screens stay restricted.",
 };
 
-export function hasPermission(role: UserRole | null | undefined, permission: Permission) {
-  if (!role) return false;
-  return ROLE_PERMISSIONS[role].includes(permission);
+export type RoleInput = UserRole | readonly UserRole[] | null | undefined;
+
+export function normalizeRoles(input: RoleInput): UserRole[] {
+  if (!input) return [];
+  if (typeof input === "string") return [input];
+  return Array.from(new Set(input));
 }
 
-export function hasAnyPermission(role: UserRole | null | undefined, permissions: readonly Permission[]) {
-  return permissions.some((permission) => hasPermission(role, permission));
+export function hasPermission(roles: RoleInput, permission: Permission) {
+  return normalizeRoles(roles).some((role) => ROLE_PERMISSIONS[role].includes(permission));
 }
 
-export function isAdminRole(role: UserRole | null | undefined) {
-  return role === "super_admin" || role === "admin";
+export function hasAnyPermission(roles: RoleInput, permissions: readonly Permission[]) {
+  return permissions.some((permission) => hasPermission(roles, permission));
+}
+
+export function isAdminRole(roles: RoleInput) {
+  return normalizeRoles(roles).some((role) => role === "super_admin" || role === "admin");
 }
 
 const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Permission }> = [
@@ -291,7 +298,7 @@ export function requiredPermissionForPath(pathname: string): Permission | null {
   return ROUTE_RULES.find((rule) => rule.match(pathname))?.permission ?? null;
 }
 
-export function canAccessPath(role: UserRole | null | undefined, pathname: string) {
+export function canAccessPath(roles: RoleInput, pathname: string) {
   const permission = requiredPermissionForPath(pathname);
-  return permission ? hasPermission(role, permission) : isAdminRole(role);
+  return permission ? hasPermission(roles, permission) : isAdminRole(roles);
 }

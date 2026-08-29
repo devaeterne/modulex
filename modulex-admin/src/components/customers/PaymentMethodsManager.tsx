@@ -67,7 +67,7 @@ export default function PaymentMethodsManager() {
         setIsLoading(false);
         return;
       }
-      setCanEdit(hasPermission(profile?.role, "finance.manage"));
+      setCanEdit(hasPermission(profile?.roles, "finance.manage"));
       await load();
     }
     init();

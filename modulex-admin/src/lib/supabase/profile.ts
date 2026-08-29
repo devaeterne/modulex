@@ -15,6 +15,7 @@ export type Profile = {
   email: string | null;
   phone: string | null;
   role: UserRole;
+  roles: UserRole[];
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -44,9 +45,36 @@ async function loadCurrentProfile() {
     .eq("id", user.id)
     .single();
 
+  if (error || !data) {
+    return {
+      profile: null,
+      error,
+    };
+  }
+
+  const { data: roleRows, error: rolesError } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id);
+
+  if (rolesError) {
+    return {
+      profile: null,
+      error: rolesError,
+    };
+  }
+
+  const baseProfile = data as Omit<Profile, "roles">;
+  const assignedRoles = Array.from(
+    new Set((roleRows ?? []).map((row) => row.role as UserRole))
+  );
+
   return {
-    profile: data as Profile | null,
-    error,
+    profile: {
+      ...baseProfile,
+      roles: assignedRoles.length > 0 ? assignedRoles : [baseProfile.role],
+    } satisfies Profile,
+    error: null,
   };
 }
 
