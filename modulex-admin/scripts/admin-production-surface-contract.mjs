@@ -45,6 +45,36 @@ for (const relativePath of forbiddenDemoPages) {
 const sidebar = await readFile(path.join(root, "src/layout/AppSidebar.tsx"), "utf8");
 assert.doesNotMatch(sidebar, /name:\s*"API Test"|path:\s*"\/api-test"/, "Production navigation must not expose API Test");
 
+const dashboard = await readFile(
+  path.join(root, "src/components/dashboard/ModulexDashboard.tsx"),
+  "utf8",
+);
+assert.match(
+  dashboard,
+  /supabase\.rpc\("get_dashboard_kpis"\)/,
+  "Dashboard KPIs must come from the production dashboard RPC instead of sample values",
+);
+assert.match(
+  dashboard,
+  /supabase\.rpc\("get_recent_inventory_movements"/,
+  "Recent dashboard movements must come from the production inventory RPC",
+);
+assert.match(
+  dashboard,
+  /getCurrentProfile/,
+  "Dashboard Quick Actions must resolve the active Admin profile before exposing role-sensitive links",
+);
+assert.match(
+  dashboard,
+  /canAccessPath/,
+  "Dashboard Quick Actions must reuse direct-route authorization truth",
+);
+assert.match(
+  dashboard,
+  /quickActions\.filter\([^)]*canAccessPath/s,
+  "Dashboard Quick Actions must be filtered by direct-route authorization",
+);
+
 const profilePage = await readFile(
   path.join(root, "src/app/(admin)/(others-pages)/profile/page.tsx"),
   "utf8",
