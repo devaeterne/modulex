@@ -11,6 +11,7 @@ export const STORE_IMAGE_MIME_TYPES = [
 export const STORE_IMAGE_MAX_BYTES = 20 * 1024 * 1024;
 
 export type StoreContentStatus = "draft" | "published";
+export type StoreProjectAttribution = "oakwell_owned" | "parent_attributed";
 
 export type StorePage = {
   id: string | null;
@@ -58,6 +59,10 @@ export type StoreProject = {
   location: string | null;
   cover_image_url: string | null;
   cover_image_alt: string | null;
+  cover_media_asset_id: string | null;
+  attribution_classification: StoreProjectAttribution;
+  attribution_text: string | null;
+  source_page_url: string | null;
   sort_order: number;
   seo_title: string | null;
   seo_description: string | null;
@@ -76,6 +81,10 @@ export type StoreProjectDraft = Pick<
   | "location"
   | "cover_image_url"
   | "cover_image_alt"
+  | "cover_media_asset_id"
+  | "attribution_classification"
+  | "attribution_text"
+  | "source_page_url"
   | "sort_order"
   | "seo_title"
   | "seo_description"
@@ -87,6 +96,7 @@ export type StoreProjectMedia = {
   project_id: string;
   media_type: "image" | "video";
   media_url: string;
+  media_asset_id: string | null;
   alt_text: string;
   sort_order: number;
   updated_at: string | null;
@@ -149,8 +159,15 @@ export function validateProjectForPublish(project: StoreProjectDraft, duplicateS
     return "Project slug must use lowercase letters, numbers and single hyphens only.";
   }
   if (duplicateSlug) return "Project slug must be unique.";
-  if (!cleanNullable(project.cover_image_url)) return "Cover image is required before publishing.";
+  if (!project.cover_media_asset_id) return "Select a published Media Library cover before publishing.";
   if (!cleanNullable(project.cover_image_alt)) return "Cover image alt text is required before publishing.";
+  if (project.attribution_classification === "parent_attributed") {
+    if (!cleanNullable(project.attribution_text)) return "Parent-attributed projects require visible attribution text.";
+    const sourceUrl = cleanNullable(project.source_page_url);
+    if (!sourceUrl || !sourceUrl.startsWith("https://")) {
+      return "Parent-attributed projects require an https source page URL.";
+    }
+  }
   return null;
 }
 
