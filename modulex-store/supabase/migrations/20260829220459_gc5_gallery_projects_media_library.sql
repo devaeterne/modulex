@@ -236,7 +236,10 @@ begin
     end if;
   end if;
 
-  return coalesce(new, old);
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
 end;
 $$;
 
@@ -277,7 +280,10 @@ begin
   ) into v_referenced;
 
   if not v_referenced then
-    return coalesce(new, old);
+    if tg_op = 'DELETE' then
+      return old;
+    end if;
+    return new;
   end if;
 
   if tg_op = 'DELETE' then
@@ -414,9 +420,9 @@ stable
 security definer
 set search_path = ''
 as $$
-  select *
-  from store_api_private.get_store_public_projects_impl()
-  where slug = p_slug
+  select q.*
+  from store_api_private.get_store_public_projects_impl() q
+  where q.slug = p_slug
   limit 1;
 $$;
 
