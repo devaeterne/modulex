@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `b1357ab2ec87b65218f562c04e1140a009289aa1`
+Main baseline: `f40c44a7a317812eb6346a618fbb5f30969ae515`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -597,11 +597,11 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
     - Publish/unpublish/delete run through the server API without browser-exposed elevated credentials. Publish verifies optimized SHA-256 and byte size, writes immutable `media/<asset-id>/<sha>.webp` with `upsert:false`, and unpublish/delete fail closed with HTTP 409 when CMS references exist.
     - TDD evidence: private-preview GREEN Actions `33262785615`; prior full GC-2C contract/lint/production-build/diff verification `33262565620`.
     - Production remains intentionally empty at closeout: `store_media_assets = 0`, `store_media_asset_sources = 0`, `store-media-staging objects = 0`, and public `store-media` objects = 0; GC-2D remains the production-intake boundary.
-  - [~] **GC-2D — controlled production intake** is in progress: the representative production asset completed Admin review/publish, exact-SHA duplicate import, unpublish, and same-path republish acceptance with the pinned `sharp@0.35.4` pipeline. A follow-up Storage audit found the private original was later removed via the Supabase Management API outside the Admin lifecycle while optimized staging/public derivatives remained valid. The verified duplicate-intake self-heal checks original + optimized private staging integrity and restores only missing exact bytes at the existing paths without changing published state; merge/deploy/re-import repair verification remains before closeout.
+  - [x] **GC-2D — controlled production intake** is production-accepted. Representative import/review/publish, exact-SHA duplicate import, unpublish, same immutable-path republish, private staging privacy, and the post-PR #128 duplicate self-heal all passed. Final production state is 1 media asset / 1 provenance row / 2 private staging objects / 1 public immutable WebP object, with published state/path unchanged by the repair. Acceptance: `docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`.
 
 # Next Action
 
 The user-approved active workstream remains the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Review/merge/deploy the **GC-2D duplicate staging self-heal**, re-import the same representative candidate from authenticated Admin Media Library, verify the missing private original is restored at its existing path while the single published asset/provenance/public object remain unchanged, then close GC-2 with acceptance evidence.
-2. Keep GC-2 `[~]` until GC-2D is complete. Gallery/Projects stays `[~]`; GC-5 still owns project/media association and final public Gallery acceptance, and no GC-2C closeout action may seed production media.
+1. Start **GC-3 — Company identity, contact, About & Showroom** from the current `main`, extending only the structured Admin/Supabase/public-projection domains actually required by confirmed business truth.
+2. Keep Gallery/Projects `[~]`; GC-5 still owns curated project/media association and final public Gallery acceptance. GC-2 is closed and must not be reopened to seed project content.
