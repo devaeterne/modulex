@@ -3,10 +3,19 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
+import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
 
 type ProductStatus = "active" | "inactive" | "archived";
-type SortBy = "sku" | "name" | "brand" | "category" | "min_stock" | "status" | "created_at";
+type SortBy =
+  | "sku"
+  | "name"
+  | "brand"
+  | "category"
+  | "min_stock"
+  | "status"
+  | "created_at";
 type SortDirection = "asc" | "desc";
 
 type Product = {
@@ -43,8 +52,11 @@ type ProductsPagePayload = {
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
+const focusClass =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900";
+
 const controlClass =
-  "h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 shadow-theme-xs outline-none transition focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300";
+  "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 shadow-theme-xs outline-none transition focus-visible:border-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500/20 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300";
 
 function statusClass(status: ProductStatus) {
   switch (status) {
@@ -66,6 +78,16 @@ function formatStatus(status: ProductStatus) {
     .join(" ");
 }
 
+function formatNumber(value: number) {
+  return new Intl.NumberFormat(undefined, {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function reportProductError(context: string, error: unknown) {
+  console.error(`[Product List] ${context}`, error);
+}
+
 function getPageNumbers(currentPage: number, totalPages: number) {
   if (totalPages <= 5) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -79,6 +101,7 @@ export default function ProductsTable() {
   const router = useRouter();
   const requestIdRef = useRef(0);
 
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<FilterOption[]>([]);
   const [categories, setCategories] = useState<FilterOption[]>([]);
@@ -98,68 +121,121 @@ export default function ProductsTable() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Product | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const activeFilterCount = [query, statusFilter, brandFilter, categoryFilter].filter(Boolean).length;
+  const canManage = hasPermission(profile?.roles, "products.manage");
+  const activeFilterCount = [query, statusFilter, brandFilter, categoryFilter].filter(
+    Boolean
+  ).length;
+  const columnCount = canManage ? 8 : 7;
 
-  const loadProducts = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
+  const loadProducts = useCallback(
+    async (options?: { background?: boolean }) => {
+      const requestId = ++requestIdRef.current;
+      const background = options?.background === true;
 
-    setIsLoading(true);
-    setErrorMessage(null);
+      if (!background) setIsLoading(true);
+      setErrorMessage(null);
 
-    const { data, error } = await supabase.rpc("get_products_page", {
-      p_query: query,
-      p_page: currentPage,
-      p_page_size: pageSize,
-      p_status: statusFilter || null,
-      p_brand_id: brandFilter || null,
-      p_category_id: categoryFilter || null,
-      p_sort_by: sortBy,
-      p_sort_direction: sortDirection,
-    });
+      const { data, error } = await supabase.rpc("get_products_page", {
+        p_query: query,
+        p_page: currentPage,
+        p_page_size: pageSize,
+        p_status: statusFilter || null,
+        p_brand_id: brandFilter || null,
+        p_category_id: categoryFilter || null,
+        p_sort_by: sortBy,
+        p_sort_direction: sortDirection,
+      });
 
-    if (requestId !== requestIdRef.current) {
-      return;
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
+      if (error) {
+        reportProductError("product page load failed", error);
+        setErrorMessage("Products are temporarily unavailable. Please try again.");
+        if (!background) {
+          setProducts([]);
+          setTotalCount(0);
+          setTotalPages(1);
+          setIsLoading(false);
+        }
+        return;
+      }
+
+      const payload = data as ProductsPagePayload | null;
+      const nextTotalPages = Math.max(1, Number(payload?.total_pages ?? 1));
+
+      if (currentPage > nextTotalPages) {
+        setCurrentPage(nextTotalPages);
+        if (!background) setIsLoading(false);
+        return;
+      }
+
+      setProducts(payload?.items ?? []);
+      setBrands(payload?.filters?.brands ?? []);
+      setCategories(payload?.filters?.categories ?? []);
+      setTotalCount(Number(payload?.total_count ?? 0));
+      setTotalPages(nextTotalPages);
+      if (!background) setIsLoading(false);
+    },
+    [
+      query,
+      currentPage,
+      pageSize,
+      statusFilter,
+      brandFilter,
+      categoryFilter,
+      sortBy,
+      sortDirection,
+    ]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfile() {
+      const { profile: current, error } = await getCurrentProfile();
+      if (cancelled) return;
+
+      if (error || !current) {
+        reportProductError("profile load failed", error);
+        setProfile(null);
+        setAccessError(
+          "We couldn’t verify product management access. Management actions are unavailable."
+        );
+        return;
+      }
+
+      setProfile(current);
+      setAccessError(null);
     }
 
-    if (error) {
-      setErrorMessage(error.message);
-      setProducts([]);
-      setTotalCount(0);
-      setTotalPages(1);
-      setIsLoading(false);
-      return;
-    }
-
-    const payload = data as ProductsPagePayload | null;
-    const nextTotalPages = Math.max(1, Number(payload?.total_pages ?? 1));
-
-    if (currentPage > nextTotalPages) {
-      setCurrentPage(nextTotalPages);
-      return;
-    }
-
-    setProducts(payload?.items ?? []);
-    setBrands(payload?.filters?.brands ?? []);
-    setCategories(payload?.filters?.categories ?? []);
-    setTotalCount(Number(payload?.total_count ?? 0));
-    setTotalPages(nextTotalPages);
-    setIsLoading(false);
-  }, [
-    query,
-    currentPage,
-    pageSize,
-    statusFilter,
-    brandFilter,
-    categoryFilter,
-    sortBy,
-    sortDirection,
-  ]);
+    void loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     void loadProducts();
   }, [loadProducts]);
+
+  useEffect(() => {
+    if (!archiveTarget) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && actionLoadingId !== archiveTarget?.product_id) {
+        setArchiveTarget(null);
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [archiveTarget, actionLoadingId]);
 
   function resetToFirstPage() {
     setCurrentPage(1);
@@ -168,12 +244,6 @@ export default function ProductsTable() {
   function handleSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setQuery(queryInput.trim());
-    resetToFirstPage();
-  }
-
-  function handleClearSearch() {
-    setQueryInput("");
-    setQuery("");
     resetToFirstPage();
   }
 
@@ -188,11 +258,11 @@ export default function ProductsTable() {
     resetToFirstPage();
   }
 
-  function openProductEdit(productId: string) {
-    router.push(`/products/${productId}/edit`);
-  }
-
   async function handleToggleStatus(product: Product) {
+    if (!canManage) {
+      setErrorMessage("You do not have permission to manage products.");
+      return;
+    }
     if (product.product_status === "archived") {
       setErrorMessage("Archived products cannot be activated from this table.");
       return;
@@ -204,44 +274,60 @@ export default function ProductsTable() {
     setActionLoadingId(product.product_id);
     setErrorMessage(null);
 
-    const { error } = await supabase
-      .from("products")
-      .update({ status: nextStatus })
-      .eq("id", product.product_id);
+    try {
+      const { error } = await supabase
+        .from("products")
+        .update({ status: nextStatus })
+        .eq("id", product.product_id);
 
-    if (error) {
-      setErrorMessage(error.message);
+      if (error) {
+        reportProductError("product status update failed", error);
+        setErrorMessage("We couldn’t update the product status. Please try again.");
+        return;
+      }
+
+      await loadProducts({ background: true });
+    } finally {
       setActionLoadingId(null);
-      return;
     }
-
-    await loadProducts();
-    setActionLoadingId(null);
   }
 
-  async function handleArchiveProduct(product: Product) {
-    const confirmed = window.confirm(`Are you sure you want to archive ${product.sku}?`);
-    if (!confirmed) return;
+  async function confirmArchiveProduct() {
+    const product = archiveTarget;
+    if (!product) return;
+    if (!canManage) {
+      setArchiveTarget(null);
+      setErrorMessage("You do not have permission to manage products.");
+      return;
+    }
 
     setActionLoadingId(product.product_id);
     setErrorMessage(null);
 
-    const { error } = await supabase
-      .from("products")
-      .update({ status: "archived" })
-      .eq("id", product.product_id);
+    try {
+      const { error } = await supabase
+        .from("products")
+        .update({ status: "archived" })
+        .eq("id", product.product_id);
 
-    if (error) {
-      setErrorMessage(error.message);
+      if (error) {
+        reportProductError("product archive failed", error);
+        setErrorMessage("We couldn’t archive the product. Please try again.");
+        return;
+      }
+
+      setArchiveTarget(null);
+      await loadProducts({ background: true });
+    } finally {
       setActionLoadingId(null);
-      return;
     }
-
-    await loadProducts();
-    setActionLoadingId(null);
   }
 
   function handleDuplicateProduct(product: Product) {
+    if (!canManage) {
+      setErrorMessage("You do not have permission to manage products.");
+      return;
+    }
     router.push(`/products/new?duplicateFrom=${product.product_id}`);
   }
 
@@ -250,324 +336,496 @@ export default function ProductsTable() {
   const pageNumbers = getPageNumbers(currentPage, totalPages);
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 xl:flex-row xl:items-center xl:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Product List</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Server-side pagination, filtering and sorting. Double click a row to edit.
-          </p>
-        </div>
+    <>
+      <div
+        className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
+        aria-busy={isLoading || Boolean(actionLoadingId)}
+      >
+        <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+              Product List
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Search, filter and sort the product catalog. Management actions are shown only to authorized roles.
+            </p>
+          </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <input
-              value={queryInput}
-              onChange={(event) => setQueryInput(event.target.value)}
-              type="text"
-              placeholder="Search SKU, barcode, name, brand..."
-              className="h-10 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 sm:w-[320px]"
-            />
-            <button
-              type="submit"
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-gray-900 px-4 text-sm font-medium text-white transition hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-            >
-              Search
-            </button>
-          </form>
-
-          <Link
-            href="/products/new"
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-          >
-            Add Product
-          </Link>
-        </div>
-      </div>
-
-      <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <select
-            value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value);
-              resetToFirstPage();
-            }}
-            className={controlClass}
-          >
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="archived">Archived</option>
-          </select>
-
-          <select
-            value={brandFilter}
-            onChange={(event) => {
-              setBrandFilter(event.target.value);
-              resetToFirstPage();
-            }}
-            className={controlClass}
-          >
-            <option value="">All Brands</option>
-            {brands.map((brand) => (
-              <option key={brand.id} value={brand.id}>
-                {brand.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={categoryFilter}
-            onChange={(event) => {
-              setCategoryFilter(event.target.value);
-              resetToFirstPage();
-            }}
-            className={controlClass}
-          >
-            <option value="">All Categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={sortBy}
-            onChange={(event) => {
-              setSortBy(event.target.value as SortBy);
-              resetToFirstPage();
-            }}
-            className={controlClass}
-          >
-            <option value="sku">Sort: SKU</option>
-            <option value="name">Sort: Product Name</option>
-            <option value="brand">Sort: Brand</option>
-            <option value="category">Sort: Category</option>
-            <option value="min_stock">Sort: Min Stock</option>
-            <option value="status">Sort: Status</option>
-            <option value="created_at">Sort: Created Date</option>
-          </select>
-
-          <select
-            value={sortDirection}
-            onChange={(event) => {
-              setSortDirection(event.target.value as SortDirection);
-              resetToFirstPage();
-            }}
-            className={controlClass}
-          >
-            <option value="asc">Ascending</option>
-            <option value="desc">Descending</option>
-          </select>
-
-          <div className="flex items-center gap-2">
-            <select
-              value={pageSize}
-              onChange={(event) => {
-                setPageSize(Number(event.target.value));
-                resetToFirstPage();
-              }}
-              className={`${controlClass} min-w-[110px] flex-1`}
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>
-                  {size} / page
-                </option>
-              ))}
-            </select>
-
-            {activeFilterCount > 0 && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
+              <div>
+                <label htmlFor="product-search" className="sr-only">
+                  Search products
+                </label>
+                <input
+                  id="product-search"
+                  value={queryInput}
+                  onChange={(event) => setQueryInput(event.target.value)}
+                  type="search"
+                  placeholder="Search SKU, barcode, name, brand..."
+                  className={`h-10 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 sm:w-[320px] ${focusClass}`}
+                />
+              </div>
               <button
-                type="button"
-                onClick={handleClearFilters}
-                className="h-10 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                type="submit"
+                className={`inline-flex h-10 w-full items-center justify-center rounded-lg bg-gray-900 px-4 text-sm font-medium text-white transition hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200 sm:w-auto ${focusClass}`}
               >
-                Clear ({activeFilterCount})
+                Search
               </button>
-            )}
+            </form>
+
+            {canManage ? (
+              <Link
+                href="/products/new"
+                className={`inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600 ${focusClass}`}
+              >
+                Add Product
+              </Link>
+            ) : null}
           </div>
         </div>
-      </div>
 
-      {errorMessage && (
-        <div className="m-5 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
-          {errorMessage}
-        </div>
-      )}
+        <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="product-status-filter"
+                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
+                Status
+              </label>
+              <select
+                id="product-status-filter"
+                value={statusFilter}
+                onChange={(event) => {
+                  setStatusFilter(event.target.value);
+                  resetToFirstPage();
+                }}
+                className={controlClass}
+              >
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-          <thead className="bg-gray-50 dark:bg-white/[0.02]">
-            <tr>
-              {[
-                "SKU",
-                "Product",
-                "Barcode",
-                "Brand",
-                "Category",
-                "Min Stock",
-                "Status",
-              ].map((label) => (
-                <th
-                  key={label}
-                  className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400"
+            <div className="space-y-1.5">
+              <label
+                htmlFor="product-brand-filter"
+                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
+                Brand
+              </label>
+              <select
+                id="product-brand-filter"
+                value={brandFilter}
+                onChange={(event) => {
+                  setBrandFilter(event.target.value);
+                  resetToFirstPage();
+                }}
+                className={controlClass}
+              >
+                <option value="">All Brands</option>
+                {brands.map((brand) => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="product-category-filter"
+                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
+                Category
+              </label>
+              <select
+                id="product-category-filter"
+                value={categoryFilter}
+                onChange={(event) => {
+                  setCategoryFilter(event.target.value);
+                  resetToFirstPage();
+                }}
+                className={controlClass}
+              >
+                <option value="">All Categories</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="product-sort-by"
+                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
+                Sort by
+              </label>
+              <select
+                id="product-sort-by"
+                value={sortBy}
+                onChange={(event) => {
+                  setSortBy(event.target.value as SortBy);
+                  resetToFirstPage();
+                }}
+                className={controlClass}
+              >
+                <option value="sku">SKU</option>
+                <option value="name">Product Name</option>
+                <option value="brand">Brand</option>
+                <option value="category">Category</option>
+                <option value="min_stock">Min Stock</option>
+                <option value="status">Status</option>
+                <option value="created_at">Created Date</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="product-sort-direction"
+                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
+                Direction
+              </label>
+              <select
+                id="product-sort-direction"
+                value={sortDirection}
+                onChange={(event) => {
+                  setSortDirection(event.target.value as SortDirection);
+                  resetToFirstPage();
+                }}
+                className={controlClass}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="product-page-size"
+                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
+              >
+                Rows per page
+              </label>
+              <div className="flex items-center gap-2">
+                <select
+                  id="product-page-size"
+                  value={pageSize}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value));
+                    resetToFirstPage();
+                  }}
+                  className={`${controlClass} min-w-[110px] flex-1`}
                 >
-                  {label}
-                </th>
-              ))}
-              <th className="px-5 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                Actions
-              </th>
-            </tr>
-          </thead>
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <option key={size} value={size}>
+                      {size} / page
+                    </option>
+                  ))}
+                </select>
 
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-            {isLoading ? (
-              <tr>
-                <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-                  Loading products...
-                </td>
-              </tr>
-            ) : products.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-                  No products found for the selected filters.
-                </td>
-              </tr>
-            ) : (
-              products.map((product) => {
-                const isActionLoading = actionLoadingId === product.product_id;
-                const isArchived = product.product_status === "archived";
-
-                return (
-                  <tr
-                    key={product.product_id}
-                    onDoubleClick={() => openProductEdit(product.product_id)}
-                    title="Double click to edit"
-                    className="cursor-pointer transition hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+                {activeFilterCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className={`h-10 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04] ${focusClass}`}
                   >
-                    <td className="px-5 py-4 text-sm font-medium text-gray-800 dark:text-white/90">
-                      {product.sku}
-                    </td>
-                    <td className="px-5 py-4">
-                      <p className="text-sm font-medium text-gray-800 dark:text-white/90">{product.product_name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Unit: {product.unit}</p>
-                    </td>
-                    <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.barcode || "-"}</td>
-                    <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.brand || "-"}</td>
-                    <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.category || "-"}</td>
-                    <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
-                      {Number(product.min_stock_level).toLocaleString("en-US")}
-                    </td>
-                    <td className="px-5 py-4">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(product.product_status)}`}>
-                        {formatStatus(product.product_status)}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex min-w-[360px] items-center justify-end gap-2">
-                        <Link
-                          href={`/products/${product.product_id}/edit`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-                        >
-                          Edit
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleToggleStatus(product);
-                          }}
-                          disabled={isActionLoading || isArchived}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                            product.product_status === "active"
-                              ? "bg-warning-50 text-warning-700 hover:bg-warning-100 dark:bg-warning-500/10 dark:text-warning-400"
-                              : "bg-success-50 text-success-700 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400"
-                          }`}
-                        >
-                          {product.product_status === "active" ? "Deactivate" : "Activate"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDuplicateProduct(product);
-                          }}
-                          disabled={isActionLoading}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-                        >
-                          Duplicate
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleArchiveProduct(product);
-                          }}
-                          disabled={isActionLoading || isArchived}
-                          className="rounded-lg bg-error-50 px-3 py-1.5 text-xs font-medium text-error-600 transition hover:bg-error-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-error-500/10 dark:text-error-400"
-                        >
-                          Archive
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                    Clear ({activeFilterCount})
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
 
-      <div className="flex flex-col gap-4 border-t border-gray-200 px-5 py-4 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Showing <span className="font-medium text-gray-700 dark:text-gray-300">{startRow}–{endRow}</span> of{" "}
-          <span className="font-medium text-gray-700 dark:text-gray-300">{totalCount}</span> products
-        </p>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={currentPage <= 1 || isLoading}
-            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-            className="h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]"
+        {accessError ? (
+          <div
+            role="status"
+            className="mx-5 mt-5 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400"
           >
-            Previous
-          </button>
+            {accessError}
+          </div>
+        ) : null}
 
-          {pageNumbers.map((page) => (
+        {errorMessage ? (
+          <div
+            role="alert"
+            className="m-5 flex flex-col gap-3 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>{errorMessage}</span>
             <button
               type="button"
-              key={page}
-              disabled={isLoading}
-              onClick={() => setCurrentPage(page)}
-              className={`h-9 min-w-9 rounded-lg px-3 text-xs font-medium transition ${
-                currentPage === page
-                  ? "bg-brand-500 text-white"
-                  : "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]"
-              }`}
+              onClick={() => void loadProducts()}
+              className={`inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-error-300 px-3 text-xs font-semibold transition hover:bg-error-100 dark:border-error-500/40 dark:hover:bg-error-500/10 ${focusClass}`}
             >
-              {page}
+              Try again
             </button>
-          ))}
+          </div>
+        ) : null}
 
-          <button
-            type="button"
-            disabled={currentPage >= totalPages || isLoading}
-            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-            className="h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]"
+        <div className="overflow-x-auto">
+          <table className="min-w-[1080px] divide-y divide-gray-100 dark:divide-gray-800">
+            <thead className="bg-gray-50 dark:bg-white/[0.02]">
+              <tr>
+                {[
+                  "SKU",
+                  "Product",
+                  "Barcode",
+                  "Brand",
+                  "Category",
+                  "Min Stock",
+                  "Status",
+                ].map((label) => (
+                  <th
+                    key={label}
+                    scope="col"
+                    className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400"
+                  >
+                    {label}
+                  </th>
+                ))}
+                {canManage ? (
+                  <th
+                    scope="col"
+                    className="px-5 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400"
+                  >
+                    Actions
+                  </th>
+                ) : null}
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              {isLoading ? (
+                <tr>
+                  <td
+                    colSpan={columnCount}
+                    className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
+                  >
+                    Loading products...
+                  </td>
+                </tr>
+              ) : products.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={columnCount}
+                    className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
+                  >
+                    No products found for the selected filters.
+                  </td>
+                </tr>
+              ) : (
+                products.map((product) => {
+                  const isActionLoading = actionLoadingId === product.product_id;
+                  const isArchived = product.product_status === "archived";
+
+                  return (
+                    <tr
+                      key={product.product_id}
+                      className="transition hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+                    >
+                      <td className="px-5 py-4 text-sm font-medium text-gray-800 dark:text-white/90">
+                        {product.sku}
+                      </td>
+                      <td className="px-5 py-4">
+                        <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                          {product.product_name}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Unit: {product.unit}
+                        </p>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
+                        {product.barcode || "—"}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
+                        {product.brand || "—"}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
+                        {product.category || "—"}
+                      </td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
+                        {formatNumber(Number(product.min_stock_level))}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(product.product_status)}`}
+                        >
+                          {formatStatus(product.product_status)}
+                        </span>
+                      </td>
+                      {canManage ? (
+                        <td className="px-5 py-4">
+                          <div className="flex min-w-[330px] items-center justify-end gap-2">
+                            <Link
+                              href={`/products/${product.product_id}/edit`}
+                              className={`rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
+                            >
+                              Edit
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleStatus(product)}
+                              disabled={isActionLoading || isArchived}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${focusClass} ${
+                                product.product_status === "active"
+                                  ? "bg-warning-50 text-warning-700 hover:bg-warning-100 dark:bg-warning-500/10 dark:text-warning-400"
+                                  : "bg-success-50 text-success-700 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400"
+                              }`}
+                            >
+                              {isActionLoading
+                                ? "Saving..."
+                                : product.product_status === "active"
+                                  ? "Deactivate"
+                                  : "Activate"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateProduct(product)}
+                              disabled={isActionLoading}
+                              className={`rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
+                            >
+                              Duplicate
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setArchiveTarget(product)}
+                              disabled={isActionLoading || isArchived}
+                              className={`rounded-lg bg-error-50 px-3 py-1.5 text-xs font-medium text-error-600 transition hover:bg-error-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-error-500/10 dark:text-error-400 ${focusClass}`}
+                            >
+                              Archive
+                            </button>
+                          </div>
+                        </td>
+                      ) : null}
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex flex-col gap-4 border-t border-gray-200 px-5 py-4 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
+          <p
+            aria-live="polite"
+            className="text-sm text-gray-500 dark:text-gray-400"
           >
-            Next
-          </button>
+            Showing{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              {startRow}–{endRow}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium text-gray-700 dark:text-gray-300">
+              {totalCount}
+            </span>{" "}
+            products
+          </p>
 
-          <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
-            Page {currentPage} of {totalPages}
-          </span>
+          <nav aria-label="Product list pagination" className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-label="Previous page"
+              disabled={currentPage <= 1 || isLoading}
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              className={`h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04] ${focusClass}`}
+            >
+              Previous
+            </button>
+
+            {pageNumbers.map((page) => (
+              <button
+                type="button"
+                key={page}
+                aria-label={`Page ${page}`}
+                aria-current={currentPage === page ? "page" : undefined}
+                disabled={isLoading}
+                onClick={() => setCurrentPage(page)}
+                className={`h-9 min-w-9 rounded-lg px-3 text-xs font-medium transition ${focusClass} ${
+                  currentPage === page
+                    ? "bg-brand-500 text-white"
+                    : "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              aria-label="Next page"
+              disabled={currentPage >= totalPages || isLoading}
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              className={`h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04] ${focusClass}`}
+            >
+              Next
+            </button>
+
+            <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
+              Page {currentPage} of {totalPages}
+            </span>
+          </nav>
         </div>
       </div>
-    </div>
+
+      {archiveTarget ? (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close archive confirmation"
+            onClick={() => {
+              if (actionLoadingId !== archiveTarget.product_id) setArchiveTarget(null);
+            }}
+            className="absolute inset-0 bg-gray-950/50 backdrop-blur-[1px]"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="archive-product-title"
+            aria-describedby="archive-product-description"
+            className="relative z-10 w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900"
+          >
+            <h4
+              id="archive-product-title"
+              className="text-lg font-semibold text-gray-900 dark:text-white"
+            >
+              Archive product?
+            </h4>
+            <p
+              id="archive-product-description"
+              className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300"
+            >
+              {archiveTarget.sku} will be moved to archived status and will no longer be available for normal product workflows.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                autoFocus
+                disabled={actionLoadingId === archiveTarget.product_id}
+                onClick={() => setArchiveTarget(null)}
+                className={`inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.04] ${focusClass}`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoadingId === archiveTarget.product_id}
+                onClick={() => void confirmArchiveProduct()}
+                className={`inline-flex h-10 items-center justify-center rounded-lg bg-error-600 px-4 text-sm font-semibold text-white transition hover:bg-error-700 disabled:cursor-not-allowed disabled:opacity-50 ${focusClass}`}
+              >
+                {actionLoadingId === archiveTarget.product_id ? "Archiving..." : "Archive product"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
