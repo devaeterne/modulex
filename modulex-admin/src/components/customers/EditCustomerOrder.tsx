@@ -3,15 +3,21 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
-import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
 import OrderProductPicker, { type OrderPickerProduct } from "@/components/customers/OrderProductPicker";
-import type { Customer, CustomerAddress, CustomerOrder, CustomerOrderItem, OrderFulfillmentType, PaymentMethod, PriceGroupLookup } from "@/lib/customers/types";
+import {
+  loadEditOrderContext,
+  loadOrderPrices,
+  updateCustomerOrder,
+  type OrderPriceRow,
+  type OrderTaxRule,
+} from "@/lib/customers/order-domain";
+import type { UserRole } from "@/lib/supabase/profile";
+import type { Customer, CustomerAddress, CustomerOrder, OrderFulfillmentType, PaymentMethod, PriceGroupLookup } from "@/lib/customers/types";
 
 type Product = OrderPickerProduct;
-type PriceRow = { product_id: string; amount: string | number };
+type PriceRow = OrderPriceRow;
 type DraftItem = { product_id: string; quantity: string; unit_price: string; discount_percent: string };
-type TaxRule = { fulfillment_type: OrderFulfillmentType; tax_rate: string | number | null; is_active: boolean };
+type TaxRule = OrderTaxRule;
 
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
 
@@ -57,87 +63,75 @@ export default function EditCustomerOrder() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     async function load() {
-      const { profile, error: profileError } = await getCurrentProfile();
-      if (profileError || !profile || !["super_admin", "admin", "sales"].includes(profile.role)) {
-        setErrorMessage(profileError?.message || "You do not have permission to edit orders.");
-        setIsLoading(false);
-        return;
+      try {
+        const context = await loadEditOrderContext(customerId, orderId);
+        if (!active) return;
+
+        const loadedOrder = context.order;
+        if (loadedOrder.status === "cancelled") {
+          setErrorMessage("Cancelled orders cannot be edited.");
+        }
+
+        setRole(context.role);
+        setCustomer(context.customer);
+        setOrder(loadedOrder);
+        setAddresses(context.addresses);
+        setPriceGroups(context.priceGroups);
+        setPaymentMethods(context.paymentMethods);
+        setProducts(context.products as Product[]);
+        setTaxRules(context.taxRules);
+        setItems(context.items.map((item) => ({
+          product_id: item.product_id ?? "",
+          quantity: String(item.quantity),
+          unit_price: String(item.unit_price),
+          discount_percent: String(item.discount_percent),
+        })));
+
+        setPriceGroupId(loadedOrder.price_group_id ?? "");
+        setFulfillmentType(loadedOrder.fulfillment_type || "delivery");
+        setPaymentMethodId(loadedOrder.payment_method_id ?? "");
+        setAppliedCommission(String(loadedOrder.payment_commission_percent ?? 0));
+        setBillingAddressId(loadedOrder.billing_address_id ?? "");
+        setShippingAddressId(loadedOrder.shipping_address_id ?? "");
+        setExpectedDate(loadedOrder.expected_delivery_date ?? "");
+        setReference(loadedOrder.customer_reference ?? "");
+        setCustomerNotes(loadedOrder.customer_notes ?? "");
+        setInternalNotes(loadedOrder.internal_notes ?? "");
+        setTaxRate(String(loadedOrder.tax_rate ?? 0));
+        setOrderDiscount(String(loadedOrder.discount_amount ?? 0));
+      } catch (error) {
+        if (!active) return;
+        setErrorMessage(error instanceof Error ? error.message : "Unable to load editable order.");
+      } finally {
+        if (active) setIsLoading(false);
       }
-      setRole(profile.role);
-
-      const [customerResult, orderResult, itemsResult, addressesResult, groupsResult, methodsResult, productsResult, taxRulesResult] = await Promise.all([
-        supabase.from("customers").select("*").eq("id", customerId).single(),
-        supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
-        supabase.from("customer_order_items").select("*").eq("order_id", orderId).order("line_no"),
-        supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("address_name"),
-        supabase.from("price_groups").select("id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only").eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
-        supabase.from("payment_methods").select("id, system_key, name, commission_percent, sort_order, is_active").eq("is_active", true).order("sort_order"),
-        supabase.from("products").select("id, sku, name, barcode, status, brand, category, brand_id, category_id").in("status", ["active", "inactive"]).order("sku"),
-        supabase.from("order_tax_rules").select("fulfillment_type, tax_rate, is_active"),
-      ]);
-
-      const firstError = customerResult.error || orderResult.error || itemsResult.error || addressesResult.error || groupsResult.error || methodsResult.error || productsResult.error || taxRulesResult.error;
-      if (firstError) {
-        setErrorMessage(firstError.message);
-        setIsLoading(false);
-        return;
-      }
-
-      const loadedOrder = orderResult.data as CustomerOrder;
-      if (loadedOrder.status === "cancelled") {
-        setErrorMessage("Cancelled orders cannot be edited.");
-      }
-
-      setCustomer(customerResult.data as Customer);
-      setOrder(loadedOrder);
-      setAddresses((addressesResult.data ?? []) as CustomerAddress[]);
-      setPriceGroups((groupsResult.data ?? []) as PriceGroupLookup[]);
-      setPaymentMethods((methodsResult.data ?? []) as PaymentMethod[]);
-      setProducts((productsResult.data ?? []) as Product[]);
-      setTaxRules((taxRulesResult.data ?? []) as TaxRule[]);
-      setItems(((itemsResult.data ?? []) as CustomerOrderItem[]).map((item) => ({
-        product_id: item.product_id ?? "",
-        quantity: String(item.quantity),
-        unit_price: String(item.unit_price),
-        discount_percent: String(item.discount_percent),
-      })));
-
-      setPriceGroupId(loadedOrder.price_group_id ?? "");
-      setFulfillmentType(loadedOrder.fulfillment_type || "delivery");
-      setPaymentMethodId(loadedOrder.payment_method_id ?? "");
-      setAppliedCommission(String(loadedOrder.payment_commission_percent ?? 0));
-      setBillingAddressId(loadedOrder.billing_address_id ?? "");
-      setShippingAddressId(loadedOrder.shipping_address_id ?? "");
-      setExpectedDate(loadedOrder.expected_delivery_date ?? "");
-      setReference(loadedOrder.customer_reference ?? "");
-      setCustomerNotes(loadedOrder.customer_notes ?? "");
-      setInternalNotes(loadedOrder.internal_notes ?? "");
-      setTaxRate(String(loadedOrder.tax_rate ?? 0));
-      setOrderDiscount(String(loadedOrder.discount_amount ?? 0));
-      setIsLoading(false);
     }
+
     void load();
+    return () => { active = false; };
   }, [customerId, orderId]);
 
   useEffect(() => {
     if (!priceGroupId || !order) return;
-    const currencyCode = order.currency_code;
     let active = true;
+
     async function loadPrices() {
       setIsLoadingPrices(true);
-      const { data, error } = await supabase
-        .from("product_prices")
-        .select("product_id, amount")
-        .eq("price_group_id", priceGroupId)
-        .eq("is_active", true)
-        .is("valid_to", null)
-        .eq("currency_code", currencyCode);
-      if (!active) return;
-      if (error) setErrorMessage(error.message);
-      else setPrices((data ?? []) as PriceRow[]);
-      setIsLoadingPrices(false);
+      try {
+        const data = await loadOrderPrices(priceGroupId, order.currency_code);
+        if (!active) return;
+        setPrices(data);
+      } catch (error) {
+        if (!active) return;
+        setErrorMessage(error instanceof Error ? error.message : "Unable to load order prices.");
+      } finally {
+        if (active) setIsLoadingPrices(false);
+      }
     }
+
     void loadPrices();
     return () => { active = false; };
   }, [priceGroupId, order]);
@@ -227,35 +221,39 @@ export default function EditCustomerOrder() {
     }
 
     setIsSaving(true);
-    const { data, error } = await supabase.rpc("update_customer_order", {
-      p_order_id: order.id,
-      p_items: items.map((item) => ({ product_id: item.product_id, quantity: Number(item.quantity), unit_price: Number(item.unit_price), discount_percent: Number(item.discount_percent || 0) })),
-      p_price_group_id: priceGroupId,
-      p_billing_address_id: billingAddressId || null,
-      p_shipping_address_id: shippingAddressId || null,
-      p_expected_delivery_date: expectedDate || null,
-      p_customer_reference: reference.trim() || null,
-      p_customer_notes: customerNotes.trim() || null,
-      p_internal_notes: internalNotes.trim() || null,
-      p_tax_rate: Number(taxRate || 0),
-      p_order_discount_amount: Number(orderDiscount || 0),
-      p_payment_method_id: paymentMethodId,
-      p_payment_commission_percent: Number(appliedCommission || 0),
-      p_revision_reason: revisionReason.trim() || null,
-      p_fulfillment_type: fulfillmentType,
-    });
+    try {
+      const revision = await updateCustomerOrder({
+        orderId: order.id,
+        items: items.map((item) => ({
+          productId: item.product_id,
+          quantity: item.quantity,
+          unitPrice: item.unit_price,
+          discountPercent: item.discount_percent,
+        })),
+        priceGroupId,
+        billingAddressId,
+        shippingAddressId,
+        expectedDeliveryDate: expectedDate,
+        customerReference: reference,
+        customerNotes,
+        internalNotes,
+        taxRate,
+        orderDiscountAmount: orderDiscount,
+        paymentMethodId,
+        paymentCommissionPercent: appliedCommission,
+        revisionReason,
+        fulfillmentType,
+      });
 
-    if (error) {
-      setErrorMessage(error.message);
+      if (revision === 0) {
+        router.push(`/customers/${customerId}/orders/${orderId}?approval=requested`);
+        return;
+      }
+      router.push(`/customers/${customerId}/orders/${orderId}?revision=${revision}`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to save order revision.");
       setIsSaving(false);
-      return;
     }
-
-    if (Number(data) === 0) {
-      router.push(`/customers/${customerId}/orders/${orderId}?approval=requested`);
-      return;
-    }
-    router.push(`/customers/${customerId}/orders/${orderId}?revision=${data}`);
   }
 
   if (isLoading) return <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"><p className="text-sm text-gray-500">Loading editable order...</p></div>;
