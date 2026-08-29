@@ -129,7 +129,10 @@ const ORDER_EDITOR_ROLES: UserRole[] = ["super_admin", "admin", "sales"];
 const ORDER_REVISION_EDITABLE_STATUSES: CustomerOrderStatus[] = ["draft", "confirmed", "in_preparation", "ready_for_shipment"];
 const ORDER_REVISION_LOCKED_STATUSES: CustomerOrderStatus[] = ["shipped", "delivered", "installation_scheduled", "installation_in_progress", "completed", "cancelled"];
 const ORDER_REVISION_EDITABLE_FIELDS = [
-  "items",
+  "items.product_id",
+  "items.quantity",
+  "items.unit_price",
+  "items.discount_percent",
   "price_group_id",
   "fulfillment_type",
   "payment_method_id",
@@ -142,8 +145,10 @@ const ORDER_REVISION_EDITABLE_FIELDS = [
   "internal_notes",
   "tax_rate",
   "discount_amount",
+  "revision_reason",
 ] as const;
 const ORDER_REVISION_IMMUTABLE_FIELDS = [
+  "id",
   "order_number",
   "customer_id",
   "status",
@@ -151,13 +156,14 @@ const ORDER_REVISION_IMMUTABLE_FIELDS = [
   "currency_code",
   "price_group_name_snapshot",
   "payment_method_name_snapshot",
+  "payment_commission_default_percent",
+  "payment_commission_amount",
   "billing_address_snapshot",
   "shipping_address_snapshot",
   "item_count",
   "subtotal",
   "tax_amount",
   "total_amount",
-  "payment_commission_amount",
   "grand_total",
   "confirmed_at",
   "completed_at",
@@ -166,6 +172,17 @@ const ORDER_REVISION_IMMUTABLE_FIELDS = [
   "updated_by",
   "created_at",
   "updated_at",
+  "items.id",
+  "items.order_id",
+  "items.line_no",
+  "items.sku_snapshot",
+  "items.product_name_snapshot",
+  "items.discount_amount",
+  "items.line_subtotal",
+  "items.line_total",
+  "items.price_source",
+  "items.created_by",
+  "items.created_at",
 ] as const;
 const PRICE_GROUP_COLUMNS = "id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only";
 const PAYMENT_METHOD_COLUMNS = "id, system_key, name, commission_percent, sort_order, is_active";
