@@ -4,6 +4,7 @@ import { cache } from "react";
 import { callPublicRpc, getPublicStorageObjectUrl } from "@/lib/supabase/public-rest";
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const PAGE_REVALIDATE_SECONDS = 60;
 const GALLERY_REVALIDATE_SECONDS = 60;
 
 export type StorePublicPage = {
@@ -140,7 +141,11 @@ function mapProjectMedia(row: ProjectMediaRpcRow): StorePublicProjectMedia | nul
 export const getStorePublicPage = cache(async (slug: string): Promise<StorePublicPage | null> => {
   const normalizedSlug = normalizeSlug(slug);
   if (!normalizedSlug) return null;
-  const rows = await callPublicRpc<PageRpcRow[]>("get_store_public_page", { p_slug: normalizedSlug }, { revalidate: 900 });
+  const rows = await callPublicRpc<PageRpcRow[]>(
+    "get_store_public_page",
+    { p_slug: normalizedSlug },
+    { revalidate: PAGE_REVALIDATE_SECONDS },
+  );
   return rows[0] ? mapPage(rows[0]) : null;
 });
 
