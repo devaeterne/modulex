@@ -33,4 +33,5 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Full smoke
+        if: always()
         run: npm run smoke
