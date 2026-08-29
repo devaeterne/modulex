@@ -5,6 +5,10 @@ Status: **APPROVED — execute sequentially via reviewed PRs**
 Primary source: https://granitecenterva.com/
 Target: `devaeterne/modulex` → `modulex-store` + controlled CMS in `modulex-admin`
 
+Architecture design: `modulex-store/docs/superpowers/specs/2026-08-29-oakwell-dynamic-content-cms-design.md`
+GC-0 truth/ownership lock: `modulex-store/docs/GC0_BUSINESS_TRUTH_LOCK.md`
+GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`
+
 > Purpose: identify which verified Granite & Cabinet Center business data, media, social proof, forms, showroom information, and cabinet-related content should be adapted into Oakwell Cabinetry without cloning the parent website or importing stale/irrelevant WordPress content.
 
 ## Status Legend
@@ -13,7 +17,7 @@ Target: `devaeterne/modulex` → `modulex-store` + controlled CMS in `modulex-ad
 - `[~]` In progress
 - `[x]` Verified complete
 - `[!]` Blocked / business decision required
-- `[?]` Needs approval or source-of-truth confirmation
+- `[?]` Needs source-of-truth confirmation
 
 ---
 
@@ -21,427 +25,351 @@ Target: `devaeterne/modulex` → `modulex-store` + controlled CMS in `modulex-ad
 
 ## 0.1 Brand relationship
 
-- Oakwell Cabinetry will be treated as a sub-brand of Granite & Cabinet Center.
-- Parent-company identity may be used to establish location, showroom, operating history, project proof, and support capabilities only where attribution is accurate.
-- Suggested public relationship wording to approve before launch:
-  - `Oakwell Cabinetry — a Granite & Cabinet Center brand`
-  - or `Oakwell Cabinetry by Granite & Cabinet Center`
-- Do not present parent-company reviews, projects, licenses, guarantees, offers, or service claims as Oakwell-specific unless the business approves that attribution.
+GC-0 is authoritative for the current public relationship and factual locks.
 
-## 0.2 Architecture principle
+- Oakwell Cabinetry is treated as a Granite & Cabinet Center brand.
+- Approved relationship wording: `Oakwell Cabinetry — a Granite & Cabinet Center brand.`
+- Parent-company identity/history/projects/reviews/service claims must not be represented as Oakwell-specific unless explicitly confirmed.
+- Parent-company content may be used as attributed supporting context where GC-0 permits it.
 
-- Do **not** clone Granite Center's WordPress structure, page markup, embedded forms, duplicated sections, plugins, or broken widgets.
-- Reuse verified data and owned media inside Oakwell's existing Next.js + Supabase CMS architecture.
-- Keep `modulex-admin` as CMS/control plane and `modulex-store` as public delivery surface.
-- Reuse existing Oakwell About, Contact, Gallery/Projects, Lead API, analytics, media and CMS foundations before creating new systems.
+## 0.2 Architecture principle — approved
+
+The migration uses a **structured hybrid CMS** and extends existing Modulex domains rather than creating a second CMS or cloning WordPress.
+
+Canonical flow:
+
+`modulex-admin` → Supabase DB / Storage → narrow published/public projections → `modulex-store`
+
+Permanent rules:
+
+- Do **not** clone Granite Center WordPress structure, page markup, embedded forms, duplicated sections, plugins, shortcodes, or broken widgets.
+- Granite Center is migration evidence, never a runtime content backend.
+- Reuse `general_settings`, `store_pages`, `store_projects`, `store_project_media`, `store_site_settings` and existing lead/CMS foundations where they fit.
+- Add typed domains incrementally when a GC package first needs them; do not create speculative tables or one unrestricted page-builder blob.
+- Mutable production business values must be DB/Storage-backed and Admin-managed rather than hard-coded in Store runtime source.
+- Anonymous Store consumers read only narrow published/public projections; they do not receive direct unrestricted CMS table access.
+- Approved media must be copied/optimized into Oakwell-controlled Supabase Storage; raw WordPress URLs are provenance only.
+- Source discovery does not publish content. The lifecycle is `discovered → classified → imported as draft → reviewed → approved → published`.
+
+## 0.3 Parallel-work safety
+
+Other Modulex conversations may merge Admin/Store PRs while this workstream runs.
+
+Before every GC package:
+
+1. fetch latest `main`;
+2. read `modulex-store/STORE_ROADMAP.md` first;
+3. if Admin is touched, read `modulex-admin/ADMIN_ROADMAP.md` too;
+4. preserve parallel roadmap work when rebasing/updating;
+5. branch from current `main`, never from a remembered SHA.
 
 ---
 
 # 1. Granite Center Source Audit
 
-## 1.1 Canonical business information discovered
+This section records parent-source evidence. GC-0 decides whether the evidence may become Oakwell public truth.
 
-### Address variants found
+## 1.1 Contact / location conflicts discovered
 
-1. `22446 DAVIS DR #109-127 STERLING, VA 20164` — repeated header/footer form.
-2. `22446 Davis Dr #109, Sterling, VA 20164` — Contact / cabinet CTA form.
-3. `22446 Davis Dr Ste 109, Sterling, VA 20164` — Showroom / Career form.
+### Address variants
 
-`[?]` **Decision required:** choose one canonical Oakwell public address representation.
+Parent pages expose variants including:
 
-Recommended canonical display if legally/operationally correct:
+- `22446 DAVIS DR #109-127 STERLING, VA 20164`
+- `22446 Davis Dr #109, Sterling, VA 20164`
+- `22446 Davis Dr Ste 109, Sterling, VA 20164`
 
-`22446 Davis Dr, Suite 109, Sterling, VA 20164`
+**Current rule:** do not overwrite Oakwell canonical profile automatically. Preserve variants as source evidence in GC-1; public Store reads the controlled Oakwell source.
 
-Do not publish the recommendation until business confirms whether `#109-127` represents multiple suites that must remain visible.
+### Phone variants
 
-### Phone variants found
+Parent pages expose:
 
-- Header/navigation: `703-956-9470`
-- Contact page: `703-439-1040`
-- Fax: `(703) 956-9649`
+- `703-956-9470`
+- `703-439-1040`
+- fax `(703) 956-9649`
 
-`[!]` **Decision required:** choose Oakwell's primary public phone number before migration.
+**Current rule:** these values may be recorded as source evidence. They do not become runtime constants or automatically replace the Oakwell primary phone. If a parent number is later approved as a public secondary channel, it must be represented in the structured DB/Admin contact model first.
 
 ### Hours found
 
+Parent source states:
+
 - Monday–Friday: `8:00 AM – 6:00 PM`
 - Saturday: `8:00 AM – 6:00 PM`
-- Showroom page summarizes: `Mon–Sat 8am–6pm`
+- Showroom shorthand: `Mon–Sat 8am–6pm`
 
-`[?]` Confirm Sunday status / closed wording before publishing structured hours.
+**Current rule:** parent hours stay unpublished on Oakwell until a canonical Oakwell hours domain/value is business-confirmed and Admin-managed. Sunday must not be inferred.
 
 ### Service region found
 
-- Virginia
-- Maryland
-- Washington, D.C.
-- Greater Washington DC / surrounding areas
+Parent source references Virginia, Maryland, Washington D.C. and Greater Washington DC/surrounding areas.
 
-`[?]` Confirm whether Oakwell serves the same territory, especially dealer vs direct-customer coverage.
+**Current rule:** do not publish this as guaranteed Oakwell coverage until confirmed and represented in the controlled source.
 
-### Parent-company history / positioning found
+## 1.2 Parent-company history / positioning
 
-- “Since 2011” / “Trusted by Thousands” appears repeatedly.
-- Family-owned wording appears on the homepage.
-- Parent business positions itself around kitchen/bath remodeling, cabinetry, countertops, fabrication, installation, showroom sales and design support.
+Parent source repeatedly uses claims such as:
 
-`[?]` If used on Oakwell, wording must clearly attribute history to Granite & Cabinet Center unless Oakwell independently existed during the claimed period.
+- `Since 2011`
+- `Trusted by Thousands`
+- family-owned wording;
+- cabinetry/remodeling/countertop/fabrication/installation positioning;
+- large assortment and promotional claims.
+
+GC-0 rules apply:
+
+- `Since 2011` is parent-attributed only and omitted from initial Oakwell migration unless specifically useful.
+- family-owned, awards, satisfaction guarantees and similar claims are not migrated by default.
+- installation/free-design/SLA/promotional claims are not inherited automatically.
+
+## 1.3 Parent-site technical/content defects not to propagate
+
+- conflicting contact/address values;
+- duplicated sections/copy;
+- broken Trustindex messages;
+- raw Contact Form 7 shortcode on Showroom;
+- Wufoo iframe dependency;
+- volatile discounts, prices, turnaround and inventory-count claims;
+- typographic/content inconsistencies;
+- parent payment links;
+- granite/stone FAQ irrelevant to Oakwell cabinetry;
+- legacy WordPress filenames and likely duplicate media.
+
+Oakwell migration is normalization, not mirroring.
 
 ---
 
 # 2. Page-by-Page Migration Matrix
 
-| Granite Center surface | Oakwell action | Priority | Notes |
-|---|---|---:|---|
-| Header contact/address | **Transfer after canonical confirmation** | P0 | One phone/address source of truth only. |
-| About Us | **Adapt, do not copy verbatim** | P0 | Use parent-company relationship, showroom, design/support capabilities; remove countertop-heavy copy unless cross-brand context is intentional. |
-| Contact | **Transfer data + redesign around native Oakwell form** | P0 | Phone, address, hours, showroom/warehouse context, map/directions CTA. |
-| Wufoo estimate form | **Rebuild natively** | P0 | Do not embed Wufoo. Map useful fields to Oakwell lead system. |
-| Showroom | **Create Oakwell showroom section/page** | P0/P1 | Strong asset source; use Oakwell/parent relationship clearly. |
-| Residential Projects | **Selective media import** | P0/P1 | Import cabinet/kitchen/vanity-relevant projects; avoid countertop-only dump. |
-| Commercial Projects | **Selective import after relevance review** | P1 | Only projects that accurately demonstrate cabinetry/woodwork/Oakwell-relevant capabilities. |
-| Kitchen Cabinet Sale / Cabinet pages | **Mine structure/process, rewrite for Oakwell** | P0/P1 | Design consultation, workflow, showroom CTA, service area, cabinet construction themes if true. |
-| Testimonials / Google review content | **Conditional, attributed social proof** | P1 | Parent-brand attribution required unless review explicitly names Oakwell. |
-| FAQ | **Do not transfer granite FAQ text** | P1 | Keep FAQ UI concept; author Oakwell cabinetry FAQ. |
-| Accessories: sinks/faucets/grids | **Optional / catalog decision** | P2 | Only if Oakwell will actually sell/support these SKUs. |
-| Home Office | **Potential Oakwell expansion** | P2 | Relevant to cabinetry; useful if Oakwell product offering supports office/storage cabinetry. |
-| Garden | **Hold** | P2 | Requires product relevance validation. |
-| Granite / Quartz pages | **Do not migrate into core Oakwell** | Exclude | Parent brand content unless intentional cross-sell section is approved. |
-| Countertop Services & Fees | **Do not migrate** | Exclude | Parent-company service/repair pricing. |
-| Remodeling sale/deals | **Do not migrate by default** | Exclude | Pricing/promotional claims are volatile and outside Oakwell core. |
-| PAY / CardPointe | **Do not migrate by default** | Exclude | Parent-company payment flow; requires finance approval if ever linked. |
-| Career | **Optional future** | P2 | Only create Oakwell Careers if recruiting under Oakwell identity. |
-| WordPress plugins/widgets | **Never migrate** | Exclude | Includes broken Trustindex rendering, Contact Form 7 shortcode, duplicated plugin blocks. |
+| Granite Center surface | Oakwell action | Target domain/surface | Notes |
+|---|---|---|---|
+| Header contact/address | **Source evidence / controlled profile only** | company profile/contact/location | Never hard-code source variants. |
+| About Us | **Adapt, do not copy verbatim** | `store_pages` / typed sections | Parent relationship and cabinet/showroom context only where truthful. |
+| Contact | **Adapt around native Oakwell lead flow** | company profile + contact page + form config | Contact facts come from controlled domains. |
+| Wufoo estimate form | **Do not embed** | native lead form | Useful field concepts may be mapped in GC-4. |
+| Showroom | **Create Oakwell showroom surface** | location/showroom domain + page CMS | No unconfirmed hours. |
+| Residential Projects | **Selective candidates** | `store_projects` + media | Cabinet/kitchen/vanity relevance required. |
+| Commercial Projects | **Hold** | future project candidates | Do not launch as Oakwell work without scope/attribution verification. |
+| Kitchen Cabinet Sale / cabinet landing pages | **Mine structure/process, rewrite** | page/process/FAQ content | Exclude promotions, guarantees, SLAs. |
+| Cabinet brand pages | **Selective evidence** | catalog/content only if actual Oakwell scope matches | Do not import unsupported brand claims. |
+| Testimonials / reviews | **Parent-attributed or hold** | future review domain | Never relabel parent reviews as Oakwell reviews. |
+| FAQ | **Exclude source stone FAQ text** | future Oakwell cabinet FAQ domain | Build cabinet-specific FAQ in GC-6. |
+| Accessories: sinks/faucets/grids | **Hold** | none initially | Requires explicit catalog scope approval. |
+| Home Office | **Hold** | none initially | Potential cabinetry expansion only if confirmed. |
+| Garden | **Hold** | none initially | Not initial Oakwell scope. |
+| Granite / Quartz | **Exclude from core Oakwell** | none | Parent brand/cross-sell only if separately approved later. |
+| Countertop Services & Fees | **Exclude** | none | Parent repair/service pricing. |
+| Deals/promotions | **Exclude** | none | Volatile/unverified business claims. |
+| PAY / CardPointe | **Exclude** | none | Finance decision required. |
+| Career | **Exclude initial scope** | none | Separate future decision. |
+| WordPress plugins/widgets | **Never migrate** | none | No Trustindex/CF7/widget cloning. |
 
 ---
 
 # 3. Content Recommended for Oakwell
 
-## 3.1 About page
+All recommendations below are candidate content. Final copy and display values must live in Admin-managed CMS/settings data when implemented.
 
-Target outcome: Oakwell gains real-world credibility without becoming a copy of Granite Center.
+## 3.1 About
 
-Recommended sections:
+Candidate sections:
 
-- Oakwell Cabinetry brand statement.
-- Clear relationship to Granite & Cabinet Center.
-- Physical showroom / warehouse presence in Sterling, Virginia.
-- Cabinet-focused design and product support.
-- Parent-team experience only with correct attribution.
-- Service area: VA / MD / Washington D.C. if confirmed.
-- Design consultation CTA.
-- Product Catalog CTA.
-- Dealer Program CTA where appropriate.
-- Showroom imagery sourced from Granite Center and optimized for Oakwell.
+- Oakwell Cabinetry brand statement;
+- clear Granite & Cabinet Center relationship;
+- Sterling showroom context;
+- cabinet-focused design/product support;
+- parent-team experience only with attribution;
+- Product Catalog CTA;
+- Dealer Program CTA;
+- Showroom CTA/media.
 
-Avoid copying:
+Avoid:
 
-- long countertop/fabrication descriptions;
-- “one stop shop” product categories Oakwell does not sell;
-- unverified guarantees, discount percentages, turnaround times, inventory size;
-- duplicated parent-site SEO paragraphs.
+- long countertop/fabrication copy;
+- categories Oakwell does not sell;
+- discounts/turnaround/inventory-count guarantees;
+- duplicated parent SEO paragraphs.
 
-## 3.2 Contact page
+## 3.2 Contact / Showroom
 
-Recommended information block:
+Candidate data/content:
 
-- Primary Oakwell phone.
-- Oakwell/public email.
-- Showroom address.
-- Business hours.
-- `Get Directions` action.
-- Relationship label such as `Oakwell showroom at Granite & Cabinet Center` if approved.
-- General inquiry / project consultation form.
-- Dealer application remains a separate flow.
+- primary/secondary approved contact channels;
+- canonical location/showroom address;
+- business hours once confirmed;
+- directions/map action;
+- relationship label;
+- selected showroom photography;
+- first-party project consultation form;
+- Dealer Application as a separate flow.
 
-Recommended form fields for **customer/project inquiry**:
+All mutable values are controlled data. Do not duplicate phone/address/hours literals across Navbar, Footer, Contact, Showroom and JSON-LD.
 
-- Project type:
-  - Kitchen Cabinetry
-  - Bathroom Vanity / Cabinetry
-  - Home Office / Built-in Storage (if approved)
-  - Dealer / Trade Inquiry → route to Dealer Application instead of mixing forms
-  - Other Cabinetry Inquiry
-- Request a showroom consultation: yes/no.
-- First name.
-- Last name.
-- Phone.
-- Email.
-- Project address or ZIP/city (scope decision).
-- Desired consultation / estimate date (optional).
-- Project notes.
-- Upload existing drawing / measurements / inspiration / estimate.
-- Privacy consent.
-- Optional marketing consent.
-- UTM/source/referrer tracking.
-- Spam protection.
+## 3.3 Project consultation concepts
 
-Current Oakwell lead infrastructure already covers name/email/phone/message/privacy/marketing/UTM and has supporting-document infrastructure for dealer applications. Customer file upload can be extended deliberately rather than inheriting Wufoo.
+Parent form/process concepts worth evaluating:
 
-## 3.3 Showroom
+- project type/context;
+- showroom/design consultation intent;
+- project address/city/ZIP where operationally useful;
+- desired consultation date as a preference, not guaranteed appointment;
+- project notes;
+- existing name/email/phone/privacy/marketing/UTM fields already supported by Oakwell.
 
-Recommended either:
-
-- `/showroom` dedicated route, or
-- a substantial Showroom section on `/about` and `/contact` with a single canonical data source.
-
-Content:
-
-- showroom/warehouse address;
-- hours;
-- map/directions CTA;
-- appointment CTA;
-- selected showroom photographs;
-- short “what you can see here” list that is Oakwell-specific;
-- parent-brand disclosure.
-
-Potential later enhancement:
-
-- optimized 360° showroom / virtual tour if source panorama quality is suitable.
+Customer drawing/file upload remains out of the first migration scope per GC-0; dealer supporting-document behavior remains unchanged.
 
 ## 3.4 Gallery / Projects
 
-Use Oakwell's existing `store_projects` + `store_project_media` CMS instead of a static image dump.
+Use existing `store_projects` + `store_project_media` foundation and extend it only where provenance/controlled media relationships require it.
 
-Recommended project taxonomy:
+Candidate taxonomy:
 
 - Residential Kitchen
 - Bathroom / Vanity
-- Home Office / Built-in
-- Commercial
+- Home Office / Built-in — only if scope later confirmed
+- Commercial — hold initially
 - Showroom / Display
 
-For every imported project:
+Imported project records must retain:
 
-- title;
+- title/slug;
 - category;
-- location when public/appropriate;
+- public location where appropriate;
 - summary;
-- cover image;
-- gallery images;
+- cover/gallery media;
 - alt text;
-- source URL;
-- original parent-site label;
-- attribution status;
-- cabinet relevance flag;
+- source/provenance;
+- source brand/entity;
+- attribution classification;
+- cabinet relevance;
 - sort order;
-- publication approval.
+- draft/published review state.
 
-Residential source contains useful categories such as `KITCHEN`, `KITCHEN CABINET GRANITE COUNTERTOP`, `BATHROOM VANITY`, but also a very large number of countertop-only assets. Cabinet relevance must be reviewed manually before publication.
+Parent residential source contains cabinet/vanity/kitchen-relevant material mixed with large amounts of countertop-only imagery. Countertop-only assets are not default Oakwell project content.
 
-Commercial candidates discovered include Alba Osteria, Cafe Cantina Harbour, L'Hommage, National Airport Grill, Ottoman Taverna, Planet Fitness, Greene Turtle locations and The Wharf. Do not publish them as Oakwell cabinetry projects until the scope represented in each image is confirmed.
+Commercial names discovered in the earlier audit include Alba Osteria, Cafe Cantina Harbour, L'Hommage, National Airport Grill, Ottoman Taverna, Planet Fitness, Greene Turtle and The Wharf. Keep these on hold until the actual work shown is verified as relevant and the attribution model is approved.
 
-## 3.5 Cabinet design process
+## 3.5 Cabinet customer journey
 
-Granite Center has a useful customer journey that can be adapted to Oakwell if operationally accurate:
+Useful parent process structure:
 
-1. Project / Pre-Design Intake
+1. Pre-Design / Project Intake
 2. Preliminary Design & Selection
 3. 3D Design / Revision / Finalization
 4. Ordering / Fulfillment
-5. Installation / Coordination where offered
+5. Installation / Coordination only if Oakwell service scope is confirmed
 
-Do not inherit specific claims such as “3D design within 24 business hours”, “2–4 weeks”, “100% satisfaction guarantee”, “50% off” or “licensed, bonded & insured” into Oakwell copy without explicit approval and evidence.
+Do not inherit `free`, `24 business hours`, `2–4 weeks`, `100% satisfaction`, `50% off`, licensed/bonded/insured or similar promises without explicit business confirmation.
 
 ## 3.6 FAQ
 
-Granite Center FAQ is mainly natural-stone education and should not be copied.
+Do not transfer the stone FAQ text. Future Oakwell cabinet FAQ may cover approved topics such as cabinet construction, styles/finishes, measurements, design consultation, lead times, ordering, delivery/pickup, installation responsibility, care, warranty, damage/replacement parts, dealer vs retail purchasing and showroom visits.
 
-Create Oakwell-specific FAQ covering approved topics such as:
-
-- cabinet construction;
-- stock / semi-custom / custom positioning if applicable;
-- door styles and finishes;
-- color/sample variation;
-- measurements and drawings;
-- design consultation;
-- lead times;
-- order process;
-- delivery / pickup;
-- installation responsibility;
-- care and cleaning;
-- warranty;
-- replacement parts / damage reporting;
-- dealer vs retail/customer purchasing;
-- showroom visits.
+FAQ entries are CMS data, not Store hard-coded arrays.
 
 ## 3.7 Reviews / testimonials
 
-Granite Center has testimonials and Google-origin review content.
-
-Migration rule:
-
-- If a review refers specifically to Granite Center, label it as parent-company social proof, e.g. `Customer review for Granite & Cabinet Center`.
-- Do not silently relabel a Granite Center review as an Oakwell review.
-- Prefer live/review-platform links or curated approved excerpts with attribution rather than copying a third-party widget.
-- Avoid reproducing the broken Trustindex implementation.
+- Parent review content may only be used with Granite & Cabinet Center attribution.
+- Prefer curated/source-linked content instead of reintroducing a third-party widget.
+- Add an Admin-managed review/testimonial domain in GC-7 if the feature is approved.
+- Publication must prevent parent reviews from appearing as Oakwell-specific reviews.
 
 ---
 
-# 4. Media Migration & Optimization Roadmap
+# 4. Media Migration & Optimization
 
-## 4.1 Source inventory
+## 4.1 GC-1 source media manifest
 
-`[ ]` Crawl approved Granite Center pages and create a media manifest.
-
-Required manifest fields:
+GC-1 records source evidence only. Required concepts include:
 
 - source page URL;
-- source media URL;
-- source filename;
-- original format;
-- original width / height;
-- original bytes;
-- SHA-256 hash;
-- optional perceptual hash for near-duplicate detection;
-- category: showroom / residential kitchen / vanity / commercial / product / accessory / marketing;
-- suggested Oakwell route/section;
-- cabinet relevance: yes / maybe / no;
-- copyright/ownership approval status;
-- approved for public use: yes/no;
-- optimized asset URL;
-- alt text;
-- migration notes.
+- source media URL when actually discoverable;
+- source alt/label when available;
+- media kind/subject;
+- proposed Oakwell placement/domain;
+- cabinet relevance;
+- attribution requirement;
+- migration action;
+- notes.
 
-Representative source URLs already exposed by the parent site include:
+GC-1 must **not** invent dimensions, file sizes, MIME types or checksums. Unverified byte-level metadata stays `null`.
 
-- `/wp-content/uploads/2024/05/h1-scaled.jpg`
-- `/wp-content/uploads/2024/05/h4-scaled.jpg`
-- `/wp-content/uploads/2024/05/h8-scaled.jpg`
-- `/wp-content/uploads/2016/11/Kitchen-1.jpeg`
-- `/wp-content/uploads/2016/11/Kitchen-Cabinet-Granite-Countertop-1.jpg`
+## 4.2 GC-2 byte acquisition and deduplication
 
-## 4.2 Deduplication
+GC-2, not GC-1, owns:
 
-`[ ]` Identify exact duplicates by SHA-256.
+- downloading approved originals;
+- verified original filename/format/dimensions/bytes;
+- SHA-256 exact deduplication;
+- optional perceptual/visual duplicate detection;
+- EXIF/GPS stripping;
+- orientation correction;
+- conservative resize without upscaling;
+- optimized master creation;
+- Supabase Storage upload;
+- media-library registration;
+- before/after size reporting.
 
-`[ ]` Identify visually equivalent assets by perceptual hash / dimension comparison.
+## 4.3 Suggested optimization targets
 
-`[ ]` Keep one canonical optimized master per photograph.
+Targets are engineering benchmarks, not public business claims:
 
-`[ ]` Preserve original source URL in migration metadata for traceability.
+- hero/showroom wide master: max long edge around `1920–2560px` depending source quality;
+- project/gallery master: max long edge around `1600–1920px`;
+- WebP quality starting point around 72–82;
+- AVIF quality starting point around 50–65;
+- hero common-viewport target ideally `<= 250 KB` when visually acceptable;
+- gallery card target ideally `<= 120–160 KB`;
+- small thumbnail target ideally `<= 60–90 KB`.
 
-## 4.3 Master image preparation
+Wood grain/detail fidelity takes priority over arbitrary byte targets.
 
-Do not upscale low-resolution source files.
+## 4.4 Delivery
 
-Suggested working masters:
-
-- Hero/showroom wide: max long edge around `1920–2560px` depending source quality.
-- Standard gallery/project: max long edge around `1600–1920px`.
-- Card/list thumbnails: generated responsively; do not maintain hand-made duplicate files unless needed.
-- 360 panorama: separate policy; preserve enough resolution for the viewer while controlling initial payload.
-
-`[ ]` Correct orientation.
-
-`[ ]` Strip unnecessary EXIF/GPS metadata.
-
-`[ ]` Preserve color appearance consistently.
-
-`[ ]` Generate descriptive, stable filenames rather than WordPress names such as `h1-scaled.jpg`.
-
-Example:
-
-`showroom-sterling-cabinet-display-01.webp`
-
-## 4.4 Delivery formats
-
-Oakwell's Next.js config already enables AVIF + WebP and allows Supabase public storage images.
-
-Preferred strategy:
-
-1. Ingest a reasonably optimized high-quality source/master.
-2. Use `next/image` for route delivery and responsive derivatives.
-3. Permit AVIF/WebP negotiation.
-4. Use explicit `sizes` rules per component.
-5. Use `priority` / preload only for the true LCP hero.
-6. Lazy-load below-the-fold gallery assets.
-
-Suggested initial quality targets to benchmark, not hard business rules:
-
-- WebP: approximately 72–82 quality.
-- AVIF: approximately 50–65 quality.
-- Hero payload target: ideally `<= 250 KB` at common desktop viewport when visually acceptable.
-- Gallery card target: ideally `<= 120–160 KB` at its rendered breakpoint.
-- Small thumbnail target: ideally `<= 60–90 KB`.
-
-Quality must be validated visually; photographic cabinetry details and wood-grain banding matter more than hitting an arbitrary byte target.
-
-## 4.5 Image UX / performance
-
-`[ ]` Use intrinsic width/height or aspect-ratio to prevent CLS.
-
-`[ ]` Define mobile/tablet/desktop `sizes`.
-
-`[ ]` Use meaningful alt text, not filenames.
-
-`[ ]` Keep decorative imagery with empty alt where appropriate.
-
-`[ ]` Use blur/low-quality placeholders only where they improve perceived loading without bloating HTML.
-
-`[ ]` Avoid loading full gallery images in card grids.
-
-`[ ]` Cache immutable fingerprinted media aggressively.
-
-`[ ]` Verify LCP / CLS / INP after rollout.
+- use Oakwell-controlled Supabase media, not WordPress hotlinks;
+- use responsive Next.js image delivery with explicit `sizes`;
+- preload/priority only the true LCP hero;
+- lazy-load below-the-fold media;
+- preserve intrinsic dimensions/aspect ratio to prevent CLS;
+- meaningful alt text is CMS-managed business content;
+- decorative images use empty alt where appropriate.
 
 ---
 
-# 5. Data / CMS Changes
+# 5. Data / CMS Ownership Map
 
-## 5.1 Company profile
+## 5.1 Existing domains to preserve
 
-Current Oakwell pages already read company identity/contact information from a canonical public company profile.
+- `general_settings` — canonical company-profile root fields that already exist;
+- `store_site_settings` — existing Store settings where semantically appropriate;
+- `store_pages` — controlled page content/SEO;
+- `store_projects` — project entity;
+- `store_project_media` — existing project/media relationship;
+- existing Lead API/tables and attribution flow.
 
-`[ ]` Populate confirmed Oakwell/parent business contact fields through the existing controlled source.
+## 5.2 Structured domains introduced only when required
 
-`[?]` Determine whether business hours belong in company profile or site settings.
+Planning domains may include:
 
-`[?]` Determine whether `parent organization / brand relationship` needs a structured CMS field rather than hard-coded copy.
+- contact channels;
+- public locations/showrooms;
+- location hours;
+- reusable media assets;
+- FAQ;
+- reviews/testimonials;
+- navigation/footer configuration;
+- business-controlled form options.
 
-## 5.2 Pages CMS
+Exact production table/RPC names are decided in the implementation package after current schema review. The roadmap does not authorize speculative table creation.
 
-Existing `store_pages` is suitable for About-level content, hero image, CTA and SEO metadata.
+## 5.3 Admin requirement
 
-Possible extension if richer content is approved:
+Every mutable public content domain introduced by the migration must have an appropriate Admin management surface by the time it is considered complete. Final operation may not depend on manual SQL for ordinary content changes.
 
-- structured About sections;
-- showroom block;
-- business-hours block;
-- parent-brand relationship copy;
-- map/directions URL;
-- review/social-proof configuration.
+## 5.4 Store requirement
 
-Avoid turning the first version into an unrestricted drag-and-drop page builder.
-
-## 5.3 Projects CMS
-
-Existing tables are a good fit:
-
-- `store_projects`
-- `store_project_media`
-
-`[ ]` Import approved Granite Center project media as draft projects.
-
-`[ ]` Human-review each draft.
-
-`[ ]` Publish only after category, title, attribution, alt text and cabinet relevance are confirmed.
-
-## 5.4 Media library
-
-`[ ]` Use the existing Admin/Supabase media flow as the controlled destination where practical.
-
-`[ ]` Add migration metadata/source notes if current media records do not preserve provenance.
-
-`[?]` Decide whether automated conversion occurs:
-
-- during migration only;
-- at Admin upload time;
-- through an image-processing backend;
-- or primarily through Next.js runtime optimization.
-
-Recommended first step: migration-time optimization + Next.js responsive delivery. Add upload-time processing later if the ongoing editorial workflow needs it.
+Store consumes only narrow server-side public projections. Internal migration notes, private metadata and draft/hold content do not cross the public RPC boundary.
 
 ---
 
@@ -449,271 +377,208 @@ Recommended first step: migration-time optimization + Next.js responsive deliver
 
 ## 6.1 Source behavior
 
-Granite Center uses an embedded Wufoo estimate form. Useful source concepts include project type, consultation request, identity/contact details, address, desired estimate date, notes and drawing/estimate upload.
+Parent site uses Wufoo and exposes useful concepts such as project type, consultation request, contact/address context, preferred date, notes and upload.
 
-## 6.2 Oakwell implementation
+## 6.2 Oakwell implementation rule
 
-`[ ]` Keep Oakwell native `/api/leads` submission path.
-
-`[ ]` Extend `LeadForm(type="contact")` with approved project-specific fields.
-
-`[ ]` Decide whether customer contact leads may upload files; dealer application upload infrastructure already exists but must remain correctly scoped.
-
-`[ ]` Store uploaded customer project files privately.
-
-`[ ]` Add server-side file type/size validation.
-
-`[ ]` Keep honeypot / spam protection and add stronger bot controls if production traffic requires them.
-
-`[ ]` Preserve UTM campaign, landing page and referrer attribution.
-
-`[ ]` Add event tracking for showroom consultation intent and project type.
-
-`[ ]` Add confirmation/reference behavior.
-
-`[ ]` Ensure privacy policy explicitly covers project documents and contact submissions.
+- keep native `/api/leads` path;
+- do not embed Wufoo/Contact Form 7;
+- keep validation/security behavior code-owned;
+- make mutable business options Admin/data-managed when implemented;
+- preserve UTM/landing/referrer attribution;
+- preserve privacy/marketing consent separation;
+- keep customer file upload deferred until separately approved;
+- keep dealer supporting-document infrastructure private and separately scoped.
 
 ---
 
 # 7. SEO / Local Business / Trust
 
-`[ ]` Use a single canonical phone/address/hours data source across Navbar, Footer, About, Contact, Showroom, metadata and structured data.
-
-`[ ]` Add or update Organization/LocalBusiness structured data after brand relationship is approved.
-
-`[ ]` Consider `brand` / `parentOrganization` relationship in JSON-LD where semantically correct.
-
-`[ ]` Do not create contradictory local-business identities for the same physical showroom.
-
-`[ ]` Add map/directions action using the canonical showroom location.
-
-`[ ]` Write Oakwell-specific SEO copy; do not duplicate parent site's paragraphs verbatim.
-
-`[ ]` Use project/gallery locations only when public and appropriate.
-
-`[ ]` Add descriptive image alt text.
-
-`[ ]` Add canonical metadata to any new `/showroom` route.
-
-`[ ]` Rebuild FAQ with cabinet-specific content before emitting FAQ structured data.
+- visible contact/location/hours and structured-data facts must derive from the same controlled sources;
+- do not hard-code a second phone/address/hours copy inside JSON-LD;
+- add Organization/LocalBusiness relationship only after corresponding data is confirmed;
+- do not create contradictory local-business identities for the same physical showroom;
+- write Oakwell-specific SEO content in CMS rather than duplicating parent paragraphs;
+- use project locations only when public/appropriate;
+- add cabinet FAQ structured data only after real Oakwell FAQ content exists;
+- canonical metadata for `/showroom` is managed from the appropriate page/settings domain.
 
 ---
 
-# 8. Parent-Site Issues We Must NOT Propagate
+# 8. Execution Phases
 
-The Granite Center site contains useful source data but also inconsistencies / legacy artifacts.
+## GC-0 — Business truth + data ownership lock
 
-- `[!]` Two visible phone numbers (`703-956-9470` and `703-439-1040`).
-- `[!]` Multiple address formats (`#109-127`, `#109`, `Ste 109`).
-- Repeated sections and duplicated page copy.
-- Broken Trustindex widget messages on indexed content.
-- Raw `[contact-form-7 id="545"]` shortcode visible on Showroom.
-- Third-party Wufoo iframe dependency.
-- Stale or volatile sale claims (`50%`, fixed package prices, turnaround times).
-- Conflicting/volatile inventory/assortment claims (`11 brands`, large color counts, etc.).
-- Parent-brand payment link in public navigation.
-- Granite-focused FAQ not relevant to Oakwell cabinetry.
-- Typographic/content errors such as quartz sections referencing granite.
-- Numerous legacy WordPress image filenames and likely duplicate assets.
+Status: `[x]` merged/accepted baseline; ownership amendment approved for the next documentation synchronization.
 
-Oakwell migration should be a content normalization project, not a mirror project.
+Completed decisions include:
 
----
+- canonical current Oakwell profile path/value baseline;
+- parent/Oakwell attribution boundary;
+- deterministic handling of conflicting parent phone/address evidence;
+- fail-closed hours/service-area/service/promotion rules;
+- initial migration scope/holds/exclusions;
+- customer upload deferral;
+- dynamic ownership rule: Admin → Supabase DB/Storage → controlled public projection → Store;
+- no runtime hard-code migration shortcuts.
 
-# 9. Proposed Execution Phases
-
-## GC-0 — Business truth lock
-
-Goal: establish immutable source-of-truth fields before any public migration.
-
-- `[?]` Confirm canonical Oakwell phone.
-- `[?]` Confirm canonical showroom address / suite format.
-- `[?]` Confirm hours, including Sunday.
-- `[?]` Confirm Oakwell's approved service region.
-- `[?]` Confirm public wording for Oakwell ↔ Granite & Cabinet Center relationship.
-- `[?]` Confirm whether parent-company `Since 2011` history can be used with attribution.
-- `[?]` Confirm whether parent reviews/projects may be displayed with parent attribution.
-
-**Exit gate:** approved business truth sheet exists.
+**Exit gate:** truth and ownership lock exists and is accepted.
 
 ## GC-1 — Source crawl & content/media manifest
 
-Goal: create a complete migration inventory before touching public CMS.
+Goal: create a complete, machine-checkable migration inventory before touching public CMS or Storage.
 
-- `[ ]` Crawl parent-site pages from primary navigation and cabinet-relevant landing pages.
-- `[ ]` Record page-level migration decision: migrate / adapt / optional / exclude.
-- `[ ]` Extract source media URLs and media metadata.
-- `[ ]` Hash and deduplicate images.
-- `[ ]` Mark cabinet relevance.
-- `[ ]` Mark proposed Oakwell placement.
-- `[ ]` Mark ownership/attribution status.
+Plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`
 
-**Exit gate:** every candidate asset/content block has a disposition.
+- `[ ]` crawl/review parent navigation + cabinet-relevant landing pages;
+- `[ ]` record page-level disposition using `adapt`, `parent_attributed`, `hold`, `exclude`, `business_confirmation_required`;
+- `[ ]` inventory content candidates and conflict evidence;
+- `[ ]` inventory source media references and qualitative relevance;
+- `[ ]` map each accepted candidate to its proposed controlled CMS domain;
+- `[ ]` keep unverified byte metadata null;
+- `[ ]` validate manifest with a deterministic Node contract;
+- `[ ]` update Store/Admin roadmaps without overwriting parallel work.
 
-## GC-2 — Media optimization pipeline
+**Exit gate:** every candidate page/content/media/conflict record has a valid disposition and target-domain mapping; deterministic manifest contract passes. No production DB/schema/content/media mutation occurs in GC-1.
 
-Goal: produce reusable optimized Oakwell masters without visual degradation.
+## GC-2 — Media library & optimization pipeline
 
-- `[ ]` Download approved originals.
-- `[ ]` Normalize orientation and metadata.
-- `[ ]` Resize oversized originals conservatively.
-- `[ ]` Generate optimized source assets.
-- `[ ]` Upload to controlled Oakwell media storage.
-- `[ ]` Validate AVIF/WebP delivery via `next/image`.
-- `[ ]` Produce before/after size report.
-- `[ ]` Verify no duplicate images were uploaded under multiple names.
+Goal: create reusable, traceable Oakwell-controlled media without visual degradation.
 
-**Exit gate:** approved optimized media library is ready, with traceable sources.
+- `[ ]` design/implement reusable media asset domain and Admin management required by migration;
+- `[ ]` download approved originals;
+- `[ ]` verify metadata and SHA-256 dedupe;
+- `[ ]` optional perceptual dedupe where useful;
+- `[ ]` strip unnecessary EXIF/GPS;
+- `[ ]` resize/encode conservatively without upscaling;
+- `[ ]` upload to controlled Supabase Storage;
+- `[ ]` register provenance/attribution/review status;
+- `[ ]` verify responsive AVIF/WebP delivery;
+- `[ ]` verify import idempotency/no duplicate uploads.
 
-## GC-3 — Company identity, About & Showroom
+**Exit gate:** approved media library exists in controlled Storage/CMS with Admin management and traceable source metadata.
 
-Goal: make Oakwell's real-world business identity explicit and credible.
+## GC-3 — Company identity, contact, About & Showroom
 
-- `[ ]` Populate canonical company profile.
-- `[ ]` Publish adapted About copy.
-- `[ ]` Add parent-brand relationship text.
-- `[ ]` Add showroom block or `/showroom` route.
-- `[ ]` Add hours and directions.
-- `[ ]` Add optimized showroom photography.
-- `[ ]` Review Navbar/Footer contact presentation.
+Goal: make real-world Oakwell identity/location content fully data-driven.
 
-**Exit gate:** phone/address/hours are consistent across every public surface.
+- `[ ]` extend company profile with structured contact/location/hours domains only as required;
+- `[ ]` backfill current approved values without code constants;
+- `[ ]` expose Admin controls;
+- `[ ]` extend narrow public profile projections;
+- `[ ]` publish adapted About content;
+- `[ ]` add Showroom page/section and controlled media;
+- `[ ]` add confirmed hours/directions only when business-approved;
+- `[ ]` make relevant public surfaces consume the controlled source.
 
-## GC-4 — Contact / Project Consultation Form
+**Exit gate:** ordinary contact/location/showroom content changes require no Store code deployment, and public surfaces/structured data do not contradict one another.
 
-Goal: replace generic contact and parent Wufoo behavior with first-party Oakwell lead capture.
+## GC-4 — Contact / Project Consultation
 
-- `[ ]` Finalize customer form schema.
-- `[ ]` Add project type and showroom consultation intent.
-- `[ ]` Add optional project date/location fields if approved.
-- `[ ]` Add private drawing/estimate upload if approved.
-- `[ ]` Extend database/API schema as needed.
-- `[ ]` Extend Admin lead visibility if new fields are introduced.
-- `[ ]` Test validation, spam protection, tracking, file privacy and confirmation.
+Goal: replace parent form behavior with configurable first-party Oakwell lead capture.
 
-**Exit gate:** no Wufoo dependency; end-to-end lead appears correctly in Admin/operations flow.
+- `[ ]` define approved business-configurable form options;
+- `[ ]` extend DB/API only for approved new fields;
+- `[ ]` add Admin management/visibility where needed;
+- `[ ]` keep validation/security behavior code-owned;
+- `[ ]` verify spam/privacy/attribution flow;
+- `[ ]` keep customer file upload deferred unless a new explicit decision approves it.
+
+**Exit gate:** no Wufoo dependency; configured lead appears correctly in Admin and no mutable business options require Store source edits.
 
 ## GC-5 — Projects / Gallery migration
 
-Goal: turn the parent project's visual archive into a curated Oakwell portfolio.
+Goal: seed real, curated, CMS-managed cabinet portfolio content.
 
-- `[ ]` Import approved residential cabinet-related projects as drafts.
-- `[ ]` Import selected commercial candidates as drafts.
-- `[ ]` Add titles, categories, locations, summaries and alt text.
-- `[ ]` Add parent-project attribution where needed.
-- `[ ]` Publish curated set.
-- `[ ]` Add gallery/project navigation only when enough content is live.
+- `[ ]` import approved cabinet-relevant candidates as drafts;
+- `[ ]` attach controlled media assets;
+- `[ ]` add provenance, title/category/location/summary/alt text;
+- `[ ]` preserve parent attribution where required;
+- `[ ]` review and publish curated set;
+- `[ ]` verify Gallery readiness/nav/sitemap/live rendering.
 
-**Exit gate:** all visible project imagery is approved, cabinet-relevant and CMS-backed.
+**Exit gate:** all visible project content/media is approved, cabinet-relevant, CMS-backed and live accepted. This package may close the standing Store Phase 2.1 Gallery blocker.
 
 ## GC-6 — Cabinet content / customer journey
 
-Goal: reuse useful cabinet-business knowledge without inheriting parent marketing noise.
+Goal: publish real Oakwell cabinet knowledge without parent marketing noise.
 
-- `[ ]` Adapt design process.
-- `[ ]` Build Oakwell cabinet FAQ.
-- `[ ]` Add consultation CTA placements.
-- `[ ]` Add showroom/service-area support copy.
-- `[ ]` Decide Home Office / built-in scope.
-- `[ ]` Decide accessories scope.
-- `[ ]` Explicitly omit unsupported guarantees/discounts/turnaround claims.
+- `[ ]` adapt process as typed CMS content;
+- `[ ]` create Oakwell cabinetry FAQ in managed data;
+- `[ ]` add approved consultation CTA content;
+- `[ ]` decide Home Office/accessory scope separately;
+- `[ ]` omit unsupported guarantees/discounts/SLAs.
 
-**Exit gate:** content accurately describes how Oakwell actually sells/supports cabinetry.
+**Exit gate:** normal content editing is Admin-managed and copy accurately describes Oakwell.
 
 ## GC-7 — Reviews / social proof
 
-Goal: add trust signals with accurate attribution.
+Goal: add trust signals with correct source identity.
 
-- `[ ]` Choose approved parent reviews/testimonials.
-- `[ ]` Add parent-company attribution.
-- `[ ]` Link external review profiles where useful.
-- `[ ]` Avoid broken third-party widgets.
-- `[ ]` Confirm legal/marketing approval for excerpts.
+- `[ ]` implement/manage review/testimonial domain;
+- `[ ]` import only approved source-linked excerpts/data;
+- `[ ]` enforce parent attribution;
+- `[ ]` avoid third-party broken widgets;
+- `[ ]` verify a parent review cannot render as Oakwell-specific by mistake.
 
-**Exit gate:** no review can be mistaken for an Oakwell-specific review unless it actually is one.
+**Exit gate:** every visible review has valid identity/source/attribution and can be managed from Admin.
 
-## GC-8 — SEO, accessibility & performance QA
+## GC-8 — Navigation, footer, SEO, accessibility & performance QA
 
-- `[ ]` Metadata/canonical audit.
-- `[ ]` Organization/LocalBusiness structured-data audit.
-- `[ ]` Alt-text audit.
-- `[ ]` Keyboard/lightbox/form accessibility.
-- `[ ]` Mobile responsive QA.
-- `[ ]` Lighthouse / Core Web Vitals baseline vs post-migration.
-- `[ ]` LCP hero verification.
-- `[ ]` No oversized source image rendered directly.
-- `[ ]` No duplicate or dead media URLs.
-- `[ ]` Sitemap/indexing verification.
-- `[ ]` Smoke/build/lint production checks.
+- `[ ]` complete configurable navigation/footer under the dynamic-content rule;
+- `[ ]` audit metadata/canonical/Organization/LocalBusiness structured data;
+- `[ ]` hard-code audit for business literals and Granite hotlinks;
+- `[ ]` alt-text/accessibility audit;
+- `[ ]` keyboard/mobile/lightbox/form QA;
+- `[ ]` Lighthouse/Core Web Vitals baseline vs post-migration;
+- `[ ]` LCP/CLS media verification;
+- `[ ]` sitemap/indexing verification;
+- `[ ]` lint/build/smoke/live checks.
 
-**Exit gate:** migration is production-verified and does not regress Store performance or content-truth contracts.
+**Exit gate:** migration is production-verified; mutable business content is managed through Admin/Supabase and Store contains behavior/layout rather than production content constants.
 
 ---
 
-# 10. Items Explicitly Waiting for Business Review
+# 9. Current Scope Decisions from GC-0
 
-Before implementation, approve/edit this list:
+## Include / active migration scope
 
-1. Oakwell primary phone: `703-956-9470` vs `703-439-1040` vs a separate Oakwell number.
-2. Canonical address: `#109`, `Suite 109`, or `#109-127`.
-3. Fax: show publicly or omit.
-4. Hours and Sunday status.
-5. Brand relationship wording.
-6. Whether to use `Since 2011` with parent attribution.
-7. Whether to show Granite Center reviews on Oakwell with attribution.
-8. Whether residential/commercial parent projects may be presented as parent-company portfolio/supporting experience.
-9. Whether Oakwell provides installation or only product/dealer fulfillment.
-10. Whether Oakwell offers free design consultation / 3D design and what SLA may be stated.
-11. Whether Home Office / Built-in cabinetry belongs in Oakwell scope.
-12. Whether sinks/faucets/accessories belong in Oakwell catalog.
-13. Whether customer leads can upload drawings/measurements/files.
-14. Whether `/showroom` should be a standalone route or a shared About/Contact block.
-15. Whether to expose a link back to Granite & Cabinet Center from Oakwell footer/About.
-16. Whether commercial projects should be included at launch.
-17. Whether Careers should exist on Oakwell at all.
-18. Whether any payment link should exist on Oakwell.
-
----
-
-# 11. Recommended Initial Scope
-
-For the first implementation package, keep the work focused:
-
-### Include
-
-- canonical address / phone / hours;
-- parent-brand relationship;
-- About rewrite;
+- canonical company identity/contact as controlled data;
+- parent-brand relationship with accurate attribution;
+- About adaptation;
 - Contact enhancement;
-- native project consultation form;
 - Showroom content;
-- curated showroom + kitchen/cabinet/vanity images;
-- image optimization/dedup pipeline;
-- Gallery/Projects seed content;
+- cabinet/project consultation concepts;
+- curated showroom + kitchen/cabinet/vanity media;
+- optimized managed media library;
+- real Gallery/Projects seed content;
 - cabinet-specific FAQ;
 - selected attributed social proof;
-- local/organization structured data and SEO normalization.
+- dynamic navigation/footer where business-editable;
+- SEO/structured-data normalization from controlled sources.
 
-### Hold for later
+## Hold / exclude until separately approved
 
-- third-party cabinet brand pages;
-- quartz/granite pages;
-- countertop service/fee schedule;
-- volatile deals/discounts/prices;
+- broad commercial portfolio;
+- Home Office / built-ins as a promised Oakwell scope;
+- sinks/faucets/accessories catalog;
+- quartz/granite/countertop services;
+- countertop repair/service fee schedule;
+- volatile deals/discounts/prices/turnaround promises;
+- customer contact file upload;
 - payment link;
 - Careers;
-- accessory catalog unless explicitly approved;
-- Garden content;
-- broad commercial portfolio until project scope is confirmed.
+- Garden content.
 
 ---
 
-# 12. Next Action
+# 10. Next Action
 
-This roadmap is approved as the dedicated Granite Center → Oakwell migration workstream. Execute it sequentially, with each material package delivered and verified through its own PR.
+The dedicated workstream is approved and GC-0 has established factual/data-ownership rules.
 
-1. Merge this roadmap into the repository.
-2. Reference this workstream from `modulex-store/STORE_ROADMAP.md` during the next Store roadmap synchronization.
-3. Begin `GC-0 — Business truth lock` as the first execution PR.
-4. Do not begin public content/media migration until the GC-0 business truth fields required by the affected package are resolved.
-5. After GC-0, execute `GC-1 — Source crawl & content/media manifest` before changing public content.
+1. Merge the dynamic-content architecture/governance documentation package.
+2. Begin **GC-1 — Source crawl & content/media manifest** from the latest `main` using `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`.
+3. GC-1 performs discovery/classification only; it does not create production CMS rows, schema, uploads or runtime changes.
+4. GC-2 begins only after the GC-1 manifest is reviewed and merged.
+5. Every later GC package that introduces a new structured domain gets its own current-schema review, implementation plan, tests and reviewed PR.
+6. Keep the existing Phase 2.1 Gallery/Projects production-content blocker visible until GC-5 or another approved content package satisfies its live acceptance gate.

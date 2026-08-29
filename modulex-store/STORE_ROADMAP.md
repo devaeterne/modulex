@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `adfd9210740c77a4196a4938caa6a41a2f71556e`
+Main baseline: `45458e1f1402614b5e4a408394706df4c4aa757d`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -26,6 +26,7 @@ These rules are mandatory for all future Modulex Store work:
    - blockers/decisions
    - `Next Action`
 10. If a change spans Store and Admin, **both `modulex-admin/ADMIN_ROADMAP.md` and `modulex-store/STORE_ROADMAP.md` must be reviewed and updated where affected**.
+11. Because Modulex work may run in parallel conversations, every new implementation package must re-read current `main` and this roadmap before branching; never rely on a remembered base SHA.
 
 ## Status Legend
 
@@ -43,6 +44,8 @@ These rules are mandatory for all future Modulex Store work:
 - `modulex-admin` remains the operational/CMS control plane. `modulex-store` remains the public website plus Customer/Dealer portal delivery surface.
 - Prefer extending existing RPC and domain modules over adding ad-hoc direct table access from Store.
 - New public content must be production-truthful: no placeholder people, phone numbers, awards, testimonials, offers, locations, or dead links.
+- Mutable production business content that operators should be able to change without deployment is **data-owned**: Admin → Supabase DB/Storage → narrow published/public projection → Store. Do not hard-code production phone/email/address/hours, real project copy/media, reviews/FAQ, business claims, configurable navigation/footer labels, SEO copy or production media URLs into Store runtime source.
+- Granite Center/WordPress URLs may be migration provenance but must never become Oakwell's runtime content/media backend.
 - Each implementation PR should update this roadmap when it completes or materially changes a listed task.
 
 ---
@@ -135,7 +138,9 @@ These rules are mandatory for all future Modulex Store work:
 
 **Goal:** Move official public content out of hard-coded page templates and into controlled Store CMS data managed from `modulex-admin`.
 
-**Approved architecture and written specs:** implement as four ordered packages: **A) secondary CMS data/RPC foundation → B) Admin Pages/Projects CMS → C) Store About + Gallery/Projects → D) configurable Navbar/Footer and phase closeout**. Blog strategy is **Option B: keep Blog disabled until a real editorial workflow is required**.
+**Approved architecture and written specs:** initial Phase 2.1 implementation is ordered as **A) secondary CMS data/RPC foundation → B) Admin Pages/Projects CMS → C) Store About + Gallery/Projects → D) configurable Navbar/Footer and phase closeout**. Blog strategy is **Option B: keep Blog disabled until a real editorial workflow is required**.
+
+The broader Granite migration now has an approved dynamic-content architecture at `docs/superpowers/specs/2026-08-29-oakwell-dynamic-content-cms-design.md`. It preserves the Phase 2.1 foundations and extends them incrementally: mutable business content/media is Admin-managed Supabase data, public Store reads narrow projections, and production business values are not embedded as runtime constants.
 
 ## 2.1.1 Shared page-content model
 
@@ -165,7 +170,8 @@ These rules are mandatory for all future Modulex Store work:
 - [~] Convert Gallery/Projects page to CMS-backed data.
   - Design for both public routes: `docs/superpowers/specs/2026-08-29-phase-2-1-c-store-public-pages-design.md`.
   - Package C implementation adds published-only project/media rendering, fail-closed `notFound()`, CMS metadata, accessible image/video interaction, and shared readiness gating for route navigation and sitemap exposure.
-  - No public project-detail route or `/gallery/detail` was reintroduced. Completion remains pending merge/deploy plus production acceptance with a published Gallery page and at least one approved published project.
+  - No public project-detail route or `/gallery/detail` was reintroduced. Completion remains pending production acceptance with a published Gallery page and at least one approved published project.
+  - Granite GC-5 may supply the curated real project/media content required to close this blocker, but only after its draft/review/publish/live acceptance gate.
 
 - [x] Decide Blog strategy.
   - Decision: **Option B — no Blog CMS in Phase 2.1.** Keep `/blog` disabled/not-found until editorial workflow is actually required.
@@ -173,9 +179,11 @@ These rules are mandatory for all future Modulex Store work:
 
 ## 2.1.2 Shared Store chrome
 
-- [ ] Make primary navigation configurable from approved site settings if business navigation is expected to change without deployment.
+- [ ] Make primary navigation configurable from approved site settings/CMS data if business navigation is expected to change without deployment.
+  - Business-owned labels, order, visibility and configurable destinations are data-owned; route implementation/allowlists remain code-owned.
 
 - [ ] Review footer sections and links for CMS configurability.
+  - Ordinary business-editable footer labels/links/social destinations must follow the dynamic-content rule rather than new hard-coded arrays.
 
 - [ ] Ensure public Navbar and portal Navbar coexist without breaking the portal sidebar experience.
 
@@ -185,6 +193,7 @@ These rules are mandatory for all future Modulex Store work:
 ### Phase 2.1 Exit Gate
 
 - [ ] No major public marketing page requires code changes for ordinary content updates.
+  - The approved dynamic-content architecture expands this gate: ordinary business information/media changes must be Admin/Supabase-managed rather than runtime hard-coded.
 - [x] Public page content is read through controlled RPCs.
   - Package C uses only `get_store_public_page`, `get_store_public_projects`, `get_store_public_project`, and `get_store_public_project_media` through the server-only query boundary; no direct public table reads were added.
 - [x] Admin roles can manage the supported content without direct database work.
@@ -323,6 +332,7 @@ These rules are mandatory for all future Modulex Store work:
 - [ ] Validate sitemap output with production domain.
 - [ ] Validate redirects from legacy `/shop` URLs.
 - [ ] Add deliberate 404 metadata and UX.
+- [ ] Ensure address/telephone/hours/service-area/parent-organization facts emitted in structured data come from the same controlled DB/CMS sources as visible content rather than duplicate literals.
 
 ## 2.5.2 Analytics
 
@@ -504,9 +514,9 @@ The items below are already present in the current Store architecture. Keep them
 - [x] Store marketing settings table/RPC exists.
 - [x] Consent banner settings are Admin-controlled.
 - [x] Do Not Track can be respected.
-- [x] GA4 and GTM identifiers are validated and configurable.
-- [x] Consent-aware analytics event utility exists.
-- [x] UTM/referrer session attribution exists.
+- [x] GA4/GTM settings are controlled from Store marketing settings.
+- [x] Session attribution captures UTM/referrer context.
+- [x] Product view, search, contact click, lead start/submit, and catalog download event foundations exist.
 
 ## Portal foundation
 
@@ -536,36 +546,43 @@ The items below are already present in the current Store architecture. Keep them
 # Granite Center → Oakwell Migration Workstream
 
 Dedicated roadmap: `modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md`
-Business-truth lock: `modulex-store/docs/GC0_BUSINESS_TRUTH_LOCK.md`
+Business-truth/data-ownership lock: `modulex-store/docs/GC0_BUSINESS_TRUTH_LOCK.md`
+Dynamic-content architecture: `modulex-store/docs/superpowers/specs/2026-08-29-oakwell-dynamic-content-cms-design.md`
+GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`
 
 - [x] Migration roadmap approved and merged through PR #104.
-- [x] GC-0 — Business truth lock defined against the live production company-profile RPC and existing Admin source of truth.
+- [x] GC-0 — Business truth lock merged through PR #105 against the live production company-profile RPC and existing Admin source of truth.
+- [x] Dynamic-content architecture approved: mutable business content/media is Admin-managed Supabase DB/Storage data consumed by Store through controlled projections; runtime hard-code migration shortcuts are prohibited.
+- [x] GC-0 ownership amendment prepared in the approved architecture/governance package so the truth lock also governs where public content is stored and managed.
 - [ ] GC-1 — Source crawl & content/media manifest.
-- [ ] GC-2 — Media optimization pipeline.
-- [ ] GC-3 — Company identity, About & Showroom migration.
+- [ ] GC-2 — Media library & optimization pipeline.
+- [ ] GC-3 — Company identity, contact, About & Showroom migration.
 - [ ] GC-4 — Contact / Project Consultation Form migration.
 - [ ] GC-5 — Projects / Gallery migration.
 - [ ] GC-6 — Cabinet content / customer journey.
 - [ ] GC-7 — Reviews / social proof.
-- [ ] GC-8 — SEO, accessibility & performance QA.
+- [ ] GC-8 — Navigation/footer, SEO, accessibility & performance QA.
 
-**GC-0 lock:** Granite Center source content must never override canonical Oakwell company-profile data. Unconfirmed hours, service area, installation/design SLAs, promotional claims, and other parent-site business claims fail closed and stay unpublished until explicitly approved in the controlled source/workstream.
+**GC-0 truth lock:** Granite Center source content must never override canonical Oakwell company-profile data automatically. Unconfirmed hours, service area, installation/design SLAs, promotional claims, and other parent-site business claims fail closed and stay unpublished until explicitly approved in the controlled source/workstream.
+
+**Data-ownership lock:** Granite Center values/media may appear in migration manifests as evidence, but public production content is operated through Admin/Supabase. Source WordPress media URLs are not production delivery URLs. New mutable business content must not be embedded as Store constants.
 
 ---
 
 # Next Action
 
-The user-approved active workstream is now the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
+The user-approved active workstream is the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Review and merge the GC-0 business-truth lock PR.
-2. After GC-0 merge, begin **GC-1 — Source crawl & content/media manifest**.
-3. GC-1 must classify every candidate source URL/media item against `GC0_BUSINESS_TRUTH_LOCK.md` before any CMS import.
-4. Do not migrate unconfirmed contact values, business hours, service-area claims, offers/SLAs, parent reviews, or parent projects without the attribution/publication rules defined by GC-0.
+1. Merge the **dynamic-content architecture / GC-0 ownership governance** documentation package based on current main `45458e1f1402614b5e4a408394706df4c4aa757d`.
+2. After that merge, begin **GC-1 — Source crawl & content/media manifest** from latest `main` using `docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`.
+3. GC-1 is discovery/classification only: no production schema, DB rows, Storage uploads, Admin runtime or Store runtime changes. It records page/content/media candidates, conflicts, attribution and target CMS domains; byte-level image download/hash/optimization belongs to GC-2.
+4. Do not migrate unconfirmed contact values, business hours, service-area claims, offers/SLAs, parent reviews, or parent projects outside the GC-0 attribution/publication rules.
 5. Keep Phase 2.1 Gallery/Projects marked `[~]` until approved real Gallery/Project content is published and live readiness is accepted; GC-5 may provide the curated content required to close that blocker.
-6. Package D — configurable Navbar/Footer remains after the active Gallery/content readiness work unless the migration package requires a coordinated shared-chrome change earlier.
+6. Package D — configurable Navbar/Footer remains an open Phase 2.1 capability and will be completed under the dynamic-content ownership rule; Granite GC-8 provides a natural final coordination point unless an earlier migration package requires the shared chrome first.
+7. Before every new package, re-read current `main` and both roadmaps because parallel Modulex PRs may have landed.
 
 **Package C branch verification:** GitHub Actions run `33244098018` passed the Phase 2.1C public-content contract, public-production contract, full Store smoke, lint, and Next.js/TypeScript build.
 
-**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending → Granite Center migration roadmap #104 merged → GC-0 business-truth lock prepared.
+**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending → Granite roadmap #104 merged → GC-0 #105 merged → dynamic-content architecture approved / governance package prepared → GC-1 next.
 
-**Admin coordination:** Admin A0.1 PR #101 is merged and production `READY` on `adfd9210740c77a4196a4938caa6a41a2f71556e`. A0.2 navigation/RBAC parity hardening is now active; this does not change the Gallery real-content blocker or the Granite migration sequence above.
+**Admin coordination:** current `main` includes the parallel Admin warehouse-list RBAC fix PR #106 at `45458e1f1402614b5e4a408394706df4c4aa757d`. Primary Admin A0 cleanup remains independent; Granite work only adds coordinated A4/A5 CMS/settings responsibilities and must not overwrite parallel Admin roadmap progress.

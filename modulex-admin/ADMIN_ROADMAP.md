@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `f248d04864c9e55111d416f99a1cced4ee4f02f3`
+Main baseline: `45458e1f1402614b5e4a408394706df4c4aa757d`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
-Current cross-roadmap package: **Store Phase 2.1C — About live accepted; Gallery/Projects content acceptance pending**
+Current cross-roadmap package: **Granite Center → Oakwell dynamic-content architecture approved; GC-1 source manifest next; Gallery/Projects content acceptance pending**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -26,7 +26,8 @@ These rules are mandatory for all future Modulex Admin work:
    - task checkboxes
    - blockers/decisions
    - `Next Action`
-10. If a change spans Admin and Store, **both `modulex-admin/ADMIN_ROADMAP.md` and `modulex-store/STORE_ROADMAP.md` must be reviewed and updated where affected**.
+10. If a change spans Store and Admin, **both `modulex-admin/ADMIN_ROADMAP.md` and `modulex-store/STORE_ROADMAP.md` must be reviewed and updated where affected**.
+11. Because Modulex work may run in parallel conversations, every new implementation package must re-read current `main` and this roadmap before branching; never rely on a remembered base SHA.
 
 ## Status Legend
 
@@ -43,6 +44,8 @@ These rules are mandatory for all future Modulex Admin work:
 - Customer/Dealer portal visibility must be explicit. Internal-only financial, pricing, document, or operational data must not leak into Store projections.
 - Prefer reusable domain components/services over route-specific duplicated Supabase logic.
 - New operational writes must define validation, authorization, audit implications, and failure behavior.
+- For Oakwell public-site content, Admin is the management surface for mutable production business data. Granite migration domains must follow **Admin → Supabase DB/Storage → narrow public projection → Store**; ordinary business content changes must not require Store source-code edits or manual SQL at final acceptance.
+- Existing Store CMS/company settings foundations must be extended incrementally with typed domains when needed; do not create a parallel migration-only CMS or unrestricted generic page builder.
 - Every implementation PR that materially changes a listed capability must update this roadmap.
 - No automatic merge or production deploy unless explicitly requested.
 
@@ -264,13 +267,24 @@ These rules are mandatory for all future Modulex Admin work:
   - Package B adds dedicated `/store/pages` and `/store/projects` management rather than extending the large existing Site Content editor.
   - Implemented with `store.manage` route/sidebar enforcement, admin/super_admin mutation controls, and existing production RLS as the real write boundary.
   - Verification: targeted secondary CMS Admin contract, lint, deterministic Admin contracts, and build passed in GitHub Actions run `33243001683`.
-  - Package C Store consumer implementation is verified in Store run `33244098018`: published-only About/Gallery queries, fail-closed Gallery readiness, conditional Navbar/sitemap exposure, and project media rendering now consume the Package A/B CMS foundation. No new Admin schema or production database change is required for Package C. About production content is now published and live-accepted; Gallery remains intentionally closed until approved real project content exists.
+  - Package C Store consumer implementation is verified in Store run `33244098018`: published-only About/Gallery queries, fail-closed Gallery readiness, conditional Navbar/sitemap exposure, and project media rendering now consume the Package A/B CMS foundation. About production content is published/live-accepted; Gallery remains intentionally closed until approved real project content exists.
+- [x] Approve the broader Oakwell dynamic-content/CMS ownership architecture for Granite migration.
+  - Design: `modulex-store/docs/superpowers/specs/2026-08-29-oakwell-dynamic-content-cms-design.md`.
+  - Rule: mutable Store business content/media is Admin-managed Supabase DB/Storage data; Store consumes narrow public projections; production phone/address/hours/projects/media/reviews/FAQ/navigation/footer/SEO content must not be added as runtime hard-coded business constants.
+  - Existing `store_pages`, `store_projects`, `store_project_media`, company/settings and lead foundations are extended incrementally rather than replaced.
 - [x] Add draft/published workflow where required.
   - Pages and Projects expose separate Save draft / Publish / Unpublish actions; uploads do not auto-publish.
 - [x] Add SEO/OG/media fields with validation.
   - Page hero/OG and project cover/OG uploads use `store-media` with JPEG/PNG/WebP/AVIF ≤20 MB validation; project media also supports external public video URLs with required alt text.
 - [~] Review navigation/footer configurability needs.
-  - Package D design keeps Account and Contact controls code-owned while ordinary navigation/footer link groups become `store.manage` CMS data.
+  - Package D design keeps route behavior/allowlists code-owned while ordinary business-editable navigation/footer labels, order, visibility and approved destinations become `store.manage` CMS/settings data.
+  - Granite GC-8 is the natural final coordination point unless an earlier migration package needs shared chrome sooner.
+- [ ] Add/extend typed Store CMS domains as Granite packages require them.
+  - GC-2 may add reusable media assets/provenance + Admin media management.
+  - GC-3 may add structured contact/location/hours management around the existing company-profile domain.
+  - GC-6 may add cabinet FAQ/process content domains.
+  - GC-7 may add attributed reviews/testimonials.
+  - Exact schemas are decided only in the package that first needs them after current production schema review.
 
 ## A4.2 Leads
 
@@ -278,6 +292,7 @@ These rules are mandatory for all future Modulex Admin work:
 - [ ] Review contact/dealer application filters, search, status, owner/assignment, notes, and conversion workflow.
 - [ ] Verify lead attribution fields are useful but do not expose sensitive form values unnecessarily.
 - [ ] Define retention/archive behavior.
+- [ ] When GC-4 adds business-configurable project-consultation options/fields, ensure Admin can manage the mutable options and view approved captured values without weakening lead/privacy boundaries.
 
 ## A4.3 Dealer onboarding
 
@@ -297,6 +312,7 @@ These rules are mandatory for all future Modulex Admin work:
 ### Phase A4 Exit Gate
 
 - [ ] Public Store content needed for normal operations is Admin-manageable.
+  - Final Granite migration acceptance also requires normal business content/media changes to avoid Store code edits/manual SQL.
 - [ ] Lead/dealer lifecycle is executable without manual SQL.
 - [ ] Private supporting/customer documents remain access-controlled.
 - [ ] Store/Admin contracts remain synchronized.
@@ -317,9 +333,12 @@ These rules are mandatory for all future Modulex Admin work:
 ## A5.2 General settings
 
 - [ ] Review company settings as the canonical public company profile source.
+  - Current Oakwell public profile remains rooted in the existing controlled `general_settings` → public profile RPC path.
+  - GC-3 may extend this domain with typed contact channels, public locations/showrooms and location hours when required; preserve backward compatibility during migration and do not duplicate values into Store constants.
 - [ ] Review localization settings and where locale/timezone/currency are consumed.
 - [ ] Review tax-rules functionality and business requirements.
 - [ ] Review document settings and numbering/templates where applicable.
+- [ ] Ensure any new public business setting used by Store has one clear ownership model, Admin management, role/RLS protection and a narrow public projection.
 
 ## A5.3 Email and notifications
 
@@ -471,6 +490,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] Dealer onboarding and portal activation Admin flows have contract coverage.
 - [x] Customer document dealer-visibility controls exist.
 - [x] Phase 2.1B secondary Pages/Projects CMS exists with controlled page slugs, project/media management, explicit publishing, SEO/OG fields, and Store media validation.
+- [x] Oakwell dynamic-content architecture is approved for Granite migration: mutable public business content/media remains Admin/Supabase-owned and Store-consumed through controlled projections.
 
 ## Security and testing
 
@@ -484,6 +504,7 @@ Keep this section current so future planning does not rediscover completed work.
 ## Recent operational fix
 
 - [x] PR #85 reduced Admin Supabase polling churn: notification polling cadence, hidden-tab suspension, profile load behavior, and cross-tab email queue coordination.
+- [x] PR #106 gated warehouse/zone/location list-page mutations with `warehouse.manage` while preserving read-only structure access; full Admin verification passed before merge.
 
 ---
 
@@ -494,7 +515,9 @@ Record material decisions here when they affect future phases.
 - [ ] Which Personnel/Finance/Training/Approvals modules are committed production scope versus template/planned surface?
 - [ ] What exact roles beyond the current core Admin roles need operational permission matrices?
 - [ ] Which customer financial capabilities, if any, should ever be exposed to the Customer/Dealer portals?
-- [x] Phase 2.1 first secondary CMS scope is **About + Gallery/Projects**; Blog remains disabled until a real editorial workflow is required. Ordinary Navbar/Footer links become configurable in Package D while Account and Contact remain code-owned.
+- [x] Phase 2.1 first secondary CMS scope is **About + Gallery/Projects**; Blog remains disabled until a real editorial workflow is required. Ordinary Navbar/Footer links become configurable in Package D while route/security behavior remains code-owned.
+- [x] Granite/Oakwell migration uses a **structured hybrid CMS**. Production business content that operators should change without deployment is DB/Storage-backed and Admin-managed; Store receives narrow public projections. Granite Center is migration evidence only, not a runtime backend.
+- [x] New Granite migration domains are introduced incrementally by the package that first needs them after current-schema review; no speculative parallel CMS is created.
 
 ---
 
@@ -502,7 +525,7 @@ Record material decisions here when they affect future phases.
 
 Primary Admin roadmap work remains **Phase A0 — Production Surface & Operational Truth Cleanup**.
 
-A0.1 production-surface cleanup is live and **A0.2 Navigation & RBAC truth is implementation-complete and fully verified**. Next:
+A0.1 production-surface cleanup is live and **A0.2 Navigation & RBAC truth is implementation-complete and fully verified, including PR #106 warehouse list mutation hardening**. Next primary Admin work:
 
 1. Audit dashboard widgets for template/sample/fake data; replace with real operational data or remove the widget.
 2. Audit placeholder links/text, fake metrics, dead buttons, and development-only controls across retained Admin surfaces.
@@ -510,4 +533,6 @@ A0.1 production-surface cleanup is live and **A0.2 Navigation & RBAC truth is im
 4. Re-run the relevant Admin verification chain after each package and keep this roadmap current.
 5. Close Phase A0 only after the remaining dashboard/surface audit and runtime/config tasks satisfy their exit criteria.
 
-**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published and live-accepted. Package D returns to Admin A4.1 after that Gallery acceptance for configurable ordinary navigation/footer links while Account and Contact remain code-owned.
+**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. The Granite migration architecture is approved and GC-0 is merged; the next migration package is **GC-1 source content/media manifest**, which is discovery/docs/contract work and does not mutate Admin runtime or production DB. GC-2+ will add Admin-managed media/contact/content domains incrementally as required. Package D configurable navigation/footer remains an A4.1 obligation and will be completed under the same dynamic-content rule.
+
+**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A0 or other concurrently merged Admin work is preserved rather than overwritten.
