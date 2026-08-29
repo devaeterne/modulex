@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import OrderProductPicker, { type OrderPickerProduct } from "@/components/customers/OrderProductPicker";
 import {
+  getCustomerOrderRevisionPolicy,
   loadEditOrderContext,
   loadOrderPrices,
   updateCustomerOrder,
@@ -71,10 +72,6 @@ export default function EditCustomerOrder() {
         if (!active) return;
 
         const loadedOrder = context.order;
-        if (loadedOrder.status === "cancelled") {
-          setErrorMessage("Cancelled orders cannot be edited.");
-        }
-
         setRole(context.role);
         setCustomer(context.customer);
         setOrder(loadedOrder);
@@ -148,6 +145,7 @@ export default function EditCustomerOrder() {
   const selectedPriceGroup = useMemo(() => priceGroups.find((group) => group.id === priceGroupId) ?? null, [priceGroups, priceGroupId]);
   const selectedPaymentMethod = useMemo(() => paymentMethods.find((m) => m.id === paymentMethodId) ?? null, [paymentMethods, paymentMethodId]);
   const selectedTaxRule = useMemo(() => taxRules.find((rule) => rule.fulfillment_type === fulfillmentType) ?? null, [taxRules, fulfillmentType]);
+  const revisionPolicy = useMemo(() => order && role ? getCustomerOrderRevisionPolicy(order.status, role) : null, [order, role]);
 
   const preview = useMemo(() => {
     let subtotal = 0;
@@ -209,7 +207,7 @@ export default function EditCustomerOrder() {
 
   async function saveRevision() {
     setErrorMessage(null);
-    if (!order || order.status === "cancelled") return;
+    if (!order || !revisionPolicy?.canEdit) return setErrorMessage(revisionPolicy?.reason ?? "This order cannot be revised.");
     if (!priceGroupId || !paymentMethodId) return setErrorMessage("Price group and payment method are required.");
     if (items.length === 0) return setErrorMessage("At least one product line is required.");
     if (Number(appliedCommission) < 0 || Number(appliedCommission) > 100) return setErrorMessage("Applied commission must be between 0 and 100%.");
@@ -259,13 +257,15 @@ export default function EditCustomerOrder() {
 
   if (isLoading) return <div className="flex min-h-[420px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"><p className="text-sm text-gray-500">Loading editable order...</p></div>;
   if (!customer || !order) return <div className="rounded-2xl border border-error-200 bg-error-50 p-6 text-error-700">{errorMessage || "Order not found."}</div>;
+  if (!revisionPolicy) return <div className="rounded-2xl border border-error-200 bg-error-50 p-6 text-error-700">Unable to resolve order revision policy.</div>;
+  if (!revisionPolicy.canEdit) return <div className="space-y-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">Revision Locked · {order.order_number}</h1><p className="mt-1 text-sm text-gray-500">{customer.name} • {revisionPolicy.reason}</p></div><Link href={`/customers/${customerId}/orders/${orderId}`} className="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">Back to Order</Link></div><div className="rounded-2xl border border-warning-200 bg-warning-50 p-5 text-sm text-warning-800 dark:border-warning-500/20 dark:bg-warning-500/10 dark:text-warning-300"><p className="font-medium">Commercial revision is disabled for status {order.status.replaceAll("_", " ")}.</p><p className="mt-2">Order number, customer, status, currency, snapshots, calculated totals, and system metadata remain immutable. Status changes continue through the dedicated status workflow.</p></div></div>;
 
   const defaultCommission = Number(selectedPaymentMethod?.commission_percent ?? 0);
   const commissionOverridden = Math.abs(Number(appliedCommission || 0) - defaultCommission) > 0.0001;
 
   return <div className="space-y-5">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div><h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">Edit {order.order_number}</h1><p className="mt-1 text-sm text-gray-500">{customer.name} • {order.status === "draft" ? "Draft changes are saved as revisions and checked against approval rules." : role === "sales" ? "Sales changes to this non-Draft order will be submitted for Admin approval before the live order changes." : "Changes create a revision snapshot."}</p></div>
+      <div><h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">Edit {order.order_number}</h1><p className="mt-1 text-sm text-gray-500">{customer.name} • {revisionPolicy.reason}</p></div>
       <Link href={`/customers/${customerId}/orders/${orderId}`} className="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">Back to Order</Link>
     </div>
 
@@ -296,9 +296,9 @@ export default function EditCustomerOrder() {
     <div className="grid gap-5 xl:grid-cols-12">
       <div className="space-y-5 xl:col-span-8">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes"><textarea value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} className="min-h-[110px] w-full rounded-lg border border-gray-300 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" /></Field><Field label="Internal Notes"><textarea value={internalNotes} onChange={(e) => setInternalNotes(e.target.value)} className="min-h-[110px] w-full rounded-lg border border-gray-300 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" /></Field></div></div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><Field label="Revision Reason"><input value={revisionReason} onChange={(e) => setRevisionReason(e.target.value)} placeholder="e.g. Quantity changed after customer request" className={inputClass} /></Field><p className="mt-2 text-xs text-gray-400">Recommended. For a Sales user, revisions to confirmed or later orders stay pending until Admin approval.</p></div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><Field label="Revision Reason"><input value={revisionReason} onChange={(e) => setRevisionReason(e.target.value)} placeholder="e.g. Quantity changed after customer request" className={inputClass} /></Field><p className="mt-2 text-xs text-gray-400">Recommended. Sales revisions from Confirmed through Ready for Shipment stay pending until Admin approval; Shipped and later orders are revision-locked.</p></div>
       </div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 xl:col-span-4"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Revised Total</h2><div className="mt-4 space-y-3 text-sm"><Row label="Lines after discount" value={money(preview.subtotal)} /><Row label="Order discount" value={`-${money(Number(orderDiscount || 0))}`} /><Row label="Tax" value={money(preview.tax)} /><Row label="Order Total" value={money(preview.orderTotal)} />{preview.commission > 0 && <Row label={`Payment Commission (${Number(appliedCommission || 0).toFixed(2)}%)`} value={money(preview.commission)} />}<div className="border-t border-gray-200 pt-3 dark:border-gray-800"><Row label="Grand Total" value={money(preview.grandTotal)} strong /></div></div><button type="button" disabled={isSaving || isLoadingPrices || order.status === "cancelled"} onClick={saveRevision} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-40">{isSaving ? "Saving..." : role === "sales" && order.status !== "draft" ? "Submit for Approval" : "Save Revision"}</button></div>
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900 xl:col-span-4"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Revised Total</h2><div className="mt-4 space-y-3 text-sm"><Row label="Lines after discount" value={money(preview.subtotal)} /><Row label="Order discount" value={`-${money(Number(orderDiscount || 0))}`} /><Row label="Tax" value={money(preview.tax)} /><Row label="Order Total" value={money(preview.orderTotal)} />{preview.commission > 0 && <Row label={`Payment Commission (${Number(appliedCommission || 0).toFixed(2)}%)`} value={money(preview.commission)} />}<div className="border-t border-gray-200 pt-3 dark:border-gray-800"><Row label="Grand Total" value={money(preview.grandTotal)} strong /></div></div><button type="button" disabled={isSaving || isLoadingPrices || !revisionPolicy.canEdit} onClick={saveRevision} className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-40">{isSaving ? "Saving..." : revisionPolicy.mode === "approval" ? "Submit for Approval" : "Save Revision"}</button></div>
     </div>
 
     <OrderProductPicker
