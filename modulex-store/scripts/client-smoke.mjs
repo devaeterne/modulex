@@ -16,10 +16,10 @@ function transpile(filePath) {
 }
 
 function runModule(filePath, globals = {}) {
-  const module = { exports: {} };
+  const runtimeModule = { exports: {} };
   const context = vm.createContext({
-    module,
-    exports: module.exports,
+    module: runtimeModule,
+    exports: runtimeModule.exports,
     URLSearchParams,
     ...globals,
     require(specifier) {
@@ -27,7 +27,7 @@ function runModule(filePath, globals = {}) {
     },
   });
   vm.runInContext(transpile(filePath), context, { filename: filePath });
-  return module.exports;
+  return runtimeModule.exports;
 }
 
 const checks = [];

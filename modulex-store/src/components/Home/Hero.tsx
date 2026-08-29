@@ -42,7 +42,7 @@ function renderTitle(title: string, highlight: string | null) {
 export default function Hero({ content }: { content: HomeHeroContent }) {
   const [shouldLoadPanorama, setShouldLoadPanorama] = useState(false);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
-  const viewerRef = useRef<any>(null);
+  const viewerRef = useRef<PannellumViewer | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function Hero({ content }: { content: HomeHeroContent }) {
 
   useEffect(() => {
     if (!shouldLoadPanorama || !isScriptLoaded || !containerRef.current || !content.panoramaUrl) return;
-    const pannellum = (window as any)?.pannellum;
+    const pannellum = window.pannellum;
     if (!pannellum) return;
 
     try {

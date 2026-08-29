@@ -35,3 +35,6 @@ jobs:
       - name: Full smoke
         if: always()
         run: npm run smoke
+      - name: Build
+        if: always()
+        run: npm run build
