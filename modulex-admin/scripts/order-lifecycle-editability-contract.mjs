@@ -33,6 +33,59 @@ assert(domain.includes('mode: "locked"'), "Fulfillment-started/finalized orders 
 assert(domain.includes("immutableFields"), "revision policy must explicitly publish immutable fields");
 assert(domain.includes("editableFields"), "revision policy must explicitly publish editable fields");
 
+for (const field of [
+  "items.product_id",
+  "items.quantity",
+  "items.unit_price",
+  "items.discount_percent",
+  "price_group_id",
+  "fulfillment_type",
+  "payment_method_id",
+  "payment_commission_percent",
+  "billing_address_id",
+  "shipping_address_id",
+  "expected_delivery_date",
+  "customer_reference",
+  "customer_notes",
+  "internal_notes",
+  "tax_rate",
+  "discount_amount",
+  "revision_reason",
+]) {
+  assert(domain.includes(`\"${field}\"`), `editable field contract must include ${field}`);
+}
+
+for (const field of [
+  "id",
+  "order_number",
+  "customer_id",
+  "status",
+  "order_date",
+  "currency_code",
+  "price_group_name_snapshot",
+  "payment_method_name_snapshot",
+  "payment_commission_default_percent",
+  "payment_commission_amount",
+  "billing_address_snapshot",
+  "shipping_address_snapshot",
+  "item_count",
+  "subtotal",
+  "tax_amount",
+  "total_amount",
+  "grand_total",
+  "items.id",
+  "items.order_id",
+  "items.line_no",
+  "items.sku_snapshot",
+  "items.product_name_snapshot",
+  "items.discount_amount",
+  "items.line_subtotal",
+  "items.line_total",
+  "items.price_source",
+]) {
+  assert(domain.includes(`\"${field}\"`), `immutable field contract must include ${field}`);
+}
+
 assert(editOrder.includes("getCustomerOrderRevisionPolicy"), "EditCustomerOrder must consume the shared lifecycle policy");
 assert(editOrder.includes("revisionPolicy.canEdit"), "EditCustomerOrder must block revision submission when policy is locked");
 assert(editActions.includes("loadCustomerOrderRevisionPolicy"), "detail edit action must resolve revision policy before rendering Edit Order");
