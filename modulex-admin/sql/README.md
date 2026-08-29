@@ -6,18 +6,21 @@ Until the project is moved to Supabase CLI migrations under `supabase/migrations
 2. `customer-master-mutation.sql`
 3. `customer-address-integrity.sql`
 4. `customer-orders.sql`
-5. `customer-order-payments.sql`
-6. `customer-order-payment-override.sql`
-7. `customer-order-editing.sql`
-8. `customer-invoices.sql`
-9. `customer-invoice-payment-terms.sql`
-10. `customer-shipments.sql`
-11. `customer-installations.sql`
-12. `performance-rls.sql`
+5. `customer-order-list-summary.sql`
+6. `customer-order-payments.sql`
+7. `customer-order-payment-override.sql`
+8. `customer-order-editing.sql`
+9. `customer-invoices.sql`
+10. `customer-invoice-payment-terms.sql`
+11. `customer-shipments.sql`
+12. `customer-installations.sql`
+13. `performance-rls.sql`
 
 `customer-master-mutation.sql` hardens the existing customer master tables with validated status/type mutations and atomic audit logging. It assumes the base `customers`, `customer_types`, `customer_activity`, `profiles`, and role-helper objects already exist.
 
 `customer-address-integrity.sql` adds SECURITY INVOKER address RPCs that serialize per customer and keep default clearing, assignment/creation, and customer activity in one transaction while preserving existing RLS.
+
+`customer-order-list-summary.sql` adds the `security_invoker=true` customer-order directory view used for server-side customer/order search, exact count, and pagination, plus the SECURITY INVOKER order-list summary RPC. Both preserve the underlying `customers` / `customer_orders` RLS boundary and expose only authenticated access.
 
 `performance-rls.sql` is a query-planning hardening step. It preserves the existing RLS role rules while converting known stable role/permission helper predicates to one-time statement checks. Apply it after all schema files that create those policies. Existing environments can apply it once as the final performance migration.
 

@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `f40c44a7a317812eb6346a618fbb5f30969ae515`
+Main baseline: `08c8fdec5ee2ef0da88a575f9346061c903cc7b8`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
 Current cross-roadmap package: **Granite Center → Oakwell GC-2 media library & optimization is production-accepted and complete. GC-2D live acceptance verified controlled import/review/publish, exact-SHA dedupe, unpublish/same-path republish, private staging, and duplicate-intake self-heal with final production counts of 1 asset / 1 provenance / 2 private staging objects / 1 public object. GC-3 — Company identity, contact, About & Showroom is the next Granite package; Admin primary work remains Phase A1**
 Current Admin next action: **A1.2A — review global and customer-scoped order list consistency**
@@ -193,7 +193,12 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A1.2 Orders
 
-- [ ] Review global and customer-scoped order list consistency.
+- [~] Review global and customer-scoped order list consistency. (A1.2A)
+  - Both `/customers/orders` and `/customers/[id]/orders` remain on the shared `CustomerOrdersList` contract.
+  - Search, status filtering, exact filtered count, and page windows move to Supabase through a `security_invoker=true` `customer_order_directory` view; customer name/code search no longer fans out matching customer IDs into the browser.
+  - Route-scope summary cards use the `SECURITY INVOKER` `get_customer_order_list_summary(uuid)` RPC under existing customer/order RLS.
+  - Original PR #125 was merged into the already-closed #124 branch rather than `main`; `repair/a12a-order-list-main` replays the review-hardened package onto current `main` while preserving newer GC-2 work.
+  - Completion remains gated on repair PR merge, Admin production deploy, production SQL migration, live authenticated acceptance, and advisor review.
 - [ ] Verify create/edit/detail flows use one domain contract.
 - [ ] Define immutable vs editable fields by order lifecycle state.
 - [ ] Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.
