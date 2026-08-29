@@ -8,15 +8,16 @@ function check(condition, message) {
   if (!condition) failures.push(message);
 }
 
-const queryPath = path.join(root, "src/lib/store/content/queries.ts");
-let querySource = "";
-try {
-  await access(queryPath);
-  querySource = await readFile(queryPath, "utf8");
-} catch {
-  failures.push("Expected Store public content query module is missing: src/lib/store/content/queries.ts");
+async function readRequired(relativePath) {
+  try {
+    return await readFile(path.join(root, relativePath), "utf8");
+  } catch {
+    failures.push(`Expected file is missing: ${relativePath}`);
+    return "";
+  }
 }
 
+const querySource = await readRequired("src/lib/store/content/queries.ts");
 if (querySource) {
   for (const rpc of [
     "get_store_public_page",
@@ -30,6 +31,24 @@ if (querySource) {
   check(!querySource.includes(".from("), "Public content query module must not directly read Supabase tables");
   check(querySource.includes("getStoreGalleryReadiness"), "Public content query module must expose getStoreGalleryReadiness");
   check(querySource.includes("import \"server-only\""), "Public content query module must remain server-only");
+}
+
+const aboutSource = await readRequired("src/app/about/page.tsx");
+if (aboutSource) {
+  check(
+    aboutSource.includes('getStorePublicPage("about")'),
+    "About must read published CMS content through getStorePublicPage(\"about\")"
+  );
+  check(aboutSource.includes("generateMetadata"), "About must generate metadata from published CMS content");
+  check(
+    aboutSource.includes("getStorePublicCompanyProfile"),
+    "About must keep the public company profile as the canonical company identity/contact source"
+  );
+  check(
+    aboutSource.includes("Cabinet products and support from Oakwell Cabinetry"),
+    "About must retain the production-safe factual fallback copy"
+  );
+  check(!aboutSource.includes("dangerouslySetInnerHTML"), "About CMS body must not render unsafe HTML");
 }
 
 if (failures.length > 0) {
