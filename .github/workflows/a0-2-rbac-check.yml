@@ -1,55 +1,33 @@
-name: A0.2 Admin verification
+name: A0.2 roadmap closeout
 
 on:
   push:
     branches:
       - phase-a0/admin-rbac-truth
     paths:
-      - modulex-admin/**
       - .github/workflows/a0-2-rbac-check.yml
 
 permissions:
-  contents: read
-
-env:
-  NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
+  contents: write
 
 jobs:
-  verify:
+  closeout:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modulex-admin
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: phase-a0/admin-rbac-truth
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: modulex-admin/package-lock.json
-      - run: npm ci
-      - name: RBAC parity contract
-        run: npm run smoke:rbac
-      - name: Production surface contract
-        run: npm run smoke:production-surface
-      - name: Secondary CMS Admin contract
-        run: npm run smoke:secondary-cms-admin
-      - name: Dealer onboarding contract
-        run: npm run smoke:dealer-onboarding
-      - name: Dealer portal Admin contract
-        run: npm run smoke:dealer-portal-admin
-      - name: Store portal Admin contract
-        run: npm run smoke:store-portal-admin
-      - name: Auth recovery contract
-        run: npm run smoke:auth-recovery
-      - name: Polling contract
-        run: npm run smoke:polling
-      - name: Lint
-        run: npm run lint
-      - name: Production build
-        run: npm run build
-      - name: Diff check
-        run: git -C .. diff --check 16ba530f91a7229c25cef5df626e609b5ba63ffe...HEAD
+      - name: Update roadmap and remove temporary verification files
+        run: |
+          python scripts/tmp-a0-2-closeout.py
+          git diff --check
+          rm .github/workflows/a0-2-rbac-check.yml
+          rm scripts/tmp-a0-2-closeout.py
+      - name: Commit closeout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin/ADMIN_ROADMAP.md .github/workflows/a0-2-rbac-check.yml scripts/tmp-a0-2-closeout.py
+          git commit -m "docs: close Admin A0.2 RBAC truth [skip ci]"
+          git push origin HEAD:phase-a0/admin-rbac-truth
