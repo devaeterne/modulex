@@ -175,13 +175,6 @@ const managementItems: NavItem[] = [
       { name: "Email Delivery Log", path: "/settings/general/email-notifications", permission: "settings.view" },
     ],
   },
-  {
-    icon: <PageIcon />,
-    name: "System",
-    subItems: [
-      { name: "API Test", path: "/api-test", permission: "system.view" },
-    ],
-  },
 ];
 
 function filterItems(items: NavItem[], role: UserRole): NavItem[] {

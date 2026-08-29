@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `01d3fe68b35e346aced37f13fb3baadbd741c955`
+Main baseline: `fbfa1613970c83117f023d89fec60ac80a6fed97`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -541,8 +541,7 @@ Phase 2.1C About is **production-accepted and complete**. Gallery/Projects remai
 2. Verify production `/gallery`, Navbar readiness, sitemap exposure, metadata, and project media/lightbox behavior.
 3. Confirm `/gallery/detail` remains not-found, then mark Gallery/Projects complete.
 4. Proceed to Package D — configurable Navbar/Footer and Phase 2.1 closeout.
-5. After live acceptance, mark About/Gallery `[x]` and proceed to **Phase 2.1D — configurable Navbar/Footer and phase closeout**.
 
 **Package C branch verification:** GitHub Actions run `33244098018` passed the Phase 2.1C public-content contract, public-production contract, full Store smoke, lint, and Next.js/TypeScript build.
 
-**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C implementation verified/pending live acceptance.
+**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending.
