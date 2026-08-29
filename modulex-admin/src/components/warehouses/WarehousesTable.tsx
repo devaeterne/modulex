@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { getCurrentProfile } from "@/lib/supabase/profile";
+import { hasPermission } from "@/lib/auth/permissions";
 
 type WarehouseType = "sellable" | "non_sellable";
 
@@ -69,6 +71,7 @@ export default function WarehousesTable() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [canManage, setCanManage] = useState(false);
 
   const filteredWarehouses = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -152,14 +155,32 @@ export default function WarehousesTable() {
   }
 
   useEffect(() => {
+    let mounted = true;
+
+    void getCurrentProfile().then(({ profile }) => {
+      if (mounted) {
+        setCanManage(
+          profile ? hasPermission(profile.role, "warehouse.manage") : false
+        );
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     loadWarehouses();
   }, []);
 
   function openWarehouseEdit(warehouseId: string) {
+    if (!canManage) return;
     router.push(`/warehouses/${warehouseId}/edit`);
   }
 
   async function handleToggleStatus(warehouse: WarehouseRow) {
+    if (!canManage) return;
     setActionLoadingId(warehouse.id);
     setErrorMessage(null);
 
@@ -199,12 +220,14 @@ export default function WarehousesTable() {
             className="h-10 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 sm:w-[300px]"
           />
 
-          <Link
-            href="/warehouses/new"
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-          >
-            Add Warehouse
-          </Link>
+          {canManage && (
+            <Link
+              href="/warehouses/new"
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
+            >
+              Add Warehouse
+            </Link>
+          )}
         </div>
       </div>
 
@@ -268,9 +291,9 @@ export default function WarehousesTable() {
                 return (
                   <tr
                     key={warehouse.id}
-                    onDoubleClick={() => openWarehouseEdit(warehouse.id)}
-                    title="Double click to edit"
-                    className="cursor-pointer transition hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+                    onDoubleClick={canManage ? () => openWarehouseEdit(warehouse.id) : undefined}
+                    title={canManage ? "Double click to edit" : undefined}
+                    className={`${canManage ? "cursor-pointer " : ""}transition hover:bg-gray-50 dark:hover:bg-white/[0.03]`}
                   >
                     <td className="px-5 py-4">
                       <div>
@@ -337,13 +360,15 @@ export default function WarehousesTable() {
 
                     <td className="px-5 py-4">
                       <div className="flex min-w-[260px] items-center justify-end gap-2">
-                        <Link
-                          href={`/warehouses/${warehouse.id}/edit`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-                        >
-                          Edit
-                        </Link>
+                        {canManage && (
+                          <Link
+                            href={`/warehouses/${warehouse.id}/edit`}
+                            onClick={(event) => event.stopPropagation()}
+                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                          >
+                            Edit
+                          </Link>
+                        )}
 
                         <Link
                           href={`/zones?warehouse=${warehouse.id}`}
@@ -353,20 +378,22 @@ export default function WarehousesTable() {
                           Zones
                         </Link>
 
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleToggleStatus(warehouse);
-                          }}
-                          disabled={isActionLoading}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${warehouse.is_active
-                            ? "bg-warning-50 text-warning-700 hover:bg-warning-100 dark:bg-warning-500/10 dark:text-warning-400"
-                            : "bg-success-50 text-success-700 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400"
-                            }`}
-                        >
-                          {warehouse.is_active ? "Deactivate" : "Activate"}
-                        </button>
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleToggleStatus(warehouse);
+                            }}
+                            disabled={isActionLoading}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${warehouse.is_active
+                              ? "bg-warning-50 text-warning-700 hover:bg-warning-100 dark:bg-warning-500/10 dark:text-warning-400"
+                              : "bg-success-50 text-success-700 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400"
+                              }`}
+                          >
+                            {warehouse.is_active ? "Deactivate" : "Activate"}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

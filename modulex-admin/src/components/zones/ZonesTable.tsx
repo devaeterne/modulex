@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { getCurrentProfile } from "@/lib/supabase/profile";
+import { hasPermission } from "@/lib/auth/permissions";
 import { QRCodeSVG } from "qrcode.react";
 
 type WarehouseType = "sellable" | "non_sellable";
@@ -103,6 +105,7 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [canManage, setCanManage] = useState(false);
 
   const filteredZones = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -289,14 +292,32 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
   }
 
   useEffect(() => {
+    let mounted = true;
+
+    void getCurrentProfile().then(({ profile }) => {
+      if (mounted) {
+        setCanManage(
+          profile ? hasPermission(profile.role, "warehouse.manage") : false
+        );
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     loadZones();
   }, [warehouseId]);
 
   function openZoneEdit(zoneId: string) {
+    if (!canManage) return;
     router.push(`/zones/${zoneId}/edit`);
   }
 
   async function handleToggleStatus(zone: ZoneRow) {
+    if (!canManage) return;
     setActionLoadingId(zone.id);
     setErrorMessage(null);
 
@@ -317,6 +338,7 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
     setActionLoadingId(null);
   }
   async function handleDeleteZone(zone: ZoneRow) {
+    if (!canManage) return;
     setErrorMessage(null);
 
     if (
@@ -423,12 +445,14 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
             </Link>
           )}
 
-          <Link
-            href={addZoneHref}
-            className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-          >
-            Add Zone
-          </Link>
+          {canManage && (
+            <Link
+              href={addZoneHref}
+              className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
+            >
+              Add Zone
+            </Link>
+          )}
         </div>
       </div>
 
@@ -502,9 +526,9 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
                 return (
                   <tr
                     key={zone.id}
-                    onDoubleClick={() => openZoneEdit(zone.id)}
-                    title="Double click to edit"
-                    className="cursor-pointer transition hover:bg-gray-50 dark:hover:bg-white/[0.03]"
+                    onDoubleClick={canManage ? () => openZoneEdit(zone.id) : undefined}
+                    title={canManage ? "Double click to edit" : undefined}
+                    className={`${canManage ? "cursor-pointer " : ""}transition hover:bg-gray-50 dark:hover:bg-white/[0.03]`}
                   >
                     <td className="px-5 py-4">
                       <div>
@@ -631,13 +655,15 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
 
                     <td className="px-5 py-4">
                       <div className="flex min-w-[260px] items-center justify-end gap-2">
-                        <Link
-                          href={`/zones/${zone.id}/edit`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-                        >
-                          Edit
-                        </Link>
+                        {canManage && (
+                          <Link
+                            href={`/zones/${zone.id}/edit`}
+                            onClick={(event) => event.stopPropagation()}
+                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                          >
+                            Edit
+                          </Link>
+                        )}
 
                         <Link
                           href={`/locations?zone=${zone.id}`}
@@ -647,31 +673,35 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
                           Locations
                         </Link>
 
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleToggleStatus(zone);
-                          }}
-                          disabled={isActionLoading}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${zone.is_active
-                            ? "bg-warning-50 text-warning-700 hover:bg-warning-100 dark:bg-warning-500/10 dark:text-warning-400"
-                            : "bg-success-50 text-success-700 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400"
-                            }`}
-                        >
-                          {zone.is_active ? "Deactivate" : "Activate"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDeleteZone(zone);
-                          }}
-                          disabled={isActionLoading}
-                          className="rounded-lg bg-error-50 px-3 py-1.5 text-xs font-medium text-error-600 transition hover:bg-error-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-error-500/10 dark:text-error-400 dark:hover:bg-error-500/20"
-                        >
-                          Delete
-                        </button>
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleToggleStatus(zone);
+                            }}
+                            disabled={isActionLoading}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${zone.is_active
+                              ? "bg-warning-50 text-warning-700 hover:bg-warning-100 dark:bg-warning-500/10 dark:text-warning-400"
+                              : "bg-success-50 text-success-700 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400"
+                              }`}
+                          >
+                            {zone.is_active ? "Deactivate" : "Activate"}
+                          </button>
+                        )}
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteZone(zone);
+                            }}
+                            disabled={isActionLoading}
+                            className="rounded-lg bg-error-50 px-3 py-1.5 text-xs font-medium text-error-600 transition hover:bg-error-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-error-500/10 dark:text-error-400 dark:hover:bg-error-500/20"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

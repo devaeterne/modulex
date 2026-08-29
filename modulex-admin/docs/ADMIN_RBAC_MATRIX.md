@@ -1,19 +1,20 @@
 # Modulex Admin RBAC Matrix
 
 Last reviewed: 2026-08-29
-Baseline: `16ba530f91a7229c25cef5df626e609b5ba63ffe`
+Baseline: `f248d04864c9e55111d416f99a1cced4ee4f02f3`
 
 This document is the Phase A0.2 navigation and direct-route authorization inventory for Modulex Admin. It records the permission expected by production navigation and the current roles that receive each permission.
 
 ## Enforcement model
 
-Admin authorization has three independent layers:
+Admin authorization has four independent layers:
 
 1. **Navigation visibility** — `src/layout/AppSidebar.tsx` filters entries with `hasPermission()`.
 2. **Direct-route visibility** — `src/app/(admin)/layout.tsx` calls `canAccessPath()` and renders Access Denied when the authenticated role does not satisfy the path permission.
-3. **Data authorization** — Supabase RLS/RPC boundaries and protected Admin API handlers remain authoritative for reads/writes. Route visibility must never be treated as a replacement for data authorization.
+3. **In-page mutation visibility** — list routes that are intentionally readable by operational roles must separately gate mutation affordances and handlers with the corresponding manage permission. Warehouse structure lists use `warehouse.manage`.
+4. **Data authorization** — Supabase RLS/RPC boundaries and protected Admin API handlers remain authoritative for reads/writes. UI visibility must never be treated as a replacement for data authorization.
 
-`scripts/rbac-smoke.mjs` asserts that every sidebar path resolves to the same permission through `requiredPermissionForPath()`. It also covers profile access, intentional aliases, and negative mutation-route cases.
+`scripts/rbac-smoke.mjs` asserts that every sidebar path resolves to the same permission through `requiredPermissionForPath()`. It also covers profile access, intentional aliases, negative mutation-route cases, and warehouse-structure list mutation UI guards.
 
 ## Current production roles
 
@@ -78,7 +79,7 @@ Navigation list permissions are not sufficient for mutation URLs. The following 
 - Personnel departments/positions and descendants → `personnel.manage`.
 - Store lead detail routes → `leads.manage`.
 
-The `warehouse` and `shipping` roles can therefore view warehouse structure but cannot open create/edit warehouse, zone or location routes.
+The `warehouse` and `shipping` roles can therefore view warehouse structure but cannot open create/edit warehouse, zone or location routes. On the readable `/warehouses`, `/zones`, and `/locations` list pages, Add/Edit, activate/deactivate, delete, and double-click edit behavior is also gated by `warehouse.manage`; non-mutating drill-down links remain available.
 
 ## Intentional aliases and non-navigation permissions
 
@@ -94,6 +95,7 @@ The `warehouse` and `shipping` roles can therefore view warehouse structure but 
 - a sidebar path and `requiredPermissionForPath()` disagree,
 - `/profile` is unavailable to an active role,
 - warehouse/shipping roles gain warehouse-structure mutation routes,
+- warehouse-structure list pages expose or invoke mutation behavior without `warehouse.manage`,
 - the legacy payment-method alias diverges from `finance.manage`, or
 - current positive/negative role-path expectations regress.
 
