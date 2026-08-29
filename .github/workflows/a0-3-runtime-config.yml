@@ -1,0 +1,23 @@
+name: A0.3 Runtime Config
+
+on:
+  push:
+    branches:
+      - phase-a0/admin-runtime-config-cleanup
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run runtime config contract
+        run: node scripts/runtime-config-contract.mjs
