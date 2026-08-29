@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
-import {
-  Gc2dIntakeError,
-  importGc2dRepresentativeCandidate,
-} from "@/lib/store/gc2MediaIntake";
+import { Gc2dIntakeError, importGc2dRepresentativeCandidate } from "@/lib/store/gc2MediaIntake";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const CONTROLLED_CANDIDATE_ID = "media-showroom-01";
 
 function bearerToken(request: Request) {
   const authorization = request.headers.get("authorization") ?? "";
@@ -18,9 +13,7 @@ function bearerToken(request: Request) {
 
 export async function POST(request: Request) {
   const accessToken = bearerToken(request);
-  if (!accessToken) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
+  if (!accessToken) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
 
   let payload: { candidate_id?: unknown };
   try {
@@ -29,18 +22,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  if (payload.candidate_id !== CONTROLLED_CANDIDATE_ID) {
-    return NextResponse.json({ error: "Unknown controlled GC-2D candidate." }, { status: 400 });
+  if (typeof payload.candidate_id !== "string" || !payload.candidate_id.trim()) {
+    return NextResponse.json({ error: "A controlled candidate_id is required." }, { status: 400 });
   }
 
   try {
-    const result = await importGc2dRepresentativeCandidate(accessToken, CONTROLLED_CANDIDATE_ID);
+    const result = await importGc2dRepresentativeCandidate(accessToken, payload.candidate_id);
     return NextResponse.json({ result });
   } catch (error) {
-    if (error instanceof Gc2dIntakeError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    console.error("GC-2D controlled media intake failed", error);
+    if (error instanceof Gc2dIntakeError) return NextResponse.json({ error: error.message }, { status: error.status });
+    console.error("Controlled media intake failed", error);
     return NextResponse.json({ error: "Controlled media intake failed." }, { status: 500 });
   }
 }

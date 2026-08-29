@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import StoreProjectEditor from "@/components/store/StoreProjectEditor";
 import StoreProjectMediaManager from "@/components/store/StoreProjectMediaManager";
+import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { isProjectSlug, type StoreProject } from "@/lib/store/secondaryCms";
+
+const PROJECT_SELECT = "id,slug,status,title,summary,category,location,cover_image_url,cover_image_alt,cover_media_asset_id,attribution_classification,attribution_text,source_page_url,sort_order,seo_title,seo_description,og_image_url,published_at,updated_at";
 
 const inputClass =
   "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs outline-none transition focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:disabled:bg-gray-800";
@@ -34,11 +37,11 @@ export default function StoreProjectsManager() {
       setLoading(false);
       return;
     }
-    setCanEdit(["super_admin", "admin"].includes(profile?.role ?? ""));
+    setCanEdit(hasPermission(profile?.roles, "store.manage"));
 
     const { data, error: projectsError } = await supabase
       .from("store_projects")
-      .select("id,slug,status,title,summary,category,location,cover_image_url,cover_image_alt,sort_order,seo_title,seo_description,og_image_url,published_at,updated_at")
+      .select(PROJECT_SELECT)
       .order("sort_order", { ascending: true })
       .order("title", { ascending: true });
     if (projectsError) setError(projectsError.message);
@@ -80,8 +83,8 @@ export default function StoreProjectsManager() {
     setError(null);
     const { data, error: insertError } = await supabase
       .from("store_projects")
-      .insert({ title, slug, status: "draft", sort_order: 0, updated_by: user.id })
-      .select("id,slug,status,title,summary,category,location,cover_image_url,cover_image_alt,sort_order,seo_title,seo_description,og_image_url,published_at,updated_at")
+      .insert({ title, slug, status: "draft", sort_order: 0, attribution_classification: "oakwell_owned", updated_by: user.id })
+      .select(PROJECT_SELECT)
       .single();
     if (insertError) setError(insertError.message);
     else {
@@ -122,7 +125,7 @@ export default function StoreProjectsManager() {
       <aside className="space-y-5">
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
           <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Projects</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create drafts, search by title or slug, then explicitly publish when ready.</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create drafts, link reviewed Media Library assets, then explicitly publish when ready.</p>
           {error ? <p className="mt-3 rounded-lg bg-error-50 px-3 py-2 text-sm text-error-700 dark:bg-error-500/10 dark:text-error-400">{error}</p> : null}
           <input className={`${inputClass} mt-4`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title or slug" />
         </section>

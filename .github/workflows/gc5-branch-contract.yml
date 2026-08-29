@@ -1,0 +1,194 @@
+name: GC-5 Branch Contract
+
+on:
+  push:
+    branches:
+      - feat/gc5-gallery-projects-media-library
+
+permissions:
+  contents: write
+
+# Branch-scoped verification: migration preparation is idempotent, then the exact
+# human-triggered HEAD runs GC-5 contracts, regressions, lint, and production builds.
+jobs:
+  prepare-migration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate migration if missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! find modulex-store/supabase/migrations -maxdepth 1 -name '*_gc5_gallery_projects_media_library.sql' | grep -q .; then
+            cd modulex-store
+            npx --yes supabase@latest migration new gc5_gallery_projects_media_library
+            cd ..
+          fi
+      - name: Apply deterministic migration robustness fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          matches = list(Path('modulex-store/supabase/migrations').glob('*_gc5_gallery_projects_media_library.sql'))
+          if len(matches) != 1:
+              raise SystemExit(f'Expected exactly one GC-5 migration, found {len(matches)}')
+          path = matches[0]
+          text = path.read_text()
+
+          helper_marker = "create or replace function private.store_current_user_has_any_role"
+          if helper_marker not in text:
+              insertion = """-- Reconcile Store authorization with PR #143 without making this migration\n-- depend on production-only RBAC SQL. When user_roles exists, effective roles\n-- participate; clean replay safely falls back to the active legacy profile role.\ncreate or replace function private.store_current_user_has_any_role(allowed_roles text[])\nreturns boolean\nlanguage plpgsql\nstable\nsecurity definer\nset search_path = ''\nas $$\ndeclare\n  v_has_role boolean := false;\nbegin\n  if auth.uid() is null then\n    return false;\n  end if;\n\n  if pg_catalog.to_regclass('public.user_roles') is not null then\n    execute $sql$\n      select exists (\n        select 1\n        from public.user_roles ur\n        join public.profiles p on p.id = ur.user_id\n        where ur.user_id = $1\n          and p.is_active\n          and ur.role::text = any($2)\n      )\n    $sql$\n    into v_has_role\n    using auth.uid(), allowed_roles;\n\n    if v_has_role then\n      return true;\n    end if;\n  end if;\n\n  select exists (\n    select 1\n    from public.profiles p\n    where p.id = auth.uid()\n      and p.is_active\n      and p.role::text = any(allowed_roles)\n  )\n  into v_has_role;\n\n  return coalesce(v_has_role, false);\nend;\n$$;\n\nrevoke all on function private.store_current_user_has_any_role(text[]) from public;\nrevoke all on function private.store_current_user_has_any_role(text[]) from anon;\ngrant execute on function private.store_current_user_has_any_role(text[]) to authenticated, service_role;\n\n"""
+              anchor = "alter table public.store_projects\n"
+              if anchor not in text:
+                  raise SystemExit('Unable to locate GC-5 migration insertion anchor')
+              text = text.replace(anchor, insertion + anchor, 1)
+
+          text = text.replace("private.current_user_has_any_role(", "private.store_current_user_has_any_role(")
+
+          attribution_helper_marker = "create or replace function private.store_project_requires_parent_attribution"
+          if attribution_helper_marker not in text:
+              insertion = """create or replace function private.store_project_requires_parent_attribution(p_project_id uuid)\nreturns boolean\nlanguage sql\nstable\nsecurity definer\nset search_path = ''\nas $$\n  select coalesce(\n    exists (\n      select 1\n      from public.store_projects p\n      join public.store_media_assets a on a.id = p.cover_media_asset_id\n      where p.id = p_project_id\n        and a.attribution_classification = 'parent_attributed'\n    )\n    or exists (\n      select 1\n      from public.store_project_media m\n      join public.store_media_assets a on a.id = m.media_asset_id\n      where m.project_id = p_project_id\n        and m.media_type = 'image'\n        and m.media_asset_id is not null\n        and a.attribution_classification = 'parent_attributed'\n    ),\n    false\n  );\n$$;\n\nrevoke all on function private.store_project_requires_parent_attribution(uuid) from public;\nrevoke all on function private.store_project_requires_parent_attribution(uuid) from anon, authenticated;\ngrant execute on function private.store_project_requires_parent_attribution(uuid) to service_role;\n\n"""
+              anchor = "create or replace function private.store_project_is_publishable(p_project_id uuid)"
+              if anchor not in text:
+                  raise SystemExit('Unable to locate project publishability helper anchor')
+              text = text.replace(anchor, insertion + anchor, 1)
+
+          old_attribution = """        and (\n          p.attribution_classification = 'oakwell_owned'\n          or (\n            p.attribution_classification = 'parent_attributed'\n            and nullif(btrim(p.attribution_text), '') is not null\n            and p.source_page_url ~* '^https://'\n          )\n        )"""
+          new_attribution = """        and (\n          (\n            p.attribution_classification = 'oakwell_owned'\n            and not private.store_project_requires_parent_attribution(p.id)\n          )\n          or (\n            p.attribution_classification = 'parent_attributed'\n            and nullif(btrim(p.attribution_text), '') is not null\n            and p.source_page_url ~* '^https://'\n          )\n        )"""
+          if old_attribution in text:
+              text = text.replace(old_attribution, new_attribution, 1)
+          elif new_attribution not in text:
+              raise SystemExit('Unable to reconcile project attribution publish guard')
+
+          old = """  return coalesce(new, old);\nend;\n$$;\n\nrevoke all on function private.enforce_store_project_media_publishability()"""
+          new = """  if tg_op = 'DELETE' then\n    return old;\n  end if;\n  return new;\nend;\n$$;\n\nrevoke all on function private.enforce_store_project_media_publishability()"""
+          text = text.replace(old, new)
+          old = """  if not v_referenced then\n    return coalesce(new, old);\n  end if;"""
+          new = """  if not v_referenced then\n    if tg_op = 'DELETE' then\n      return old;\n    end if;\n    return new;\n  end if;"""
+          text = text.replace(old, new)
+
+          immutability_marker = "new.public_path is distinct from old.public_path"
+          if immutability_marker not in text:
+              old_guard = """  if tg_op = 'DELETE' then\n    raise exception 'Media asset is referenced by a published project.';\n  end if;\n\n  v_new_eligible :="""
+              new_guard = """  if tg_op = 'DELETE' then\n    raise exception 'Media asset is referenced by a published project.';\n  end if;\n\n  if new.status is distinct from old.status\n    or new.media_type is distinct from old.media_type\n    or new.public_bucket is distinct from old.public_bucket\n    or new.public_path is distinct from old.public_path\n    or new.cabinet_relevance is distinct from old.cabinet_relevance\n    or new.attribution_classification is distinct from old.attribution_classification\n  then\n    raise exception 'Publication-critical media fields are immutable while referenced by a published project.';\n  end if;\n\n  v_new_eligible :="""
+              if old_guard not in text:
+                  raise SystemExit('Unable to locate published-project media asset guard')
+              text = text.replace(old_guard, new_guard, 1)
+
+          old = """  select *\n  from store_api_private.get_store_public_projects_impl()\n  where slug = p_slug\n  limit 1;"""
+          new = """  select q.*\n  from store_api_private.get_store_public_projects_impl() q\n  where q.slug = p_slug\n  limit 1;"""
+          text = text.replace(old, new)
+          path.write_text(text)
+          PY
+      - name: Commit generated or hardened migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- modulex-store/supabase/migrations; then
+            echo 'Migration already prepared.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add modulex-store/supabase/migrations/*_gc5_gallery_projects_media_library.sql
+          git commit -m 'fix: harden GC-5 published media references'
+          git push origin HEAD:feat/gc5-gallery-projects-media-library
+
+  gc5-contracts:
+    needs: prepare-migration
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Store GC-5 contract
+        id: store_contract
+        continue-on-error: true
+        run: node modulex-store/scripts/gc5-gallery-projects-contract.mjs
+      - name: Admin GC-5 contract
+        id: admin_contract
+        continue-on-error: true
+        run: node modulex-admin/scripts/gc5-gallery-projects-admin-contract.mjs
+      - name: Require both contracts
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.store_contract.outcome }}" = "success"
+          test "${{ steps.admin_contract.outcome }}" = "success"
+
+  admin-verification:
+    needs: prepare-migration
+    if: always()
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: GC-5 contract
+        run: npm run smoke:gc5-gallery-projects
+      - name: Secondary CMS regression
+        run: npm run smoke:secondary-cms-admin
+      - name: Media Library regression
+        run: npm run smoke:media-library-admin
+      - name: Controlled intake regression
+        run: npm run smoke:gc2d-media-intake
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build
+
+  store-verification:
+    needs: prepare-migration
+    if: always()
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-store
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-store/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: GC-5 contract
+        run: npm run smoke:gc5-gallery-projects
+      - name: Secondary CMS regression
+        run: npm run smoke:secondary-cms-contract
+      - name: Public content regression
+        run: npm run smoke:store-public-content
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
