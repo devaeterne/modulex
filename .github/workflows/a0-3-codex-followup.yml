@@ -6,26 +6,46 @@ on:
       - fix/admin-a03-codex-followup
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  red:
+  verify:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: modulex-admin
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Apply bounded follow-up patch
+        run: |
+          python3 scripts/tmp-a03-codex-followup.py
+          if ! git diff --quiet -- src/app/api/admin/dealer-portal/route.ts ADMIN_ROADMAP.md; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/app/api/admin/dealer-portal/route.ts ADMIN_ROADMAP.md
+            git commit -m "fix(admin): close A0.3 Codex runtime gaps"
+            git push
+          fi
       - name: Prove privileged public env leakage is rejected
         run: |
           cat > src/__runtime-config-negative-fixture__.ts <<'EOF'
           export const leaked = process.env.NEXT_PUBLIC_DATABASE_URL;
           EOF
-          if npm run smoke:runtime-config; then
+          set +e
+          output=$(npm run smoke:runtime-config 2>&1)
+          status=$?
+          set -e
+          rm src/__runtime-config-negative-fixture__.ts
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
             echo "::error::runtime config contract failed to reject NEXT_PUBLIC_DATABASE_URL in source"
             exit 1
           fi
-          rm src/__runtime-config-negative-fixture__.ts
+          printf '%s\n' "$output" | grep -q "NEXT_PUBLIC_DATABASE_URL"
+      - name: Run positive runtime config contract
+        run: npm run smoke:runtime-config
