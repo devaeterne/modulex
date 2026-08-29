@@ -325,7 +325,8 @@ export default function NotificationDropdown() {
 
   const visibleNotifications = useMemo(() => role ? notifications.filter((notification) => canRoleSeeNotification(role, notification.type)) : [], [notifications, role]);
   const isRead = (id: string) => id.startsWith("user:") ? persistentReadIds.has(id) : readIds.has(id);
-  const unreadCount = visibleNotifications.filter((notification) => notification.id.startsWith("user:") ? !persistentReadIds.has(notification.id) : !readIds.has(notification.id)).length;
+  const unreadNotifications = visibleNotifications.filter((notification) => !isRead(notification.id));
+  const unreadCount = unreadNotifications.length;
 
   function persistReadIds(next: Set<string>) {
     setReadIds(next);
@@ -370,8 +371,8 @@ export default function NotificationDropdown() {
       </div>
 
       <div className="max-h-[430px] overflow-y-auto custom-scrollbar">
-        {isLoading ? <div className="flex min-h-[180px] items-center justify-center px-5 py-8 text-sm text-gray-500">Loading notifications...</div> : visibleNotifications.length === 0 ? <div className="flex min-h-[200px] flex-col items-center justify-center px-6 py-8 text-center"><span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-success-50 text-success-600">✓</span><p className="text-sm font-medium text-gray-800 dark:text-white/90">You&apos;re all caught up</p></div> : <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-          {visibleNotifications.map((notification) => {
+        {isLoading ? <div className="flex min-h-[180px] items-center justify-center px-5 py-8 text-sm text-gray-500">Loading notifications...</div> : unreadNotifications.length === 0 ? <div className="flex min-h-[200px] flex-col items-center justify-center px-6 py-8 text-center"><span className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-success-50 text-success-600">✓</span><p className="text-sm font-medium text-gray-800 dark:text-white/90">You&apos;re all caught up</p></div> : <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+          {unreadNotifications.map((notification) => {
             const unread = !isRead(notification.id);
             const styles = severityStyles(notification.severity);
             return <li key={notification.id}><DropdownItem tag="a" href={notification.href ?? "/"} onClick={() => void markAsRead(notification.id)} onItemClick={() => setIsOpen(false)} baseClassName="block w-full text-left" className={`relative flex gap-3 px-4 py-4 transition hover:bg-gray-50 dark:hover:bg-white/[0.03] ${unread ? "bg-brand-50/30 dark:bg-brand-500/[0.03]" : ""}`}>{unread && <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-brand-500" />}{notificationIcon(notification)}<span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-2"><span className="block text-sm font-medium text-gray-800 dark:text-white/90">{notification.title}</span><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${styles.badge}`}>{styles.label}</span></span><span className="mt-1.5 block text-xs leading-5 text-gray-500 dark:text-gray-400">{notification.description}</span><span className="mt-2 flex items-center gap-2 text-[11px] text-gray-400"><span className={`h-1.5 w-1.5 rounded-full ${styles.dot}`} />{notification.timeLabel}</span></span></DropdownItem></li>;
