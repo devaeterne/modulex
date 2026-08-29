@@ -533,17 +533,39 @@ The items below are already present in the current Store architecture. Keep them
 
 ---
 
+# Granite Center → Oakwell Migration Workstream
+
+Dedicated roadmap: `modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md`
+Business-truth lock: `modulex-store/docs/GC0_BUSINESS_TRUTH_LOCK.md`
+
+- [x] Migration roadmap approved and merged through PR #104.
+- [x] GC-0 — Business truth lock defined against the live production company-profile RPC and existing Admin source of truth.
+- [ ] GC-1 — Source crawl & content/media manifest.
+- [ ] GC-2 — Media optimization pipeline.
+- [ ] GC-3 — Company identity, About & Showroom migration.
+- [ ] GC-4 — Contact / Project Consultation Form migration.
+- [ ] GC-5 — Projects / Gallery migration.
+- [ ] GC-6 — Cabinet content / customer journey.
+- [ ] GC-7 — Reviews / social proof.
+- [ ] GC-8 — SEO, accessibility & performance QA.
+
+**GC-0 lock:** Granite Center source content must never override canonical Oakwell company-profile data. Unconfirmed hours, service area, installation/design SLAs, promotional claims, and other parent-site business claims fail closed and stay unpublished until explicitly approved in the controlled source/workstream.
+
+---
+
 # Next Action
 
-Phase 2.1C About is **production-accepted and complete**. Gallery/Projects remains `[~]` until approved real Gallery/Project content is published and live readiness is accepted.
+The user-approved active workstream is now the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Publish an approved `gallery` page plus at least one approved project with cover image/alt text.
-2. Verify production `/gallery`, Navbar readiness, sitemap exposure, metadata, and project media/lightbox behavior.
-3. Confirm `/gallery/detail` remains not-found, then mark Gallery/Projects complete.
-4. Proceed to Package D — configurable Navbar/Footer and Phase 2.1 closeout.
+1. Review and merge the GC-0 business-truth lock PR.
+2. After GC-0 merge, begin **GC-1 — Source crawl & content/media manifest**.
+3. GC-1 must classify every candidate source URL/media item against `GC0_BUSINESS_TRUTH_LOCK.md` before any CMS import.
+4. Do not migrate unconfirmed contact values, business hours, service-area claims, offers/SLAs, parent reviews, or parent projects without the attribution/publication rules defined by GC-0.
+5. Keep Phase 2.1 Gallery/Projects marked `[~]` until approved real Gallery/Project content is published and live readiness is accepted; GC-5 may provide the curated content required to close that blocker.
+6. Package D — configurable Navbar/Footer remains after the active Gallery/content readiness work unless the migration package requires a coordinated shared-chrome change earlier.
 
 **Package C branch verification:** GitHub Actions run `33244098018` passed the Phase 2.1C public-content contract, public-production contract, full Store smoke, lint, and Next.js/TypeScript build.
 
-**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending.
+**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending → Granite Center migration roadmap #104 merged → GC-0 business-truth lock prepared.
 
-**Admin coordination:** Admin A0.1 PR #101 is merged and production `READY` on `adfd9210740c77a4196a4938caa6a41a2f71556e`. A0.2 navigation/RBAC parity hardening is now active; this does not change the Gallery real-content blocker or the Package D ordering above.
+**Admin coordination:** Admin A0.1 PR #101 is merged and production `READY` on `adfd9210740c77a4196a4938caa6a41a2f71556e`. A0.2 navigation/RBAC parity hardening is now active; this does not change the Gallery real-content blocker or the Granite migration sequence above.
