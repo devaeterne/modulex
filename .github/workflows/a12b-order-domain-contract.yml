@@ -7,15 +7,44 @@ on:
   workflow_dispatch:
 
 jobs:
-  contract:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - name: Install dependencies
+        working-directory: modulex-admin
+        run: npm ci
       - name: Run A1.2B order domain contract
         working-directory: modulex-admin
-        run: node scripts/order-domain-contract.mjs
+        run: npm run smoke:order-domain
+      - name: Run order list contract
+        working-directory: modulex-admin
+        run: npm run smoke:order-list
+      - name: Run customer detail contract
+        working-directory: modulex-admin
+        run: npm run smoke:customer-detail
+      - name: Run production surface contract
+        working-directory: modulex-admin
+        run: npm run smoke:production-surface
+      - name: Lint
+        working-directory: modulex-admin
+        run: npm run lint
+      - name: Production build
+        working-directory: modulex-admin
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+          NEXT_PUBLIC_SITE_URL: https://admin.example.com
+          NEXT_PUBLIC_STORE_URL: https://store.example.com
+        run: npm run build
+      - name: Diff check
+        run: git diff --check c0adbfbb431973a3acb4a94902341ac64b11c1de..HEAD
