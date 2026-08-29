@@ -5,14 +5,22 @@ on:
     branches:
       - fix/admin-production-residue-cleanup
 
+permissions:
+  contents: write
+
 jobs:
-  production-surface:
+  verify:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
     defaults:
       run:
         working-directory: modulex-admin
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -20,3 +28,23 @@ jobs:
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
       - run: npm run smoke:production-surface
+      - run: npm run smoke:rbac
+      - run: npm run smoke:secondary-cms-admin
+      - run: npm run smoke:dealer-onboarding
+      - run: npm run smoke:dealer-portal-admin
+      - run: npm run smoke:store-portal-admin
+      - run: npm run smoke:auth-recovery
+      - run: npm run smoke:polling
+      - run: npm run lint
+      - run: npm run build
+      - run: git diff --check 6cbd27198d930cb129b912fa4faece3bf967e292...HEAD -- .
+      - name: Record verified A0.1 closeout
+        run: |
+          python scripts/a0-1-production-residue-closeout.py "$GITHUB_RUN_ID"
+          if ! git diff --quiet -- ADMIN_ROADMAP.md docs/ADMIN_PRODUCTION_SURFACE.md; then
+            git config user.name "devaeterne"
+            git config user.email "info@safaksariyildiz.com"
+            git add ADMIN_ROADMAP.md docs/ADMIN_PRODUCTION_SURFACE.md
+            git commit -m "docs(admin): close A0.1 retained-surface audit"
+            git push origin HEAD:fix/admin-production-residue-cleanup
+          fi
