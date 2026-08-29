@@ -1,6 +1,12 @@
+type PannellumViewerOptions = Record<string, string | number | boolean>;
+
+type PannellumViewer = {
+  destroy: () => void;
+};
+
 interface Window {
-  pannellum: {
-    viewer: (elementId: string, options: any) => any;
+  pannellum?: {
+    viewer: (element: string | HTMLElement, options: PannellumViewerOptions) => PannellumViewer;
   };
-  libpannellum: any;
+  libpannellum?: unknown;
 }

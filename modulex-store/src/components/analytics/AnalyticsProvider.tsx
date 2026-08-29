@@ -18,6 +18,8 @@ function ensureGoogleCommandQueue() {
   if (typeof window.gtag === "function") return;
 
   window.gtag = function gtag() {
+    // Google gtag intentionally queues the native arguments object.
+    // eslint-disable-next-line prefer-rest-params
     window.dataLayer?.push(arguments);
   };
 }
@@ -114,6 +116,7 @@ export default function AnalyticsProvider({
   const [draftConsent, setDraftConsent] = useState<AnalyticsConsentState>(DENIED);
   const lastPageView = useRef<string | null>(null);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- This effect hydrates React state from browser-owned consent and DNT state. */
   useEffect(() => {
     captureSessionAttribution();
     initializeDeniedGoogleConsent();
@@ -146,6 +149,7 @@ export default function AnalyticsProvider({
     setDraftConsent(DENIED);
     setBannerOpen(settings.consentBannerEnabled);
   }, [settings]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     captureSessionAttribution();

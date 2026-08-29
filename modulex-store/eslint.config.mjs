@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Static legacy/vendor browser bundles are shipped as-is and are not application source.
+    "public/assets/js/**",
   ]),
 ]);
 
