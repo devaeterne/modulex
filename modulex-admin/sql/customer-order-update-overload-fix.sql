@@ -229,12 +229,9 @@ begin
   select p.pronargdefaults
   into v_wrapper_defaults
   from pg_proc p
-  join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname = 'private'
-    and p.proname = 'update_customer_order'
-    and p.prokind = 'f'
-    and p.oid::regprocedure::text =
-      'private.update_customer_order(uuid,jsonb,uuid,uuid,uuid,date,text,text,text,numeric,numeric,uuid,numeric,text,text)';
+  where p.oid = to_regprocedure(
+    'private.update_customer_order(uuid,jsonb,uuid,uuid,uuid,date,text,text,text,numeric,numeric,uuid,numeric,text,text)'
+  );
 
   if v_wrapper_defaults is distinct from 0 then
     raise exception
