@@ -179,24 +179,24 @@ const managementItems: NavItem[] = [
   },
 ];
 
-function filterItems(items: NavItem[], role: UserRole): NavItem[] {
+function filterItems(items: NavItem[], roles: readonly UserRole[]): NavItem[] {
   return items.flatMap((item) => {
     if (item.path) {
-      return item.permission && hasPermission(role, item.permission) ? [item] : [];
+      return item.permission && hasPermission(roles, item.permission) ? [item] : [];
     }
 
-    const subItems = (item.subItems ?? []).filter((subItem) => hasPermission(role, subItem.permission));
+    const subItems = (item.subItems ?? []).filter((subItem) => hasPermission(roles, subItem.permission));
     return subItems.length ? [{ ...item, subItems }] : [];
   });
 }
 
-export default function AppSidebar({ role }: { role: UserRole }) {
+export default function AppSidebar({ roles }: { roles: UserRole[] }) {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
   const [openSubmenu, setOpenSubmenu] = useState<{ type: "main" | "management"; index: number } | null>(null);
 
-  const visibleNavItems = useMemo(() => filterItems(navItems, role), [role]);
-  const visibleManagementItems = useMemo(() => filterItems(managementItems, role), [role]);
+  const visibleNavItems = useMemo(() => filterItems(navItems, roles), [roles]);
+  const visibleManagementItems = useMemo(() => filterItems(managementItems, roles), [roles]);
 
   const isActive = useCallback((path: string, exact = false) => {
     if (path === "/" || exact) return pathname === path;
