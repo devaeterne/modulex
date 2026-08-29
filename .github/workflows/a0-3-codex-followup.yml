@@ -11,6 +11,12 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
+      NEXT_PUBLIC_SITE_URL: https://modulex-admin.example.test
+      NEXT_PUBLIC_STORE_URL: https://store.example.test
+      STORE_SITE_URL: https://store.example.test
     defaults:
       run:
         working-directory: modulex-admin
@@ -21,6 +27,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
       - name: Apply bounded follow-up patch
         run: |
           python3 scripts/tmp-a03-codex-followup.py
@@ -31,6 +39,8 @@ jobs:
             git commit -m "fix(admin): close A0.3 Codex runtime gaps"
             git push
           fi
+      - name: Install dependencies
+        run: npm ci
       - name: Prove privileged public env leakage is rejected
         run: |
           cat > src/__runtime-config-negative-fixture__.ts <<'EOF'
@@ -47,5 +57,37 @@ jobs:
             exit 1
           fi
           printf '%s\n' "$output" | grep -q "NEXT_PUBLIC_DATABASE_URL"
-      - name: Run positive runtime config contract
+      - name: Runtime config
         run: npm run smoke:runtime-config
+      - name: Production surface
+        run: npm run smoke:production-surface
+      - name: RBAC
+        run: npm run smoke:rbac
+      - name: Secondary CMS Admin
+        run: npm run smoke:secondary-cms-admin
+      - name: Dealer onboarding
+        run: npm run smoke:dealer-onboarding
+      - name: Dealer portal Admin
+        run: npm run smoke:dealer-portal-admin
+      - name: Store portal Admin
+        run: npm run smoke:store-portal-admin
+      - name: Auth recovery
+        run: npm run smoke:auth-recovery
+      - name: Polling
+        run: npm run smoke:polling
+      - name: Lint
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Diff check
+        run: git diff --check f6d7f9673dc874b5c254e47c750ff1bd4793c7c3...HEAD -- .
+      - name: Record verified follow-up closeout
+        run: |
+          python3 scripts/tmp-a03-codex-followup.py closeout "${{ github.run_id }}"
+          if ! git diff --quiet -- ADMIN_ROADMAP.md; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add ADMIN_ROADMAP.md
+            git commit -m "docs(admin): verify A0.3 Codex follow-up"
+            git push
+          fi
