@@ -116,12 +116,13 @@ export default function EditCustomerOrder() {
 
   useEffect(() => {
     if (!priceGroupId || !order) return;
+    const currencyCode = order.currency_code;
     let active = true;
 
     async function loadPrices() {
       setIsLoadingPrices(true);
       try {
-        const data = await loadOrderPrices(priceGroupId, order.currency_code);
+        const data = await loadOrderPrices(priceGroupId, currencyCode);
         if (!active) return;
         setPrices(data);
       } catch (error) {
