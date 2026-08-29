@@ -1,0 +1,23 @@
+name: A1.1C review regression
+
+on:
+  push:
+    branches:
+      - phase-a1/customer-detail-address-integrity
+
+permissions:
+  contents: read
+
+jobs:
+  customer-detail-regression:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run customer detail contract
+        run: node scripts/customer-detail-integrity-contract.mjs
