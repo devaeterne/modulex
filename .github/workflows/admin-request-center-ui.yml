@@ -1,0 +1,57 @@
+name: Admin Request Center UI
+
+on:
+  push:
+    paths:
+      - "modulex-admin/src/app/(admin)/requests/**"
+      - "modulex-admin/src/components/requests/**"
+      - "modulex-admin/src/app/api/requests/**"
+      - "modulex-admin/docs/REQUEST_CENTER_SCHEMA.sql"
+      - "modulex-admin/scripts/request-center-ui-contract.mjs"
+      - "modulex-admin/scripts/requests-admin-contract.mjs"
+      - ".github/workflows/admin-request-center-ui.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/app/(admin)/requests/**"
+      - "modulex-admin/src/components/requests/**"
+      - "modulex-admin/src/app/api/requests/**"
+      - "modulex-admin/docs/REQUEST_CENTER_SCHEMA.sql"
+      - "modulex-admin/scripts/request-center-ui-contract.mjs"
+      - "modulex-admin/scripts/requests-admin-contract.mjs"
+      - ".github/workflows/admin-request-center-ui.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  request-center-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Request Center UI contract
+        run: node scripts/request-center-ui-contract.mjs
+      - name: Request Center admin regression
+        run: npm run smoke:requests-admin
+      - name: Production surface regression
+        run: npm run smoke:production-surface
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build
