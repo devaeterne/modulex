@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `fbfa1613970c83117f023d89fec60ac80a6fed97`
+Main baseline: `adfd9210740c77a4196a4938caa6a41a2f71556e`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -545,3 +545,5 @@ Phase 2.1C About is **production-accepted and complete**. Gallery/Projects remai
 **Package C branch verification:** GitHub Actions run `33244098018` passed the Phase 2.1C public-content contract, public-production contract, full Store smoke, lint, and Next.js/TypeScript build.
 
 **Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending.
+
+**Admin coordination:** Admin A0.1 PR #101 is merged and production `READY` on `adfd9210740c77a4196a4938caa6a41a2f71556e`. A0.2 navigation/RBAC parity hardening is now active; this does not change the Gallery real-content blocker or the Package D ordering above.
