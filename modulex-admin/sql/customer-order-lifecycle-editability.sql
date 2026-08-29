@@ -17,7 +17,7 @@ security invoker
 set search_path = pg_catalog
 as $$
   select case
-    when p_role not in ('super_admin','admin','sales') then 'locked'
+    when p_role is null or p_role not in ('super_admin','admin','sales') then 'locked'
     when p_status in (
       'shipped',
       'delivered',
@@ -76,7 +76,7 @@ begin
   where p.id = auth.uid()
     and p.is_active = true;
 
-  if v_role not in ('super_admin','admin','sales') then
+  if v_role is null or v_role not in ('super_admin','admin','sales') then
     raise exception 'You do not have permission to edit customer orders.';
   end if;
 
@@ -252,6 +252,9 @@ begin
   end if;
   if private.customer_order_revision_mode('cancelled','admin') <> 'locked' then
     raise exception 'Cancelled orders must be revision-locked.';
+  end if;
+  if private.customer_order_revision_mode('draft', null) <> 'locked' then
+    raise exception 'Profiles-less/null-role callers must be revision-locked.';
   end if;
 end;
 $$;
