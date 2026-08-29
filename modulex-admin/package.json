@@ -1,5 +1,5 @@
 {
-  "name": "free-nextjs-admin-dashboard",
+  "name": "modulex-admin",
   "version": "2.3.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "npm run smoke",
-    "smoke": "npm run smoke:rbac && npm run smoke:production-surface && npm run smoke:secondary-cms-admin && npm run smoke:api && npm run smoke:phase1 && npm run smoke:db && npm run smoke:db:phase1 && npm run smoke:dealer-onboarding && npm run smoke:dealer-onboarding:db && npm run smoke:dealer-portal-admin && npm run smoke:store-portal-admin && npm run smoke:auth-recovery && npm run smoke:polling",
+    "smoke": "npm run smoke:runtime-config && npm run smoke:rbac && npm run smoke:production-surface && npm run smoke:secondary-cms-admin && npm run smoke:api && npm run smoke:phase1 && npm run smoke:db && npm run smoke:db:phase1 && npm run smoke:dealer-onboarding && npm run smoke:dealer-onboarding:db && npm run smoke:dealer-portal-admin && npm run smoke:store-portal-admin && npm run smoke:auth-recovery && npm run smoke:polling",
+    "smoke:runtime-config": "node scripts/runtime-config-contract.mjs",
     "smoke:rbac": "node scripts/rbac-smoke.mjs",
     "smoke:production-surface": "node scripts/admin-production-surface-contract.mjs",
     "smoke:secondary-cms-admin": "node scripts/secondary-cms-admin-contract.mjs",
