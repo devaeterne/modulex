@@ -1,9 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `afaa8ba6e0717b97f9979d61b413541072ed155c`
+Main baseline: `8998871b81d0e41840fd67d7af66c835e4b5840b`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
 Current cross-roadmap package: **Granite Center → Oakwell GC-2B importer/optimizer capability verified with zero production media writes; GC-2C Admin Media Library next; Gallery/Projects content acceptance remains pending**
+Current Admin next action: **A1.1C — customer detail action hierarchy, secure portal-enabled lifecycle consistency, and atomic default-address behavior**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -171,13 +172,16 @@ These rules are mandatory for all future Modulex Admin work:
   - Full deterministic verification: Actions run `33257875905` passed runtime-config, production-surface, customer-directory, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check; post-closeout verification run `33258088112` repeated the same suite successfully on the committed roadmap closeout.
   - Production schema/RLS/RPC/data were not mutated by A1.1A; existing customer status/type/price-group/sales-rep indexes remain the query foundation. Mutation validation/audit and atomic default-address work remain intentionally separated into A1.1B/C.
 - [ ] Review customer detail information architecture and action hierarchy.
-- [~] Verify customer status/account-type changes have explicit validation.
+- [x] Verify customer status/account-type changes have explicit validation.
   - A1.1B moves General customer-master saves to a validated RPC and adds DB-level status/type guards so direct table updates cannot bypass lifecycle rules. Converted customers cannot return to prospect; changed customer types must be active.
-  - Production SQL acceptance remains pending until this package is merged and `sql/customer-master-mutation.sql` is applied to Supabase.
+  - Production migration `20260829155809_customer_master_mutation_contract` is present on Supabase. Live catalog verification confirmed the guard/audit triggers are enabled, the public RPC is `SECURITY INVOKER` with an empty `search_path`, and RPC execution is granted to `authenticated` while revoked from `anon`/`public`.
+  - Production acceptance used an authenticated Admin context inside an explicit transaction and rollback: a valid RPC save produced the expected `customer_master_updated` audit entry, a direct non-prospect → prospect update was rejected, and assignment of a transaction-only inactive customer type was rejected. No test customer/type mutation persisted.
+  - PR #119 is included in current `main` `8998871b81d0e41840fd67d7af66c835e4b5840b`; Admin Vercel production deployment `dpl_214r7D8Dhy9bBzEmbkuGTgvXnTYx` is `READY` from that exact SHA.
 - [ ] Verify portal-enabled changes use the secure lifecycle API consistently across all customer-detail surfaces. (A1.1C)
 - [ ] Verify address management and default-address behavior. (A1.1C)
-- [~] Add/confirm audit visibility for sensitive customer master changes.
-  - A1.1B adds an atomic AFTER UPDATE audit trigger with changed field names plus status/type from/to metadata, without full-row PII snapshots. Production SQL acceptance remains pending.
+- [x] Add/confirm audit visibility for sensitive customer master changes.
+  - A1.1B adds an atomic AFTER UPDATE audit trigger with changed field names plus status/type from/to metadata, without full-row PII snapshots.
+  - Production acceptance confirmed the audit is written in the same transaction as the customer-master update and is rolled back with the mutation. Post-DDL Supabase advisors reported no A1.1B-specific security or performance finding; unrelated Store security warnings and existing performance advisory items remain outside this package.
 
 ## A1.2 Orders
 
