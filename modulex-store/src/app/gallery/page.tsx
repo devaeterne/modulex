@@ -9,7 +9,7 @@ import {
   getStorePublicProjectMedia,
 } from "@/lib/store/content/queries";
 
-export const revalidate = 900;
+export const revalidate = 60;
 
 const UNAVAILABLE_METADATA: Metadata = {
   title: "Projects",
