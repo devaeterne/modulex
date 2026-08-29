@@ -20,7 +20,7 @@ Until the project is moved to Supabase CLI migrations under `supabase/migrations
 
 `customer-address-integrity.sql` adds SECURITY INVOKER address RPCs that serialize per customer and keep default clearing, assignment/creation, and customer activity in one transaction while preserving existing RLS.
 
-`customer-order-list-summary.sql` adds the SECURITY INVOKER aggregate used by global and customer-scoped order lists so summary cards do not require downloading the full order table. The function preserves `customer_orders` RLS and returns a monetary total only when the selected scope has one currency.
+`customer-order-list-summary.sql` adds the `security_invoker=true` `customer_order_directory` view used for joined order/customer search with exact server-side count and pagination, plus the SECURITY INVOKER aggregate used by global and customer-scoped summary cards. Both surfaces preserve the existing `customers` / `customer_orders` RLS boundary; the summary returns a monetary total only when the selected scope has one currency.
 
 `performance-rls.sql` is a query-planning hardening step. It preserves the existing RLS role rules while converting known stable role/permission helper predicates to one-time statement checks. Apply it after all schema files that create those policies. Existing environments can apply it once as the final performance migration.
 
