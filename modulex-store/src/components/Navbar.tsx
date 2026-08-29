@@ -8,9 +8,11 @@ import { pushAnalyticsEvent } from "@/lib/analytics/events";
 export default function Navbar({
   companyName = "Oakwell Cabinetry",
   logoUrl,
+  galleryReady = false,
 }: {
   companyName?: string;
   logoUrl?: string | null;
+  galleryReady?: boolean;
 }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -88,6 +90,9 @@ export default function Navbar({
           <li className="nav-item home-dd"><Link className="nav-link" href="/" onClick={handleLinkClick}>Home</Link></li>
           <li className="nav-item about-dd"><Link className="nav-link" href="/about" onClick={handleLinkClick}>About</Link></li>
           <li className="nav-item"><Link className="nav-link" href="/products" onClick={handleLinkClick}>Products</Link></li>
+          {galleryReady ? (
+            <li className="nav-item"><Link className="nav-link" href="/gallery" onClick={handleLinkClick}>Gallery</Link></li>
+          ) : null}
           <li className="nav-item"><Link className="nav-link" href="/dealers/apply" onClick={handleLinkClick}>Dealers</Link></li>
         </ul>
 
