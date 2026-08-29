@@ -12,6 +12,7 @@ GC-2 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc2-m
 GC-2 production acceptance: `modulex-store/docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`
 GC-3 implementation plan: `docs/superpowers/plans/2026-08-29-gc3-company-identity-contact-about-showroom.md`
 GC-3 production acceptance: `modulex-store/docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`
+GC-4 production acceptance: `modulex-store/docs/granite-center/GC4_PRODUCTION_ACCEPTANCE.md`
 GC-1 manifest: `modulex-store/docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md` + `gc1-source-manifest.json`
 
 > Purpose: identify which verified Granite & Cabinet Center business data, media, social proof, forms, showroom information, and cabinet-related content should be adapted into Oakwell Cabinetry without cloning the parent website or importing stale/irrelevant WordPress content.
@@ -494,12 +495,14 @@ Status: `[x]` production-accepted on 2026-08-29. Acceptance: `modulex-store/docs
 
 Goal: replace parent form behavior with configurable first-party Oakwell lead capture.
 
-- `[ ]` define approved business-configurable form options;
-- `[ ]` extend DB/API only for approved new fields;
-- `[ ]` add Admin management/visibility where needed;
-- `[ ]` keep validation/security behavior code-owned;
-- `[ ]` verify spam/privacy/attribution flow;
-- `[ ]` keep customer file upload deferred unless a new explicit decision approves it.
+- `[x]` define the Admin-managed business-configurable option domain without seeding unapproved option values;
+- `[x]` extend DB/API only for approved project-consultation fields while preserving backward-compatible general inquiries;
+- `[x]` add Admin management/visibility through `/store/leads/form-options` and the Project Consultation lead-detail panel;
+- `[x]` keep validation/security behavior code-owned and preserve the public SECURITY INVOKER → private SECURITY DEFINER submission boundary;
+- `[x]` verify privacy/marketing separation, attribution persistence, option validation, and dealer/project-field isolation;
+- `[x]` keep customer file upload deferred; dealer supporting-document behavior remains unchanged.
+
+**Exit gate:** `[x]` GC-4 is production-accepted. Migration `gc4_contact_project_consultation` is applied, Store/Admin production builds are READY on main `406bd374a4b4a7738a1a785709f3b277d21e4410`, live `/contact` exposes General Inquiry / Project Consultation, and the empty public option projection fails closed until business-approved option values are configured. Evidence: `docs/granite-center/GC4_PRODUCTION_ACCEPTANCE.md`.
 
 **Exit gate:** no Wufoo dependency; configured lead appears correctly in Admin and no mutable business options require Store source edits.
 
@@ -593,8 +596,8 @@ Goal: add trust signals with correct source identity.
 
 GC-0 truth/data ownership is locked; GC-1, GC-2, and GC-3 are production-accepted.
 
-1. Start **GC-4 — Contact / Project Consultation** from the latest `main`.
-2. Preserve the existing native `/api/leads` path, same-origin/spam/privacy protections, UTM/referrer attribution, and separate marketing consent.
-3. Add only business-approved consultation fields/options; mutable business choices must be Admin/data-managed, while validation/security behavior remains code-owned.
-4. Keep customer file upload deferred unless separately approved; dealer supporting-document infrastructure remains private and separately scoped.
-5. Keep Gallery/Projects `[~]`; GC-5 owns curated project/media association and final Gallery acceptance.
+1. Start **GC-5 — Projects / Gallery migration** from the latest `main`.
+2. Use the existing `store_projects` + `store_project_media` foundation and GC-2 media/provenance domain; do not publish parent projects until cabinet relevance, attribution, and media review are approved.
+3. Keep Phase 2.1 Gallery/Projects `[~]` until GC-5 supplies at least one approved published project/media set and live Gallery acceptance passes.
+4. GC-4 is closed. Do not seed project-type or consultation-intent values unless the business approves them; the Store intentionally hides empty configurable selects.
+5. Preserve customer-upload deferral, dealer document isolation, and all GC-4 lead security/attribution boundaries.

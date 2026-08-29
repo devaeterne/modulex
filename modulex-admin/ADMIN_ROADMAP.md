@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `406bd374a4b4a7738a1a785709f3b277d21e4410`
+Main baseline: `2dd1af00dc2c2291e95507b1961957a6c0ddc0bf`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-3 company identity, Contact, About & Showroom is production-accepted and complete. GC-4 — Contact / Project Consultation is the next Granite package; Admin primary work remains Phase A1**
+Current cross-roadmap package: **Granite Center → Oakwell GC-4 Contact / Project Consultation is production-accepted and complete. GC-5 — Projects / Gallery is the next Granite package; Admin primary Phase A1 work remains independently owned by its current roadmap next action.**
 Current Admin next action: **Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
@@ -598,6 +598,6 @@ Primary Admin roadmap work is **Phase A1 — Customer, Order & Fulfillment Opera
 2. Then start **A1.1B — Customer Master Mutation Contract**: validated customer status/type/master mutations plus mutation+audit atomicity.
 3. Follow with **A1.1C — Customer Detail & Address Integrity**: remove legacy action-hiding CSS, clarify detail action hierarchy, and make default-address changes atomic.
 
-**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, Phase 2.1C About is production-accepted, and Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1, GC-2, and GC-3 are complete. GC-3 production acceptance is recorded in `modulex-store/docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`; Admin `/store/company`, structured company RLS/projection, and live Contact/About/Showroom behavior passed final deterministic smoke/lint and production acceptance. **GC-4 — Contact / Project Consultation is next.** Gallery/Projects remains `[~]` and GC-5 owns project/media association. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule. Admin primary work remains Phase A1 with current next action A1.2B.
+**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, Phase 2.1C About is production-accepted, and Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1, GC-2, GC-3, and GC-4 are production-accepted. GC-4 production acceptance is recorded in `modulex-store/docs/granite-center/GC4_PRODUCTION_ACCEPTANCE.md`; Admin `/store/leads/form-options`, Project Consultation lead visibility, and the native lead security/attribution boundary passed production acceptance. **GC-5 — Projects / Gallery is next.** Gallery/Projects remains `[~]` and GC-5 owns curated project/media association and final Gallery acceptance. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule. Admin primary work remains Phase A1 with its current next action unchanged.
 
 **Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A1 or other concurrently merged Admin work is preserved rather than overwritten.

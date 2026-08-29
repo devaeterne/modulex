@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `c0adbfbb431973a3acb4a94902341ac64b11c1de`
+Main baseline: `406bd374a4b4a7738a1a785709f3b277d21e4410`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -566,7 +566,8 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 - [x] GC-2 — Media library & optimization pipeline.
 - [x] GC-3 — Company identity, contact, About & Showroom migration.
   - Production acceptance: `docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`.
-- [ ] GC-4 — Contact / Project Consultation Form migration.
+- [x] GC-4 — Contact / Project Consultation Form migration.
+  - Production acceptance: `docs/granite-center/GC4_PRODUCTION_ACCEPTANCE.md`.
 - [ ] GC-5 — Projects / Gallery migration.
 - [ ] GC-6 — Cabinet content / customer journey.
 - [ ] GC-7 — Reviews / social proof.
@@ -614,6 +615,6 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 
 The user-approved active workstream remains the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Start **GC-4 — Contact / Project Consultation Form migration** from the current `main`, preserving the native `/api/leads` security/attribution path and adding only business-approved fields/options.
-2. Keep Gallery/Projects `[~]`; GC-5 still owns curated project/media association and final public Gallery acceptance.
-3. GC-3 is closed. Do not seed unconfirmed showroom locations, hours, directions, or showroom media as a shortcut during GC-4.
+1. Start **GC-5 — Projects / Gallery migration** from the latest `main`; keep the existing Phase 2.1 Gallery/Projects `[~]` dependency explicit until curated production project/media acceptance closes it.
+2. GC-4 is production-accepted. Form option values remain intentionally empty until business-approved values are configured in Admin; do not seed guessed project types or consultation intents.
+3. Preserve GC-4's native `/api/leads`, attribution/privacy boundaries, dealer-document isolation, and public-wrapper/private-definer RPC architecture while GC-5 proceeds.
