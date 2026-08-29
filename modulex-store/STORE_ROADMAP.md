@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `45458e1f1402614b5e4a408394706df4c4aa757d`
+Main baseline: `6cbd27198d930cb129b912fa4faece3bf967e292`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -553,8 +553,11 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 - [x] Migration roadmap approved and merged through PR #104.
 - [x] GC-0 — Business truth lock merged through PR #105 against the live production company-profile RPC and existing Admin source of truth.
 - [x] Dynamic-content architecture approved: mutable business content/media is Admin-managed Supabase DB/Storage data consumed by Store through controlled projections; runtime hard-code migration shortcuts are prohibited.
-- [x] GC-0 ownership amendment prepared in the approved architecture/governance package so the truth lock also governs where public content is stored and managed.
-- [ ] GC-1 — Source crawl & content/media manifest.
+- [x] GC-0 ownership amendment merged through PR #108 so the truth lock also governs where public content is stored and managed.
+- [x] GC-1 — Source crawl & content/media manifest.
+  - Reviewed 32 Granite Center source pages and classified 55 content candidates, 62 media candidates, and 7 conflict classes.
+  - Machine-readable manifest: `docs/granite-center/gc1-source-manifest.json`; human review: `docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md`.
+  - Deterministic manifest contract passed in GitHub Actions run `33254382256`; byte-level media metadata remains intentionally unverified/null for GC-2.
 - [ ] GC-2 — Media library & optimization pipeline.
 - [ ] GC-3 — Company identity, contact, About & Showroom migration.
 - [ ] GC-4 — Contact / Project Consultation Form migration.
@@ -573,16 +576,16 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 
 The user-approved active workstream is the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Merge the **dynamic-content architecture / GC-0 ownership governance** documentation package based on current main `45458e1f1402614b5e4a408394706df4c4aa757d`.
-2. After that merge, begin **GC-1 — Source crawl & content/media manifest** from latest `main` using `docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`.
-3. GC-1 is discovery/classification only: no production schema, DB rows, Storage uploads, Admin runtime or Store runtime changes. It records page/content/media candidates, conflicts, attribution and target CMS domains; byte-level image download/hash/optimization belongs to GC-2.
-4. Do not migrate unconfirmed contact values, business hours, service-area claims, offers/SLAs, parent reviews, or parent projects outside the GC-0 attribution/publication rules.
+1. Review and merge the **GC-1 source content/media manifest** package.
+2. After GC-1 merge, begin **GC-2 — Media library & optimization pipeline** from latest `main`.
+3. GC-2 owns source-byte acquisition, verified dimensions/bytes/MIME, SHA-256 exact deduplication, optional perceptual duplicate review, EXIF/GPS stripping, conservative resize/encoding, Supabase Storage upload, reusable media records and the Admin media-management surface required for ongoing operation.
+4. Do not publish or hard-code Granite source values/media; source URLs remain provenance and all public content continues to follow GC-0 attribution/publication rules.
 5. Keep Phase 2.1 Gallery/Projects marked `[~]` until approved real Gallery/Project content is published and live readiness is accepted; GC-5 may provide the curated content required to close that blocker.
-6. Package D — configurable Navbar/Footer remains an open Phase 2.1 capability and will be completed under the dynamic-content ownership rule; Granite GC-8 provides a natural final coordination point unless an earlier migration package requires the shared chrome first.
+6. Package D — configurable Navbar/Footer remains an open Phase 2.1 capability and must follow the same Admin-managed dynamic-content rule.
 7. Before every new package, re-read current `main` and both roadmaps because parallel Modulex PRs may have landed.
 
 **Package C branch verification:** GitHub Actions run `33244098018` passed the Phase 2.1C public-content contract, public-production contract, full Store smoke, lint, and Next.js/TypeScript build.
 
-**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending → Granite roadmap #104 merged → GC-0 #105 merged → dynamic-content architecture approved / governance package prepared → GC-1 next.
+**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending → Granite roadmap #104 merged → GC-0 #105 merged → dynamic-content architecture/ownership #108 merged → GC-1 source manifest complete for review → GC-2 next after merge.
 
-**Admin coordination:** current `main` includes the parallel Admin warehouse-list RBAC fix PR #106 at `45458e1f1402614b5e4a408394706df4c4aa757d`. Primary Admin A0 cleanup remains independent; Granite work only adds coordinated A4/A5 CMS/settings responsibilities and must not overwrite parallel Admin roadmap progress.
+**Admin coordination:** GC-1 started from current main `6cbd27198d930cb129b912fa4faece3bf967e292`, which includes parallel Admin dashboard-truth PR #107 and dynamic-content PR #108. Primary Admin A0 cleanup remains independent; Granite work only adds coordinated A4/A5 CMS/settings responsibilities and must not overwrite parallel Admin roadmap progress.

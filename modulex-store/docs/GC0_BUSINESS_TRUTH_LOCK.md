@@ -269,9 +269,6 @@ Production warehouse records currently include unrelated operational locations a
 
 ## 11. Next package
 
-Proceed to **GC-1 — Source crawl & content/media manifest** using:
+GC-1 source discovery/classification is complete for review. Its manifest preserves the conflicts, attribution rules and dynamic-content ownership constraints in this lock.
 
-- architecture design: `modulex-store/docs/superpowers/specs/2026-08-29-oakwell-dynamic-content-cms-design.md`;
-- implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`.
-
-GC-1 must inventory and classify source URLs/media against these locks before anything is imported into the Oakwell CMS. Any source item that conflicts with this document must be excluded, held or flagged for an explicit business decision rather than silently adapted.
+After the GC-1 PR is merged, proceed to **GC-2 — Media library & optimization pipeline**. GC-2 may verify/download/transform approved source media, but final delivery must use Oakwell-controlled Supabase Storage + Admin-managed media records. Granite Center URLs remain provenance only and no GC-0 factual/publication lock is relaxed by GC-1 completion.
