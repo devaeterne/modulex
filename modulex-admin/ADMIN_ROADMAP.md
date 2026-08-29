@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `8cce1b0c065e66c3939a96704b05aa6c96f2b3d8`
+Main baseline: `406bd374a4b4a7738a1a785709f3b277d21e4410`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-3 company identity, Contact, About & Showroom is production-accepted and complete. GC-4 — Contact / Project Consultation is the next Granite package; Admin primary work remains Phase A1 and the current Admin next action remains A1.2C**
-Current Admin next action: **A1.2C — define immutable vs editable fields by order lifecycle state**
+Current cross-roadmap package: **Granite Center → Oakwell GC-3 company identity, Contact, About & Showroom is production-accepted and complete. GC-4 — Contact / Project Consultation is the next Granite package; Admin primary work remains Phase A1**
+Current Admin next action: **Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -205,7 +205,11 @@ These rules are mandatory for all future Modulex Admin work:
   - Admin Vercel production deployment `dpl_EZnRkBzEpnU4quNdKPS2XAWaQy86` and Store deployment `dpl_Gq24GKZyrTZiL2xu1cE7KLzALVth` are both `READY` from exact merge SHA `e04425c0bd6c7ae0bf7df4fc447c90ed2e8809af`.
   - Read-only authenticated Admin acceptance verified the adapter's production query surface under existing RLS: the scoped customer/order resolved 1/1, the sample order exposed 3 items plus status history, and shared create/edit lookups returned 6 order price groups, 3 active payment methods, 462 products, 3 tax rules, and 462 current price rows. A profiles-less authenticated caller saw 0 profile/customer/order/item/approval rows.
   - Catalog verification confirmed `create_customer_order`, `update_customer_order`, and `set_customer_order_status` remain SECURITY INVOKER (`prosecdef=false`), use `search_path=pg_catalog, private`, allow authenticated EXECUTE, and deny anon/PUBLIC EXECUTE. No production mutation RPC was invoked during acceptance, no production data was written, and A1.2B required no Supabase DDL or migration.
-- [ ] Define immutable vs editable fields by order lifecycle state. (A1.2C)
+- [x] Define immutable vs editable fields by order lifecycle state. (A1.2C)
+  - PR #139 merged to `main` as `406bd374a4b4a7738a1a785709f3b277d21e4410`; Admin Vercel production deployment `dpl_CP331iPmZH2KdnJw1YURTfJjFX8i` is `READY` from that exact merge SHA, and the deployed `/signin` surface returned HTTP 200.
+  - Production migration `20260829205817_customer_order_lifecycle_editability` installed the private lifecycle policy and hardened order-update wrapper. Live policy checks returned Draft Sales=`direct`, Confirmed Sales=`approval`, Ready for Shipment Admin=`direct`, and Shipped/Completed/Cancelled/null-role=`locked`.
+  - Transaction-scoped authenticated acceptance proved a temporarily `shipped` order rejects commercial revision and a profiles-less authenticated subject is denied; both tests rolled back and the sample order remained `draft` with no acceptance-test data persistence.
+  - Post-DDL security/performance advisors reported no A1.2C-specific new finding; unrelated existing Store/security and index/policy backlog remains separately tracked.
 - [ ] Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.
 - [ ] Verify customer portal order projections remain narrower than Admin order data.
 
