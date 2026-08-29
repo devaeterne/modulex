@@ -41,37 +41,53 @@ const rpcContracts = [
   ["get_store_public_project_media", "text"],
 ];
 
-for (const [name, signature] of rpcContracts) {
-  assert.match(migration, new RegExp(`create or replace function public\\.${name}\\(`, "i"), `${name} must exist`);
-  assert.match(
-    migration,
-    new RegExp(`create or replace function public\\.${name}\\([\\s\\S]*?security definer[\\s\\S]*?set search_path = pg_catalog, public`, "i"),
-    `${name} must be SECURITY DEFINER with a pinned search_path`,
-  );
-  const revokeSignature = signature ? `${name}\\(${signature}\\)` : `${name}\\(\\)`;
-  assert.match(migration, new RegExp(`revoke all on function public\\.${revokeSignature} from public`, "i"), `${name} must revoke PUBLIC execute`);
-  assert.match(migration, new RegExp(`grant execute on function public\\.${revokeSignature} to anon, authenticated`, "i"), `${name} must grant only intended public roles`);
+function functionSection(name) {
+  const marker = `create or replace function public.${name}`;
+  const start = migration.indexOf(marker);
+  assert.notEqual(start, -1, `${name} must exist`);
+  const next = migration.indexOf("create or replace function public.", start + marker.length);
+  return migration.slice(start, next === -1 ? migration.indexOf("revoke all on function", start) : next);
 }
 
-assert.match(migration, /get_store_public_page[\s\S]*status = 'published'/i, "public page RPC must filter to published rows");
-assert.match(migration, /get_store_public_projects[\s\S]*status = 'published'/i, "public project list must filter to published rows");
-assert.match(migration, /get_store_public_project[\s\S]*status = 'published'/i, "public project RPC must filter to published rows");
+for (const [name, signature] of rpcContracts) {
+  const section = functionSection(name);
+  assert.match(section, /security definer/i, `${name} must be SECURITY DEFINER`);
+  assert.match(section, /set search_path = pg_catalog, public/i, `${name} must pin search_path`);
+  assert.doesNotMatch(section, /select\s+\*/i, `${name} must use a fixed public projection`);
+
+  const returnsMatch = section.match(/returns table\s*\(([\s\S]*?)\)\s*language/i);
+  assert.ok(returnsMatch, `${name} must declare a fixed RETURNS TABLE projection`);
+  for (const forbiddenField of ["id", "status", "updated_by", "created_at"]) {
+    assert.doesNotMatch(
+      returnsMatch[1],
+      new RegExp(`(^|\\s|,)${forbiddenField}\\s`, "i"),
+      `${name} public projection must not expose ${forbiddenField}`,
+    );
+  }
+
+  const escapedSignature = signature ? `${name}\\(${signature}\\)` : `${name}\\(\\)`;
+  assert.match(migration, new RegExp(`revoke all on function public\\.${escapedSignature} from public`, "i"), `${name} must revoke PUBLIC execute`);
+  assert.match(migration, new RegExp(`grant execute on function public\\.${escapedSignature} to anon, authenticated`, "i"), `${name} must grant only intended public roles`);
+}
+
+assert.match(functionSection("get_store_public_page"), /p\.status = 'published'/i, "public page RPC must filter to published rows");
+assert.match(functionSection("get_store_public_projects"), /p\.status = 'published'/i, "public project list must filter to published rows");
+assert.match(functionSection("get_store_public_project"), /p\.status = 'published'/i, "public project RPC must filter to published rows");
 assert.match(
-  migration,
-  /get_store_public_project_media[\s\S]*join public\.store_projects[\s\S]*p\.status = 'published'/i,
+  functionSection("get_store_public_project_media"),
+  /join public\.store_projects p[\s\S]*p\.status = 'published'/i,
   "public project media must require a published owning project",
 );
 assert.match(
-  migration,
+  functionSection("get_store_public_projects"),
   /order by p\.sort_order asc, p\.published_at desc nulls last, p\.id asc/i,
   "public project ordering must be deterministic",
 );
-assert.match(migration, /order by m\.sort_order asc, m\.id asc/i, "public project media ordering must be deterministic");
-
-for (const forbiddenProjection of ["updated_by", "created_at"]) {
-  const rpcSection = migration.slice(migration.indexOf("create or replace function public.get_store_public_page"));
-  assert.ok(!new RegExp(`returns table \\([\\s\\S]*?${forbiddenProjection}`, "i").test(rpcSection.split("create or replace function public.get_store_public_projects")[0]), `page public projection must not expose ${forbiddenProjection}`);
-}
+assert.match(
+  functionSection("get_store_public_project_media"),
+  /order by m\.sort_order asc, m\.id asc/i,
+  "public project media ordering must be deterministic",
+);
 
 assert.doesNotMatch(migration, /insert into public\.store_projects/i, "migration must not seed fake projects");
 assert.doesNotMatch(migration, /Manhattan|Brooklyn|testimonial|award/i, "migration must not reintroduce template/demo content");
