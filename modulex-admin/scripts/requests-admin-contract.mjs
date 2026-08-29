@@ -29,6 +29,10 @@ expect(dropdown.includes('from("user_notifications")'), "targeted user notificat
 expect(dropdown.includes('"request_created"'), "new-request targeted notification is not shown");
 expect(dropdown.includes('"request_updated"'), "request-update targeted notification is not shown");
 expect(dropdown.includes('rpc("mark_user_notification_read"'), "DB-backed notification read tracking is missing");
+expect(dropdown.includes('const unreadNotifications = visibleNotifications.filter((notification) => !isRead(notification.id));'), "read notifications must be removed from the dropdown");
+expect(dropdown.includes('unreadNotifications.map((notification)'), "dropdown must render only unread notifications");
+expect(dropdown.includes('Mark all as read'), "mark-all-as-read action is missing");
+expect(dropdown.includes('rpc("mark_all_user_notifications_read"'), "mark-all-as-read must persist request notification state");
 expect(emailRoute.includes('info@dasoft.me'), "request email recipient must be info@dasoft.me");
 expect(emailRoute.includes('RESEND_API_KEY'), "request email route must use server-side Resend configuration");
 expect(emailRoute.includes('auth.getUser'), "request email route must authenticate the caller");
