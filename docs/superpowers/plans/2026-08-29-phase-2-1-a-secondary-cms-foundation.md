@@ -16,6 +16,7 @@ Assertions:
 - migration file exists;
 - three CMS tables, RLS, anon revokes, authenticated role policies, publish guards, and updated/published timestamp triggers are present;
 - four public RPCs use `SECURITY DEFINER`, pinned `search_path`, fixed projections, published-only filtering, and narrow execute grants;
+- public RPC return signatures exclude internal identifiers/status/audit fields;
 - project ordering and media parent-publication guard are explicit;
 - no fake project/content seed is introduced.
 
@@ -37,21 +38,20 @@ Implement:
 
 Do not seed fake projects. A minimal `about` draft may be omitted to avoid introducing content implicitly.
 
-## Task 3 — Record roadmap state
+## Task 3 — Preserve roadmap truth in the stack
 
-Modify:
-- `modulex-store/STORE_ROADMAP.md`
-- `modulex-admin/ADMIN_ROADMAP.md`
+The stacked base PR #90 already records both coordinated workstreams as started:
+- Store Phase 2.1 shared page-content design is `[~]`;
+- Admin A4.1 secondary CMS expansion is `[~]`.
 
-Mark the Phase 2.1A data/RPC foundation as in progress/reviewable, while keeping Phase 2.0 as the Store primary phase until lint + full smoke evidence closes its exit gate. Do not mark downstream Admin/public UI work complete.
+Keep Store Phase 2.0 as the primary phase until fresh lint + full-smoke evidence closes its exit gate. Do not advance the migration/RPC task or downstream Admin/public UI tasks to complete merely because code exists on this draft branch. Update the roadmap checkboxes again only when migration/runtime verification supplies new completion evidence.
 
 ## Task 4 — Review the stacked diff
 
 Compare `docs/phase-2-1-cms-design...phase-2-1/a-secondary-cms-foundation` and confirm only:
 - this implementation plan;
 - the secondary CMS contract + package script wiring;
-- the single additive migration;
-- coordinated roadmap updates.
+- the single additive migration.
 
 No B/C/D files or runtime page/UI changes.
 
@@ -59,6 +59,7 @@ No B/C/D files or runtime page/UI changes.
 
 Available evidence in this environment:
 - perform static diff/source review through GitHub;
+- use production Supabase only for read-only compatibility introspection;
 - do not claim local lint/build/smoke execution because no working checkout is available;
 - do not apply the migration to production.
 
