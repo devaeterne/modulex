@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `142df0b28a56e87f1c128d407eca16fab2e11a49`
+Main baseline: `836bc0b28379b39c8e0ad33199650a9bc944b60f`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
 Current cross-roadmap package: **Granite Center → Oakwell GC-2A media schema/security production-verified; GC-2B importer/optimizer next; Gallery/Projects content acceptance remains pending**
 
@@ -171,9 +171,13 @@ These rules are mandatory for all future Modulex Admin work:
   - Full deterministic verification: Actions run `33257875905` passed runtime-config, production-surface, customer-directory, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check; post-closeout verification run `33258088112` repeated the same suite successfully on the committed roadmap closeout.
   - Production schema/RLS/RPC/data were not mutated by A1.1A; existing customer status/type/price-group/sales-rep indexes remain the query foundation. Mutation validation/audit and atomic default-address work remain intentionally separated into A1.1B/C.
 - [ ] Review customer detail information architecture and action hierarchy.
-- [ ] Verify customer status/account-type/portal-enabled changes have explicit validation.
-- [ ] Verify address management and default-address behavior.
-- [ ] Add/confirm audit visibility for sensitive customer changes.
+- [~] Verify customer status/account-type changes have explicit validation.
+  - A1.1B moves General customer-master saves to a validated RPC and adds DB-level status/type guards so direct table updates cannot bypass lifecycle rules. Converted customers cannot return to prospect; changed customer types must be active.
+  - Production SQL acceptance remains pending until this package is merged and `sql/customer-master-mutation.sql` is applied to Supabase.
+- [ ] Verify portal-enabled changes use the secure lifecycle API consistently across all customer-detail surfaces. (A1.1C)
+- [ ] Verify address management and default-address behavior. (A1.1C)
+- [~] Add/confirm audit visibility for sensitive customer master changes.
+  - A1.1B adds an atomic AFTER UPDATE audit trigger with changed field names plus status/type from/to metadata, without full-row PII snapshots. Production SQL acceptance remains pending.
 
 ## A1.2 Orders
 
