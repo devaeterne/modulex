@@ -1,0 +1,39 @@
+name: A1.2C Full Verification
+
+on:
+  push:
+    branches:
+      - phase-a1/order-lifecycle-editability
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_test
+      NEXT_PUBLIC_SITE_URL: https://admin.example.com
+      NEXT_PUBLIC_STORE_URL: https://store.example.com
+      STORE_SITE_URL: https://store.example.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - run: npm run smoke:order-lifecycle
+      - run: npm run smoke:order-domain
+      - run: npm run smoke:order-list
+      - run: npm run smoke:customer-detail
+      - run: npm run smoke:production-surface
+      - run: npm run lint
+      - run: npm run build
+      - name: Diff check
+        working-directory: .
+        run: git diff --check origin/main...HEAD
