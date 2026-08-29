@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `8cce1b0c065e66c3939a96704b05aa6c96f2b3d8`
+Main baseline: `406bd374a4b4a7738a1a785709f3b277d21e4410`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-3 company identity, Contact, About & Showroom is production-accepted and complete. GC-4 — Contact / Project Consultation is the next Granite package; Admin primary work remains Phase A1 and the current Admin next action remains A1.2C**
+Current cross-roadmap package: **Granite Center → Oakwell GC-4 Contact / Project Consultation is production-accepted and complete. GC-5 — Projects / Gallery is the next Granite package; Admin primary Phase A1 work remains independently owned by its current roadmap next action.**
 Current Admin next action: **A1.2C — define immutable vs editable fields by order lifecycle state**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
