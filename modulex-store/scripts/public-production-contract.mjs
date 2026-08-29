@@ -78,10 +78,17 @@ if (galleryClientSource && /supabase/i.test(galleryClientSource)) {
 }
 
 const sitemapSource = await readFile(path.join(root, "src/app/sitemap.ts"), "utf8");
-for (const blockedRoute of ["/gallery", "/services", "/blog", "/index-premium", "/index-slider", "/account", "/dealer"]) {
+for (const blockedRoute of ["/services", "/blog", "/index-premium", "/index-slider", "/account", "/dealer"]) {
   if (sitemapSource.includes(`"${blockedRoute}"`) || sitemapSource.includes(`'${blockedRoute}'`)) {
     failures.push(`Sitemap exposes non-production route: ${blockedRoute}`);
   }
+}
+const staticRoutes = sitemapSource.match(/const staticRoutes\s*=\s*\[([\s\S]*?)\];/)?.[1] ?? "";
+if (staticRoutes.includes("/gallery")) {
+  failures.push("Gallery must not be an unconditional static sitemap route");
+}
+if (!sitemapSource.includes("getStoreGalleryReadiness") || !/isReady[\s\S]*?\/gallery/.test(sitemapSource)) {
+  failures.push("Sitemap may expose Gallery only behind the shared published readiness rule");
 }
 
 const robotsSource = await readFile(path.join(root, "src/app/robots.ts"), "utf8");
