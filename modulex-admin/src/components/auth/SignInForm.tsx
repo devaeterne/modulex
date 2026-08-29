@@ -14,7 +14,7 @@ export default function SignInForm() {
   const router = useRouter();
 
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("info@dasoft.me");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [isLoading, setIsLoading] = useState(false);
@@ -87,7 +87,7 @@ export default function SignInForm() {
                   Email <span className="text-error-500">*</span>
                 </Label>
                 <Input
-                  placeholder="admin@modulex.com"
+                  placeholder="name@company.com"
                   type="email"
                   defaultValue={email}
                   onChange={(event) => setEmail(event.target.value)}

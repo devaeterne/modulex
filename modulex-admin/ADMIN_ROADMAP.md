@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `45458e1f1402614b5e4a408394706df4c4aa757d`
+Main baseline: `6cbd27198d930cb129b912fa4faece3bf967e292`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
 Current cross-roadmap package: **Granite Center → Oakwell dynamic-content architecture approved; GC-1 source manifest next; Gallery/Projects content acceptance pending**
 
@@ -64,7 +64,7 @@ These rules are mandatory for all future Modulex Admin work:
   - **Done when:** every non-business route is either intentionally retained, removed, or inaccessible from production navigation.
 
 - [x] Remove or disable unused demo pages and their navigation entries.
-  - Removed `/alerts`, `/avatars`, `/badge`, `/buttons`, `/images`, `/modals`, `/videos`, `/bar-chart`, `/line-chart`, `/form-elements`, `/basic-tables`, `/blank`, `/calendar`, and `/api-test`.
+  - Removed `/alerts`, `/avatars`, `/badge`, `/buttons`, `/images`, `/modals`, `/videos`, `/bar-chart`, `/line-chart`, `/form-elements`, `/basic-tables`, `/blank`, `/calendar`, `/api-test`, and the explicit TailAdmin `/error-404` route.
   - Removed the `API Test` System navigation entry.
   - **Done when:** no generic TailAdmin sample page is reachable through normal Admin navigation unless explicitly required.
 
@@ -74,10 +74,15 @@ These rules are mandatory for all future Modulex Admin work:
   - TDD evidence: Actions run `33253263982` failed on the missing profile/route guard before implementation; targeted GREEN run `33253331280` passed the expanded production-surface contract.
   - Full package verification: `33253394213` passed production-surface, RBAC, secondary CMS, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, production build, and diff-check.
 
-- [ ] Audit placeholder links, sample text, fake metrics, dead buttons, and development-only controls across Admin.
+- [x] Audit placeholder links, sample text, fake metrics, dead buttons, and development-only controls across Admin.
+  - Retained production shell/auth/profile/settings/roles surfaces were reviewed in this bounded A0.1 pass; no additional fake dashboard metrics or dead actions were found in scope. Personnel, Finance, Approvals, and Training remain explicit A6 classification work rather than being silently removed here.
+  - Removed the explicit `/error-404` TailAdmin template route, rebranded the global Next.js 404 as Modulex Admin, and removed the `info@dasoft.me` sign-in prefill in favor of an empty production login field.
+  - `smoke:production-surface` now prevents the explicit template 404 route, TailAdmin branding in the global 404, and the known developer-account prefill from returning.
+  - TDD evidence: Actions run `33254287380` failed on the still-present explicit TailAdmin 404 route before implementation; targeted GREEN run `33254350807` passed after the bounded fixes.
+  - Full package verification: Actions run `33254494898` passed production-surface, RBAC, secondary CMS, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
 
 - [x] Add an Admin production-surface contract test.
-  - `scripts/admin-production-surface-contract.mjs` blocks the known demo route files and `/api-test` navigation while explicitly protecting the intentional `/profile` surface.
+  - `scripts/admin-production-surface-contract.mjs` blocks the known demo route files and `/api-test` navigation, protects the intentional `/profile` surface, and guards the production 404/login shell against known template/developer residue.
   - Wired as `npm run smoke:production-surface` and into the main `npm run smoke` chain.
   - TDD evidence: Actions run `33248189596` failed on the first existing demo route before cleanup; run `33248248681` passed after route removal.
   - Full A0 verification run `33248339553` passed the production-surface contract, lint, deterministic Admin contracts, and production build.
@@ -127,7 +132,7 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Unauthorized direct route access is denied consistently.
   - A0.2 route-permission parity, negative direct-URL cases, and warehouse-structure list mutation UI guards passed in full verification runs `33249988130` and `33251372987`; data authorization remains independently enforced by RLS/RPC/API contracts.
 - [x] No known TailAdmin demo/sample route remains exposed unintentionally.
-  - Production-surface contract plus the fresh production build guard the removed route set.
+  - Production-surface contract plus the production build guard the removed route set, Modulex-branded global 404, and empty production sign-in state.
 
 ---
 
@@ -528,13 +533,11 @@ Record material decisions here when they affect future phases.
 
 Primary Admin roadmap work remains **Phase A0 — Production Surface & Operational Truth Cleanup**.
 
-A0.1 production-surface cleanup is live and **A0.2 Navigation & RBAC truth is implementation-complete and fully verified, including PR #106 warehouse list mutation hardening**. Next primary Admin work:
+A0.1 production-surface cleanup and retained-surface residue audit are implementation-complete and verified, and **A0.2 Navigation & RBAC truth is implementation-complete and fully verified, including PR #106 warehouse list mutation hardening**. Next primary Admin work:
 
-1. Audit dashboard widgets for template/sample/fake data; replace with real operational data or remove the widget.
-2. Audit placeholder links/text, fake metrics, dead buttons, and development-only controls across retained Admin surfaces.
-3. Execute A0.3 runtime/config cleanup: package identity, `.env.example` contract, Vercel Admin-domain assumptions, and client/server secret boundaries.
-4. Re-run the relevant Admin verification chain after each package and keep this roadmap current.
-5. Close Phase A0 only after the remaining dashboard/surface audit and runtime/config tasks satisfy their exit criteria.
+1. Execute A0.3 runtime/config cleanup: package identity, `.env.example` contract, Vercel Admin-domain assumptions, and client/server secret boundaries.
+2. Re-run the relevant Admin verification chain after the A0.3 package and keep this roadmap current.
+3. Close Phase A0 only after A0.3 satisfies its runtime/config exit criteria.
 
 **Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. The Granite migration architecture is approved and GC-0 is merged; the next migration package is **GC-1 source content/media manifest**, which is discovery/docs/contract work and does not mutate Admin runtime or production DB. GC-2+ will add Admin-managed media/contact/content domains incrementally as required. Package D configurable navigation/footer remains an A4.1 obligation and will be completed under the same dynamic-content rule.
 
