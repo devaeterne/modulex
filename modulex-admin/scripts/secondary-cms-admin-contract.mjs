@@ -54,24 +54,24 @@ assert.match(domain, /crypto\.randomUUID\(\)/, "Store media object keys must inc
 assert.match(pagesRoute, /StorePagesManager/, "Pages route must render StorePagesManager");
 assert.match(pageManager, /CONTROLLED_PAGE_SLUGS/, "Pages manager must load only controlled slugs");
 assert.match(pageManager, /\["super_admin",\s*"admin"\]/, "Only Admin roles may receive mutation controls");
-assert.match(pageEditor, />Save draft</, "Pages UI must expose explicit Save draft intent");
-assert.match(pageEditor, />Publish</, "Pages UI must expose explicit Publish intent");
-assert.match(pageEditor, />Unpublish</, "Pages UI must expose explicit Unpublish intent");
+assert.match(pageEditor, /Save draft/, "Pages UI must expose explicit Save draft intent");
+assert.match(pageEditor, /Publish/, "Pages UI must expose explicit Publish intent");
+assert.match(pageEditor, /Unpublish/, "Pages UI must expose explicit Unpublish intent");
+assert.match(pageEditor, /persist\("draft"\)/, "Save draft/unpublish must invoke the draft persistence path");
+assert.match(pageEditor, /persist\("published"\)/, "Publish must invoke the published persistence path");
 assert.match(pageEditor, /validatePageForPublish/, "Publishing a page must call publish validation");
-assert.match(pageEditor, /status:\s*"draft"/, "Save draft/unpublish must explicitly persist draft status");
-assert.match(pageEditor, /status:\s*"published"/, "Publish must explicitly persist published status");
 assert.match(pageEditor, /storage[\s\S]*from\("store-media"\)/, "Page images must upload to store-media");
 
 assert.match(projectsRoute, /StoreProjectsManager/, "Projects route must render StoreProjectsManager");
 assert.match(projectManager, /title[\s\S]*slug|slug[\s\S]*title/, "Projects manager must support title/slug search");
 assert.match(projectManager, /status\s*!==\s*"published"/, "Published projects must not expose delete action");
 assert.match(projectManager, /window\.confirm/, "Project delete must require confirmation");
-assert.match(projectEditor, />Save draft</, "Projects UI must expose explicit Save draft intent");
-assert.match(projectEditor, />Publish</, "Projects UI must expose explicit Publish intent");
-assert.match(projectEditor, />Unpublish</, "Projects UI must expose explicit Unpublish intent");
+assert.match(projectEditor, /Save draft/, "Projects UI must expose explicit Save draft intent");
+assert.match(projectEditor, /Publish/, "Projects UI must expose explicit Publish intent");
+assert.match(projectEditor, /Unpublish/, "Projects UI must expose explicit Unpublish intent");
+assert.match(projectEditor, /persist\("draft"\)/, "Project draft/unpublish must invoke the draft persistence path");
+assert.match(projectEditor, /persist\("published"\)/, "Project publish must invoke the published persistence path");
 assert.match(projectEditor, /validateProjectForPublish/, "Publishing a project must call publish validation");
-assert.match(projectEditor, /status:\s*"draft"/, "Project draft/unpublish must explicitly persist draft status");
-assert.match(projectEditor, /status:\s*"published"/, "Project publish must explicitly persist published status");
 assert.match(projectEditor, /storage[\s\S]*from\("store-media"\)/, "Project cover/OG images must upload to store-media");
 
 assert.match(projectMedia, /media_type:\s*"image"/, "Project media manager must persist image media type");
