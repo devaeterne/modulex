@@ -1,4 +1,4 @@
-name: A0 production surface contract
+name: Verify Admin A0 production surface
 
 on:
   push:
@@ -10,8 +10,11 @@ on:
       - ".github/workflows/a0-production-surface-contract.yml"
 
 jobs:
-  contract:
+  verify:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
     defaults:
       run:
         working-directory: modulex-admin
@@ -19,7 +22,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
-      - run: node scripts/admin-production-surface-contract.mjs
+      - run: npm ci
+      - name: Production surface contract
+        run: npm run smoke:production-surface
+      - name: Lint
+        run: npm run lint
+      - name: Deterministic Admin contracts
+        run: npm run smoke:rbac && npm run smoke:secondary-cms-admin && npm run smoke:dealer-onboarding && npm run smoke:dealer-portal-admin && npm run smoke:store-portal-admin && npm run smoke:auth-recovery && npm run smoke:polling
+      - name: Build
+        run: npm run build
