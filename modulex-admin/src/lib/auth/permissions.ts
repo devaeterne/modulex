@@ -195,6 +195,14 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/users" || path.startsWith("/users/"), permission: "users.view" },
   { match: (path) => path === "/store/leads", permission: "leads.view" },
   { match: (path) => path.startsWith("/store/leads/"), permission: "leads.manage" },
+  {
+    match: (path) =>
+      path === "/store/pages" ||
+      path.startsWith("/store/pages/") ||
+      path === "/store/projects" ||
+      path.startsWith("/store/projects/"),
+    permission: "store.manage",
+  },
   { match: (path) => path === "/store/products" || path === "/store/colors" || path === "/store/content", permission: "store.view" },
   { match: (path) => path.startsWith("/store/products/") || path.startsWith("/store/colors/"), permission: "store.manage" },
   { match: (path) => path === "/store" || path.startsWith("/store/"), permission: "store.view" },
