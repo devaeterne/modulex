@@ -1,4 +1,4 @@
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 const root = process.cwd();
@@ -49,6 +49,22 @@ if (aboutSource) {
     "About must retain the production-safe factual fallback copy"
   );
   check(!aboutSource.includes("dangerouslySetInnerHTML"), "About CMS body must not render unsafe HTML");
+}
+
+const gallerySource = await readRequired("src/app/gallery/page.tsx");
+if (gallerySource) {
+  check(gallerySource.includes("getStoreGalleryReadiness"), "Gallery route must use shared published readiness");
+  check(gallerySource.includes("getStorePublicProjectMedia"), "Gallery route must load media through the approved public RPC query layer");
+  check(gallerySource.includes("notFound()"), "Gallery route must fail closed with notFound() when it is not ready");
+  check(gallerySource.includes("generateMetadata"), "Gallery must generate metadata from published CMS content");
+  check(!gallerySource.includes(".from("), "Gallery route must not directly read Supabase tables");
+}
+
+const galleryClientSource = await readRequired("src/components/gallery/StoreProjectsGallery.tsx");
+if (galleryClientSource) {
+  check(!/supabase/i.test(galleryClientSource), "Gallery client must use server-provided props and must not query Supabase");
+  check(galleryClientSource.includes("altText"), "Gallery client must preserve CMS media alt text");
+  check(galleryClientSource.includes("Escape"), "Gallery lightbox must support Escape-to-close");
 }
 
 if (failures.length > 0) {
