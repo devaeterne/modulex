@@ -96,7 +96,7 @@ export default function StoreProjectsManager() {
 
   async function deleteProject(project: StoreProject) {
     if (!canEdit || project.status === "published") return;
-    if (project.status !== "published" && !window.confirm(`Delete draft project “${project.title}”? Its media records will also be removed.`)) return;
+    if (!window.confirm(`Delete draft project “${project.title}”? Its media records will also be removed.`)) return;
     setBusy(true);
     setError(null);
     const { error: deleteError } = await supabase.from("store_projects").delete().eq("id", project.id);
