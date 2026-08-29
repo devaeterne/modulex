@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `7160e3b3b05c059ac7d9dc906756f628685a5e3b`
+Main baseline: `8ad3eaa928f2955fdcd0b4ae5c646f1f19101796`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-2B importer/optimizer capability verified with zero production media writes; GC-2C Admin Media Library next; Gallery/Projects content acceptance remains pending**
+Current cross-roadmap package: **Granite Center → Oakwell GC-2C Admin Media Library verified with zero production media intake; GC-2D controlled production intake next; Gallery/Projects content acceptance remains pending**
 Current Admin next action: **A1.1C — customer detail action hierarchy, secure portal-enabled lifecycle consistency, and atomic default-address behavior**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
@@ -326,7 +326,7 @@ These rules are mandatory for all future Modulex Admin work:
   - Package D design keeps route behavior/allowlists code-owned while ordinary business-editable navigation/footer labels, order, visibility and approved destinations become `store.manage` CMS/settings data.
   - Granite GC-8 is the natural final coordination point unless an earlier migration package needs shared chrome sooner.
 - [ ] Add/extend typed Store CMS domains as Granite packages require them.
-  - GC-2 may add reusable media assets/provenance + Admin media management.
+  - GC-2A/GC-2C now provide reusable media assets/provenance plus Admin review/publish lifecycle management; GC-2D still owns controlled production intake.
   - GC-3 may add structured contact/location/hours management around the existing company-profile domain.
   - GC-6 may add cabinet FAQ/process content domains.
   - GC-7 may add attributed reviews/testimonials.
@@ -448,6 +448,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
 - [x] Dealer portal Admin contract exists.
 - [x] Store portal Admin contract exists.
 - [x] Secondary CMS Admin contract exists and protects Pages/Projects routes, RBAC, lifecycle actions, media constraints, and service-role exclusion.
+- [x] GC-2 Media Library Admin contract protects `/store/media`, `store.manage` RBAC, private signed previews, metadata/provenance review, and controlled publish/unpublish/delete behavior; it is part of the permanent Admin smoke chain.
 - [x] Auth recovery contract exists.
 - [x] Polling regression contract exists.
 - [x] Production-surface/demo-route contract exists and is part of the Admin smoke chain.
@@ -536,6 +537,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] Dealer onboarding and portal activation Admin flows have contract coverage.
 - [x] Customer document dealer-visibility controls exist.
 - [x] Phase 2.1B secondary Pages/Projects CMS exists with controlled page slugs, project/media management, explicit publishing, SEO/OG fields, and Store media validation.
+- [x] GC-2C Admin Media Library exists at `/store/media` with `store.manage` route/sidebar RBAC, asset/provenance review, 5-minute authenticated signed previews for private staging, metadata editing, and server-side publish/unpublish/delete lifecycle controls.
 - [x] Oakwell dynamic-content architecture is approved for Granite migration: mutable public business content/media remains Admin/Supabase-owned and Store-consumed through controlled projections.
 
 ## Security and testing
@@ -575,6 +577,6 @@ Primary Admin roadmap work is **Phase A1 — Customer, Order & Fulfillment Opera
 2. Then start **A1.1B — Customer Master Mutation Contract**: validated customer status/type/master mutations plus mutation+audit atomicity.
 3. Follow with **A1.1C — Customer Detail & Address Integrity**: remove legacy action-hiding CSS, clarify detail action hierarchy, and make default-address changes atomic.
 
-**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1 source discovery is complete. GC-2 media-library/optimization architecture is approved in PR #115; implementation planning is next and will add Admin-managed media domains incrementally without overwriting concurrent A1 work. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
+**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1, GC-2A, GC-2B, and GC-2C are complete at their package gates; GC-2D controlled production intake is next. GC-2C leaves production at zero media asset/provenance rows and zero staging/public media objects, so GC-2D remains the only package authorized to introduce approved Granite media. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
 
 **Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A1 or other concurrently merged Admin work is preserved rather than overwritten.
