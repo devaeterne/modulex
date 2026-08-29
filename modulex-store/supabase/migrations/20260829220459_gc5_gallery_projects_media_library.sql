@@ -378,6 +378,16 @@ begin
     raise exception 'Media asset is referenced by a published project.';
   end if;
 
+  if new.status is distinct from old.status
+    or new.media_type is distinct from old.media_type
+    or new.public_bucket is distinct from old.public_bucket
+    or new.public_path is distinct from old.public_path
+    or new.cabinet_relevance is distinct from old.cabinet_relevance
+    or new.attribution_classification is distinct from old.attribution_classification
+  then
+    raise exception 'Publication-critical media fields are immutable while referenced by a published project.';
+  end if;
+
   v_new_eligible :=
     new.status = 'published'
     and new.media_type = 'image'
