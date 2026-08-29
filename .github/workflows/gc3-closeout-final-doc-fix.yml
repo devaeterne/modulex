@@ -1,0 +1,37 @@
+name: GC-3 closeout final doc fix
+
+on:
+  push:
+    branches:
+      - docs/gc3-production-acceptance
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix stale GC-2 next-package wording
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md')
+          text = p.read_text()
+          old = "Production acceptance is recorded in `docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`; GC-3 is next and GC-5 retains project/media association ownership."
+          new = "Production acceptance is recorded in `docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`; GC-3 is also closed, GC-4 is next, and GC-5 retains project/media association ownership."
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one stale GC-2 exit-gate sentence, found {text.count(old)}')
+          p.write_text(text.replace(old, new))
+          PY
+          grep -Fq 'GC-3 is also closed, GC-4 is next' modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md
+          git diff --check
+      - name: Commit final docs and remove helper
+        run: |
+          rm .github/workflows/gc3-closeout-final-doc-fix.yml
+          git config user.name devaeterne
+          git config user.email info@safaksariyildiz.com
+          git add -A
+          git commit -m 'docs: align GC-2 exit gate with GC-3 closeout'
+          git push
