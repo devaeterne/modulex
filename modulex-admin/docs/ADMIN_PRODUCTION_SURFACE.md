@@ -1,7 +1,7 @@
 # Modulex Admin Production Surface Inventory
 
 Last reviewed: 2026-08-29
-Baseline branch: `phase-a0/admin-production-surface-cleanup`
+Baseline branch: `phase-a0/admin-rbac-truth`
 
 This inventory classifies the Admin route/navigation surface for Phase A0. It is intentionally conservative: a route is removed only when it is clearly TailAdmin/demo residue. Business modules whose long-term scope is still under review remain explicit rather than being silently deleted.
 
@@ -56,13 +56,16 @@ The following sample routes are prohibited from the production Admin surface and
 
 `/api-test` was also removed from the authenticated sidebar navigation.
 
-## Guardrail
+## Guardrails
 
 `npm run smoke:production-surface` fails when a known TailAdmin/demo route file is reintroduced or when `/api-test` is added back to navigation. The contract also asserts that the intentional `/profile` surface remains present.
 
+Phase A0.2 navigation/direct-route permission truth is documented in `docs/ADMIN_RBAC_MATRIX.md`. `npm run smoke:rbac` compares every sidebar path with `requiredPermissionForPath()`, verifies all active roles can reach `/profile`, protects manage-only Store and warehouse mutation routes, and keeps intentional route aliases aligned with their canonical permissions.
+
+These UI/route guards do not replace Supabase RLS/RPC/API authorization; data authorization remains independently enforced and tested.
+
 ## Remaining A0 work
 
-- Verify direct-route authorization for every retained business surface, not only sidebar visibility.
-- Finish navigation-to-permission inventory for current production roles.
 - Audit dashboard widgets, sample values, dead buttons, placeholder links/text, and development-only controls.
 - Complete runtime/package/environment cleanup tasks listed in `ADMIN_ROADMAP.md`.
+- Keep A6 Personnel/Finance/Training/Approvals scope decisions explicit rather than treating them as template residue.
