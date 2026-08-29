@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `ccb84ddc1758350f4fcc88a5078819600dc8c25f`
+Main baseline: `e6c6e6d8ecf09135aeab4d49e46f7445ef52e254`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-2D controlled production intake in progress through an Admin/Vercel Node route using the logged-in Admin JWT + existing RLS; private-staging implementation is verified, production lifecycle acceptance remains pending, and Gallery/Projects content acceptance remains pending**
+Current cross-roadmap package: **Granite Center → Oakwell GC-2D controlled production intake in progress; the first live intake attempt failed before any DB/Storage mutation because the Vercel Turbopack function omitted Sharp/libvips runtime files, and the verified fix keeps `sharp@0.35.4` while building Admin with Webpack; merge/deploy/retry plus lifecycle acceptance remain pending**
 Current Admin next action: **A1.2A — review global and customer-scoped order list consistency**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
@@ -582,6 +582,6 @@ Primary Admin roadmap work is **Phase A1 — Customer, Order & Fulfillment Opera
 2. Then start **A1.1B — Customer Master Mutation Contract**: validated customer status/type/master mutations plus mutation+audit atomicity.
 3. Follow with **A1.1C — Customer Detail & Address Integrity**: remove legacy action-hiding CSS, clarify detail action hierarchy, and make default-address changes atomic.
 
-**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1, GC-2A, GC-2B, and GC-2C are complete at their package gates; GC-2D controlled production intake is in progress. The Admin/Vercel private-staging intake implementation is verified without a GitHub Supabase secret, while production import/review/publish/dedupe/unpublish-republish acceptance remains pending. Production still has zero media asset/provenance rows and zero staging/public media objects, so GC-2D remains the only package authorized to introduce approved Granite media. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
+**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1, GC-2A, GC-2B, and GC-2C are complete at their package gates; GC-2D controlled production intake is in progress. The first live Admin/Vercel intake request failed at Sharp module startup because the Turbopack deployment omitted `libvips-cpp.so.8.18.6`; it failed before auth/RLS or DB/Storage mutation, leaving production at zero media asset/provenance rows and zero staging/public media objects. The runtime fix preserves `sharp@0.35.4` and switches the Admin production build to Webpack for correct Sharp/libvips tracing; merge/deploy/retry and import/review/publish/dedupe/unpublish-republish acceptance remain pending. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
 
 **Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A1 or other concurrently merged Admin work is preserved rather than overwritten.

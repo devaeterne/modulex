@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `ccb84ddc1758350f4fcc88a5078819600dc8c25f`
+Main baseline: `e6c6e6d8ecf09135aeab4d49e46f7445ef52e254`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -597,11 +597,11 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
     - Publish/unpublish/delete run through the server API without browser-exposed elevated credentials. Publish verifies optimized SHA-256 and byte size, writes immutable `media/<asset-id>/<sha>.webp` with `upsert:false`, and unpublish/delete fail closed with HTTP 409 when CMS references exist.
     - TDD evidence: private-preview GREEN Actions `33262785615`; prior full GC-2C contract/lint/production-build/diff verification `33262565620`.
     - Production remains intentionally empty at closeout: `store_media_assets = 0`, `store_media_asset_sources = 0`, `store-media-staging objects = 0`, and public `store-media` objects = 0; GC-2D remains the production-intake boundary.
-  - [~] **GC-2D — controlled production intake** is in progress: the Admin/Vercel Node intake path is implemented and verified for the fixed `media-showroom-01` candidate, authenticates with the logged-in Admin JWT against existing RLS, preserves pinned `sharp@0.35.4`, writes only to private `store-media-staging`, starts assets in `review` with human relevance/alt decisions pending, and cannot publish. Production lifecycle acceptance remains pending.
+  - [~] **GC-2D — controlled production intake** is in progress: the Admin/Vercel Node intake path remains the approved boundary and preserves pinned `sharp@0.35.4`, but the first live request failed before auth/RLS or DB/Storage mutation because the Turbopack function omitted Sharp/libvips runtime files (`libvips-cpp.so.8.18.6`). A regression contract now requires the Admin production build to use Webpack so Sharp/libvips is traced; merge/deploy/retry and production lifecycle acceptance remain pending.
 
 # Next Action
 
 The user-approved active workstream remains the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Review/merge/deploy the verified **GC-2D — controlled production intake** implementation, then use the authenticated Admin Media Library to import the fixed representative candidate into private staging and record production import/review/publish/dedupe/unpublish-republish acceptance evidence.
+1. Review/merge/deploy the **GC-2D Sharp/libvips Vercel runtime fix**, retry the fixed representative candidate from authenticated Admin Media Library, then record production import/review/publish/dedupe/unpublish-republish acceptance evidence.
 2. Keep GC-2 `[~]` until GC-2D is complete. Gallery/Projects stays `[~]`; GC-5 still owns project/media association and final public Gallery acceptance, and no GC-2C closeout action may seed production media.
