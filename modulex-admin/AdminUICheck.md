@@ -52,16 +52,16 @@ PR: #148 — `fix(admin): harden Request Center UI and notifications`
 
 ### [ ] 03 — Product List (`/products`)
 
-- [ ] Separate `products.view` from `products.manage` UI affordances.
-- [ ] Hide Add/Edit/Activate/Deactivate/Duplicate/Archive actions from view-only roles.
-- [ ] Remove mouse-only double-click edit behavior.
-- [ ] Replace raw Supabase errors with controlled messages + technical logging/retry.
-- [ ] Replace hardcoded number locale with runtime locale formatting.
-- [ ] Improve mobile search/table/action sizing.
-- [ ] Add explicit labels/ARIA/focus-visible states for search, filters, pagination, and actions.
-- [ ] Replace native archive confirm with an in-app themed confirmation dialog.
-- [ ] Remove package-scope lint warning for unused search-clear handler.
-- [ ] Add Product List regression contract/workflow and verify production build.
+- [x] Separate `products.view` from `products.manage` UI affordances.
+- [x] Hide Add/Edit/Activate/Deactivate/Duplicate/Archive actions from view-only roles.
+- [x] Remove mouse-only double-click edit behavior.
+- [x] Replace raw Supabase errors with controlled messages + technical logging/retry.
+- [x] Replace hardcoded number locale with runtime locale formatting.
+- [x] Improve mobile search/table/action sizing.
+- [x] Add explicit labels/ARIA/focus-visible states for search, filters, pagination, and actions.
+- [x] Replace native archive confirm with an in-app themed confirmation dialog.
+- [x] Remove package-scope lint warning for unused search-clear handler.
+- [x] Add Product List regression contract/workflow and verify production build.
 - [ ] Merge and deploy.
 
 ## Queue — sidebar order
