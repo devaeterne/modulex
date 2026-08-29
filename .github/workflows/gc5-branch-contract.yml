@@ -40,6 +40,17 @@ jobs:
               raise SystemExit(f'Expected exactly one GC-5 migration, found {len(matches)}')
           path = matches[0]
           text = path.read_text()
+
+          helper_marker = "create or replace function private.store_current_user_has_any_role"
+          if helper_marker not in text:
+              insertion = """-- Reconcile Store authorization with PR #143 without making this migration\n-- depend on production-only RBAC SQL. When user_roles exists, effective roles\n-- participate; clean replay safely falls back to the active legacy profile role.\ncreate or replace function private.store_current_user_has_any_role(allowed_roles text[])\nreturns boolean\nlanguage plpgsql\nstable\nsecurity definer\nset search_path = ''\nas $$\ndeclare\n  v_has_role boolean := false;\nbegin\n  if auth.uid() is null then\n    return false;\n  end if;\n\n  if pg_catalog.to_regclass('public.user_roles') is not null then\n    execute $sql$\n      select exists (\n        select 1\n        from public.user_roles ur\n        join public.profiles p on p.id = ur.user_id\n        where ur.user_id = $1\n          and p.is_active\n          and ur.role::text = any($2)\n      )\n    $sql$\n    into v_has_role\n    using auth.uid(), allowed_roles;\n\n    if v_has_role then\n      return true;\n    end if;\n  end if;\n\n  select exists (\n    select 1\n    from public.profiles p\n    where p.id = auth.uid()\n      and p.is_active\n      and p.role::text = any(allowed_roles)\n  )\n  into v_has_role;\n\n  return coalesce(v_has_role, false);\nend;\n$$;\n\nrevoke all on function private.store_current_user_has_any_role(text[]) from public;\nrevoke all on function private.store_current_user_has_any_role(text[]) from anon;\ngrant execute on function private.store_current_user_has_any_role(text[]) to authenticated, service_role;\n\n"""
+              anchor = "alter table public.store_projects\n"
+              if anchor not in text:
+                  raise SystemExit('Unable to locate GC-5 migration insertion anchor')
+              text = text.replace(anchor, insertion + anchor, 1)
+
+          text = text.replace("private.current_user_has_any_role(", "private.store_current_user_has_any_role(")
+
           old = """  return coalesce(new, old);\nend;\n$$;\n\nrevoke all on function private.enforce_store_project_media_publishability()"""
           new = """  if tg_op = 'DELETE' then\n    return old;\n  end if;\n  return new;\nend;\n$$;\n\nrevoke all on function private.enforce_store_project_media_publishability()"""
           text = text.replace(old, new)
@@ -62,7 +73,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add modulex-store/supabase/migrations/*_gc5_gallery_projects_media_library.sql
-          git commit -m 'fix: harden GC-5 migration guards'
+          git commit -m 'fix: reconcile GC-5 Store role authorization'
           git push origin HEAD:feat/gc5-gallery-projects-media-library
 
   gc5-contracts:
