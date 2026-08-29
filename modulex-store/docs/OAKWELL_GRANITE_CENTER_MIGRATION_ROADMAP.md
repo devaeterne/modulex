@@ -470,7 +470,7 @@ Status: `[x]` production-accepted on 2026-08-29.
 - `[x]` verify optimized WebP public delivery; responsive Store rendering remains consumer acceptance in GC-5 when media is attached to projects;
 - `[x]` verify import idempotency/no duplicate uploads.
 
-**Exit gate:** `[x]` approved media library exists in controlled Storage/CMS with Admin management and traceable source metadata. Production acceptance is recorded in `docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`; GC-3 is next and GC-5 retains project/media association ownership.
+**Exit gate:** `[x]` approved media library exists in controlled Storage/CMS with Admin management and traceable source metadata. Production acceptance is recorded in `docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`; GC-3 is also closed, GC-4 is next, and GC-5 retains project/media association ownership.
 
 ## GC-3 — Company identity, contact, About & Showroom
 
