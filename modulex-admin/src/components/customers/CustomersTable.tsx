@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import type {
@@ -21,9 +21,13 @@ const primaryButtonClass =
   "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
 
 const secondaryButtonClass =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
+  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100];
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const CUSTOMER_STATUSES: CustomerStatus[] = ["active", "inactive", "blocked", "prospect"];
+
+type PortalFilter = "all" | "enabled" | "disabled";
+type Summary = { total: number; active: number; prospects: number; portal: number };
 
 function statusClass(status: CustomerStatus) {
   if (status === "active") {
@@ -45,6 +49,15 @@ function titleCase(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function quotePostgrestValue(value: string) {
+  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+}
+
+function parsePositiveInteger(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export default function CustomersTable() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerTypes, setCustomerTypes] = useState<CustomerType[]>([]);
@@ -57,17 +70,23 @@ export default function CustomersTable() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [referenceReady, setReferenceReady] = useState(false);
+  const [urlReady, setUrlReady] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | CustomerStatus>("all");
   const [typeFilter, setTypeFilter] = useState("");
   const [priceGroupFilter, setPriceGroupFilter] = useState("");
   const [countryFilter, setCountryFilter] = useState("");
   const [salesRepFilter, setSalesRepFilter] = useState("");
-  const [portalFilter, setPortalFilter] = useState<"all" | "enabled" | "disabled">("all");
+  const [portalFilter, setPortalFilter] = useState<PortalFilter>("all");
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [summary, setSummary] = useState<Summary>({ total: 0, active: 0, prospects: 0, portal: 0 });
 
   const [newCustomer, setNewCustomer] = useState({
     name: "",
@@ -102,71 +121,39 @@ export default function CustomersTable() {
     [profiles]
   );
 
-  const countries = useMemo(() => {
-    return Array.from(
-      new Set(customers.map((item) => item.country_code).filter(Boolean) as string[])
-    ).sort();
-  }, [customers]);
+  const normalizedSearch = debouncedSearch.trim().toLowerCase();
 
-  const filteredCustomers = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+  const searchCustomerTypeIds = useMemo(
+    () =>
+      normalizedSearch
+        ? customerTypes
+            .filter((item) => item.name.toLowerCase().includes(normalizedSearch))
+            .map((item) => item.id)
+        : [],
+    [customerTypes, normalizedSearch]
+  );
 
-    return customers.filter((customer) => {
-      const typeName = customer.customer_type_id
-        ? typeMap.get(customer.customer_type_id) ?? ""
-        : "";
-      const groupName = customer.price_group_id
-        ? groupMap.get(customer.price_group_id) ?? ""
-        : "";
-      const repName = customer.sales_rep_id
-        ? profileMap.get(customer.sales_rep_id) ?? ""
-        : "";
+  const searchPriceGroupIds = useMemo(
+    () =>
+      normalizedSearch
+        ? priceGroups
+            .filter((item) => item.name.toLowerCase().includes(normalizedSearch))
+            .map((item) => item.id)
+        : [],
+    [priceGroups, normalizedSearch]
+  );
 
-      const matchesSearch =
-        !query ||
-        customer.customer_code.toLowerCase().includes(query) ||
-        customer.name.toLowerCase().includes(query) ||
-        (customer.legal_name ?? "").toLowerCase().includes(query) ||
-        (customer.email ?? "").toLowerCase().includes(query) ||
-        (customer.phone ?? "").toLowerCase().includes(query) ||
-        (customer.tax_number ?? "").toLowerCase().includes(query) ||
-        typeName.toLowerCase().includes(query) ||
-        groupName.toLowerCase().includes(query) ||
-        repName.toLowerCase().includes(query);
-
-      const matchesStatus = statusFilter === "all" || customer.status === statusFilter;
-      const matchesType = !typeFilter || customer.customer_type_id === typeFilter;
-      const matchesGroup = !priceGroupFilter || customer.price_group_id === priceGroupFilter;
-      const matchesCountry = !countryFilter || customer.country_code === countryFilter;
-      const matchesRep = !salesRepFilter || customer.sales_rep_id === salesRepFilter;
-      const matchesPortal =
-        portalFilter === "all" ||
-        (portalFilter === "enabled" && customer.portal_enabled) ||
-        (portalFilter === "disabled" && !customer.portal_enabled);
-
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesType &&
-        matchesGroup &&
-        matchesCountry &&
-        matchesRep &&
-        matchesPortal
-      );
-    });
-  }, [
-    customers,
-    searchQuery,
-    statusFilter,
-    typeFilter,
-    priceGroupFilter,
-    countryFilter,
-    salesRepFilter,
-    portalFilter,
-    typeMap,
-    groupMap,
-    profileMap,
-  ]);
+  const searchSalesRepIds = useMemo(
+    () =>
+      normalizedSearch
+        ? profiles
+            .filter((item) =>
+              `${item.full_name ?? ""} ${item.email ?? ""}`.toLowerCase().includes(normalizedSearch)
+            )
+            .map((item) => item.id)
+        : [],
+    [profiles, normalizedSearch]
+  );
 
   const activeFilterCount = [
     searchQuery.trim(),
@@ -178,66 +165,128 @@ export default function CustomersTable() {
     portalFilter !== "all" ? portalFilter : "",
   ].filter(Boolean).length;
 
-  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / pageSize));
-  const paginatedCustomers = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredCustomers.slice(start, start + pageSize);
-  }, [filteredCustomers, currentPage, pageSize]);
+  const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+  const startRow = filteredCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRow = Math.min(currentPage * pageSize, filteredCount);
 
-  const summary = useMemo(() => {
-    return {
-      total: customers.length,
-      active: customers.filter((item) => item.status === "active").length,
-      prospects: customers.filter((item) => item.status === "prospect").length,
-      portal: customers.filter((item) => item.portal_enabled).length,
-    };
-  }, [customers]);
-
-  async function loadData() {
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    const [customersResult, typesResult, groupsResult, profilesResult] = await Promise.all([
-      supabase.from("customers").select("*").order("created_at", { ascending: false }),
-      supabase
-        .from("customer_types")
-        .select("id, system_key, name, sort_order, is_active")
-        .eq("is_active", true)
-        .order("sort_order"),
-      supabase
-        .from("price_groups")
-        .select("id, name, system_key, sort_order, is_base_price, is_active")
-        .eq("is_active", true)
-        .order("sort_order"),
-      supabase
-        .from("profiles")
-        .select("id, full_name, email, role, is_active")
-        .eq("is_active", true)
-        .order("full_name"),
+  const loadSummary = useCallback(async () => {
+    const [totalResult, activeResult, prospectsResult, portalResult] = await Promise.all([
+      supabase.from("customers").select("id", { count: "exact", head: true }),
+      supabase.from("customers").select("id", { count: "exact", head: true }).eq("status", "active"),
+      supabase.from("customers").select("id", { count: "exact", head: true }).eq("status", "prospect"),
+      supabase.from("customers").select("id", { count: "exact", head: true }).eq("portal_enabled", true),
     ]);
 
     const firstError =
-      customersResult.error || typesResult.error || groupsResult.error || profilesResult.error;
+      totalResult.error || activeResult.error || prospectsResult.error || portalResult.error;
 
     if (firstError) {
       setErrorMessage(firstError.message);
-      setIsLoading(false);
       return;
     }
 
-    setCustomers((customersResult.data ?? []) as Customer[]);
-    setCustomerTypes((typesResult.data ?? []) as CustomerType[]);
-    setPriceGroups((groupsResult.data ?? []) as PriceGroupLookup[]);
-    setProfiles((profilesResult.data ?? []) as ProfileLookup[]);
-    setIsLoading(false);
-  }
+    setSummary({
+      total: totalResult.count ?? 0,
+      active: activeResult.count ?? 0,
+      prospects: prospectsResult.count ?? 0,
+      portal: portalResult.count ?? 0,
+    });
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initialSearch = params.get("q") ?? "";
+    const initialStatus = params.get("status");
+    const initialPortal = params.get("portal");
+    const initialSize = parsePositiveInteger(params.get("size"), 50);
+
+    setSearchQuery(initialSearch);
+    setDebouncedSearch(initialSearch.trim());
+    setStatusFilter(
+      initialStatus && CUSTOMER_STATUSES.includes(initialStatus as CustomerStatus)
+        ? (initialStatus as CustomerStatus)
+        : "all"
+    );
+    setTypeFilter(params.get("type") ?? "");
+    setPriceGroupFilter(params.get("group") ?? "");
+    setCountryFilter((params.get("country") ?? "").toUpperCase().slice(0, 2));
+    setSalesRepFilter(params.get("rep") ?? "");
+    setPortalFilter(
+      initialPortal === "enabled" || initialPortal === "disabled" ? initialPortal : "all"
+    );
+    setCurrentPage(parsePositiveInteger(params.get("page"), 1));
+    setPageSize(PAGE_SIZE_OPTIONS.includes(initialSize as (typeof PAGE_SIZE_OPTIONS)[number]) ? initialSize : 50);
+    setUrlReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!urlReady) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const setOrDelete = (key: string, value: string, defaultValue = "") => {
+      if (!value || value === defaultValue) params.delete(key);
+      else params.set(key, value);
+    };
+
+    setOrDelete("q", searchQuery.trim());
+    setOrDelete("status", statusFilter, "all");
+    setOrDelete("type", typeFilter);
+    setOrDelete("group", priceGroupFilter);
+    setOrDelete("country", countryFilter);
+    setOrDelete("rep", salesRepFilter);
+    setOrDelete("portal", portalFilter, "all");
+    setOrDelete("page", String(currentPage), "1");
+    setOrDelete("size", String(pageSize), "50");
+
+    const queryString = params.toString();
+    const nextUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, [
+    urlReady,
+    searchQuery,
+    statusFilter,
+    typeFilter,
+    priceGroupFilter,
+    countryFilter,
+    salesRepFilter,
+    portalFilter,
+    currentPage,
+    pageSize,
+  ]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
 
   useEffect(() => {
     async function initialize() {
-      const { profile, error } = await getCurrentProfile();
+      setIsLoading(true);
+      setErrorMessage(null);
 
-      if (error) {
-        setErrorMessage(error.message);
+      const [{ profile, error: profileError }, typesResult, groupsResult, profilesResult] =
+        await Promise.all([
+          getCurrentProfile(),
+          supabase
+            .from("customer_types")
+            .select("id, system_key, name, sort_order, is_active")
+            .eq("is_active", true)
+            .order("sort_order"),
+          supabase
+            .from("price_groups")
+            .select("id, name, system_key, sort_order, is_base_price, is_active")
+            .eq("is_active", true)
+            .order("sort_order"),
+          supabase
+            .from("profiles")
+            .select("id, full_name, email, role, is_active")
+            .eq("is_active", true)
+            .order("full_name"),
+        ]);
+
+      const firstError = profileError || typesResult.error || groupsResult.error || profilesResult.error;
+      if (firstError) {
+        setErrorMessage(firstError.message);
         setIsLoading(false);
         return;
       }
@@ -247,29 +296,108 @@ export default function CustomersTable() {
           profile?.role === "admin" ||
           profile?.role === "sales"
       );
-
-      await loadData();
+      setCustomerTypes((typesResult.data ?? []) as CustomerType[]);
+      setPriceGroups((groupsResult.data ?? []) as PriceGroupLookup[]);
+      setProfiles((profilesResult.data ?? []) as ProfileLookup[]);
+      await loadSummary();
+      setReferenceReady(true);
     }
 
-    initialize();
-  }, []);
+    void initialize();
+  }, [loadSummary]);
 
   useEffect(() => {
-    setCurrentPage(1);
+    if (!referenceReady || !urlReady) return;
+
+    let cancelled = false;
+
+    async function loadDirectory() {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      let query = supabase.from("customers").select("*", { count: "exact" });
+
+      if (statusFilter !== "all") query = query.eq("status", statusFilter);
+      if (typeFilter) query = query.eq("customer_type_id", typeFilter);
+      if (priceGroupFilter) query = query.eq("price_group_id", priceGroupFilter);
+      if (countryFilter) query = query.eq("country_code", countryFilter);
+      if (salesRepFilter) query = query.eq("sales_rep_id", salesRepFilter);
+      if (portalFilter !== "all") query = query.eq("portal_enabled", portalFilter === "enabled");
+
+      if (normalizedSearch) {
+        const pattern = quotePostgrestValue(`%${debouncedSearch.trim()}%`);
+        const filters = [
+          `customer_code.ilike.${pattern}`,
+          `name.ilike.${pattern}`,
+          `legal_name.ilike.${pattern}`,
+          `email.ilike.${pattern}`,
+          `phone.ilike.${pattern}`,
+          `tax_number.ilike.${pattern}`,
+        ];
+
+        if (searchCustomerTypeIds.length) {
+          filters.push(`customer_type_id.in.(${searchCustomerTypeIds.join(",")})`);
+        }
+        if (searchPriceGroupIds.length) {
+          filters.push(`price_group_id.in.(${searchPriceGroupIds.join(",")})`);
+        }
+        if (searchSalesRepIds.length) {
+          filters.push(`sales_rep_id.in.(${searchSalesRepIds.join(",")})`);
+        }
+
+        query = query.or(filters.join(","));
+      }
+
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+      const { data, error, count } = await query
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (cancelled) return;
+      if (error) {
+        setErrorMessage(error.message);
+        setCustomers([]);
+        setFilteredCount(0);
+        setIsLoading(false);
+        return;
+      }
+
+      setCustomers((data ?? []) as Customer[]);
+      setFilteredCount(count ?? 0);
+      setIsLoading(false);
+    }
+
+    void loadDirectory();
+    return () => {
+      cancelled = true;
+    };
   }, [
-    searchQuery,
+    referenceReady,
+    urlReady,
+    refreshToken,
+    currentPage,
+    pageSize,
     statusFilter,
     typeFilter,
     priceGroupFilter,
     countryFilter,
     salesRepFilter,
     portalFilter,
-    pageSize,
+    normalizedSearch,
+    debouncedSearch,
+    searchCustomerTypeIds,
+    searchPriceGroupIds,
+    searchSalesRepIds,
   ]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
+
+  function resetToFirstPage() {
+    setCurrentPage(1);
+  }
 
   function clearFilters() {
     setSearchQuery("");
@@ -279,6 +407,7 @@ export default function CustomersTable() {
     setCountryFilter("");
     setSalesRepFilter("");
     setPortalFilter("all");
+    resetToFirstPage();
   }
 
   function resetNewCustomer() {
@@ -320,7 +449,11 @@ export default function CustomersTable() {
       customer_since: new Date().toISOString().slice(0, 10),
     };
 
-    const { data, error } = await supabase.from("customers").insert(payload).select("id, customer_code").single();
+    const { data, error } = await supabase
+      .from("customers")
+      .insert(payload)
+      .select("id, customer_code")
+      .single();
 
     if (error) {
       setErrorMessage(error.message);
@@ -337,13 +470,12 @@ export default function CustomersTable() {
 
     setCreateOpen(false);
     resetNewCustomer();
-    await loadData();
+    await loadSummary();
+    resetToFirstPage();
+    setRefreshToken((value) => value + 1);
     setSuccessMessage(`Customer ${data.customer_code} created successfully.`);
     setIsSaving(false);
   }
-
-  const startRow = filteredCustomers.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const endRow = Math.min(currentPage * pageSize, filteredCustomers.length);
 
   return (
     <div className="space-y-5">
@@ -382,7 +514,11 @@ export default function CustomersTable() {
               <button
                 type="button"
                 onClick={() => setFiltersOpen((current) => !current)}
-                className={filtersOpen || activeFilterCount ? "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 text-sm font-medium text-brand-700 shadow-theme-xs dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400" : secondaryButtonClass}
+                className={
+                  filtersOpen || activeFilterCount
+                    ? "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 text-sm font-medium text-brand-700 shadow-theme-xs dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400"
+                    : secondaryButtonClass
+                }
               >
                 Filters
                 {activeFilterCount > 0 && (
@@ -407,10 +543,16 @@ export default function CustomersTable() {
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Filters</h3>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Filter the customer directory.</p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Server-side filters are reflected in the URL so views can be shared or revisited.
+                  </p>
                 </div>
                 {activeFilterCount > 0 && (
-                  <button type="button" onClick={clearFilters} className="text-xs font-medium text-brand-600 dark:text-brand-400">
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="text-xs font-medium text-brand-600 dark:text-brand-400"
+                  >
                     Clear All
                   </button>
                 )}
@@ -421,7 +563,10 @@ export default function CustomersTable() {
                   <FilterLabel>Search</FilterLabel>
                   <input
                     value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      resetToFirstPage();
+                    }}
                     placeholder="Code, company, email, tax number..."
                     className={inputClass}
                   />
@@ -429,7 +574,14 @@ export default function CustomersTable() {
 
                 <div>
                   <FilterLabel>Status</FilterLabel>
-                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | CustomerStatus)} className={selectClass}>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => {
+                      setStatusFilter(event.target.value as "all" | CustomerStatus);
+                      resetToFirstPage();
+                    }}
+                    className={selectClass}
+                  >
                     <option value="all">All Statuses</option>
                     <option value="active">Active</option>
                     <option value="prospect">Prospect</option>
@@ -440,31 +592,62 @@ export default function CustomersTable() {
 
                 <div>
                   <FilterLabel>Customer Type</FilterLabel>
-                  <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={selectClass}>
+                  <select
+                    value={typeFilter}
+                    onChange={(event) => {
+                      setTypeFilter(event.target.value);
+                      resetToFirstPage();
+                    }}
+                    className={selectClass}
+                  >
                     <option value="">All Types</option>
-                    {customerTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    {customerTypes.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
                   <FilterLabel>Price Group</FilterLabel>
-                  <select value={priceGroupFilter} onChange={(event) => setPriceGroupFilter(event.target.value)} className={selectClass}>
+                  <select
+                    value={priceGroupFilter}
+                    onChange={(event) => {
+                      setPriceGroupFilter(event.target.value);
+                      resetToFirstPage();
+                    }}
+                    className={selectClass}
+                  >
                     <option value="">All Groups</option>
-                    {priceGroups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    {priceGroups.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
                   <FilterLabel>Country</FilterLabel>
-                  <select value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)} className={selectClass}>
-                    <option value="">All Countries</option>
-                    {countries.map((country) => <option key={country} value={country}>{country}</option>)}
-                  </select>
+                  <input
+                    value={countryFilter}
+                    maxLength={2}
+                    placeholder="US"
+                    onChange={(event) => {
+                      setCountryFilter(event.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2));
+                      resetToFirstPage();
+                    }}
+                    className={inputClass}
+                  />
                 </div>
 
                 <div>
                   <FilterLabel>Portal</FilterLabel>
-                  <select value={portalFilter} onChange={(event) => setPortalFilter(event.target.value as "all" | "enabled" | "disabled")} className={selectClass}>
+                  <select
+                    value={portalFilter}
+                    onChange={(event) => {
+                      setPortalFilter(event.target.value as PortalFilter);
+                      resetToFirstPage();
+                    }}
+                    className={selectClass}
+                  >
                     <option value="all">All</option>
                     <option value="enabled">Enabled</option>
                     <option value="disabled">Disabled</option>
@@ -473,11 +656,20 @@ export default function CustomersTable() {
 
                 <div className="xl:col-span-2">
                   <FilterLabel>Sales Representative</FilterLabel>
-                  <select value={salesRepFilter} onChange={(event) => setSalesRepFilter(event.target.value)} className={selectClass}>
+                  <select
+                    value={salesRepFilter}
+                    onChange={(event) => {
+                      setSalesRepFilter(event.target.value);
+                      resetToFirstPage();
+                    }}
+                    className={selectClass}
+                  >
                     <option value="">All Representatives</option>
-                    {profiles.filter((item) => ["super_admin", "admin", "sales"].includes(item.role)).map((item) => (
-                      <option key={item.id} value={item.id}>{item.full_name || item.email}</option>
-                    ))}
+                    {profiles
+                      .filter((item) => ["super_admin", "admin", "sales"].includes(item.role))
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>{item.full_name || item.email}</option>
+                      ))}
                   </select>
                 </div>
               </div>
@@ -498,18 +690,11 @@ export default function CustomersTable() {
                   <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
                     <thead className="bg-gray-50 dark:bg-white/[0.02]">
                       <tr>
-                        {[
-                          "Customer",
-                          "Type",
-                          "Contact",
-                          "Country",
-                          "Price Group",
-                          "Sales Rep",
-                          "Portal",
-                          "Status",
-                          "",
-                        ].map((label) => (
-                          <th key={label || "action"} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {["Customer", "Type", "Contact", "Country", "Price Group", "Sales Rep", "Portal", "Status", ""].map((label) => (
+                          <th
+                            key={label || "action"}
+                            className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                          >
                             {label}
                           </th>
                         ))}
@@ -517,13 +702,20 @@ export default function CustomersTable() {
                     </thead>
 
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {paginatedCustomers.length === 0 ? (
-                        <tr><td colSpan={9} className="px-4 py-12 text-center text-sm text-gray-500">No customers found.</td></tr>
+                      {customers.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="px-4 py-12 text-center text-sm text-gray-500">
+                            No customers found.
+                          </td>
+                        </tr>
                       ) : (
-                        paginatedCustomers.map((customer) => (
+                        customers.map((customer) => (
                           <tr key={customer.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                             <td className="px-4 py-3">
-                              <Link href={`/customers/${customer.id}`} className="font-semibold text-gray-800 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400">
+                              <Link
+                                href={`/customers/${customer.id}`}
+                                className="font-semibold text-gray-800 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"
+                              >
                                 {customer.name}
                               </Link>
                               <p className="mt-0.5 text-xs text-gray-400">{customer.customer_code}</p>
@@ -543,7 +735,13 @@ export default function CustomersTable() {
                               {customer.sales_rep_id ? profileMap.get(customer.sales_rep_id) ?? "—" : "—"}
                             </td>
                             <td className="px-4 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${customer.portal_enabled ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400" : "bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"}`}>
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  customer.portal_enabled
+                                    ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
+                                    : "bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
+                                }`}
+                              >
                                 {customer.portal_enabled ? "Enabled" : "Disabled"}
                               </span>
                             </td>
@@ -553,7 +751,10 @@ export default function CustomersTable() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <Link href={`/customers/${customer.id}`} className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
+                              <Link
+                                href={`/customers/${customer.id}`}
+                                className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+                              >
                                 Open
                               </Link>
                             </td>
@@ -567,16 +768,41 @@ export default function CustomersTable() {
 
               <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Showing <span className="font-medium text-gray-700 dark:text-gray-300">{startRow}–{endRow}</span> of <span className="font-medium text-gray-700 dark:text-gray-300">{filteredCustomers.length}</span>
+                  Showing <span className="font-medium text-gray-700 dark:text-gray-300">{startRow}–{endRow}</span> of <span className="font-medium text-gray-700 dark:text-gray-300">{filteredCount}</span>
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                    {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size} / page</option>)}
+                  <select
+                    value={pageSize}
+                    onChange={(event) => {
+                      setPageSize(Number(event.target.value));
+                      resetToFirstPage();
+                    }}
+                    className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>{size} / page</option>
+                    ))}
                   </select>
-                  <button type="button" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} className={secondaryButtonClass}>Previous</button>
-                  <span className="flex h-10 min-w-[90px] items-center justify-center rounded-lg bg-gray-50 px-3 text-xs text-gray-600 dark:bg-white/[0.04] dark:text-gray-300">{currentPage} / {totalPages}</span>
-                  <button type="button" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} className={secondaryButtonClass}>Next</button>
+                  <button
+                    type="button"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    className={secondaryButtonClass}
+                  >
+                    Previous
+                  </button>
+                  <span className="flex h-10 min-w-[90px] items-center justify-center rounded-lg bg-gray-50 px-3 text-xs text-gray-600 dark:bg-white/[0.04] dark:text-gray-300">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    className={secondaryButtonClass}
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
             </>
@@ -590,26 +816,44 @@ export default function CustomersTable() {
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5 dark:border-gray-800">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">New Customer</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create the customer master record. More details can be added from the customer card.</p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Create the customer master record. More details can be added from the customer card.
+                </p>
               </div>
               <button type="button" onClick={() => setCreateOpen(false)} className="text-xl text-gray-400 hover:text-gray-700">×</button>
             </div>
 
             <div className="grid gap-4 p-6 md:grid-cols-2">
               <Field label="Company / Customer Name" required>
-                <input value={newCustomer.name} onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))} className={inputClass} />
+                <input
+                  value={newCustomer.name}
+                  onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))}
+                  className={inputClass}
+                />
               </Field>
               <Field label="Legal Name">
-                <input value={newCustomer.legal_name} onChange={(event) => setNewCustomer((current) => ({ ...current, legal_name: event.target.value }))} className={inputClass} />
+                <input
+                  value={newCustomer.legal_name}
+                  onChange={(event) => setNewCustomer((current) => ({ ...current, legal_name: event.target.value }))}
+                  className={inputClass}
+                />
               </Field>
               <Field label="Customer Type">
-                <select value={newCustomer.customer_type_id} onChange={(event) => setNewCustomer((current) => ({ ...current, customer_type_id: event.target.value }))} className={selectClass}>
+                <select
+                  value={newCustomer.customer_type_id}
+                  onChange={(event) => setNewCustomer((current) => ({ ...current, customer_type_id: event.target.value }))}
+                  className={selectClass}
+                >
                   <option value="">Default (Company)</option>
                   {customerTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </Field>
               <Field label="Status">
-                <select value={newCustomer.status} onChange={(event) => setNewCustomer((current) => ({ ...current, status: event.target.value as CustomerStatus }))} className={selectClass}>
+                <select
+                  value={newCustomer.status}
+                  onChange={(event) => setNewCustomer((current) => ({ ...current, status: event.target.value as CustomerStatus }))}
+                  className={selectClass}
+                >
                   <option value="prospect">Prospect</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
@@ -617,31 +861,58 @@ export default function CustomersTable() {
                 </select>
               </Field>
               <Field label="Email">
-                <input type="email" value={newCustomer.email} onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))} className={inputClass} />
+                <input
+                  type="email"
+                  value={newCustomer.email}
+                  onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))}
+                  className={inputClass}
+                />
               </Field>
               <Field label="Phone">
-                <input value={newCustomer.phone} onChange={(event) => setNewCustomer((current) => ({ ...current, phone: event.target.value }))} className={inputClass} />
+                <input
+                  value={newCustomer.phone}
+                  onChange={(event) => setNewCustomer((current) => ({ ...current, phone: event.target.value }))}
+                  className={inputClass}
+                />
               </Field>
               <Field label="Country Code">
-                <input maxLength={2} placeholder="US" value={newCustomer.country_code} onChange={(event) => setNewCustomer((current) => ({ ...current, country_code: event.target.value.toUpperCase() }))} className={inputClass} />
+                <input
+                  maxLength={2}
+                  placeholder="US"
+                  value={newCustomer.country_code}
+                  onChange={(event) => setNewCustomer((current) => ({ ...current, country_code: event.target.value.toUpperCase() }))}
+                  className={inputClass}
+                />
               </Field>
               <Field label="Price Group">
-                <select value={newCustomer.price_group_id} onChange={(event) => setNewCustomer((current) => ({ ...current, price_group_id: event.target.value }))} className={selectClass}>
+                <select
+                  value={newCustomer.price_group_id}
+                  onChange={(event) => setNewCustomer((current) => ({ ...current, price_group_id: event.target.value }))}
+                  className={selectClass}
+                >
                   <option value="">Default (List / Base)</option>
                   {priceGroups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </Field>
               <Field label="Sales Representative">
-                <select value={newCustomer.sales_rep_id} onChange={(event) => setNewCustomer((current) => ({ ...current, sales_rep_id: event.target.value }))} className={selectClass}>
+                <select
+                  value={newCustomer.sales_rep_id}
+                  onChange={(event) => setNewCustomer((current) => ({ ...current, sales_rep_id: event.target.value }))}
+                  className={selectClass}
+                >
                   <option value="">Unassigned</option>
-                  {profiles.filter((item) => ["super_admin", "admin", "sales"].includes(item.role)).map((item) => <option key={item.id} value={item.id}>{item.full_name || item.email}</option>)}
+                  {profiles
+                    .filter((item) => ["super_admin", "admin", "sales"].includes(item.role))
+                    .map((item) => <option key={item.id} value={item.id}>{item.full_name || item.email}</option>)}
                 </select>
               </Field>
             </div>
 
             <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-4 dark:border-gray-800">
               <button type="button" onClick={() => setCreateOpen(false)} className={secondaryButtonClass}>Cancel</button>
-              <button type="button" onClick={createCustomer} disabled={isSaving} className={primaryButtonClass}>{isSaving ? "Creating..." : "Create Customer"}</button>
+              <button type="button" onClick={createCustomer} disabled={isSaving} className={primaryButtonClass}>
+                {isSaving ? "Creating..." : "Create Customer"}
+              </button>
             </div>
           </div>
         </div>
@@ -654,7 +925,15 @@ function FilterLabel({ children }: { children: React.ReactNode }) {
   return <label className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">{children}</label>;
 }
 
-function Field({ label, required = false, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({
+  label,
+  required = false,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -665,7 +944,15 @@ function Field({ label, required = false, children }: { label: string; required?
   );
 }
 
-function SummaryCard({ label, value, type = "default" }: { label: string; value: number; type?: "default" | "success" | "warning" | "brand" }) {
+function SummaryCard({
+  label,
+  value,
+  type = "default",
+}: {
+  label: string;
+  value: number;
+  type?: "default" | "success" | "warning" | "brand";
+}) {
   const classes =
     type === "success"
       ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10"
