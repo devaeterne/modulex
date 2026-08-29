@@ -49,6 +49,27 @@ assert.match(migration, /public\.profiles/i, "Store role reconciliation must ret
 assert.match(migration, /store_current_user_has_any_role\s*\(array\['super_admin',\s*'admin',\s*'sales'\]/i, "Store read policies must use the reconciled effective-role helper");
 assert.match(migration, /store_current_user_has_any_role\s*\(array\['super_admin',\s*'admin'\]/i, "Store write policies must use the reconciled effective-role helper");
 
+assert.match(
+  migration,
+  /create\s+or\s+replace\s+function\s+private\.store_project_requires_parent_attribution\s*\(p_project_id\s+uuid\)/i,
+  "GC-5 must derive whether any linked project asset requires parent attribution",
+);
+assert.match(
+  migration,
+  /store_project_requires_parent_attribution[\s\S]*cover_media_asset_id[\s\S]*attribution_classification\s*=\s*'parent_attributed'/i,
+  "Parent-attribution derivation must include the linked cover asset",
+);
+assert.match(
+  migration,
+  /store_project_requires_parent_attribution[\s\S]*store_project_media[\s\S]*media_asset_id[\s\S]*attribution_classification\s*=\s*'parent_attributed'/i,
+  "Parent-attribution derivation must include linked project image assets",
+);
+assert.match(
+  migration,
+  /store_project_is_publishable[\s\S]*store_project_requires_parent_attribution\(p\.id\)[\s\S]*p\.attribution_classification\s*=\s*'parent_attributed'/i,
+  "A project using parent-attributed assets must itself publish as parent-attributed",
+);
+
 for (const fn of ["get_store_public_projects", "get_store_public_project", "get_store_public_project_media"]) {
   const publicFunction = migration.match(new RegExp(`create\\s+or\\s+replace\\s+function\\s+public\\.${fn}[\\s\\S]*?(?=create\\s+or\\s+replace\\s+function|revoke|grant|$)`, "i"))?.[0] ?? "";
   assert.ok(publicFunction, `GC-5 migration must replace public.${fn}`);
