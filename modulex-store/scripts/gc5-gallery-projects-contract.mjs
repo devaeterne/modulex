@@ -38,7 +38,16 @@ assert.match(migration, /attribution_text/i, "Projects must store visible attrib
 assert.match(migration, /source_page_url/i, "Parent-attributed projects must retain their source page URL");
 assert.match(migration, /cabinet_relevance\s*=\s*'relevant'/i, "GC-5 project images must require relevant cabinet imagery");
 assert.match(migration, /store-media/i, "GC-5 project images must resolve only published store-media objects");
-assert.match(migration, /current_user_has_any_role/i, "GC-5 must preserve effective multi-role RLS authorization");
+
+assert.match(
+  migration,
+  /create\s+or\s+replace\s+function\s+private\.store_current_user_has_any_role\s*\(allowed_roles\s+text\[\]\)/i,
+  "GC-5 must reconcile a Store-local effective-role helper for clean migration replay",
+);
+assert.match(migration, /to_regclass\s*\(\s*'public\.user_roles'\s*\)/i, "Store role reconciliation must detect optional multi-role storage safely");
+assert.match(migration, /public\.profiles/i, "Store role reconciliation must retain legacy profile.role fallback");
+assert.match(migration, /store_current_user_has_any_role\s*\(array\['super_admin',\s*'admin',\s*'sales'\]/i, "Store read policies must use the reconciled effective-role helper");
+assert.match(migration, /store_current_user_has_any_role\s*\(array\['super_admin',\s*'admin'\]/i, "Store write policies must use the reconciled effective-role helper");
 
 for (const fn of ["get_store_public_projects", "get_store_public_project", "get_store_public_project_media"]) {
   const publicFunction = migration.match(new RegExp(`create\\s+or\\s+replace\\s+function\\s+public\\.${fn}[\\s\\S]*?(?=create\\s+or\\s+replace\\s+function|revoke|grant|$)`, "i"))?.[0] ?? "";
