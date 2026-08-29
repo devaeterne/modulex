@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `f6d7f9673dc874b5c254e47c750ff1bd4793c7c3`
-Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
-Current cross-roadmap package: **Granite Center → Oakwell GC-1 source manifest complete for review; GC-2 media library/optimization next; Gallery/Projects content acceptance pending**
+Main baseline: `a39efe3f76db8fe677ad5d1c7f2e6a1f4c1fac1c`
+Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
+Current cross-roadmap package: **Granite Center → Oakwell GC-2 media library implementation plan approved; implementation next; Gallery/Projects content acceptance pending**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -149,6 +149,9 @@ These rules are mandatory for all future Modulex Admin work:
   - A0.2 route-permission parity, negative direct-URL cases, and warehouse-structure list mutation UI guards passed in full verification runs `33249988130` and `33251372987`; data authorization remains independently enforced by RLS/RPC/API contracts.
 - [x] No known TailAdmin demo/sample route remains exposed unintentionally.
   - Production-surface contract plus the production build guard the removed route set, Modulex-branded global 404, and empty production sign-in state.
+- [x] Phase A0 production acceptance is deployed on current `main`.
+  - PR #114 merged as `978df97c9fd56e75eed2c5d1972d7b86fbc07fcd`; its final Codex review found no major issues.
+  - PR #115 then advanced `main` to `e1bb780b1c5bbaed3bca4a5e82bebecb5c010365`; Admin Vercel production deployment `dpl_47gPYNow2GpAeQwGnLRVBYQBTr61` is `READY` from that exact SHA and serves `admin.oakwellcabinetry.com`.
 
 ---
 
@@ -158,7 +161,15 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A1.1 Customer master record
 
-- [ ] Review customer list/search/filter scalability and pagination.
+- [x] Review customer list/search/filter scalability and pagination.
+  - A1.1A moved customer rows, search, status/type/price-group/country/sales-rep/portal filters, exact filtered count, and page windows to the Supabase query layer; the browser no longer downloads the full customer table and slices it locally.
+  - Lookup-name search remains supported by resolving matching customer-type, price-group, and sales-rep IDs before building the server-side OR filter. Search is debounced and query values are sanitized for the raw PostgREST `.or()` syntax.
+  - Filter/page/page-size state round-trips through URL query parameters so operational views can be shared and revisited. Country remains a two-letter code filter, avoiding an all-row country-facet download.
+  - Summary cards now use count-only (`head: true`) queries and remain global rather than becoming page-local metrics.
+  - `scripts/customer-directory-contract.mjs` is wired as `npm run smoke:customer-directory` and into the main Admin smoke chain.
+  - TDD RED: Actions run `33257591106` failed because the legacy directory had no exact server-side count/pagination contract. Targeted GREEN: run `33257782375` passed after the query-layer migration.
+  - Full deterministic verification: Actions run `33257875905` passed runtime-config, production-surface, customer-directory, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check; post-closeout verification run `33258088112` repeated the same suite successfully on the committed roadmap closeout.
+  - Production schema/RLS/RPC/data were not mutated by A1.1A; existing customer status/type/price-group/sales-rep indexes remain the query foundation. Mutation validation/audit and atomic default-address work remain intentionally separated into A1.1B/C.
 - [ ] Review customer detail information architecture and action hierarchy.
 - [ ] Verify customer status/account-type/portal-enabled changes have explicit validation.
 - [ ] Verify address management and default-address behavior.
@@ -547,14 +558,12 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin roadmap work remains **Phase A0 — Production Surface & Operational Truth Cleanup** until the post-merge A0.3 Codex follow-up is merged and production-accepted.
+Primary Admin roadmap work is **Phase A1 — Customer, Order & Fulfillment Operations**. **A1.1A — Customer Directory Scalability** is verified and ready for review/merge.
 
-PR #113 is merged and its Admin Vercel deployment is `READY`, but post-merge Codex review identified one P1 and one P2 runtime/config gap that must be closed before the phase exit. Next primary Admin work:
+1. Review, merge, and deploy the A1.1A PR; confirm the resulting Admin Vercel production deployment is `READY` from the merged `main` SHA.
+2. Then start **A1.1B — Customer Master Mutation Contract**: validated customer status/type/master mutations plus mutation+audit atomicity.
+3. Follow with **A1.1C — Customer Detail & Address Integrity**: remove legacy action-hiding CSS, clarify detail action hierarchy, and make default-address changes atomic.
 
-1. Complete and verify the bounded A0.3 Codex follow-up: source-wide `NEXT_PUBLIC_*` allowlist and configuration-owned Store activation origin with no preview-host fallback.
-2. Merge/deploy that follow-up and confirm the resulting Admin production deployment is `READY` from the merged `main` SHA.
-3. Then close Phase A0, advance to **Phase A1 — Customer, Order & Fulfillment Operations**, and start the bounded A1.1 customer-master review.
+**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1 source discovery is complete. GC-2 media-library/optimization architecture is approved in PR #115; implementation planning is next and will add Admin-managed media domains incrementally without overwriting concurrent A1 work. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
 
-**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1 is source discovery/classification only and is complete for review with 32 pages, 55 content candidates, 62 media candidates and 7 conflict classes; it introduces no Admin runtime or production DB mutation. GC-2+ will add Admin-managed media/contact/content domains incrementally as required. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
-
-**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A0 or other concurrently merged Admin work is preserved rather than overwritten.
+**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A1 or other concurrently merged Admin work is preserved rather than overwritten.
