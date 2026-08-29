@@ -9,7 +9,6 @@ const blockedRouteFiles = [
   "src/app/services/residential/page.tsx",
   "src/app/blog/page.tsx",
   "src/app/blog/[slug]/page.tsx",
-  "src/app/gallery/page.tsx",
   "src/app/gallery/detail/page.tsx",
   "src/app/index-premium/page.tsx",
   "src/app/index-slider/page.tsx",
@@ -26,11 +25,13 @@ for (const relativePath of blockedRouteFiles) {
 
 const productionSurfaceFiles = [
   "src/app/about/page.tsx",
+  "src/app/gallery/page.tsx",
   "src/app/page.tsx",
   "src/app/sitemap.ts",
   "src/app/robots.ts",
   "src/components/Navbar.tsx",
   "src/components/Footer.tsx",
+  "src/components/gallery/StoreProjectsGallery.tsx",
 ];
 
 const blockedPatterns = [
@@ -59,6 +60,21 @@ for (const relativePath of productionSurfaceFiles) {
       failures.push(`${relativePath}: blocked ${label}`);
     }
   }
+}
+
+const gallerySource = await readFile(path.join(root, "src/app/gallery/page.tsx"), "utf8").catch(() => "");
+if (gallerySource) {
+  if (!gallerySource.includes("getStoreGalleryReadiness")) {
+    failures.push("Gallery must use the shared published readiness helper");
+  }
+  if (!gallerySource.includes("notFound()")) {
+    failures.push("Gallery must fail closed when published content is not ready");
+  }
+}
+
+const galleryClientSource = await readFile(path.join(root, "src/components/gallery/StoreProjectsGallery.tsx"), "utf8").catch(() => "");
+if (galleryClientSource && /supabase/i.test(galleryClientSource)) {
+  failures.push("Gallery client must not establish a direct Supabase data boundary");
 }
 
 const sitemapSource = await readFile(path.join(root, "src/app/sitemap.ts"), "utf8");
