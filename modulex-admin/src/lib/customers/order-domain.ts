@@ -115,10 +115,111 @@ export type SetCustomerOrderStatusInput = {
   note?: string | null;
 };
 
+export type CustomerOrderRevisionMode = "direct" | "approval" | "locked";
+
+export type CustomerOrderRevisionPolicy = {
+  mode: CustomerOrderRevisionMode;
+  canEdit: boolean;
+  editableFields: readonly string[];
+  immutableFields: readonly string[];
+  reason: string;
+};
+
 const ORDER_EDITOR_ROLES: UserRole[] = ["super_admin", "admin", "sales"];
+const ORDER_REVISION_EDITABLE_STATUSES: CustomerOrderStatus[] = ["draft", "confirmed", "in_preparation", "ready_for_shipment"];
+const ORDER_REVISION_LOCKED_STATUSES: CustomerOrderStatus[] = ["shipped", "delivered", "installation_scheduled", "installation_in_progress", "completed", "cancelled"];
+const ORDER_REVISION_EDITABLE_FIELDS = [
+  "items",
+  "price_group_id",
+  "fulfillment_type",
+  "payment_method_id",
+  "payment_commission_percent",
+  "billing_address_id",
+  "shipping_address_id",
+  "expected_delivery_date",
+  "customer_reference",
+  "customer_notes",
+  "internal_notes",
+  "tax_rate",
+  "discount_amount",
+] as const;
+const ORDER_REVISION_IMMUTABLE_FIELDS = [
+  "order_number",
+  "customer_id",
+  "status",
+  "order_date",
+  "currency_code",
+  "price_group_name_snapshot",
+  "payment_method_name_snapshot",
+  "billing_address_snapshot",
+  "shipping_address_snapshot",
+  "item_count",
+  "subtotal",
+  "tax_amount",
+  "total_amount",
+  "payment_commission_amount",
+  "grand_total",
+  "confirmed_at",
+  "completed_at",
+  "cancelled_at",
+  "created_by",
+  "updated_by",
+  "created_at",
+  "updated_at",
+] as const;
 const PRICE_GROUP_COLUMNS = "id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only";
 const PAYMENT_METHOD_COLUMNS = "id, system_key, name, commission_percent, sort_order, is_active";
 const PRODUCT_COLUMNS = "id, sku, name, barcode, status, brand, category, brand_id, category_id";
+
+export function getCustomerOrderRevisionPolicy(status: CustomerOrderStatus, role: UserRole): CustomerOrderRevisionPolicy {
+  if (!ORDER_EDITOR_ROLES.includes(role)) {
+    return {
+      mode: "locked",
+      canEdit: false,
+      editableFields: [],
+      immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
+      reason: "You do not have permission to revise customer orders.",
+    };
+  }
+
+  if (ORDER_REVISION_LOCKED_STATUSES.includes(status)) {
+    return {
+      mode: "locked",
+      canEdit: false,
+      editableFields: [],
+      immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
+      reason: "Order revisions are locked once fulfillment has started or the order is finalized.",
+    };
+  }
+
+  if (!ORDER_REVISION_EDITABLE_STATUSES.includes(status)) {
+    return {
+      mode: "locked",
+      canEdit: false,
+      editableFields: [],
+      immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
+      reason: "This order status does not allow commercial revisions.",
+    };
+  }
+
+  if (status !== "draft" && role === "sales") {
+    return {
+      mode: "approval",
+      canEdit: true,
+      editableFields: ORDER_REVISION_EDITABLE_FIELDS,
+      immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
+      reason: "Sales revisions to confirmed pre-fulfillment orders require Admin approval.",
+    };
+  }
+
+  return {
+    mode: "direct",
+    canEdit: true,
+    editableFields: ORDER_REVISION_EDITABLE_FIELDS,
+    immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
+    reason: status === "draft" ? "Draft orders can be revised directly." : "Pre-fulfillment orders can be revised directly by Admin.",
+  };
+}
 
 function nullableText(value: string | null | undefined) {
   const normalized = value?.trim() ?? "";
@@ -150,6 +251,19 @@ async function requireViewerProfile() {
     throw new Error("You do not have permission to view customer orders.");
   }
   return profile;
+}
+
+export async function loadCustomerOrderRevisionPolicy(customerId: string, orderId: string): Promise<CustomerOrderRevisionPolicy> {
+  const profile = await requireEditorProfile("edit");
+  const { data, error } = await supabase
+    .from("customer_orders")
+    .select("status")
+    .eq("id", orderId)
+    .eq("customer_id", customerId)
+    .single();
+
+  if (error) throw error;
+  return getCustomerOrderRevisionPolicy(data.status as CustomerOrderStatus, profile.role);
 }
 
 export async function loadCreateOrderContext(customerId: string): Promise<CreateOrderContext> {
