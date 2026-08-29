@@ -11,6 +11,10 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
+      NEXT_PUBLIC_SITE_URL: https://modulex-admin.example.test
     defaults:
       run:
         working-directory: modulex-admin
@@ -21,25 +25,41 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Normalize package-lock identity without dependency churn
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run runtime config contract
+        run: npm run smoke:runtime-config
+      - name: Run production surface contract
+        run: npm run smoke:production-surface
+      - name: Run RBAC contract
+        run: npm run smoke:rbac
+      - name: Run secondary CMS Admin contract
+        run: npm run smoke:secondary-cms-admin
+      - name: Run dealer onboarding contract
+        run: npm run smoke:dealer-onboarding
+      - name: Run dealer portal Admin contract
+        run: npm run smoke:dealer-portal-admin
+      - name: Run Store portal Admin contract
+        run: npm run smoke:store-portal-admin
+      - name: Run auth recovery contract
+        run: npm run smoke:auth-recovery
+      - name: Run polling contract
+        run: npm run smoke:polling
+      - name: Lint
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Diff check
+        run: git diff --check 7b19a5cf417092c6088aff91747e4c1da7c0019f...HEAD -- .
+      - name: Record verified A0.3 closeout
         run: |
-          git show origin/main:modulex-admin/package-lock.json > package-lock.json
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("package-lock.json")
-          text = path.read_text()
-          old = '"name": "free-nextjs-admin-dashboard"'
-          new = '"name": "modulex-admin"'
-          if text.count(old) != 2:
-              raise SystemExit(f"expected exactly two legacy package names, found {text.count(old)}")
-          path.write_text(text.replace(old, new, 2))
-          PY
-          if ! git diff --quiet -- package-lock.json; then
+          python3 scripts/a0-3-runtime-config-closeout.py "${{ github.run_id }}"
+          if ! git diff --quiet -- ADMIN_ROADMAP.md; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "chore(admin): minimize package lock identity diff"
+            git add ADMIN_ROADMAP.md
+            git commit -m "docs(admin): close A0.3 runtime config cleanup"
             git push
           fi
-      - name: Run runtime config contract
-        run: node scripts/runtime-config-contract.mjs
