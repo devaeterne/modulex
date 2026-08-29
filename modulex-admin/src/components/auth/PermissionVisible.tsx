@@ -19,7 +19,7 @@ export default function PermissionVisible({
     async function load() {
       const { profile } = await getCurrentProfile();
       if (mounted) {
-        setAllowed(hasPermission(profile?.role, permission));
+        setAllowed(hasPermission(profile?.roles, permission));
       }
     }
 
