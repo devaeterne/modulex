@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `7b19a5cf417092c6088aff91747e4c1da7c0019f`
+Main baseline: `23e5d365876dc65dae9a46645f0627d8f38bc683`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
 Current cross-roadmap package: **Granite Center → Oakwell GC-1 source manifest complete for review; GC-2 media library/optimization next; Gallery/Projects content acceptance pending**
 

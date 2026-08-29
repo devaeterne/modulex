@@ -1,7 +1,7 @@
 # Modulex Admin Runtime Configuration
 
 Last reviewed: 2026-08-29
-Baseline main: `7b19a5cf417092c6088aff91747e4c1da7c0019f`
+Baseline main: `23e5d365876dc65dae9a46645f0627d8f38bc683`
 
 This document is the runtime/configuration contract for `modulex-admin`. It records what belongs in source, what belongs in deployment configuration, and which values must never reach the browser bundle.
 
