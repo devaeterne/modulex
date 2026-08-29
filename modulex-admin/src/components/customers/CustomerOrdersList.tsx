@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
-import type { Customer, CustomerOrder, CustomerOrderStatus } from "@/lib/customers/types";
+import type { CustomerOrder, CustomerOrderStatus } from "@/lib/customers/types";
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100];
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 const ORDER_STATUSES: CustomerOrderStatus[] = [
   "draft",
   "confirmed",
@@ -20,6 +20,30 @@ const ORDER_STATUSES: CustomerOrderStatus[] = [
   "completed",
   "cancelled",
 ];
+
+type CustomerLookup = {
+  id: string;
+  customer_code: string;
+  name: string;
+};
+
+type OrderSummary = {
+  total: number;
+  open: number;
+  completed: number;
+  currencyCount: number;
+  totalValue: number;
+  currencyCode: string | null;
+};
+
+type OrderSummaryRow = {
+  total_count: number | string | null;
+  open_count: number | string | null;
+  completed_count: number | string | null;
+  currency_count: number | string | null;
+  total_value: number | string | null;
+  currency_code: string | null;
+};
 
 function money(value: string | number | null | undefined, currency = "USD") {
   const amount = Number(value ?? 0);
@@ -58,26 +82,130 @@ function grandTotal(order: CustomerOrder) {
     : Number(order.total_amount ?? 0);
 }
 
+function quotePostgrestValue(value: string) {
+  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+}
+
+function parsePositiveInteger(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export default function CustomerOrdersList({ customerId }: { customerId?: string }) {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerLookup[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerLookup | null>(null);
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [canManage, setCanManage] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [urlReady, setUrlReady] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState<"all" | CustomerOrderStatus>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [filteredCount, setFilteredCount] = useState(0);
+  const [summary, setSummary] = useState<OrderSummary>({
+    total: 0,
+    open: 0,
+    completed: 0,
+    currencyCount: 0,
+    totalValue: 0,
+    currencyCode: null,
+  });
+
+  const customerMap = useMemo(
+    () => new Map(customers.map((customer) => [customer.id, customer])),
+    [customers]
+  );
+
+  const normalizedSearch = debouncedSearch.trim().toLowerCase();
+  const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
+  const startRow = filteredCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRow = Math.min(currentPage * pageSize, filteredCount);
 
   useEffect(() => {
-    let mounted = true;
+    const params = new URLSearchParams(window.location.search);
+    const initialSearch = params.get("q") ?? "";
+    const initialStatus = params.get("status");
+    const initialSize = parsePositiveInteger(params.get("size"), 50);
 
-    async function load() {
+    setSearchQuery(initialSearch);
+    setDebouncedSearch(initialSearch.trim());
+    setStatus(
+      initialStatus && ORDER_STATUSES.includes(initialStatus as CustomerOrderStatus)
+        ? (initialStatus as CustomerOrderStatus)
+        : "all"
+    );
+    setCurrentPage(parsePositiveInteger(params.get("page"), 1));
+    setPageSize(
+      PAGE_SIZE_OPTIONS.includes(initialSize as (typeof PAGE_SIZE_OPTIONS)[number])
+        ? initialSize
+        : 50
+    );
+    setUrlReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!urlReady) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const setOrDelete = (key: string, value: string, defaultValue = "") => {
+      if (!value || value === defaultValue) params.delete(key);
+      else params.set(key, value);
+    };
+
+    setOrDelete("q", searchQuery.trim());
+    setOrDelete("status", status, "all");
+    setOrDelete("page", String(currentPage), "1");
+    setOrDelete("size", String(pageSize), "50");
+
+    const queryString = params.toString();
+    const nextUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
+    window.history.replaceState(null, "", nextUrl);
+  }, [urlReady, searchQuery, status, currentPage, pageSize]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 250);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const loadSummary = useCallback(async () => {
+    const { data, error } = await supabase.rpc("get_customer_order_list_summary", {
+      p_customer_id: customerId ?? null,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    const row = ((data ?? [])[0] ?? null) as OrderSummaryRow | null;
+    if (!row) {
+      setSummary({ total: 0, open: 0, completed: 0, currencyCount: 0, totalValue: 0, currencyCode: null });
+      return;
+    }
+
+    setSummary({
+      total: Number(row.total_count ?? 0),
+      open: Number(row.open_count ?? 0),
+      completed: Number(row.completed_count ?? 0),
+      currencyCount: Number(row.currency_count ?? 0),
+      totalValue: Number(row.total_value ?? 0),
+      currencyCode: row.currency_code,
+    });
+  }, [customerId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initialize() {
       setIsLoading(true);
       setErrorMessage(null);
 
       const { profile, error: profileError } = await getCurrentProfile();
-      if (!mounted) return;
+      if (cancelled) return;
       if (profileError || !profile) {
         setErrorMessage(profileError?.message ?? "User profile could not be loaded.");
         setIsLoading(false);
@@ -88,78 +216,174 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
         setIsLoading(false);
         return;
       }
+
       setCanManage(hasPermission(profile.role, "orders.manage"));
 
-      const customersQuery = customerId
-        ? supabase.from("customers").select("*").eq("id", customerId)
-        : supabase.from("customers").select("*").order("name");
-      let ordersQuery = supabase
-        .from("customer_orders")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (customerId) ordersQuery = ordersQuery.eq("customer_id", customerId);
+      if (customerId) {
+        const { data, error } = await supabase
+          .from("customers")
+          .select("id, customer_code, name")
+          .eq("id", customerId)
+          .single();
+        if (cancelled) return;
+        if (error) {
+          setErrorMessage(error.message);
+          setIsLoading(false);
+          return;
+        }
+        setSelectedCustomer(data as CustomerLookup);
+      } else {
+        setSelectedCustomer(null);
+      }
 
-      const [customersResult, ordersResult] = await Promise.all([customersQuery, ordersQuery]);
-      if (!mounted) return;
-      const firstError = customersResult.error || ordersResult.error;
-      if (firstError) {
-        setErrorMessage(firstError.message);
+      setAuthReady(true);
+    }
+
+    void initialize();
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    void loadSummary();
+  }, [authReady, loadSummary]);
+
+  useEffect(() => {
+    if (!authReady || !urlReady) return;
+
+    let cancelled = false;
+
+    async function loadOrders() {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      let searchCustomerIds: string[] = [];
+      if (normalizedSearch) {
+        const customerPattern = quotePostgrestValue(`%${debouncedSearch.trim()}%`);
+        let customerSearch = supabase
+          .from("customers")
+          .select("id")
+          .or(`customer_code.ilike.${customerPattern},name.ilike.${customerPattern}`);
+        if (customerId) customerSearch = customerSearch.eq("id", customerId);
+
+        const customerSearchResult = await customerSearch;
+        if (cancelled) return;
+        if (customerSearchResult.error) {
+          setErrorMessage(customerSearchResult.error.message);
+          setOrders([]);
+          setCustomers([]);
+          setFilteredCount(0);
+          setIsLoading(false);
+          return;
+        }
+        searchCustomerIds = (customerSearchResult.data ?? []).map((row) => row.id);
+      }
+
+      let query = supabase
+        .from("customer_orders")
+        .select("*", { count: "exact" });
+
+      if (customerId) query = query.eq("customer_id", customerId);
+      if (status !== "all") query = query.eq("status", status);
+
+      if (normalizedSearch) {
+        const pattern = quotePostgrestValue(`%${debouncedSearch.trim()}%`);
+        const filters = [
+          `order_number.ilike.${pattern}`,
+          `customer_reference.ilike.${pattern}`,
+          `payment_method_name_snapshot.ilike.${pattern}`,
+        ];
+        if (searchCustomerIds.length) {
+          filters.push(`customer_id.in.(${searchCustomerIds.join(",")})`);
+        }
+        query = query.or(filters.join(","));
+      }
+
+      const from = (currentPage - 1) * pageSize;
+      const to = from + pageSize - 1;
+      const ordersResult = await query
+        .order("created_at", { ascending: false })
+        .range(from, to);
+
+      if (cancelled) return;
+      if (ordersResult.error) {
+        setErrorMessage(ordersResult.error.message);
+        setOrders([]);
+        setCustomers([]);
+        setFilteredCount(0);
         setIsLoading(false);
         return;
       }
 
-      setCustomers((customersResult.data ?? []) as Customer[]);
-      setOrders((ordersResult.data ?? []) as CustomerOrder[]);
+      const pageOrders = (ordersResult.data ?? []) as CustomerOrder[];
+      let pageCustomers: CustomerLookup[] = selectedCustomer ? [selectedCustomer] : [];
+
+      if (!customerId) {
+        const customerIds = [...new Set(pageOrders.map((order) => order.customer_id))];
+        if (customerIds.length) {
+          const customerResult = await supabase
+            .from("customers")
+            .select("id, customer_code, name")
+            .in("id", customerIds);
+          if (cancelled) return;
+          if (customerResult.error) {
+            setErrorMessage(customerResult.error.message);
+            setOrders([]);
+            setCustomers([]);
+            setFilteredCount(0);
+            setIsLoading(false);
+            return;
+          }
+          pageCustomers = (customerResult.data ?? []) as CustomerLookup[];
+        } else {
+          pageCustomers = [];
+        }
+      }
+
+      setOrders(pageOrders);
+      setCustomers(pageCustomers);
+      setFilteredCount(ordersResult.count ?? 0);
       setIsLoading(false);
     }
 
-    void load();
+    void loadOrders();
     return () => {
-      mounted = false;
+      cancelled = true;
     };
-  }, [customerId]);
-
-  const customerMap = useMemo(
-    () => new Map(customers.map((customer) => [customer.id, customer])),
-    [customers]
-  );
-  const selectedCustomer = customerId ? customers[0] ?? null : null;
-
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return orders.filter((order) => {
-      const customer = customerMap.get(order.customer_id);
-      const matchesSearch =
-        !query ||
-        order.order_number.toLowerCase().includes(query) ||
-        (order.customer_reference ?? "").toLowerCase().includes(query) ||
-        (order.payment_method_name_snapshot ?? "").toLowerCase().includes(query) ||
-        (customer?.name ?? "").toLowerCase().includes(query) ||
-        (customer?.customer_code ?? "").toLowerCase().includes(query);
-      return matchesSearch && (status === "all" || order.status === status);
-    });
-  }, [orders, search, status, customerMap]);
+  }, [
+    authReady,
+    urlReady,
+    customerId,
+    selectedCustomer,
+    currentPage,
+    pageSize,
+    status,
+    normalizedSearch,
+    debouncedSearch,
+  ]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [search, status, pageSize]);
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const page = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const openOrders = orders.filter((order) => !["completed", "cancelled"].includes(order.status));
-  const currencies = [...new Set(orders.map((order) => order.currency_code).filter(Boolean))];
-  const totalValue = orders.reduce((sum, order) => sum + grandTotal(order), 0);
-  const totalValueLabel = currencies.length <= 1 ? money(totalValue, currencies[0] || "USD") : "Multiple currencies";
+  const totalValueLabel =
+    summary.currencyCount <= 1
+      ? money(summary.totalValue, summary.currencyCode || selectedCustomer?.id ? summary.currencyCode || "USD" : summary.currencyCode || "USD")
+      : "Multiple currencies";
 
-  if (isLoading) {
+  if (isLoading && !orders.length) {
     return <Loading label="Loading orders..." />;
   }
-  if (errorMessage) {
+  if (errorMessage && !orders.length) {
     return <ErrorBox>{errorMessage}</ErrorBox>;
   }
 
   return (
     <div className="space-y-5">
+      {errorMessage && <ErrorBox>{errorMessage}</ErrorBox>}
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
@@ -186,23 +410,29 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Summary label="Orders" value={orders.length.toString()} />
-        <Summary label="Open" value={openOrders.length.toString()} />
-        <Summary label="Completed" value={orders.filter((order) => order.status === "completed").length.toString()} />
+        <Summary label="Orders" value={summary.total.toString()} />
+        <Summary label="Open" value={summary.open.toString()} />
+        <Summary label="Completed" value={summary.completed.toString()} />
         <Summary label="Total Value" value={totalValueLabel} />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="grid gap-3 border-b border-gray-200 p-4 md:grid-cols-[1fr_240px] dark:border-gray-800">
           <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            value={searchQuery}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Search order, reference, payment or customer..."
             className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
           />
           <select
             value={status}
-            onChange={(event) => setStatus(event.target.value as "all" | CustomerOrderStatus)}
+            onChange={(event) => {
+              setStatus(event.target.value as "all" | CustomerOrderStatus);
+              setCurrentPage(1);
+            }}
             className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
           >
             <option value="all">All Statuses</option>
@@ -220,8 +450,8 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {page.map((order) => {
-                const customer = customerMap.get(order.customer_id);
+              {orders.map((order) => {
+                const customer = selectedCustomer ?? customerMap.get(order.customer_id);
                 return (
                   <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                     <td className="px-5 py-4">
@@ -246,7 +476,7 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
                   </tr>
                 );
               })}
-              {page.length === 0 && (
+              {orders.length === 0 && (
                 <tr><td colSpan={selectedCustomer ? 6 : 7} className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">No orders found.</td></tr>
               )}
             </tbody>
@@ -254,14 +484,23 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
         </div>
 
         <div className="flex flex-col gap-3 border-t border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
-          <p className="text-sm text-gray-500 dark:text-gray-400">{filtered.length} orders</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {filteredCount === 0 ? "0 orders" : `${startRow}–${endRow} of ${filteredCount} orders`}
+          </p>
           <div className="flex items-center gap-2">
-            <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+            <select
+              value={pageSize}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                setCurrentPage(1);
+              }}
+              className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+            >
               {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size} / page</option>)}
             </select>
-            <button disabled={currentPage <= 1} onClick={() => setCurrentPage((value) => Math.max(1, value - 1))} className="h-9 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300">Previous</button>
+            <button disabled={currentPage <= 1 || isLoading} onClick={() => setCurrentPage((value) => Math.max(1, value - 1))} className="h-9 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300">Previous</button>
             <span className="min-w-[75px] text-center text-xs text-gray-500 dark:text-gray-400">{currentPage} / {totalPages}</span>
-            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage((value) => Math.min(totalPages, value + 1))} className="h-9 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300">Next</button>
+            <button disabled={currentPage >= totalPages || isLoading} onClick={() => setCurrentPage((value) => Math.min(totalPages, value + 1))} className="h-9 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300">Next</button>
           </div>
         </div>
       </div>
