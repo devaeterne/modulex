@@ -28,6 +28,7 @@ function loadModule(filePath) {
 
 const permissions = loadModule(resolve(process.cwd(), "src/lib/auth/permissions.ts"));
 const { hasPermission, requiredPermissionForPath, canAccessPath } = permissions;
+const sidebarSource = readFileSync(resolve(process.cwd(), "src/layout/AppSidebar.tsx"), "utf8");
 
 const checks = [];
 function check(name, fn) {
@@ -65,24 +66,77 @@ check("Warehouse manages stock while Shipping cannot run general stock operation
   assert.equal(hasPermission("shipping", "shipments.manage"), true);
 });
 
+check("Sidebar navigation permissions match direct-route permissions", () => {
+  const navEntries = [...sidebarSource.matchAll(/path:\s*"([^"]+)"\s*,\s*permission:\s*"([^"]+)"/g)].map((match) => ({
+    path: match[1],
+    permission: match[2],
+  }));
+
+  assert.ok(navEntries.length > 0, "Expected to discover sidebar navigation entries");
+
+  const mismatches = navEntries
+    .map(({ path, permission }) => ({
+      path,
+      sidebarPermission: permission,
+      routePermission: requiredPermissionForPath(path),
+    }))
+    .filter((entry) => entry.sidebarPermission !== entry.routePermission);
+
+  assert.deepEqual(mismatches, []);
+});
+
+check("Profile is available to every active Admin role", () => {
+  assert.equal(requiredPermissionForPath("/profile"), "profile.view");
+  for (const role of ["super_admin", "admin", "sales", "finance", "hr", "warehouse", "shipping"]) {
+    assert.equal(hasPermission(role, "profile.view"), true, `${role} should have profile.view`);
+    assert.equal(canAccessPath(role, "/profile"), true, `${role} should access /profile`);
+  }
+});
+
 check("Store lead list/detail route permissions are distinct", () => {
   assert.equal(requiredPermissionForPath("/store/leads"), "leads.view");
   assert.equal(requiredPermissionForPath("/store/leads/abc"), "leads.manage");
 });
 
+check("Store CMS manage-only navigation stays manage-only on direct URLs", () => {
+  assert.equal(requiredPermissionForPath("/store/content"), "store.manage");
+  assert.equal(requiredPermissionForPath("/store/colors"), "store.manage");
+  assert.equal(requiredPermissionForPath("/store/marketing"), "store.manage");
+});
+
 check("Finance-sensitive route rules remain protected", () => {
   assert.equal(requiredPermissionForPath("/pricing/cost-margin"), "pricing.cost.view");
   assert.equal(requiredPermissionForPath("/settings/general/tax-rules"), "finance.manage");
+  assert.equal(requiredPermissionForPath("/customers/payment-methods"), "finance.manage");
 });
 
 check("Personnel and low-stock routes map to their dedicated permissions", () => {
   assert.equal(requiredPermissionForPath("/personnel/employees"), "personnel.view");
+  assert.equal(requiredPermissionForPath("/personnel/departments"), "personnel.manage");
+  assert.equal(requiredPermissionForPath("/personnel/positions"), "personnel.manage");
   assert.equal(requiredPermissionForPath("/low-stock"), "inventory.view");
+});
+
+check("Warehouse structure mutation routes require warehouse.manage", () => {
+  for (const path of [
+    "/warehouses/new",
+    "/warehouses/warehouse-1/edit",
+    "/zones/new",
+    "/zones/zone-1/edit",
+    "/locations/new",
+    "/locations/location-1/edit",
+  ]) {
+    assert.equal(requiredPermissionForPath(path), "warehouse.manage", `${path} should require warehouse.manage`);
+    assert.equal(canAccessPath("warehouse", path), false, `warehouse role should not mutate ${path}`);
+    assert.equal(canAccessPath("shipping", path), false, `shipping role should not mutate ${path}`);
+    assert.equal(canAccessPath("admin", path), true, `admin should mutate ${path}`);
+  }
 });
 
 check("Role/path access follows the permission matrix", () => {
   assert.equal(canAccessPath("sales", "/store/leads/abc"), true);
   assert.equal(canAccessPath("finance", "/pricing/cost-margin"), true);
+  assert.equal(canAccessPath("finance", "/customers/payment-methods"), true);
   assert.equal(canAccessPath("shipping", "/stock-operations"), false);
   assert.equal(canAccessPath("hr", "/personnel/employees"), true);
 });
