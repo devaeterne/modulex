@@ -1,0 +1,23 @@
+name: A1.1C customer detail contract
+
+on:
+  push:
+    branches:
+      - phase-a1/customer-detail-address-integrity
+
+permissions:
+  contents: read
+
+jobs:
+  customer-detail-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run A1.1C contract
+        run: node scripts/customer-detail-integrity-contract.mjs
