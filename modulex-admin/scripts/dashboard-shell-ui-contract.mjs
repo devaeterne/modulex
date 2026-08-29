@@ -42,7 +42,7 @@ assert.match(
 
 assert.match(
   dashboard,
-  />Try again</,
+  />\s*Try again\s*</,
   "Dashboard error state must provide an explicit retry action",
 );
 assert.doesNotMatch(
