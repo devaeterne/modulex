@@ -1,0 +1,41 @@
+name: GC-3 closeout patch
+
+on:
+  push:
+    branches:
+      - docs/gc3-production-acceptance
+
+permissions:
+  contents: write
+
+jobs:
+  patch-roadmaps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply GC-3 closeout
+        run: node modulex-store/scripts/apply-gc3-closeout.mjs
+      - name: Verify GC-3 closeout records
+        run: |
+          grep -Fq -- '- [x] GC-2 — Media library & optimization pipeline.' modulex-store/STORE_ROADMAP.md
+          grep -Fq -- '- [x] GC-3 — Company identity, contact, About & Showroom migration.' modulex-store/STORE_ROADMAP.md
+          grep -Fq 'GC-4 — Contact / Project Consultation Form migration' modulex-store/STORE_ROADMAP.md
+          grep -Fq 'Status: `[x]` production-accepted on 2026-08-29.' modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md
+          grep -Fq '**GC-3: complete / production-accepted.**' modulex-store/docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md
+          grep -Fq 'Current Admin next action: **A1.2B — verify create/edit/detail flows use one domain contract**' modulex-admin/ADMIN_ROADMAP.md
+          grep -Fq 'GC-4 — Contact / Project Consultation is the next Granite package' modulex-admin/ADMIN_ROADMAP.md
+          git diff --check
+      - name: Commit docs-only closeout and remove temporary helpers
+        run: |
+          rm modulex-store/scripts/apply-gc3-closeout.mjs
+          rm .github/workflows/gc3-closeout-patch.yml
+          git config user.name devaeterne
+          git config user.email info@safaksariyildiz.com
+          git add -A
+          git commit -m 'docs: close GC-3 production acceptance'
+          git push
