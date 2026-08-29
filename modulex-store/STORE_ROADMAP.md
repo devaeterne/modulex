@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `f40c44a7a317812eb6346a618fbb5f30969ae515`
+Main baseline: `c0adbfbb431973a3acb4a94902341ac64b11c1de`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -563,8 +563,9 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
   - Reviewed 32 Granite Center source pages and classified 55 content candidates, 62 media candidates, and 7 conflict classes.
   - Machine-readable manifest: `docs/granite-center/gc1-source-manifest.json`; human review: `docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md`.
   - Deterministic manifest contract passed in GitHub Actions run `33254382256`; byte-level media metadata remains intentionally unverified/null for GC-2.
-- [~] GC-2 — Media library & optimization pipeline.
-- [ ] GC-3 — Company identity, contact, About & Showroom migration.
+- [x] GC-2 — Media library & optimization pipeline.
+- [x] GC-3 — Company identity, contact, About & Showroom migration.
+  - Production acceptance: `docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`.
 - [ ] GC-4 — Contact / Project Consultation Form migration.
 - [ ] GC-5 — Projects / Gallery migration.
 - [ ] GC-6 — Cabinet content / customer journey.
@@ -579,7 +580,7 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 
 ## Granite Center Migration — GC-2 Execution Status
 
-- [~] **GC-2 — Media Library & Optimization Pipeline**
+- [x] **GC-2 — Media Library & Optimization Pipeline**
   - [x] **GC-2A — schema/security foundation** is production-verified.
     - Production migrations: `store_media_library` and `store_media_library_grant_hardening`.
     - Added reusable `store_media_assets` + `store_media_asset_sources`, exact original SHA-256 uniqueness, Admin-only RLS, and private `store-media-staging`.
@@ -599,9 +600,20 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
     - Production remains intentionally empty at closeout: `store_media_assets = 0`, `store_media_asset_sources = 0`, `store-media-staging objects = 0`, and public `store-media` objects = 0; GC-2D remains the production-intake boundary.
   - [x] **GC-2D — controlled production intake** is production-accepted. Representative import/review/publish, exact-SHA duplicate import, unpublish, same immutable-path republish, private staging privacy, and the post-PR #128 duplicate self-heal all passed. Final production state is 1 media asset / 1 provenance row / 2 private staging objects / 1 public immutable WebP object, with published state/path unchanged by the repair. Acceptance: `docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`.
 
+## Granite Center Migration — GC-3 Execution Status
+
+- [x] **GC-3 — Company identity, Contact, About & Showroom** is production-accepted.
+  - Production migration `20260829192009_gc3_company_domain` adds structured contact channels, locations/showrooms, weekly hours, Admin-only RLS, and the narrow public company projection. It deliberately seeds no showroom, hours, directions, alternate channels, or media.
+  - Admin `/store/company` is protected by `store.manage`, reuses the existing company-profile editor for scalar identity, and manages structured contact/location/hour rows without browser-exposed elevated credentials.
+  - Public Contact preserves canonical profile contact data and augments it only with active structured projection rows. About remains on the existing published About CMS + verified company-profile contract. `/showroom` renders only explicitly published `location_type = 'showroom'` rows and otherwise returns the truthful empty state.
+  - Final deterministic Admin + Store smoke/lint verification passed in GitHub Actions run `33271713693`. Current production Admin and Store deployments from `c0adbfbb431973a3acb4a94902341ac64b11c1de` are `READY`; live `/about`, `/contact`, and `/showroom` return 200/indexable responses, and Showroom navigation/footer links are live.
+  - Production DB/advisor evidence was captured in PR #132: initial new-table counts remained zero and the public projection returned empty arrays, with no new GC-3 security or missing-index warning.
+  - Acceptance: `docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`.
+
 # Next Action
 
 The user-approved active workstream remains the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Start **GC-3 — Company identity, contact, About & Showroom** from the current `main`, extending only the structured Admin/Supabase/public-projection domains actually required by confirmed business truth.
-2. Keep Gallery/Projects `[~]`; GC-5 still owns curated project/media association and final public Gallery acceptance. GC-2 is closed and must not be reopened to seed project content.
+1. Start **GC-4 — Contact / Project Consultation Form migration** from the current `main`, preserving the native `/api/leads` security/attribution path and adding only business-approved fields/options.
+2. Keep Gallery/Projects `[~]`; GC-5 still owns curated project/media association and final public Gallery acceptance.
+3. GC-3 is closed. Do not seed unconfirmed showroom locations, hours, directions, or showroom media as a shortcut during GC-4.

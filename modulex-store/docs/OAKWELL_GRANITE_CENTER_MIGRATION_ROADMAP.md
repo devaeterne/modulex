@@ -10,6 +10,8 @@ GC-0 truth/ownership lock: `modulex-store/docs/GC0_BUSINESS_TRUTH_LOCK.md`
 GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`
 GC-2 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc2-media-library-optimization-implementation.md`
 GC-2 production acceptance: `modulex-store/docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`
+GC-3 implementation plan: `docs/superpowers/plans/2026-08-29-gc3-company-identity-contact-about-showroom.md`
+GC-3 production acceptance: `modulex-store/docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`
 GC-1 manifest: `modulex-store/docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md` + `gc1-source-manifest.json`
 
 > Purpose: identify which verified Granite & Cabinet Center business data, media, social proof, forms, showroom information, and cabinet-related content should be adapted into Oakwell Cabinetry without cloning the parent website or importing stale/irrelevant WordPress content.
@@ -474,16 +476,19 @@ Status: `[x]` production-accepted on 2026-08-29.
 
 Goal: make real-world Oakwell identity/location content fully data-driven.
 
-- `[ ]` extend company profile with structured contact/location/hours domains only as required;
-- `[ ]` backfill current approved values without code constants;
-- `[ ]` expose Admin controls;
-- `[ ]` extend narrow public profile projections;
-- `[ ]` publish adapted About content;
-- `[ ]` add Showroom page/section and controlled media;
-- `[ ]` add confirmed hours/directions only when business-approved;
-- `[ ]` make relevant public surfaces consume the controlled source.
+Status: `[x]` production-accepted on 2026-08-29. Acceptance: `modulex-store/docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`.
 
-**Exit gate:** ordinary contact/location/showroom content changes require no Store code deployment, and public surfaces/structured data do not contradict one another.
+- `[x]` add structured contact/location/hour domains with Admin-only write boundaries and a narrow active public projection;
+- `[x]` preserve `general_settings` as canonical scalar company identity instead of duplicating it;
+- `[x]` expose Admin `/store/company` under `store.manage`;
+- `[x]` make Contact consume canonical profile data plus active structured rows without replacing the native first-party lead form;
+- `[x]` preserve About on the existing published `store_pages.slug = 'about'` CMS + verified company identity contract;
+- `[x]` add `/showroom` and render only explicitly active showroom rows, with a truthful empty state when none are published;
+- `[x]` gate hours/directions behind explicitly supplied and published data; no Sunday, hours, map URL, or showroom is inferred;
+- `[x]` add Showroom navigation/footer entry while keeping media/project association outside GC-3.
+
+**Exit gate:** `[x]` ordinary structured contact/location/showroom changes are Admin/Supabase-managed and Store reads the controlled projection; current production does not manufacture unconfirmed showroom facts.
+
 
 ## GC-4 — Contact / Project Consultation
 
@@ -586,10 +591,10 @@ Goal: add trust signals with correct source identity.
 
 # 10. Next Action
 
-GC-0 truth/data ownership is locked and GC-1 source discovery/classification is complete for review.
+GC-0 truth/data ownership is locked; GC-1, GC-2, and GC-3 are production-accepted.
 
-1. Review and merge the GC-1 manifest PR.
-2. Start **GC-2 — Media library & optimization pipeline** from the latest `main`.
-3. GC-2 must acquire source bytes, verify dimensions/bytes/MIME, compute SHA-256 hashes, review exact/near duplicates, strip unnecessary metadata, optimize without upscaling, upload approved assets to Oakwell-controlled Supabase Storage, and provide the Admin-managed reusable media domain required by later GC packages.
-4. Do not publish source media directly from Granite Center URLs; source URLs remain provenance only.
-5. Re-read current Store/Admin roadmaps before GC-2 implementation because parallel PRs may have merged.
+1. Start **GC-4 — Contact / Project Consultation** from the latest `main`.
+2. Preserve the existing native `/api/leads` path, same-origin/spam/privacy protections, UTM/referrer attribution, and separate marketing consent.
+3. Add only business-approved consultation fields/options; mutable business choices must be Admin/data-managed, while validation/security behavior remains code-owned.
+4. Keep customer file upload deferred unless separately approved; dealer supporting-document infrastructure remains private and separately scoped.
+5. Keep Gallery/Projects `[~]`; GC-5 owns curated project/media association and final Gallery acceptance.

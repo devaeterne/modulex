@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `f9d9571c70e911ee41c588e2ff8bd17a9a351a05`
+Main baseline: `c0adbfbb431973a3acb4a94902341ac64b11c1de`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-2 media library & optimization is production-accepted and complete. GC-2D live acceptance verified controlled import/review/publish, exact-SHA dedupe, unpublish/same-path republish, private staging, and duplicate-intake self-heal with final production counts of 1 asset / 1 provenance / 2 private staging objects / 1 public object. GC-3 — Company identity, contact, About & Showroom is the next Granite package; Admin primary work remains Phase A1**
+Current cross-roadmap package: **Granite Center → Oakwell GC-3 company identity, Contact, About & Showroom is production-accepted and complete. GC-4 — Contact / Project Consultation is the next Granite package; Admin primary work remains Phase A1 and the current Admin next action remains A1.2B**
 Current Admin next action: **A1.2B — verify create/edit/detail flows use one domain contract**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
@@ -459,6 +459,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
 - [x] Store portal Admin contract exists.
 - [x] Secondary CMS Admin contract exists and protects Pages/Projects routes, RBAC, lifecycle actions, media constraints, and service-role exclusion.
 - [x] GC-2 Media Library Admin contract protects `/store/media`, `store.manage` RBAC, private signed previews, metadata/provenance review, and controlled publish/unpublish/delete behavior; it is part of the permanent Admin smoke chain.
+- [x] GC-3 Company Admin contract protects `/store/company`, `store.manage` RBAC, reuse of the canonical company-profile editor, and structured contact/location/hour management; it is part of the permanent Admin smoke chain.
 - [x] Auth recovery contract exists.
 - [x] Polling regression contract exists.
 - [x] Production-surface/demo-route contract exists and is part of the Admin smoke chain.
@@ -548,6 +549,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] Customer document dealer-visibility controls exist.
 - [x] Phase 2.1B secondary Pages/Projects CMS exists with controlled page slugs, project/media management, explicit publishing, SEO/OG fields, and Store media validation.
 - [x] GC-2C Admin Media Library exists at `/store/media` with `store.manage` route/sidebar RBAC, asset/provenance review, 5-minute authenticated signed previews for private staging, metadata editing, and server-side publish/unpublish/delete lifecycle controls.
+- [x] GC-3 Company workspace exists at `/store/company` with `store.manage` route/sidebar RBAC, canonical profile reuse, and authenticated structured contact/location/hour management. Public Store consumption remains through the narrow active projection.
 - [x] Oakwell dynamic-content architecture is approved for Granite migration: mutable public business content/media remains Admin/Supabase-owned and Store-consumed through controlled projections.
 
 ## Security and testing
@@ -587,6 +589,6 @@ Primary Admin roadmap work is **Phase A1 — Customer, Order & Fulfillment Opera
 2. Then start **A1.1B — Customer Master Mutation Contract**: validated customer status/type/master mutations plus mutation+audit atomicity.
 3. Follow with **A1.1C — Customer Detail & Address Integrity**: remove legacy action-hiding CSS, clarify detail action hierarchy, and make default-address changes atomic.
 
-**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1 and GC-2 are complete. GC-2 production acceptance is recorded in `modulex-store/docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`: the representative asset is live-published, duplicate import preserved one asset/provenance row and lifecycle state, unpublish/re-publish restored the same immutable SHA path/bytes, and the post-PR #128 duplicate self-heal restored the missing private original at its existing path while final counts remained 1 asset / 1 provenance / 2 private staging objects / 1 public object. GC-3 — Company identity, contact, About & Showroom is next. Gallery/Projects remains `[~]` and GC-5 owns project/media association. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
+**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, Phase 2.1C About is production-accepted, and Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1, GC-2, and GC-3 are complete. GC-3 production acceptance is recorded in `modulex-store/docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`; Admin `/store/company`, structured company RLS/projection, and live Contact/About/Showroom behavior passed final deterministic smoke/lint and production acceptance. **GC-4 — Contact / Project Consultation is next.** Gallery/Projects remains `[~]` and GC-5 owns project/media association. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule. Admin primary work remains Phase A1 with current next action A1.2B.
 
 **Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A1 or other concurrently merged Admin work is preserved rather than overwritten.
