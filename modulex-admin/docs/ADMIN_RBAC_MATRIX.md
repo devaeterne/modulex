@@ -7,7 +7,7 @@ This document is the Phase A0.2 navigation and direct-route authorization invent
 
 ## Enforcement model
 
-Admin authorization has three independent layers:
+Admin authorization has four independent layers:
 
 1. **Navigation visibility** — `src/layout/AppSidebar.tsx` filters entries with `hasPermission()`.
 2. **Direct-route visibility** — `src/app/(admin)/layout.tsx` calls `canAccessPath()` and renders Access Denied when the authenticated role does not satisfy the path permission.
