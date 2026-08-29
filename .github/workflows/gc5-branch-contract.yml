@@ -8,6 +8,8 @@ on:
 permissions:
   contents: write
 
+# Branch-scoped verification: migration preparation is idempotent, then the exact
+# human-triggered HEAD runs GC-5 contracts, regressions, lint, and production builds.
 jobs:
   prepare-migration:
     runs-on: ubuntu-latest
