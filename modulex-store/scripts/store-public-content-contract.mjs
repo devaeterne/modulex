@@ -67,6 +67,34 @@ if (galleryClientSource) {
   check(galleryClientSource.includes("Escape"), "Gallery lightbox must support Escape-to-close");
 }
 
+const layoutSource = await readRequired("src/app/layout.tsx");
+if (layoutSource) {
+  check(layoutSource.includes("getStoreGalleryReadiness"), "Root layout must resolve Gallery readiness server-side");
+  check(layoutSource.includes("galleryReady"), "Root layout must pass a fail-closed Gallery readiness flag to StoreChrome");
+}
+
+const chromeSource = await readRequired("src/components/StoreChrome.tsx");
+if (chromeSource) {
+  check(chromeSource.includes("galleryReady"), "StoreChrome must accept and forward Gallery readiness");
+  check(/<Navbar[\s\S]*?galleryReady=\{galleryReady\}/.test(chromeSource), "StoreChrome must forward Gallery readiness to Navbar");
+}
+
+const navbarSource = await readRequired("src/components/Navbar.tsx");
+if (navbarSource) {
+  check(navbarSource.includes("galleryReady"), "Navbar must accept Gallery readiness");
+  check(navbarSource.includes('href="/gallery"'), "Navbar must expose the Gallery route when ready");
+  check(/galleryReady\s*\?/.test(navbarSource), "Navbar Gallery link must be conditional on readiness");
+}
+
+const sitemapSource = await readRequired("src/app/sitemap.ts");
+if (sitemapSource) {
+  check(sitemapSource.includes("getStoreGalleryReadiness"), "Sitemap must use the shared Gallery readiness helper");
+  const staticRoutes = sitemapSource.match(/const staticRoutes\s*=\s*\[([\s\S]*?)\];/)?.[1] ?? "";
+  check(!staticRoutes.includes("/gallery"), "Gallery must never be an unconditional static sitemap route");
+  check(sitemapSource.includes("/gallery"), "Sitemap must be able to append Gallery when published content is ready");
+  check(/isReady[\s\S]*?\/gallery/.test(sitemapSource), "Sitemap Gallery entry must be guarded by published readiness");
+}
+
 if (failures.length > 0) {
   console.error("Store public content contract failed:\n");
   for (const failure of failures) console.error(`- ${failure}`);
