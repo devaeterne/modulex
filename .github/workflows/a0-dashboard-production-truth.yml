@@ -11,58 +11,31 @@ on:
 permissions:
   contents: write
 
-env:
-  NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
-
 jobs:
-  verify:
+  closeout:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modulex-admin
+    env:
+      A0_DASHBOARD_STATUS: complete
+      FULL_RUN_ID: "33253394213"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Mark dashboard audit in progress
+      - name: Apply verified dashboard closeout
+        working-directory: modulex-admin
         run: python scripts/tmp-a0-dashboard-roadmap.py
-      - name: Commit roadmap package state
-        working-directory: .
+      - name: Remove temporary verification files
         run: |
-          if git diff --quiet; then
-            exit 0
-          fi
+          rm .github/workflows/a0-dashboard-production-truth.yml
+          rm modulex-admin/scripts/tmp-a0-dashboard-roadmap.py
+      - name: Verify closeout diff
+        run: |
+          git diff --check
+          git status --short
+      - name: Commit closeout
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add modulex-admin/ADMIN_ROADMAP.md
-          git commit -m "docs: mark A0 dashboard audit in progress [skip ci]"
+          git add -A
+          git commit -m "docs: close A0 dashboard production-truth audit [skip ci]"
           git push
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: modulex-admin/package-lock.json
-      - run: npm ci
-      - name: Production surface contract
-        run: npm run smoke:production-surface
-      - name: RBAC contract
-        run: npm run smoke:rbac
-      - name: Secondary CMS Admin contract
-        run: npm run smoke:secondary-cms-admin
-      - name: Dealer onboarding contract
-        run: npm run smoke:dealer-onboarding
-      - name: Dealer portal Admin contract
-        run: npm run smoke:dealer-portal-admin
-      - name: Store portal Admin contract
-        run: npm run smoke:store-portal-admin
-      - name: Auth recovery contract
-        run: npm run smoke:auth-recovery
-      - name: Polling contract
-        run: npm run smoke:polling
-      - name: Lint
-        run: npm run lint
-      - name: Production build
-        run: npm run build
-      - name: Diff check
-        run: git -C .. diff --check 45458e1f1402614b5e4a408394706df4c4aa757d...HEAD
