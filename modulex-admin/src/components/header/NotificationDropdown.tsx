@@ -325,7 +325,7 @@ export default function NotificationDropdown() {
 
   const visibleNotifications = useMemo(() => role ? notifications.filter((notification) => canRoleSeeNotification(role, notification.type)) : [], [notifications, role]);
   const isRead = (id: string) => id.startsWith("user:") ? persistentReadIds.has(id) : readIds.has(id);
-  const unreadCount = useMemo(() => visibleNotifications.filter((notification) => !isRead(notification.id)).length, [visibleNotifications, readIds, persistentReadIds]);
+  const unreadCount = visibleNotifications.filter((notification) => notification.id.startsWith("user:") ? !persistentReadIds.has(notification.id) : !readIds.has(notification.id)).length;
 
   function persistReadIds(next: Set<string>) {
     setReadIds(next);
