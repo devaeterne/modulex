@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `23e5d365876dc65dae9a46645f0627d8f38bc683`
+Main baseline: `142df0b28a56e87f1c128d407eca16fab2e11a49`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -577,19 +577,21 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 
 ---
 
+## Granite Center Migration — GC-2 Execution Status
+
+- [~] **GC-2 — Media Library & Optimization Pipeline**
+  - [x] **GC-2A — schema/security foundation** is production-verified.
+    - Production migrations: `store_media_library` and `store_media_library_grant_hardening`.
+    - Added reusable `store_media_assets` + `store_media_asset_sources`, exact original SHA-256 uniqueness, Admin-only RLS, and private `store-media-staging`.
+    - `authenticated` table grants are narrowed to `SELECT/INSERT/UPDATE/DELETE`; `anon` has no direct table grant.
+    - Existing public `store-media` remains public and unchanged; staging is private, 20 MB, image-only, and both buckets had zero objects at GC-2A acceptance.
+    - TDD evidence: initial RED `33257908417`, grant-hardening RED `33258120507`, final GREEN `33258278549`.
+  - [ ] **GC-2B — importer/optimizer** is next: manifest selection, bounded source acquisition, verified MIME/dimensions/bytes, SHA-256 dedupe, auto-orientation, metadata stripping, no-upscale WebP optimization, private staging and idempotent registration.
+  - [ ] GC-2C Admin Media Library and GC-2D controlled production intake remain pending.
+
 # Next Action
 
-The user-approved active workstream is the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
+The user-approved active workstream remains the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Begin **GC-2 — Media library & optimization pipeline** from latest `main` after the bounded public self-link cleanup is merged.
-2. GC-2 owns source-byte acquisition, verified dimensions/bytes/MIME, SHA-256 exact deduplication, optional perceptual duplicate review, EXIF/GPS stripping, conservative resize/encoding, Supabase Storage upload, reusable media records and the Admin media-management surface required for ongoing operation.
-3. Do not publish or hard-code Granite source values/media; source URLs remain provenance and all public content continues to follow GC-0 attribution/publication rules.
-4. Keep Phase 2.1 Gallery/Projects marked `[~]` until approved real Gallery/Project content is published and live readiness is accepted; GC-5 may provide the curated content required to close that blocker.
-5. Package D — configurable Navbar/Footer remains an open Phase 2.1 capability and must follow the same Admin-managed dynamic-content rule.
-6. Before every new package, re-read current `main` and both roadmaps because parallel Modulex PRs may have landed.
-
-**Package C branch verification:** GitHub Actions run `33244098018` passed the Phase 2.1C public-content contract, public-production contract, full Store smoke, lint, and Next.js/TypeScript build.
-
-**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C About production-accepted; Gallery/Projects content acceptance pending → Granite roadmap #104 merged → GC-0 #105 merged → dynamic-content architecture/ownership #108 merged → GC-1 source manifest merged via #110 → public Contact self-link cleanup merged via #111 → GC-2 next after this bounded self-link follow-up.
-
-**Admin coordination:** GC-1 started from current main `6cbd27198d930cb129b912fa4faece3bf967e292`, which includes parallel Admin dashboard-truth PR #107 and dynamic-content PR #108. Primary Admin A0 cleanup remains independent; Granite work only adds coordinated A4/A5 CMS/settings responsibilities and must not overwrite parallel Admin roadmap progress.
+1. Execute **GC-2B — importer/optimizer** from the latest `main` after GC-2A is merged. GC-2B owns source-byte acquisition, verified MIME/dimensions/bytes, original SHA-256 exact deduplication, auto-orientation, EXIF/GPS stripping, conservative no-upscale WebP optimization, private staging upload, and idempotent asset/provenance registration. The importer must not publish.
+2. Preserve Gallery/Projects as `[~]`; GC-5 remains responsible for curated project/media association and final public Gallery acceptance.
