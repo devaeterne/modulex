@@ -65,20 +65,20 @@ These rules are mandatory for all future Modulex Store work:
   - **Done when:** route purpose matches the actual Oakwell business and all links resolve to real Store routes.
   - Current deliberate treatment: route removed and production `/services` returns not-found.
 
-- [~] Replace or remove template content from `/services/residential`.
+- [x] Replace or remove template content from `/services/residential`.
   - Remove Manhattan/Brooklyn projects, fake testimonials, demo 360 links, fake phone number, and design-studio language.
   - **Done when:** route is production-truthful or permanently redirected/removed.
-  - Route file is removed; direct production crawl verification is still pending.
+  - Route file is removed and production `/services/residential` returns not-found.
 
 - [x] Replace or temporarily disable `/blog` until a real content source exists.
   - Remove fake articles, dates, categories, duplicate cards, placeholder pagination, and dead links.
   - **Done when:** route either renders real published content or returns a deliberate redirect/not-found behavior.
   - Current deliberate treatment: route removed and production `/blog` returns not-found.
 
-- [~] Replace or temporarily disable `/blog/[slug]` demo content.
+- [x] Replace or temporarily disable `/blog/[slug]` demo content.
   - Remove fake author profiles, comments, categories, recent posts, forms, and placeholder social links.
   - **Done when:** only real published article content can resolve a slug.
-  - Route file is removed; arbitrary slug production crawl verification is still pending.
+  - Route file is removed and an arbitrary production slug (`/blog/phase-2-0-verification`) returns not-found.
 
 - [x] Replace Gallery template dataset with approved Oakwell project/media content.
   - Remove invented project names/categories/locations and fake CTA phone number.
@@ -86,10 +86,10 @@ These rules are mandatory for all future Modulex Store work:
   - **Done when:** every visible gallery item maps to approved source data.
   - Current deliberate treatment: Gallery is disabled and production `/gallery` returns not-found until Phase 2.1 provides published CMS projects.
 
-- [~] Audit and remove legacy/demo routes such as `/index-premium` and any other unused template variants.
+- [x] Audit and remove legacy/demo routes such as `/index-premium` and any other unused template variants.
   - Prefer deletion or permanent redirect over leaving discoverable stale pages.
   - **Done when:** no demo marketing page can be reached from a normal URL without an intentional redirect/not-found.
-  - Known legacy route files are removed; full direct production crawl remains pending.
+  - Production `/index-premium`, `/index-slider`, and `/gallery/detail` all return not-found.
 
 - [~] Remove all production placeholders across Store.
   - Search for `+1555`, `href="#"`, `.html` legacy links, fake offers, demo author/testimonial names, and template-only copy.
@@ -120,11 +120,11 @@ These rules are mandatory for all future Modulex Store work:
 - [x] `npm run build` passes.
   - Vercel production build for main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c` compiled successfully, passed TypeScript, generated all routes, and deployed READY.
 - [ ] `npm run smoke` passes.
-- [~] Public route crawl shows no fake/demo content.
-  - `/about`, `/gallery`, `/services`, and `/blog` verified; remaining removed legacy/deep routes still need direct crawl evidence.
+- [x] Public route crawl shows no fake/demo content.
+  - Verified production routes include `/about`, `/gallery`, `/gallery/detail`, `/services`, `/services/residential`, `/blog`, an arbitrary `/blog/[slug]`, `/index-premium`, and `/index-slider`.
 - [x] Sitemap contains only production-approved routes.
 
-**Phase 2.0 closeout blocker:** production merge/deploy and runtime behavior are healthy, but the roadmap's strict exit gate is not complete until fresh `npm run lint`, full `npm run smoke`, and the remaining direct disabled-route crawl evidence are recorded. Phase 2.1 design work may proceed, but Phase 2.1 must not become the primary implementation phase until this gate is formally closed.
+**Phase 2.0 closeout blocker:** production merge/deploy, build, indexing protections, sitemap, and the complete known demo/deep-route crawl are verified. The strict exit gate now has only two missing command-level proofs: fresh `npm run lint` and full `npm run smoke`. Phase 2.1 design work may proceed, but Phase 2.1 must not become the primary implementation phase until this gate is formally closed.
 
 ---
 
@@ -522,7 +522,7 @@ The items below are already present in the current Store architecture. Keep them
 
 # Next Action
 
-1. **Formally close Phase 2.0:** obtain fresh `npm run lint`, full `npm run smoke`, and remaining disabled-route crawl evidence. Production main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c` is already merged, deployed READY, build/TypeScript verified, and account/dealer `noindex, nofollow` verified live.
+1. **Formally close Phase 2.0:** obtain fresh `npm run lint` and full `npm run smoke` evidence. Production main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c` is already merged, deployed READY, build/TypeScript verified, account/dealer `noindex, nofollow` verified live, and the known disabled/demo route crawl is complete.
 2. **Review the written Phase 2.1 architecture specs** in `docs/superpowers/specs/2026-08-29-phase-2-1-{a,b,c,d}-*.md` and record explicit spec approval before implementation.
 3. After written-spec approval and Phase 2.0 formal closeout, implement Phase 2.1 in strict dependency order: **A → B → C → D**.
 4. Each implementation package must update both Store/Admin roadmaps where affected and must not mark downstream tasks complete before verification.
