@@ -154,6 +154,8 @@ const managementItems: NavItem[] = [
     name: "Store",
     subItems: [
       { name: "Site Content", path: "/store/content", permission: "store.manage", exact: true },
+      { name: "Pages", path: "/store/pages", permission: "store.manage", exact: true },
+      { name: "Projects", path: "/store/projects", permission: "store.manage", exact: true },
       { name: "Marketing & Analytics", path: "/store/marketing", permission: "store.manage", exact: true },
       { name: "Product Content", path: "/store/products", permission: "store.view", exact: true },
       { name: "Color Options", path: "/store/colors", permission: "store.manage", exact: true },
