@@ -1,24 +1,65 @@
 import type { UserRole } from "@/lib/supabase/profile";
 import {
-  canAssignRole,
+  canAssignRoles,
   jsonError,
   requireAdmin,
 } from "@/lib/auth/admin-api";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 import { isValidEmail, isValidPhone } from "@/lib/validation";
 
-const VALID_ROLES: UserRole[] = [
+const ROLE_PRIORITY: UserRole[] = [
   "super_admin",
   "admin",
   "sales",
   "finance",
-  "hr",
   "warehouse",
   "shipping",
+  "hr",
 ];
 
+const VALID_ROLES = new Set<UserRole>(ROLE_PRIORITY);
+
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  role: UserRole;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+type UserProfile = ProfileRow & {
+  roles: UserRole[];
+};
+
 function isUserRole(value: unknown): value is UserRole {
-  return typeof value === "string" && VALID_ROLES.includes(value as UserRole);
+  return typeof value === "string" && VALID_ROLES.has(value as UserRole);
+}
+
+function normalizeRequestedRoles(value: unknown):
+  | { roles: UserRole[]; error?: never }
+  | { roles?: never; error: string } {
+  const rawRoles = Array.isArray(value) ? value : [value];
+
+  if (rawRoles.length === 0 || rawRoles.some((role) => !isUserRole(role))) {
+    return { error: "At least one valid user role is required." };
+  }
+
+  const roles = Array.from(new Set(rawRoles as UserRole[])).sort(
+    (a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b)
+  );
+
+  const hasElevatedRole = roles.includes("super_admin") || roles.includes("admin");
+
+  if (hasElevatedRole && roles.length > 1) {
+    return {
+      error: "Admin and Super Admin roles must be assigned exclusively.",
+    };
+  }
+
+  return { roles };
 }
 
 function normalizeEmail(value: unknown) {
@@ -53,14 +94,40 @@ function getSiteUrl(request: Request) {
   return new URL(request.url).origin.replace(/\/$/, "");
 }
 
-async function getProfile(userId: string) {
+async function getRolesForUser(userId: string, fallbackRole: UserRole) {
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+
+  if (error) {
+    return [fallbackRole];
+  }
+
+  const roles = Array.from(
+    new Set((data ?? []).map((row) => row.role as UserRole))
+  ).sort((a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b));
+
+  return roles.length > 0 ? roles : [fallbackRole];
+}
+
+async function getProfile(userId: string): Promise<UserProfile | null> {
   const { data } = await supabaseAdmin
     .from("profiles")
     .select("id, full_name, email, phone, role, is_active, created_at, updated_at")
     .eq("id", userId)
     .maybeSingle();
 
-  return data;
+  if (!data) {
+    return null;
+  }
+
+  const profile = data as ProfileRow;
+
+  return {
+    ...profile,
+    roles: await getRolesForUser(profile.id, profile.role),
+  };
 }
 
 async function countActiveSuperAdmins() {
@@ -71,6 +138,18 @@ async function countActiveSuperAdmins() {
     .eq("is_active", true);
 
   return count ?? 0;
+}
+
+async function setUserRoles(
+  userId: string,
+  roles: UserRole[],
+  actorUserId: string
+) {
+  return supabaseAdmin.rpc("set_user_roles", {
+    target_user_id: userId,
+    target_roles: roles,
+    actor_user_id: actorUserId,
+  });
 }
 
 export async function GET(request: Request) {
@@ -97,27 +176,49 @@ export async function GET(request: Request) {
   }
 
   const userIds = data.users.map((user) => user.id);
-  let profiles: Array<Record<string, unknown>> = [];
+  let profiles: ProfileRow[] = [];
+  const roleMap = new Map<string, UserRole[]>();
 
   if (userIds.length > 0) {
-    const { data: profileRows, error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .select("id, full_name, email, phone, role, is_active, created_at, updated_at")
-      .in("id", userIds);
+    const [{ data: profileRows, error: profileError }, { data: roleRows, error: roleError }] =
+      await Promise.all([
+        supabaseAdmin
+          .from("profiles")
+          .select("id, full_name, email, phone, role, is_active, created_at, updated_at")
+          .in("id", userIds),
+        supabaseAdmin
+          .from("user_roles")
+          .select("user_id, role")
+          .in("user_id", userIds),
+      ]);
 
     if (profileError) {
       return jsonError(profileError.message, 500);
     }
 
-    profiles = (profileRows ?? []) as Array<Record<string, unknown>>;
+    if (roleError) {
+      return jsonError(roleError.message, 500);
+    }
+
+    profiles = (profileRows ?? []) as ProfileRow[];
+
+    for (const row of roleRows ?? []) {
+      const userId = String(row.user_id);
+      const current = roleMap.get(userId) ?? [];
+      current.push(row.role as UserRole);
+      roleMap.set(userId, current);
+    }
   }
 
-  const profileMap = new Map(
-    profiles.map((profile) => [String(profile.id), profile])
-  );
+  const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
 
   const users = data.users.map((user) => {
     const profile = profileMap.get(user.id);
+    const fallbackRole = profile?.role ?? "warehouse";
+    const assignedRoles = roleMap.get(user.id) ?? [];
+    const roles = Array.from(new Set(assignedRoles)).sort(
+      (a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b)
+    );
 
     return {
       id: user.id,
@@ -128,7 +229,8 @@ export async function GET(request: Request) {
           ? user.user_metadata.full_name
           : null),
       phone: profile?.phone ?? user.phone ?? null,
-      role: profile?.role ?? "warehouse",
+      role: fallbackRole,
+      roles: roles.length > 0 ? roles : [fallbackRole],
       is_active: profile?.is_active ?? true,
       email_confirmed_at: user.email_confirmed_at ?? null,
       last_sign_in_at: user.last_sign_in_at ?? null,
@@ -145,6 +247,7 @@ export async function GET(request: Request) {
     actor: {
       id: auth.actor.user.id,
       role: auth.actor.profile.role,
+      roles: auth.actor.profile.roles,
     },
   });
 }
@@ -167,7 +270,7 @@ export async function POST(request: Request) {
   const email = normalizeEmail(body.email);
   const fullName = normalizeOptionalText(body.full_name);
   const phone = normalizeOptionalText(body.phone);
-  const role = body.role;
+  const roleResult = normalizeRequestedRoles(body.roles ?? body.role);
   const mode = body.mode === "password" ? "password" : "invite";
   const password = typeof body.password === "string" ? body.password : "";
 
@@ -182,11 +285,13 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!isUserRole(role)) {
-    return jsonError("A valid user role is required.", 400);
+  if (roleResult.error) {
+    return jsonError(roleResult.error, 400);
   }
 
-  if (!canAssignRole(auth.actor.profile.role, role)) {
+  const roles = roleResult.roles;
+
+  if (!canAssignRoles(auth.actor.profile.roles, roles)) {
     return jsonError("Only a Super Admin can assign the Super Admin role.", 403);
   }
 
@@ -235,13 +340,24 @@ export async function POST(request: Request) {
     full_name: fullName,
     email,
     phone,
-    role,
+    role: roles[0],
     is_active: true,
   });
 
   if (profileError) {
     await supabaseAdmin.auth.admin.deleteUser(createdUserId);
     return jsonError(profileError.message, 500);
+  }
+
+  const { error: rolesError } = await setUserRoles(
+    createdUserId,
+    roles,
+    auth.actor.user.id
+  );
+
+  if (rolesError) {
+    await supabaseAdmin.auth.admin.deleteUser(createdUserId);
+    return jsonError(rolesError.message, 500);
   }
 
   return Response.json(
@@ -281,9 +397,10 @@ export async function PATCH(request: Request) {
     return jsonError("User profile was not found.", 404);
   }
 
-  const targetRole = currentProfile.role as UserRole;
+  const targetIsSuperAdmin = currentProfile.roles.includes("super_admin");
+  const actorIsSuperAdmin = auth.actor.profile.roles.includes("super_admin");
 
-  if (targetRole === "super_admin" && auth.actor.profile.role !== "super_admin") {
+  if (targetIsSuperAdmin && !actorIsSuperAdmin) {
     return jsonError("Only a Super Admin can modify a Super Admin account.", 403);
   }
 
@@ -331,7 +448,7 @@ export async function PATCH(request: Request) {
 
     const isActive = body.is_active === true;
 
-    if (targetRole === "super_admin" && !isActive) {
+    if (targetIsSuperAdmin && !isActive) {
       const superAdminCount = await countActiveSuperAdmins();
 
       if (superAdminCount <= 1) {
@@ -354,25 +471,27 @@ export async function PATCH(request: Request) {
     });
   }
 
-  const nextRole = body.role;
+  const roleResult = normalizeRequestedRoles(body.roles ?? body.role);
 
-  if (!isUserRole(nextRole)) {
-    return jsonError("A valid user role is required.", 400);
+  if (roleResult.error) {
+    return jsonError(roleResult.error, 400);
   }
 
-  if (!canAssignRole(auth.actor.profile.role, nextRole)) {
+  const nextRoles = roleResult.roles;
+
+  if (!canAssignRoles(auth.actor.profile.roles, nextRoles)) {
     return jsonError("Only a Super Admin can assign the Super Admin role.", 403);
   }
 
   if (
     userId === auth.actor.user.id &&
-    currentProfile.role === "super_admin" &&
-    nextRole !== "super_admin"
+    targetIsSuperAdmin &&
+    !nextRoles.includes("super_admin")
   ) {
     return jsonError("You cannot demote your own Super Admin account.", 400);
   }
 
-  if (currentProfile.role === "super_admin" && nextRole !== "super_admin") {
+  if (targetIsSuperAdmin && !nextRoles.includes("super_admin")) {
     const superAdminCount = await countActiveSuperAdmins();
 
     if (currentProfile.is_active && superAdminCount <= 1) {
@@ -406,18 +525,27 @@ export async function PATCH(request: Request) {
     }
   }
 
-  const { error } = await supabaseAdmin
+  const { error: profileError } = await supabaseAdmin
     .from("profiles")
     .update({
       full_name: fullName,
       email,
       phone,
-      role: nextRole,
     })
     .eq("id", userId);
 
-  if (error) {
-    return jsonError(error.message, 500);
+  if (profileError) {
+    return jsonError(profileError.message, 500);
+  }
+
+  const { error: rolesError } = await setUserRoles(
+    userId,
+    nextRoles,
+    auth.actor.user.id
+  );
+
+  if (rolesError) {
+    return jsonError(rolesError.message, 500);
   }
 
   return Response.json({
@@ -450,8 +578,8 @@ export async function DELETE(request: Request) {
     return jsonError("User profile was not found.", 404);
   }
 
-  if (currentProfile.role === "super_admin") {
-    if (auth.actor.profile.role !== "super_admin") {
+  if (currentProfile.roles.includes("super_admin")) {
+    if (!auth.actor.profile.roles.includes("super_admin")) {
       return jsonError("Only a Super Admin can delete a Super Admin account.", 403);
     }
 
