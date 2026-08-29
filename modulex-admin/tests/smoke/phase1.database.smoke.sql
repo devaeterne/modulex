@@ -25,7 +25,7 @@ create temp table phase1_ctx (
   position_id uuid,
   employee_id uuid,
   lead_id uuid,
-  marketing_tracking_before boolean
+  marketing_consent_banner_before boolean
 ) on commit drop;
 insert into phase1_ctx default values;
 grant select, insert, update, delete on phase1_ctx to authenticated, anon;
@@ -135,18 +135,18 @@ select 1 / case when exists (
 ) then 1 else 0 end as "PASS Store marketing settings singleton";
 
 update phase1_ctx
-set marketing_tracking_before = (
-  select tracking_enabled from public.store_marketing_settings where id = 1
+set marketing_consent_banner_before = (
+  select consent_banner_enabled from public.store_marketing_settings where id = 1
 );
 
 update public.store_marketing_settings
-set tracking_enabled = not tracking_enabled
+set consent_banner_enabled = not consent_banner_enabled
 where id = 1;
 
 select 1 / case when (
-  select tracking_enabled from public.store_marketing_settings where id = 1
+  select consent_banner_enabled from public.store_marketing_settings where id = 1
 ) is distinct from (
-  select marketing_tracking_before from phase1_ctx
+  select marketing_consent_banner_before from phase1_ctx
 ) then 1 else 0 end as "PASS Store marketing settings update";
 
 select 1 / case when exists (
