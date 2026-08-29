@@ -59,11 +59,11 @@ const quickActions = [
   { href: "/low-stock", label: "Check Low Stock" },
 ] as const;
 
-const numberFormatter = new Intl.NumberFormat("en-US", {
+const numberFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
 });
 
-const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
   timeStyle: "short",
 });
@@ -76,6 +76,12 @@ function formatNumber(value: number | string | null | undefined) {
 
 function formatDate(value: string) {
   return dateTimeFormatter.format(new Date(value));
+}
+
+function formatMovementType(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 async function fetchDashboardData(): Promise<DashboardLoadResult> {
@@ -126,6 +132,7 @@ export default function ModulexDashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<UserRole | null>(null);
   const [profileResolved, setProfileResolved] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -168,11 +175,8 @@ export default function ModulexDashboard() {
           return;
         }
 
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Dashboard could not be loaded."
-        );
+        console.error("Dashboard load failed:", error);
+        setErrorMessage("Dashboard data is temporarily unavailable. Please try again.");
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -185,7 +189,7 @@ export default function ModulexDashboard() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [retryToken]);
 
   if (isLoading) {
     return (
@@ -202,9 +206,16 @@ export default function ModulexDashboard() {
 
   if (errorMessage) {
     return (
-      <div className="rounded-2xl border border-error-200 bg-error-50 p-6 text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
-        <h2 className="mb-2 text-lg font-semibold">Dashboard could not be loaded</h2>
-        <p className="text-sm">{errorMessage}</p>
+      <div className="rounded-2xl border border-error-200 bg-error-50 p-6 text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+        <h2 className="text-lg font-semibold">Dashboard could not be loaded</h2>
+        <p className="mt-2 text-sm">{errorMessage}</p>
+        <button
+          type="button"
+          onClick={() => setRetryToken((current) => current + 1)}
+          className="mt-4 inline-flex h-10 items-center justify-center rounded-lg bg-error-600 px-4 text-sm font-medium text-white transition hover:bg-error-700 focus:outline-hidden focus:ring-3 focus:ring-error-500/20 dark:bg-error-500 dark:hover:bg-error-600"
+        >
+          Try again
+        </button>
       </div>
     );
   }
@@ -243,7 +254,7 @@ export default function ModulexDashboard() {
   ];
 
   const visibleQuickActions = profileResolved
-    ? quickActions.filter(action => canAccessPath(activeRole, action.href))
+    ? quickActions.filter((action) => canAccessPath(activeRole, action.href))
     : [];
 
   return (
@@ -277,7 +288,7 @@ export default function ModulexDashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <div className="xl:col-span-7 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-7">
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
@@ -289,8 +300,8 @@ export default function ModulexDashboard() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-gray-100 dark:border-gray-800">
-            <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
+          <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-800">
+            <table className="min-w-[720px] divide-y divide-gray-100 dark:divide-gray-800">
               <thead className="bg-gray-50 dark:bg-white/[0.02]">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
@@ -335,15 +346,13 @@ export default function ModulexDashboard() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {movement.movement_type}
+                        {formatMovementType(movement.movement_type)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                         {formatNumber(movement.quantity)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {movement.to_location_code ||
-                          movement.from_location_code ||
-                          "-"}
+                        {movement.to_location_code || movement.from_location_code || "-"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                         {formatDate(movement.created_at)}
@@ -356,7 +365,7 @@ export default function ModulexDashboard() {
           </div>
         </div>
 
-        <div className="xl:col-span-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-5">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
             Quick Actions
           </h2>
@@ -378,7 +387,7 @@ export default function ModulexDashboard() {
                 <Link
                   key={action.href}
                   href={action.href}
-                  className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                  className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
                 >
                   {action.label}
                 </Link>

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { getCurrentProfile, Profile } from "@/lib/supabase/profile";
@@ -23,8 +22,6 @@ function getInitials(name: string, email: string) {
 }
 
 export default function UserDropdown() {
-  const router = useRouter();
-
   const [isOpen, setIsOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
