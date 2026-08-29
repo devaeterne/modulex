@@ -21,9 +21,9 @@ expect(permissions.includes('"requests.manage"'), "requests.manage permission is
 expect(permissions.includes('path === "/requests"'), "/requests route rule is missing");
 expect(sidebar.includes('path: "/requests"'), "Request Center sidebar link is missing");
 expect(page.includes("RequestCenter"), "Request Center page is not wired");
-expect(center.includes('rpc("create_support_request"'), "create_support_request RPC is not used");
+expect(/rpc\(\s*"create_support_request"/.test(center), "create_support_request RPC is not used");
 expect(center.includes('/api/requests/notify-created'), "request-created email endpoint is not called");
-expect(center.includes('rpc("update_support_request_status"'), "admin status RPC is not used");
+expect(/rpc\(\s*"update_support_request_status"/.test(center), "admin status RPC is not used");
 expect(notifications.includes('"request_created"'), "request_created notification type is missing");
 expect(notifications.includes('"request_updated"'), "request_updated notification type is missing");
 expect(notifications.includes('"request_completed"'), "request_completed notification type is missing");
