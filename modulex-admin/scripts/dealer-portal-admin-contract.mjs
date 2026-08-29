@@ -9,10 +9,11 @@ const repoRoot = path.resolve(adminRoot, "..");
 const readAdmin = (relative) => readFile(path.join(adminRoot, relative), "utf8");
 const readRepo = (relative) => readFile(path.join(repoRoot, relative), "utf8");
 
-const [route, panel, customerPage, mailer, migration] = await Promise.all([
+const [route, panel, customerPage, customerCard, mailer, migration] = await Promise.all([
   readAdmin("src/app/api/admin/dealer-portal/route.ts"),
-  readAdmin("src/components/customers/DealerPortalAccessCard.tsx"),
+  readAdmin("src/components/customers/CustomerPortalAccessCard.tsx"),
   readAdmin("src/app/(admin)/customers/[id]/page.tsx"),
+  readAdmin("src/components/customers/CustomerCard.tsx"),
   readAdmin("src/lib/email/dealer-portal.ts"),
   readRepo("modulex-store/supabase/migrations/20260828200000_dealer_portal_activation_lifecycle.sql"),
 ]);
@@ -31,9 +32,12 @@ assert.match(route, /activated_at/, "restore must account for prior activation")
 assert.match(route, /auth_user_id/, "lifecycle must bind and validate the Auth user");
 assert.match(route, /customer_activity/, "portal lifecycle must append customer activity");
 
-assert.match(customerPage, /DealerPortalAccessCard/, "customer page must surface the secure dealer lifecycle panel");
-assert.match(customerPage, /button:nth-child\(6\)/, "superseded legacy Web / Portal tab must not be exposed");
+assert.match(customerPage, /CustomerPortalAccessCard/, "customer page must surface the secure portal lifecycle panel");
+assert.doesNotMatch(customerPage, /button:nth-child\(6\)|legacy-customer-card/, "customer page must not rely on CSS to hide a superseded portal surface");
+assert.doesNotMatch(customerCard, /Web \/ Portal/, "core customer card must not expose a duplicate portal mutation tab");
+assert.doesNotMatch(customerCard, /customer_portal_users/, "core customer card must not mutate portal lifecycle rows directly");
 assert.match(panel, /\/api\/admin\/dealer-portal/, "Admin lifecycle UI must call the server API");
+assert.match(panel, />Store Portal Access</, "Admin lifecycle UI must use the neutral Store portal heading");
 assert.doesNotMatch(panel, /portalForm\.status/, "secure Admin lifecycle UI must not expose a mutable status field");
 assert.match(panel, /Resend Invite/, "Admin UI must expose resend for pending invitations");
 assert.match(panel, /Suspend/, "Admin UI must expose suspension");
