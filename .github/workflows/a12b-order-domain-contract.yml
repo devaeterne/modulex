@@ -1,0 +1,21 @@
+name: A1.2B Order Domain Contract
+
+on:
+  push:
+    branches:
+      - phase-a1/order-domain-contract
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run A1.2B order domain contract
+        working-directory: modulex-admin
+        run: node scripts/order-domain-contract.mjs
