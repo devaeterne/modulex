@@ -32,6 +32,7 @@ const forbiddenDemoPages = [
   "src/app/(admin)/(others-pages)/blank/page.tsx",
   "src/app/(admin)/(others-pages)/calendar/page.tsx",
   "src/app/(admin)/api-test/page.tsx",
+  "src/app/(full-width-pages)/(error-pages)/error-404/page.tsx",
 ];
 
 for (const relativePath of forbiddenDemoPages) {
@@ -73,6 +74,25 @@ assert.match(
   dashboard,
   /quickActions\.filter\([^)]*canAccessPath/s,
   "Dashboard Quick Actions must be filtered by direct-route authorization",
+);
+
+const notFound = await readFile(path.join(root, "src/app/not-found.tsx"), "utf8");
+assert.doesNotMatch(
+  notFound,
+  /TailAdmin/i,
+  "Global 404 must not expose TailAdmin template branding",
+);
+assert.match(
+  notFound,
+  /Modulex/i,
+  "Global 404 must identify the Modulex Admin surface",
+);
+
+const signInForm = await readFile(path.join(root, "src/components/auth/SignInForm.tsx"), "utf8");
+assert.doesNotMatch(
+  signInForm,
+  /info@dasoft\.me/i,
+  "Production sign-in must not preload a developer or external-project account",
 );
 
 const profilePage = await readFile(
