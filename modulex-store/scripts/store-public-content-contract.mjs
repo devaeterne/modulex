@@ -49,12 +49,18 @@ if (aboutSource) {
     "About must retain the production-safe factual fallback copy"
   );
   check(!aboutSource.includes("dangerouslySetInnerHTML"), "About CMS body must not render unsafe HTML");
+  check(!aboutSource.includes("company?.website"), "About must not render or depend on a self-link to the Oakwell website");
 }
 
 const contactSource = await readRequired("src/app/contact/page.tsx");
 if (contactSource) {
   check(!contactSource.includes("<h3>Website</h3>"), "Contact must not render a Website card for the site the visitor is already using");
   check(!contactSource.includes("company?.website"), "Contact direct-contact readiness must not depend on the company website field");
+}
+
+const footerSource = await readRequired("src/components/Footer.tsx");
+if (footerSource) {
+  check(!footerSource.includes("company?.website"), "Footer must not render a self-link to the Oakwell website");
 }
 
 const gallerySource = await readRequired("src/app/gallery/page.tsx");
