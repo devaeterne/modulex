@@ -1,0 +1,54 @@
+"use client";
+
+import { supabase } from "@/lib/supabase/client";
+import type { StoreMediaAsset } from "@/lib/store/mediaLibrary";
+
+export type MediaLifecycleAction = "publish" | "unpublish";
+
+type MediaApiResponse = {
+  asset?: StoreMediaAsset;
+  deleted?: boolean;
+  error?: string;
+};
+
+async function getAccessToken() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  const accessToken = data.session?.access_token;
+  if (!accessToken) throw new Error("Authentication required.");
+  return accessToken;
+}
+
+async function parseResponse(response: Response) {
+  const payload = (await response.json().catch(() => ({}))) as MediaApiResponse;
+  if (!response.ok) throw new Error(payload.error ?? "Media lifecycle request failed.");
+  return payload;
+}
+
+export async function runMediaLifecycle(assetId: string, action: MediaLifecycleAction) {
+  const accessToken = await getAccessToken();
+  const response = await fetch("/api/admin/store-media", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ asset_id: assetId, action }),
+  });
+  const payload = await parseResponse(response);
+  if (!payload.asset) throw new Error("Media lifecycle response did not include an asset.");
+  return payload.asset;
+}
+
+export async function deleteMediaAsset(assetId: string) {
+  const accessToken = await getAccessToken();
+  const params = new URLSearchParams({ asset_id: assetId });
+  const response = await fetch(`/api/admin/store-media?${params.toString()}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  const payload = await parseResponse(response);
+  if (!payload.deleted) throw new Error("Media delete response did not confirm deletion.");
+}

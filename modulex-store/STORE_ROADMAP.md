@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `afaa8ba6e0717b97f9979d61b413541072ed155c`
+Main baseline: `7160e3b3b05c059ac7d9dc906756f628685a5e3b`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -591,12 +591,17 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
     - Real dry-run evidence: Actions `33260112614` processed `media-showroom-01` without DB/Storage writes: source JPEG 583×425 / 281,219 B / SHA-256 `c9a6cfab62d6e6ee7c885df9f7f7d0c635442a9b35ba2909eb1b27190906d32b`; optimized WebP 583×425 / 55,088 B / SHA-256 `a7a09a6ee877cccbaa607aaadcf2583722e1fc380bea3e078ac43c26b612ed7a`.
     - Post-dry-run production verification: `store_media_assets = 0`, `store_media_asset_sources = 0`, `store-media-staging objects = 0`.
     - TDD evidence includes selection RED `33259373457`, image RED `33259598195`, downloader RED `33259703991`, writer/CLI RED `33259849440`, and plan-aligned GREEN `33260212518`.
-  - [ ] **GC-2C — Admin Media Library review UI + lifecycle controls** is next.
+  - [x] **GC-2C — Admin Media Library review UI + lifecycle controls** is verified.
+    - `/store/media` is protected by `store.manage` route/sidebar RBAC and supports asset/provenance listing, search, status/attribution/relevance filters, and review metadata editing.
+    - Draft/review optimized media uses 5-minute authenticated signed previews from private `store-media-staging`; staging is not made public.
+    - Publish/unpublish/delete run through the server API without browser-exposed elevated credentials. Publish verifies optimized SHA-256 and byte size, writes immutable `media/<asset-id>/<sha>.webp` with `upsert:false`, and unpublish/delete fail closed with HTTP 409 when CMS references exist.
+    - TDD evidence: private-preview GREEN Actions `33262785615`; prior full GC-2C contract/lint/production-build/diff verification `33262565620`.
+    - Production remains intentionally empty at closeout: `store_media_assets = 0`, `store_media_asset_sources = 0`, `store-media-staging objects = 0`, and public `store-media` objects = 0; GC-2D remains the production-intake boundary.
   - [ ] **GC-2D — controlled production intake** remains pending; GC-2B does not publish or seed production media.
 
 # Next Action
 
 The user-approved active workstream remains the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Execute **GC-2C — Admin Media Library** from the latest `main` after GC-2B is merged: `/store/media`, `store.manage` RBAC, review/edit lifecycle, verified metadata/provenance visibility, and controlled publish/unpublish/delete server actions.
-2. Keep GC-2 `[~]` until GC-2C and GC-2D are complete. Production Granite media intake remains deferred; Gallery/Projects stays `[~]` and GC-5 still owns project/media association and final public Gallery acceptance.
+1. Execute **GC-2D — controlled production intake** from the latest `main`: import only explicitly approved eligible Granite candidates into private staging, review them through the verified Admin Media Library, publish only approved optimized derivatives, and record production/live acceptance evidence.
+2. Keep GC-2 `[~]` until GC-2D is complete. Gallery/Projects stays `[~]`; GC-5 still owns project/media association and final public Gallery acceptance, and no GC-2C closeout action may seed production media.
