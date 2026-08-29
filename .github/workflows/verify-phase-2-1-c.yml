@@ -6,8 +6,12 @@ on:
       - phase-2-1/c-store-public-pages
 
 jobs:
-  contract:
+  verify:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
+      NEXT_PUBLIC_SITE_URL: https://oakwell-phi.vercel.app
     defaults:
       run:
         working-directory: modulex-store
@@ -19,4 +23,13 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-store/package-lock.json
       - run: npm ci
-      - run: npm run smoke:store-public-content
+      - name: Phase 2.1C public content contract
+        run: npm run smoke:store-public-content
+      - name: Public production contract
+        run: npm run smoke:public-production
+      - name: Lint
+        run: npm run lint
+      - name: Full Store smoke
+        run: npm run smoke
+      - name: Build
+        run: npm run build
