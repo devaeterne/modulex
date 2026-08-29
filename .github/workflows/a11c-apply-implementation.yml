@@ -1,0 +1,34 @@
+name: A1.1C implementation apply
+
+on:
+  push:
+    branches:
+      - phase-a1/customer-detail-address-integrity
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[a11c applied]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: phase-a1/customer-detail-address-integrity
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply implementation patch
+        run: node modulex-admin/scripts/apply-a11c-implementation.mjs
+      - name: Verify target contract before commit
+        working-directory: modulex-admin
+        run: node scripts/customer-detail-integrity-contract.mjs
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin
+          git commit -m "feat(admin): complete A1.1C customer detail integrity [a11c applied]"
+          git push origin HEAD:phase-a1/customer-detail-address-integrity
