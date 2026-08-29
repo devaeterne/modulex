@@ -35,6 +35,12 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
+function formatDateOnly(value: string | null) {
+  if (!value) return "—";
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? value : new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(parsed);
+}
+
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   return <div><dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">{label}</dt><dd className="mt-1 text-sm text-gray-800 dark:text-white/90">{value || "—"}</dd></div>;
 }
@@ -111,34 +117,20 @@ export default function StoreLeadDetail({ id }: { id: string }) {
 
   async function convertToCustomer() {
     if (!lead || lead.lead_type !== "dealer_application" || lead.status !== "approved" || lead.converted_customer_id) return;
-
     setConverting(true);
     setError(null);
     setSuccess(null);
-
     const { data, error: rpcError } = await supabase.rpc("convert_store_dealer_lead_to_customer", { p_lead_id: lead.id });
-
-    if (rpcError) {
-      setError(rpcError.message);
-      setConverting(false);
-      return;
-    }
-
+    if (rpcError) { setError(rpcError.message); setConverting(false); return; }
     const result = data as DealerConversionResult | null;
     if (!result?.ok) {
-      if (result?.reason === "duplicate_customer" && result.customer_id) {
-        setError(`A matching customer already exists${result.customer_code ? ` (${result.customer_code})` : ""}. Review customer ${result.customer_id} before converting this lead.`);
-      } else if (result?.reason === "lead_not_approved") {
-        setError("Only approved dealer applications can be converted.");
-      } else if (result?.reason === "not_dealer_application") {
-        setError("Only dealer applications can be converted to dealer customers.");
-      } else {
-        setError("Dealer customer conversion could not be completed.");
-      }
+      if (result?.reason === "duplicate_customer" && result.customer_id) setError(`A matching customer already exists${result.customer_code ? ` (${result.customer_code})` : ""}. Review customer ${result.customer_id} before converting this lead.`);
+      else if (result?.reason === "lead_not_approved") setError("Only approved dealer applications can be converted.");
+      else if (result?.reason === "not_dealer_application") setError("Only dealer applications can be converted to dealer customers.");
+      else setError("Dealer customer conversion could not be completed.");
       setConverting(false);
       return;
     }
-
     setSuccess(result.created ? `Dealer customer ${result.customer_code || result.customer_name || "record"} created.` : "Dealer application is already linked to a customer.");
     await load();
     setConverting(false);
@@ -149,12 +141,14 @@ export default function StoreLeadDetail({ id }: { id: string }) {
   if (!lead) return null;
 
   const dealer = lead.lead_type === "dealer_application";
+  const consultation = lead.lead_type === "contact" && lead.request_kind === "project_consultation";
   const canConvert = dealer && lead.status === "approved" && !lead.converted_customer_id;
+  const leadLabel = dealer ? "Dealer Application" : consultation ? "Project Consultation" : "Contact Inquiry";
 
   return <div className="space-y-5">
     <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div><Link href="/store/leads" className="text-sm font-medium text-brand-500">← Back to Leads</Link><h1 className="mt-2 text-xl font-semibold text-gray-800 dark:text-white/90">{lead.reference_code}</h1><p className="mt-1 text-sm text-gray-500">{dealer ? "Dealer Application" : "Contact Inquiry"} · Received {formatDate(lead.created_at)}</p></div>
+        <div><Link href="/store/leads" className="text-sm font-medium text-brand-500">← Back to Leads</Link><h1 className="mt-2 text-xl font-semibold text-gray-800 dark:text-white/90">{lead.reference_code}</h1><p className="mt-1 text-sm text-gray-500">{leadLabel} · Received {formatDate(lead.created_at)}</p></div>
         <button type="button" className={primaryButton} onClick={save} disabled={saving || converting}>{saving ? "Saving..." : "Save Lead"}</button>
       </div>
       {error ? <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{error}</div> : null}
@@ -165,58 +159,27 @@ export default function StoreLeadDetail({ id }: { id: string }) {
       <div className="space-y-5">
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
           <h2 className="font-semibold text-gray-800 dark:text-white/90">Contact</h2>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-            <DetailRow label="Name" value={`${lead.first_name} ${lead.last_name}`} />
-            <DetailRow label="Email" value={<a className="text-brand-500" href={`mailto:${lead.email}`}>{lead.email}</a>} />
-            <DetailRow label="Phone" value={lead.phone} />
-            <DetailRow label="Location" value={[lead.city, lead.country_code].filter(Boolean).join(", ")} />
-          </dl>
+          <dl className="mt-4 grid gap-4 sm:grid-cols-2"><DetailRow label="Name" value={`${lead.first_name} ${lead.last_name}`} /><DetailRow label="Email" value={<a className="text-brand-500" href={`mailto:${lead.email}`}>{lead.email}</a>} /><DetailRow label="Phone" value={lead.phone} /><DetailRow label="Location" value={[lead.city, lead.country_code].filter(Boolean).join(", ")} /></dl>
         </section>
 
-        {dealer ? <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">Dealer Application</h2>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-            <DetailRow label="Company" value={lead.company_name} />
-            <DetailRow label="Website" value={lead.company_website ? <a className="text-brand-500" href={lead.company_website} target="_blank" rel="noreferrer">{lead.company_website}</a> : null} />
-            <DetailRow label="Business Type" value={lead.business_type} />
-            <DetailRow label="Showroom" value={lead.has_showroom == null ? "—" : lead.has_showroom ? "Yes" : "No"} />
-            <DetailRow label="Annual Volume" value={lead.estimated_annual_volume} />
-            <DetailRow label="Sales Channels" value={lead.sales_channels?.join(", ")} />
-            <DetailRow label="Product Interests" value={lead.product_interests?.join(", ")} />
-          </dl>
+        {consultation ? <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+          <h2 className="font-semibold text-gray-800 dark:text-white/90">Project Consultation</h2>
+          <dl className="mt-4 grid gap-4 sm:grid-cols-2"><DetailRow label="Request Kind" value="Project Consultation" /><DetailRow label="Project Type" value={lead.project_type} /><DetailRow label="Consultation Intent" value={lead.consultation_intent} /><DetailRow label="Project Address" value={lead.project_address} /><DetailRow label="Project City" value={lead.project_city} /><DetailRow label="Project ZIP / Postal Code" value={lead.project_postal_code} /><DetailRow label="Preferred Date" value={formatDateOnly(lead.preferred_consultation_date)} /></dl>
         </section> : null}
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">Message</h2>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-gray-300">{lead.message || "No message provided."}</p>
-        </section>
+        {dealer ? <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6"><h2 className="font-semibold text-gray-800 dark:text-white/90">Dealer Application</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2"><DetailRow label="Company" value={lead.company_name} /><DetailRow label="Website" value={lead.company_website ? <a className="text-brand-500" href={lead.company_website} target="_blank" rel="noreferrer">{lead.company_website}</a> : null} /><DetailRow label="Business Type" value={lead.business_type} /><DetailRow label="Showroom" value={lead.has_showroom == null ? "—" : lead.has_showroom ? "Yes" : "No"} /><DetailRow label="Annual Volume" value={lead.estimated_annual_volume} /><DetailRow label="Sales Channels" value={lead.sales_channels?.join(", ")} /><DetailRow label="Product Interests" value={lead.product_interests?.join(", ")} /></dl></section> : null}
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">Attribution</h2>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-            <DetailRow label="Source" value={lead.utm_source || lead.source} /><DetailRow label="Medium" value={lead.utm_medium} /><DetailRow label="Campaign" value={lead.utm_campaign} /><DetailRow label="Content" value={lead.utm_content} /><DetailRow label="Term" value={lead.utm_term} /><DetailRow label="Landing Page" value={lead.landing_page} /><DetailRow label="Referrer" value={lead.referrer} /><DetailRow label="Marketing Consent" value={lead.marketing_consent ? "Yes" : "No"} />
-          </dl>
-        </section>
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6"><h2 className="font-semibold text-gray-800 dark:text-white/90">{consultation ? "Project Notes" : "Message"}</h2><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-gray-300">{lead.message || "No message provided."}</p></section>
+
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6"><h2 className="font-semibold text-gray-800 dark:text-white/90">Attribution</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2"><DetailRow label="Source" value={lead.utm_source || lead.source} /><DetailRow label="Medium" value={lead.utm_medium} /><DetailRow label="Campaign" value={lead.utm_campaign} /><DetailRow label="Content" value={lead.utm_content} /><DetailRow label="Term" value={lead.utm_term} /><DetailRow label="Landing Page" value={lead.landing_page} /><DetailRow label="Referrer" value={lead.referrer} /><DetailRow label="Marketing Consent" value={lead.marketing_consent ? "Yes" : "No"} /></dl></section>
       </div>
 
       <div className="space-y-5">
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">Workflow</h2>
-          <div className="mt-4 space-y-4">
-            <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</span><select className={inputClass} value={status} onChange={(event) => setStatus(event.target.value as StoreLeadStatus)} disabled={converting}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Assigned To</span><select className={inputClass} value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} disabled={converting}><option value="">Unassigned</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name || item.email || item.id} ({item.role})</option>)}</select></label>
-            <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Internal Notes</span><textarea className={textareaClass} value={internalNotes} maxLength={5000} onChange={(event) => setInternalNotes(event.target.value)} disabled={converting} /></label>
-          </div>
-
-          {dealer ? <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-white/[0.03] dark:text-gray-300">
-            {lead.converted_customer_id ? <div className="flex flex-col gap-3"><p>This dealer application has been converted to a customer. Portal access remains a separate controlled activation step.</p><Link className={primaryButton} href={`/customers/${lead.converted_customer_id}`}>View Customer</Link></div> : canConvert ? <div className="space-y-3"><p>Approval is complete. Create the dealer customer record as a separate controlled action; this does not enable portal access.</p><button type="button" className={primaryButton} onClick={convertToCustomer} disabled={converting}>{converting ? "Creating Customer..." : "Create Dealer Customer"}</button></div> : <p>Approve this dealer application first. Customer creation is intentionally separate from status review.</p>}
-          </div> : null}
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6"><h2 className="font-semibold text-gray-800 dark:text-white/90">Workflow</h2><div className="mt-4 space-y-4"><label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</span><select className={inputClass} value={status} onChange={(event) => setStatus(event.target.value as StoreLeadStatus)} disabled={converting}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Assigned To</span><select className={inputClass} value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} disabled={converting}><option value="">Unassigned</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name || item.email || item.id} ({item.role})</option>)}</select></label><label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Internal Notes</span><textarea className={textareaClass} value={internalNotes} maxLength={5000} onChange={(event) => setInternalNotes(event.target.value)} disabled={converting} /></label></div>
+          {dealer ? <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-white/[0.03] dark:text-gray-300">{lead.converted_customer_id ? <div className="flex flex-col gap-3"><p>This dealer application has been converted to a customer. Portal access remains a separate controlled activation step.</p><Link className={primaryButton} href={`/customers/${lead.converted_customer_id}`}>View Customer</Link></div> : canConvert ? <div className="space-y-3"><p>Approval is complete. Create the dealer customer record as a separate controlled action; this does not enable portal access.</p><button type="button" className={primaryButton} onClick={convertToCustomer} disabled={converting}>{converting ? "Creating Customer..." : "Create Dealer Customer"}</button></div> : <p>Approve this dealer application first. Customer creation is intentionally separate from status review.</p>}</div> : null}
         </section>
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">Activity</h2>
-          <div className="mt-4 space-y-3">{activity.map((item) => <div key={item.id} className="rounded-xl border border-gray-100 p-3 text-sm dark:border-gray-800"><div className="font-medium text-gray-800 dark:text-white/90">{item.action === "created" ? "Lead created" : item.action === "converted_to_customer" ? "Converted to customer" : `${item.from_status || "—"} → ${item.to_status || "—"}`}</div><div className="mt-1 text-xs text-gray-500">{formatDate(item.created_at)}{item.actor_user_id ? ` · ${assigneeMap.get(item.actor_user_id) || "Staff"}` : " · Website"}</div></div>)}{activity.length === 0 ? <p className="text-sm text-gray-500">No activity yet.</p> : null}</div>
-        </section>
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6"><h2 className="font-semibold text-gray-800 dark:text-white/90">Activity</h2><div className="mt-4 space-y-3">{activity.map((item) => <div key={item.id} className="rounded-xl border border-gray-100 p-3 text-sm dark:border-gray-800"><div className="font-medium text-gray-800 dark:text-white/90">{item.action === "created" ? "Lead created" : item.action === "converted_to_customer" ? "Converted to customer" : `${item.from_status || "—"} → ${item.to_status || "—"}`}</div><div className="mt-1 text-xs text-gray-500">{formatDate(item.created_at)}{item.actor_user_id ? ` · ${assigneeMap.get(item.actor_user_id) || "Staff"}` : " · Website"}</div></div>)}{activity.length === 0 ? <p className="text-sm text-gray-500">No activity yet.</p> : null}</div></section>
       </div>
     </div>
   </div>;
