@@ -1,0 +1,64 @@
+name: A1.2C Roadmap Closeout
+
+on:
+  push:
+    branches:
+      - docs/admin-a1-2c-production-acceptance
+
+permissions:
+  contents: write
+
+jobs:
+  closeout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch Admin roadmap
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('modulex-admin/ADMIN_ROADMAP.md')
+          text = path.read_text()
+
+          def replace_once(old, new, label):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 anchor, found {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              'Main baseline: `8cce1b0c065e66c3939a96704b05aa6c96f2b3d8`',
+              'Main baseline: `406bd374a4b4a7738a1a785709f3b277d21e4410`',
+              'main baseline',
+          )
+          replace_once(
+              ' and the current Admin next action remains A1.2C',
+              '',
+              'cross-roadmap Admin next-action suffix',
+          )
+          replace_once(
+              'Current Admin next action: **A1.2C — define immutable vs editable fields by order lifecycle state**',
+              'Current Admin next action: **Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.**',
+              'current Admin next action',
+          )
+          replace_once(
+              '- [ ] Define immutable vs editable fields by order lifecycle state. (A1.2C)',
+              '''- [x] Define immutable vs editable fields by order lifecycle state. (A1.2C)\n  - PR #139 merged to `main` as `406bd374a4b4a7738a1a785709f3b277d21e4410`; Admin Vercel production deployment `dpl_CP331iPmZH2KdnJw1YURTfJjFX8i` is `READY` from that exact merge SHA, and the deployed `/signin` surface returned HTTP 200.\n  - Production migration `20260829205817_customer_order_lifecycle_editability` installed the private lifecycle policy and hardened order-update wrapper. Live policy checks returned Draft Sales=`direct`, Confirmed Sales=`approval`, Ready for Shipment Admin=`direct`, and Shipped/Completed/Cancelled/null-role=`locked`.\n  - Transaction-scoped authenticated acceptance proved a temporarily `shipped` order rejects commercial revision and a profiles-less authenticated subject is denied; both tests rolled back and the sample order remained `draft` with no acceptance-test data persistence.\n  - Post-DDL security/performance advisors reported no A1.2C-specific new finding; unrelated existing Store/security and index/policy backlog remains separately tracked.''',
+              'A1.2C task',
+          )
+
+          path.write_text(text)
+          PY
+      - name: Remove temporary workflow
+        run: rm .github/workflows/a12c-roadmap-closeout.yml
+      - name: Commit closeout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin/ADMIN_ROADMAP.md .github/workflows/a12c-roadmap-closeout.yml
+          git commit -m "docs(admin): close A1.2C production acceptance"
+          git push origin HEAD:docs/admin-a1-2c-production-acceptance
