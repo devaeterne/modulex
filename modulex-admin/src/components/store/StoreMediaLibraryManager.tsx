@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import StoreMediaAssetEditor from "@/components/store/StoreMediaAssetEditor";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { importStoreMediaCandidate } from "@/lib/store/mediaApi";
 import {
   formatMediaBytes,
   formatMediaDimensions,
@@ -37,6 +38,8 @@ export default function StoreMediaLibraryManager() {
   const [canEdit, setCanEdit] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [intakeMessage, setIntakeMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const createPreviewUrl = useCallback(async (asset: StoreMediaAsset) => {
@@ -148,6 +151,26 @@ export default function StoreMediaLibraryManager() {
   const selectedSources = selected ? sourcesByAsset.get(selected.id) ?? [] : [];
   const selectedPreviewUrl = selected ? previewUrls[selected.id] ?? null : null;
 
+  async function handleControlledImport() {
+    setImporting(true);
+    setError(null);
+    setIntakeMessage(null);
+    try {
+      const result = await importStoreMediaCandidate("media-showroom-01");
+      setIntakeMessage(
+        result.status === "created"
+          ? "Showroom source imported to private staging for review. Nothing was published."
+          : "Showroom source already exists. Existing staged asset was reused; nothing was published.",
+      );
+      await load();
+      setSelectedId(result.assetId);
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "Controlled media intake failed.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function handleSaved(saved: StoreMediaAsset) {
     setAssets((current) => current.map((asset) => (asset.id === saved.id ? saved : asset)));
     void createPreviewUrl(saved).then((previewUrl) => {
@@ -199,6 +222,28 @@ export default function StoreMediaLibraryManager() {
               Refresh
             </button>
           </div>
+
+          {canEdit ? (
+            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-950/40">
+              <p className="text-xs text-gray-500">
+                GC-2D controlled intake downloads the approved showroom candidate on the server and writes only to private staging. It never publishes automatically.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleControlledImport()}
+                disabled={importing}
+                className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-brand-500 px-3 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importing ? "Importing..." : "Import showroom candidate"}
+              </button>
+            </div>
+          ) : null}
+
+          {intakeMessage ? (
+            <p className="mt-3 rounded-lg bg-success-50 px-3 py-2 text-sm text-success-700 dark:bg-success-500/10 dark:text-success-400">
+              {intakeMessage}
+            </p>
+          ) : null}
           {error ? (
             <p className="mt-3 rounded-lg bg-error-50 px-3 py-2 text-sm text-error-700 dark:bg-error-500/10 dark:text-error-400">
               {error}

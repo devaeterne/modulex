@@ -452,7 +452,7 @@ Goal: create reusable, traceable Oakwell-controlled media without visual degrada
 - `[x]` **GC-2A — schema/security foundation:** reusable asset/provenance tables and private staging boundary are production-verified.
 - `[x]` **GC-2B — importer/optimizer capability:** bounded Granite acquisition, verified metadata/hash, no-upscale WebP optimization, private staging writer/idempotency, rollback, credential gate, reporting and `--publish` prohibition are verified. A real `media-showroom-01` dry-run succeeded in Actions `33260112614` with zero production DB/Storage writes.
 - `[x]` **GC-2C — Admin Media Library:** `/store/media`, `store.manage` RBAC, metadata/provenance review, private signed staging previews, and controlled server-side publish/unpublish/delete lifecycle are verified; production intake remains zero and deferred to GC-2D.
-- `[ ]` **GC-2D — controlled production intake:** actual approved Granite assets are not yet imported.
+- `[~]` **GC-2D — controlled production intake:** an Admin/Vercel Node intake path is implemented and verified for the fixed representative candidate. It uses the logged-in Admin JWT + existing RLS rather than a GitHub privileged Supabase secret, preserves the pinned `sharp@0.35.4` pipeline, writes only to private staging, and cannot publish. Actual production import/review/publish/dedupe/unpublish-republish acceptance remains pending.
 
 - `[x]` design/implement reusable media asset domain and Admin management required by migration;
 - `[ ]` download approved originals;
