@@ -1,0 +1,31 @@
+name: A0.3 Codex Follow-up
+
+on:
+  push:
+    branches:
+      - fix/admin-a03-codex-followup
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prove privileged public env leakage is rejected
+        run: |
+          cat > src/__runtime-config-negative-fixture__.ts <<'EOF'
+          export const leaked = process.env.NEXT_PUBLIC_DATABASE_URL;
+          EOF
+          if npm run smoke:runtime-config; then
+            echo "::error::runtime config contract failed to reject NEXT_PUBLIC_DATABASE_URL in source"
+            exit 1
+          fi
+          rm src/__runtime-config-negative-fixture__.ts
