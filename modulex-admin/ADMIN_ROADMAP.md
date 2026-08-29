@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `c0adbfbb431973a3acb4a94902341ac64b11c1de`
+Main baseline: `8cce1b0c065e66c3939a96704b05aa6c96f2b3d8`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-3 company identity, Contact, About & Showroom is production-accepted and complete. GC-4 — Contact / Project Consultation is the next Granite package; Admin primary work remains Phase A1 and the current Admin next action remains A1.2B**
-Current Admin next action: **A1.2B — verify create/edit/detail flows use one domain contract**
+Current cross-roadmap package: **Granite Center → Oakwell GC-3 company identity, Contact, About & Showroom is production-accepted and complete. GC-4 — Contact / Project Consultation is the next Granite package; Admin primary work remains Phase A1 and the current Admin next action remains A1.2C**
+Current Admin next action: **A1.2C — define immutable vs editable fields by order lifecycle state**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -199,8 +199,13 @@ These rules are mandatory for all future Modulex Admin work:
   - Production migration `20260829193058_customer_order_list_summary` installed `customer_order_directory` with `security_invoker=true` and authenticated-only SELECT plus `get_customer_order_list_summary(uuid)` as SECURITY INVOKER / STABLE with an empty `search_path` and authenticated-only EXECUTE.
   - Read-only authenticated Admin acceptance verified 5/5 direct-vs-directory RLS-visible rows, working order/customer-code/customer-name searches, 1/1 scoped rows, and exact global/scoped summary parity. A profiles-less authenticated caller saw 0 directory rows and a zero summary, confirming underlying RLS remains authoritative.
   - No production data writes were made during acceptance. Post-DDL Supabase advisors reported no A1.2A-specific security or performance finding; existing Store SECURITY DEFINER/auth warnings and broader FK/index/policy performance backlog remain outside this package.
-- [ ] Verify create/edit/detail flows use one domain contract.
-- [ ] Define immutable vs editable fields by order lifecycle state.
+- [x] Verify create/edit/detail flows use one domain contract. (A1.2B)
+  - PR #135 merged the shared Admin order-domain adapter to `main` as `e04425c0bd6c7ae0bf7df4fc447c90ed2e8809af`; `NewCustomerOrder`, `EditCustomerOrder`, and `CustomerOrderDetail` now consume `src/lib/customers/order-domain.ts` for scoped context reads, price reads, mutation payload normalization, and Supabase error propagation while preserving the existing database mutation boundaries.
+  - TDD evidence: RED Actions run `33272031540` failed on the missing shared adapter; targeted GREEN run `33272225887` passed the new order-domain contract; final deterministic verification run `33272334038` passed order-domain/order-list/customer-detail/production-surface smoke checks, lint with 0 errors, production build, and diff-check after fixing the TypeScript narrowing regression exposed by the first full run.
+  - Admin Vercel production deployment `dpl_EZnRkBzEpnU4quNdKPS2XAWaQy86` and Store deployment `dpl_Gq24GKZyrTZiL2xu1cE7KLzALVth` are both `READY` from exact merge SHA `e04425c0bd6c7ae0bf7df4fc447c90ed2e8809af`.
+  - Read-only authenticated Admin acceptance verified the adapter's production query surface under existing RLS: the scoped customer/order resolved 1/1, the sample order exposed 3 items plus status history, and shared create/edit lookups returned 6 order price groups, 3 active payment methods, 462 products, 3 tax rules, and 462 current price rows. A profiles-less authenticated caller saw 0 profile/customer/order/item/approval rows.
+  - Catalog verification confirmed `create_customer_order`, `update_customer_order`, and `set_customer_order_status` remain SECURITY INVOKER (`prosecdef=false`), use `search_path=pg_catalog, private`, allow authenticated EXECUTE, and deny anon/PUBLIC EXECUTE. No production mutation RPC was invoked during acceptance, no production data was written, and A1.2B required no Supabase DDL or migration.
+- [ ] Define immutable vs editable fields by order lifecycle state. (A1.2C)
 - [ ] Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.
 - [ ] Verify customer portal order projections remain narrower than Admin order data.
 
