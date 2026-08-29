@@ -1,0 +1,22 @@
+name: A0.1 Production Residue
+
+on:
+  push:
+    branches:
+      - fix/admin-production-residue-cleanup
+
+jobs:
+  production-surface:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - run: npm run smoke:production-surface
