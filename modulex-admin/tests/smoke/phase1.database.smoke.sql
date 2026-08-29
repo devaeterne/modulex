@@ -235,7 +235,7 @@ select 1 / case when has_column_privilege('authenticated', 'public.store_leads',
 then 1 else 0 end as "PASS Store lead column update hardening";
 
 select 1 / case when has_function_privilege('anon', 'public.submit_store_lead(jsonb)', 'EXECUTE')
-  and has_function_privilege('authenticated', 'public.submit_store_lead(jsonb)', 'EXECUTE')
+  and not has_function_privilege('authenticated', 'public.submit_store_lead(jsonb)', 'EXECUTE')
   and has_function_privilege('anon', 'public.get_store_marketing_settings()', 'EXECUTE')
 then 1 else 0 end as "PASS Store RPC execute grants";
 
