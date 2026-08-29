@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `23e5d365876dc65dae9a46645f0627d8f38bc683`
+Main baseline: `f6d7f9673dc874b5c254e47c750ff1bd4793c7c3`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
 Current cross-roadmap package: **Granite Center → Oakwell GC-1 source manifest complete for review; GC-2 media library/optimization next; Gallery/Projects content acceptance pending**
 
@@ -127,6 +127,13 @@ These rules are mandatory for all future Modulex Admin work:
   - The runtime-config contract fails if privileged key/password/DB variables are introduced with `NEXT_PUBLIC_`, if the browser client references elevated Supabase keys, or if the elevated client loses its server-only boundary.
   - TDD evidence: Actions run `33255658800` failed on the legacy package identity before implementation; targeted GREEN run `33255818899` passed the runtime-config contract with the minimized lockfile identity delta.
   - Full deterministic verification: Actions run `33255912909` passed runtime-config, production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check. Credential-bound API/DB live smoke was not rerun because this package changes no schema, RLS, RPC, API, or production data behavior.
+- [x] Close post-merge Codex runtime/config findings before Phase A0 exit.
+  - PR #113 merged as `f6d7f9673dc874b5c254e47c750ff1bd4793c7c3`; Vercel deployment `dpl_5jbrwJDsdJv3FtXuMhfsstX7DY6k` is production `READY` from that exact merge SHA.
+  - Post-merge Codex review found a P1 gap in source-wide privileged `NEXT_PUBLIC_*` detection and a P2 gap in Store activation-origin configuration/fallback handling.
+  - Follow-up scope: strict source-wide browser-safe env allowlist, configuration-owned `STORE_SITE_URL` / `NEXT_PUBLIC_STORE_URL`, removal of the legacy `oakwell-phi.vercel.app` fallback, and fresh deterministic verification.
+  - TDD RED: Actions run `33256670583` proved the previous runtime contract did not reject an injected `NEXT_PUBLIC_DATABASE_URL` source reference.
+  - Targeted GREEN: Actions run `33256841429` rejected the negative fixture and passed the positive runtime-config contract.
+  - Full deterministic verification: Actions run `33256903655` passed runtime-config, production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
 
 ### Phase A0 Exit Gate
 
@@ -540,13 +547,13 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin roadmap work remains **Phase A0 — Production Surface & Operational Truth Cleanup** until the verified A0.3 package is merged and production deployment is accepted.
+Primary Admin roadmap work remains **Phase A0 — Production Surface & Operational Truth Cleanup** until the post-merge A0.3 Codex follow-up is merged and production-accepted.
 
-A0.1 production-surface cleanup, A0.2 Navigation & RBAC truth, and A0.3 runtime/config cleanup are implementation-complete and verified. Next primary Admin work:
+PR #113 is merged and its Admin Vercel deployment is `READY`, but post-merge Codex review identified one P1 and one P2 runtime/config gap that must be closed before the phase exit. Next primary Admin work:
 
-1. Merge/deploy the verified A0.3 package and confirm the resulting Admin production deployment is `READY` from the merged `main` SHA.
-2. After production acceptance, close Phase A0 and advance primary Admin work to **Phase A1 — Customer, Order & Fulfillment Operations**.
-3. Start A1 with the bounded A1.1 customer-master review: list/search/filter scalability, customer detail action hierarchy, status/account/portal validation, address/default-address behavior, and audit visibility.
+1. Complete and verify the bounded A0.3 Codex follow-up: source-wide `NEXT_PUBLIC_*` allowlist and configuration-owned Store activation origin with no preview-host fallback.
+2. Merge/deploy that follow-up and confirm the resulting Admin production deployment is `READY` from the merged `main` SHA.
+3. Then close Phase A0, advance to **Phase A1 — Customer, Order & Fulfillment Operations**, and start the bounded A1.1 customer-master review.
 
 **Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1 is source discovery/classification only and is complete for review with 32 pages, 55 content candidates, 62 media candidates and 7 conflict classes; it introduces no Admin runtime or production DB mutation. GC-2+ will add Admin-managed media/contact/content domains incrementally as required. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
 

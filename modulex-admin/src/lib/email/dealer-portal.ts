@@ -1,6 +1,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
+import { getStoreActivationUrl } from "@/lib/runtime/store-origin";
 
 function escapeHtml(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
@@ -11,8 +12,7 @@ function controlledActivationUrl(actionLink: string) {
   const tokenHash = source.searchParams.get("token");
   const type = source.searchParams.get("type");
   if (!tokenHash || type !== "recovery") throw new Error("Generated portal activation token is invalid.");
-  const storeBase = (process.env.NEXT_PUBLIC_STORE_URL || process.env.STORE_SITE_URL || "https://oakwell-phi.vercel.app").replace(/\/$/, "");
-  const target = new URL(`${storeBase}/account/activate`);
+  const target = new URL(getStoreActivationUrl());
   target.hash = new URLSearchParams({ token_hash: tokenHash, type: "recovery" }).toString();
   return target.toString();
 }

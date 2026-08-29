@@ -1,5 +1,6 @@
 import { jsonError, requireAdmin } from "@/lib/auth/admin-api";
 import { sendDealerPortalInvite } from "@/lib/email/dealer-portal";
+import { getStoreActivationUrl } from "@/lib/runtime/store-origin";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
 const PORTAL_ROLES = new Set(["admin", "buyer", "viewer"]);
@@ -11,7 +12,7 @@ type CustomerRow = { id:string; name:string; portal_enabled:boolean; customerTyp
 
 function isUuid(value: unknown): value is string { return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value); }
 function normalizeEmail(value: unknown) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
-function storeActivationUrl() { const base=(process.env.NEXT_PUBLIC_STORE_URL||process.env.STORE_SITE_URL||"https://oakwell-phi.vercel.app").replace(/\/$/,""); return `${base}/account/activate`; }
+function storeActivationUrl() { return getStoreActivationUrl(); }
 
 async function getCustomer(customerId:string):Promise<CustomerRow|null>{
   const {data,error}=await supabaseAdmin.from("customers").select("id,name,portal_enabled,customer_type_id").eq("id",customerId).single();
