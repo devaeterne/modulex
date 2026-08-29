@@ -12,6 +12,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export type Permission =
   | "dashboard.view"
+  | "profile.view"
   | "products.view"
   | "products.manage"
   | "store.view"
@@ -54,6 +55,7 @@ export type Permission =
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
   "dashboard.view": "View dashboard",
+  "profile.view": "View own profile",
   "products.view": "View products",
   "products.manage": "Manage products, brands & categories",
   "store.view": "View Store content",
@@ -102,6 +104,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: allPermissions,
   sales: [
     "dashboard.view",
+    "profile.view",
     "products.view",
     "leads.view",
     "leads.manage",
@@ -123,6 +126,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   finance: [
     "dashboard.view",
+    "profile.view",
     "products.view",
     "pricing.view",
     "pricing.cost.view",
@@ -137,12 +141,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "training.view",
   ],
   hr: [
+    "profile.view",
     "personnel.view",
     "personnel.manage",
     "training.view",
   ],
   warehouse: [
     "dashboard.view",
+    "profile.view",
     "products.view",
     "shipments.view",
     "shipments.manage",
@@ -155,6 +161,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   shipping: [
     "dashboard.view",
+    "profile.view",
     "products.view",
     "shipments.view",
     "shipments.manage",
@@ -189,6 +196,7 @@ export function isAdminRole(role: UserRole | null | undefined) {
 }
 
 const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Permission }> = [
+  { match: (path) => path === "/profile" || path.startsWith("/profile/"), permission: "profile.view" },
   { match: (path) => path === "/training" || path.startsWith("/training/"), permission: "training.view" },
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
@@ -200,16 +208,37 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
       path === "/store/pages" ||
       path.startsWith("/store/pages/") ||
       path === "/store/projects" ||
-      path.startsWith("/store/projects/"),
+      path.startsWith("/store/projects/") ||
+      path === "/store/content" ||
+      path.startsWith("/store/content/") ||
+      path === "/store/marketing" ||
+      path.startsWith("/store/marketing/") ||
+      path === "/store/colors" ||
+      path.startsWith("/store/colors/"),
     permission: "store.manage",
   },
-  { match: (path) => path === "/store/products" || path === "/store/colors" || path === "/store/content", permission: "store.view" },
-  { match: (path) => path.startsWith("/store/products/") || path.startsWith("/store/colors/"), permission: "store.manage" },
+  { match: (path) => path === "/store/products", permission: "store.view" },
+  { match: (path) => path.startsWith("/store/products/"), permission: "store.manage" },
   { match: (path) => path === "/store" || path.startsWith("/store/"), permission: "store.view" },
+  {
+    match: (path) =>
+      path === "/personnel/departments" ||
+      path.startsWith("/personnel/departments/") ||
+      path === "/personnel/positions" ||
+      path.startsWith("/personnel/positions/"),
+    permission: "personnel.manage",
+  },
   { match: (path) => path === "/personnel" || path.startsWith("/personnel/"), permission: "personnel.view" },
   { match: (path) => path === "/finance" || path.startsWith("/finance/"), permission: "finance.view" },
   { match: (path) => path === "/settings/general/tax-rules" || path.startsWith("/settings/general/tax-rules/"), permission: "finance.manage" },
-  { match: (path) => path === "/settings/payment-methods" || path.startsWith("/settings/payment-methods/"), permission: "finance.manage" },
+  {
+    match: (path) =>
+      path === "/settings/payment-methods" ||
+      path.startsWith("/settings/payment-methods/") ||
+      path === "/customers/payment-methods" ||
+      path.startsWith("/customers/payment-methods/"),
+    permission: "finance.manage",
+  },
   { match: (path) => path === "/settings" || path.startsWith("/settings/"), permission: "settings.view" },
   { match: (path) => path === "/approvals" || path.startsWith("/approvals/"), permission: "approvals.view" },
   { match: (path) => path.includes("/invoices"), permission: "invoices.view" },
@@ -227,6 +256,16 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/low-stock" || path.startsWith("/low-stock/"), permission: "inventory.view" },
   { match: (path) => path === "/stock-operations" || path.startsWith("/stock-operations/"), permission: "inventory.manage" },
   { match: (path) => path === "/stock-movements" || path.startsWith("/stock-movements/") || path === "/inventory" || path.startsWith("/inventory/"), permission: "inventory.view" },
+  {
+    match: (path) =>
+      path === "/warehouses/new" ||
+      (path.startsWith("/warehouses/") && path.endsWith("/edit")) ||
+      path === "/zones/new" ||
+      (path.startsWith("/zones/") && path.endsWith("/edit")) ||
+      path === "/locations/new" ||
+      (path.startsWith("/locations/") && path.endsWith("/edit")),
+    permission: "warehouse.manage",
+  },
   { match: (path) => path === "/warehouses" || path.startsWith("/warehouses/") || path === "/zones" || path.startsWith("/zones/") || path === "/locations" || path.startsWith("/locations/"), permission: "warehouse.view" },
   { match: (path) => path === "/qr-labels" || path.startsWith("/qr-labels/"), permission: "qr.view" },
   { match: (path) => path === "/scan" || path.startsWith("/scan/") || path === "/shelf-inventory" || path.startsWith("/shelf-inventory/"), permission: "qr.manage" },
