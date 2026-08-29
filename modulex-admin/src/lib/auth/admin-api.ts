@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import { isAdminRole } from "@/lib/auth/permissions";
 import type { UserRole } from "@/lib/supabase/profile";
 import {
   isSupabaseAdminConfigured,
@@ -10,6 +11,7 @@ export type AdminActor = {
   profile: {
     id: string;
     role: UserRole;
+    roles: UserRole[];
     is_active: boolean;
   };
 };
@@ -70,7 +72,7 @@ export async function requireAdmin(request: Request): Promise<
     };
   }
 
-  const typedProfile = profile as AdminActor["profile"];
+  const typedProfile = profile as Omit<AdminActor["profile"], "roles">;
 
   if (!typedProfile.is_active) {
     return {
@@ -78,7 +80,23 @@ export async function requireAdmin(request: Request): Promise<
     };
   }
 
-  if (typedProfile.role !== "super_admin" && typedProfile.role !== "admin") {
+  const { data: roleRows, error: roleError } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id);
+
+  if (roleError) {
+    return {
+      response: jsonError("User roles could not be resolved.", 500),
+    };
+  }
+
+  const roles = Array.from(
+    new Set((roleRows ?? []).map((row) => row.role as UserRole))
+  );
+  const effectiveRoles = roles.length > 0 ? roles : [typedProfile.role];
+
+  if (!isAdminRole(effectiveRoles)) {
     return {
       response: jsonError("Administrator access is required.", 403),
     };
@@ -87,15 +105,32 @@ export async function requireAdmin(request: Request): Promise<
   return {
     actor: {
       user,
-      profile: typedProfile,
+      profile: {
+        ...typedProfile,
+        roles: effectiveRoles,
+      },
     },
   };
 }
 
-export function canAssignRole(actorRole: UserRole, targetRole: UserRole) {
-  if (targetRole === "super_admin") {
-    return actorRole === "super_admin";
+export function canAssignRoles(
+  actorRoles: readonly UserRole[],
+  targetRoles: readonly UserRole[]
+) {
+  const actorIsSuperAdmin = actorRoles.includes("super_admin");
+  const actorIsAdmin = actorIsSuperAdmin || actorRoles.includes("admin");
+
+  if (!actorIsAdmin) {
+    return false;
   }
 
-  return actorRole === "super_admin" || actorRole === "admin";
+  if (targetRoles.includes("super_admin")) {
+    return actorIsSuperAdmin;
+  }
+
+  return true;
+}
+
+export function canAssignRole(actorRole: UserRole, targetRole: UserRole) {
+  return canAssignRoles([actorRole], [targetRole]);
 }
