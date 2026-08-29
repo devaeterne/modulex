@@ -31,9 +31,9 @@ function getDisplayMedia(entry: StoreProjectGalleryEntry): DisplayMedia[] {
 function ProjectAttribution({ project }: { project: StorePublicProject }) {
   if (project.attributionClassification !== "parent_attributed" || !project.attributionText) return null;
   return (
-    <p className="small text-muted mt-2 mb-0">
+    <p className="project-gallery-attribution">
       {project.sourcePageUrl ? (
-        <a href={project.sourcePageUrl} target="_blank" rel="noopener noreferrer" className="text-reset text-decoration-underline">
+        <a href={project.sourcePageUrl} target="_blank" rel="noopener noreferrer" className="project-gallery-attribution-link">
           {project.attributionText}
         </a>
       ) : project.attributionText}
@@ -81,10 +81,10 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
   return (
     <>
       {categories.length > 1 ? (
-        <div className="d-flex flex-wrap justify-content-center gap-2 mb-4" role="group" aria-label="Filter projects by category">
+        <div className="gallery-filter project-gallery-filter" role="group" aria-label="Filter projects by category">
           <button
             type="button"
-            className={`btn btn-sm ${activeCategory === "All" ? "btn-dark" : "btn-outline-dark"}`}
+            className={`nav-link ${activeCategory === "All" ? "active" : ""}`}
             aria-pressed={activeCategory === "All"}
             onClick={() => setActiveCategory("All")}
           >
@@ -93,7 +93,7 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
           {categories.map((category) => (
             <button
               type="button"
-              className={`btn btn-sm ${activeCategory === category ? "btn-dark" : "btn-outline-dark"}`}
+              className={`nav-link ${activeCategory === category ? "active" : ""}`}
               aria-pressed={activeCategory === category}
               onClick={() => setActiveCategory(category)}
               key={category}
@@ -104,16 +104,25 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
         </div>
       ) : null}
 
-      <div className="row g-4">
+      <div className="row g-4 project-gallery-grid">
         {visibleEntries.map((entry) => (
           <div className="col-md-6 col-lg-4" key={entry.project.slug}>
-            <article className="h-100 border rounded-3 overflow-hidden bg-white shadow-sm">
-              <button type="button" className="w-100 border-0 bg-transparent p-0 text-start" onClick={() => setSelectedSlug(entry.project.slug)} aria-label={`View ${entry.project.title} project media`}>
-                <img src={entry.project.coverImageUrl} alt={entry.project.coverImageAlt} className="w-100" style={{ aspectRatio: "4 / 3", objectFit: "cover" }} />
-                <div className="p-4">
-                  <h2 className="h4 mb-2">{entry.project.title}</h2>
-                  {entry.project.summary ? <p className="mb-3">{entry.project.summary}</p> : null}
-                  {entry.project.category || entry.project.location ? <p className="small text-muted mb-0">{[entry.project.category, entry.project.location].filter(Boolean).join(" · ")}</p> : null}
+            <article className="project-gallery-card">
+              <button
+                type="button"
+                className="project-gallery-card-button"
+                onClick={() => setSelectedSlug(entry.project.slug)}
+                aria-label={`View ${entry.project.title} project media`}
+              >
+                <div className="project-gallery-card-media">
+                  <img src={entry.project.coverImageUrl} alt={entry.project.coverImageAlt} />
+                </div>
+                <div className="project-gallery-card-content">
+                  <h2 className="project-gallery-title">{entry.project.title}</h2>
+                  {entry.project.summary ? <p className="project-gallery-summary">{entry.project.summary}</p> : null}
+                  {entry.project.category || entry.project.location ? (
+                    <p className="project-gallery-meta">{[entry.project.category, entry.project.location].filter(Boolean).join(" · ")}</p>
+                  ) : null}
                   <ProjectAttribution project={entry.project} />
                 </div>
               </button>
@@ -123,25 +132,30 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
       </div>
 
       {selected ? (
-        <div role="dialog" aria-modal="true" aria-label={`${selected.project.title} project gallery`} className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ zIndex: 2000, background: "rgba(0, 0, 0, 0.86)", padding: "1rem" }} onMouseDown={(event) => { if (event.currentTarget === event.target) setSelectedSlug(null); }}>
-          <div className="bg-white rounded-3 overflow-auto position-relative" style={{ width: "min(1100px, 100%)", maxHeight: "92vh" }}>
-            <button type="button" className="btn btn-dark position-absolute top-0 end-0 m-3" style={{ zIndex: 2 }} onClick={() => setSelectedSlug(null)} aria-label="Close project gallery">Close</button>
-            <div className="p-4 p-lg-5">
-              <div className="pe-5 mb-4">
-                <h2 className="mb-2">{selected.project.title}</h2>
-                {selected.project.summary ? <p className="mb-2">{selected.project.summary}</p> : null}
-                {selected.project.category || selected.project.location ? <p className="small text-muted mb-0">{[selected.project.category, selected.project.location].filter(Boolean).join(" · ")}</p> : null}
+        <div role="dialog" aria-modal="true" aria-label={`${selected.project.title} project gallery`} className="gallery-lightbox active project-gallery-lightbox">
+          <div className="lightbox-overlay" onMouseDown={() => setSelectedSlug(null)}></div>
+          <div className="project-gallery-dialog">
+            <button type="button" className="lightbox-close" onClick={() => setSelectedSlug(null)} aria-label="Close project gallery">
+              <i className="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+            <div className="project-gallery-dialog-content">
+              <div className="project-gallery-dialog-header">
+                <h2 className="project-gallery-dialog-title">{selected.project.title}</h2>
+                {selected.project.summary ? <p className="project-gallery-dialog-summary">{selected.project.summary}</p> : null}
+                {selected.project.category || selected.project.location ? (
+                  <p className="project-gallery-meta">{[selected.project.category, selected.project.location].filter(Boolean).join(" · ")}</p>
+                ) : null}
                 <ProjectAttribution project={selected.project} />
               </div>
-              <div className="row g-4">
+              <div className="project-gallery-media-list">
                 {selectedMedia.map((media, index) => (
-                  <div className="col-12" key={`${media.mediaUrl}-${index}`}>
+                  <div key={`${media.mediaUrl}-${index}`}>
                     {media.mediaType === "image" ? (
-                      <img src={media.mediaUrl} alt={media.altText} className="w-100 rounded-3" style={{ maxHeight: "75vh", objectFit: "contain", background: "#f4f4f4" }} />
+                      <img src={media.mediaUrl} alt={media.altText} className="project-gallery-media" />
                     ) : isDirectVideoUrl(media.mediaUrl) ? (
-                      <video className="w-100 rounded-3" controls preload="metadata" aria-label={media.altText}><source src={media.mediaUrl} /></video>
+                      <video className="project-gallery-media" controls preload="metadata" aria-label={media.altText}><source src={media.mediaUrl} /></video>
                     ) : (
-                      <a href={media.mediaUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline-dark">Open video: {media.altText}</a>
+                      <a href={media.mediaUrl} target="_blank" rel="noopener noreferrer" className="btn-primary project-gallery-video-link">Open video: {media.altText}</a>
                     )}
                   </div>
                 ))}

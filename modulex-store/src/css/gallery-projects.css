@@ -1,0 +1,253 @@
+/* Project Gallery theme extension.
+   Reuses the Store's gallery/lightbox classes and existing light/dark tokens. */
+
+.project-gallery-filter {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+}
+
+.project-gallery-filter .nav-link {
+    border: 0;
+    background: transparent;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color .25s ease, background .25s ease, transform .25s ease;
+}
+
+.project-gallery-filter .nav-link:hover {
+    transform: translateY(-1px);
+}
+
+.project-gallery-filter .nav-link.active {
+    color: white;
+}
+
+.project-gallery-card {
+    height: 100%;
+    overflow: hidden;
+    background: white;
+    border: 1px solid rgba(45, 37, 32, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.055);
+    transition: transform .35s ease, box-shadow .35s ease, border-color .35s ease;
+}
+
+.project-gallery-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(217, 163, 40, 0.22);
+    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.09);
+}
+
+.project-gallery-card-button {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.project-gallery-card-media {
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: var(--cream);
+}
+
+.project-gallery-card-media img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    transition: transform .5s ease;
+}
+
+.project-gallery-card:hover .project-gallery-card-media img {
+    transform: scale(1.045);
+}
+
+.project-gallery-card-content {
+    padding: 1.6rem;
+}
+
+.project-gallery-title,
+.project-gallery-dialog-title {
+    font-family: 'Playfair Display', serif;
+    color: var(--dark-brown);
+    font-weight: 800;
+}
+
+.project-gallery-title {
+    font-size: 1.45rem;
+    margin-bottom: 0.65rem;
+}
+
+.project-gallery-summary,
+.project-gallery-dialog-summary,
+.project-gallery-meta,
+.project-gallery-attribution {
+    color: var(--text-light);
+}
+
+.project-gallery-summary {
+    margin-bottom: 1rem;
+    line-height: 1.7;
+}
+
+.project-gallery-meta {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.project-gallery-attribution {
+    margin: 0.6rem 0 0;
+    font-size: 0.85rem;
+}
+
+.project-gallery-attribution-link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.project-gallery-attribution-link:hover {
+    color: var(--orange-primary);
+}
+
+.project-gallery-dialog {
+    position: relative;
+    z-index: 1;
+    top: 50%;
+    transform: translateY(-50%);
+    width: min(1100px, calc(100% - 2rem));
+    max-height: 92vh;
+    margin: 0 auto;
+    overflow: auto;
+    background: var(--cream);
+    color: var(--dark);
+    border: 1px solid rgba(45, 37, 32, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
+}
+
+.project-gallery-dialog .lightbox-close {
+    top: 1rem;
+    right: 1rem;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--dark-brown);
+    border: 0;
+    color: white;
+}
+
+.project-gallery-dialog .lightbox-close:hover {
+    background: var(--orange-primary);
+}
+
+.project-gallery-dialog-content {
+    padding: 2rem;
+}
+
+.project-gallery-dialog-header {
+    padding-right: 3.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.project-gallery-dialog-title {
+    margin-bottom: 0.6rem;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+}
+
+.project-gallery-dialog-summary {
+    margin-bottom: 0.7rem;
+    line-height: 1.7;
+}
+
+.project-gallery-media-list {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.project-gallery-media {
+    width: 100%;
+    max-height: 75vh;
+    display: block;
+    object-fit: contain;
+    background: white;
+    border-radius: 10px;
+}
+
+.project-gallery-video-link {
+    display: inline-flex;
+}
+
+body.dark .project-gallery-card {
+    background: var(--bg-card);
+    border-color: var(--border-subtle);
+    box-shadow: 0 10px 40px var(--shadow-dark), 0 0 0 1px var(--border-subtle);
+}
+
+body.dark .project-gallery-card:hover {
+    background: var(--bg-elevated);
+    border-color: var(--border-orange);
+    box-shadow: 0 20px 60px var(--shadow-dark), 0 0 0 1px var(--border-orange);
+}
+
+body.dark .project-gallery-card-media {
+    background: var(--bg-surface);
+}
+
+body.dark .project-gallery-title,
+body.dark .project-gallery-dialog-title {
+    color: var(--text-primary);
+}
+
+body.dark .project-gallery-summary,
+body.dark .project-gallery-dialog-summary,
+body.dark .project-gallery-meta,
+body.dark .project-gallery-attribution {
+    color: var(--text-secondary);
+}
+
+body.dark .project-gallery-dialog {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    border-color: var(--border-subtle);
+    box-shadow: 0 30px 90px var(--shadow-dark), 0 0 0 1px var(--border-subtle);
+}
+
+body.dark .project-gallery-dialog .lightbox-close {
+    background: var(--bg-base);
+    border: 1px solid var(--border-soft);
+    color: var(--text-primary);
+}
+
+body.dark .project-gallery-dialog .lightbox-close:hover {
+    background: var(--orange-primary);
+    color: white;
+}
+
+body.dark .project-gallery-media {
+    background: var(--bg-base);
+}
+
+@media (max-width: 575px) {
+    .project-gallery-card-content {
+        padding: 1.25rem;
+    }
+
+    .project-gallery-dialog-content {
+        padding: 1.5rem 1rem;
+    }
+
+    .project-gallery-dialog .lightbox-close {
+        top: 0.75rem;
+        right: 0.75rem;
+    }
+}
