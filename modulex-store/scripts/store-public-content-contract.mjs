@@ -1,0 +1,104 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+const root = process.cwd();
+const failures = [];
+
+function check(condition, message) {
+  if (!condition) failures.push(message);
+}
+
+async function readRequired(relativePath) {
+  try {
+    return await readFile(path.join(root, relativePath), "utf8");
+  } catch {
+    failures.push(`Expected file is missing: ${relativePath}`);
+    return "";
+  }
+}
+
+const querySource = await readRequired("src/lib/store/content/queries.ts");
+if (querySource) {
+  for (const rpc of [
+    "get_store_public_page",
+    "get_store_public_projects",
+    "get_store_public_project",
+    "get_store_public_project_media",
+  ]) {
+    check(querySource.includes(`\"${rpc}\"`), `Public content query module must call ${rpc}`);
+  }
+  check(/revalidate:\s*900/.test(querySource), "Public content queries must use 900-second revalidation");
+  check(!querySource.includes(".from("), "Public content query module must not directly read Supabase tables");
+  check(querySource.includes("getStoreGalleryReadiness"), "Public content query module must expose getStoreGalleryReadiness");
+  check(querySource.includes("import \"server-only\""), "Public content query module must remain server-only");
+}
+
+const aboutSource = await readRequired("src/app/about/page.tsx");
+if (aboutSource) {
+  check(
+    aboutSource.includes('getStorePublicPage("about")'),
+    "About must read published CMS content through getStorePublicPage(\"about\")"
+  );
+  check(aboutSource.includes("generateMetadata"), "About must generate metadata from published CMS content");
+  check(
+    aboutSource.includes("getStorePublicCompanyProfile"),
+    "About must keep the public company profile as the canonical company identity/contact source"
+  );
+  check(
+    aboutSource.includes("Cabinet products and support from Oakwell Cabinetry"),
+    "About must retain the production-safe factual fallback copy"
+  );
+  check(!aboutSource.includes("dangerouslySetInnerHTML"), "About CMS body must not render unsafe HTML");
+}
+
+const gallerySource = await readRequired("src/app/gallery/page.tsx");
+if (gallerySource) {
+  check(gallerySource.includes("getStoreGalleryReadiness"), "Gallery route must use shared published readiness");
+  check(gallerySource.includes("getStorePublicProjectMedia"), "Gallery route must load media through the approved public RPC query layer");
+  check(gallerySource.includes("notFound()"), "Gallery route must fail closed with notFound() when it is not ready");
+  check(gallerySource.includes("generateMetadata"), "Gallery must generate metadata from published CMS content");
+  check(!gallerySource.includes(".from("), "Gallery route must not directly read Supabase tables");
+}
+
+const galleryClientSource = await readRequired("src/components/gallery/StoreProjectsGallery.tsx");
+if (galleryClientSource) {
+  check(!/supabase/i.test(galleryClientSource), "Gallery client must use server-provided props and must not query Supabase");
+  check(galleryClientSource.includes("altText"), "Gallery client must preserve CMS media alt text");
+  check(galleryClientSource.includes("Escape"), "Gallery lightbox must support Escape-to-close");
+}
+
+const layoutSource = await readRequired("src/app/layout.tsx");
+if (layoutSource) {
+  check(layoutSource.includes("getStoreGalleryReadiness"), "Root layout must resolve Gallery readiness server-side");
+  check(layoutSource.includes("galleryReady"), "Root layout must pass a fail-closed Gallery readiness flag to StoreChrome");
+}
+
+const chromeSource = await readRequired("src/components/StoreChrome.tsx");
+if (chromeSource) {
+  check(chromeSource.includes("galleryReady"), "StoreChrome must accept and forward Gallery readiness");
+  check(/<Navbar[\s\S]*?galleryReady=\{galleryReady\}/.test(chromeSource), "StoreChrome must forward Gallery readiness to Navbar");
+}
+
+const navbarSource = await readRequired("src/components/Navbar.tsx");
+if (navbarSource) {
+  check(navbarSource.includes("galleryReady"), "Navbar must accept Gallery readiness");
+  check(navbarSource.includes('href="/gallery"'), "Navbar must expose the Gallery route when ready");
+  check(/galleryReady\s*\?/.test(navbarSource), "Navbar Gallery link must be conditional on readiness");
+}
+
+const sitemapSource = await readRequired("src/app/sitemap.ts");
+if (sitemapSource) {
+  check(sitemapSource.includes("getStoreGalleryReadiness"), "Sitemap must use the shared Gallery readiness helper");
+  const staticRoutes = sitemapSource.match(/const staticRoutes\s*=\s*\[([\s\S]*?)\];/)?.[1] ?? "";
+  check(!staticRoutes.includes("/gallery"), "Gallery must never be an unconditional static sitemap route");
+  check(sitemapSource.includes("/gallery"), "Sitemap must be able to append Gallery when published content is ready");
+  check(/isReady[\s\S]*?\/gallery/.test(sitemapSource), "Sitemap Gallery entry must be guarded by published readiness");
+}
+
+if (failures.length > 0) {
+  console.error("Store public content contract failed:\n");
+  for (const failure of failures) console.error(`- ${failure}`);
+  process.exit(1);
+}
+
+console.log("Store public content contract passed.");

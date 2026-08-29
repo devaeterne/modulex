@@ -15,9 +15,17 @@ type StoreChromeProps = {
   siteSettings: StoreSiteSettings | null;
   companyName: string;
   logoUrl?: string | null;
+  galleryReady: boolean;
 };
 
-export default function StoreChrome({ children, company, siteSettings, companyName, logoUrl }: StoreChromeProps) {
+export default function StoreChrome({
+  children,
+  company,
+  siteSettings,
+  companyName,
+  logoUrl,
+  galleryReady,
+}: StoreChromeProps) {
   const pathname = usePathname();
   const isDealerRoute = pathname === "/dealer" || pathname.startsWith("/dealer/");
   const isAccountRoute = pathname === "/account" || pathname.startsWith("/account/");
@@ -25,7 +33,7 @@ export default function StoreChrome({ children, company, siteSettings, companyNa
   if (isDealerRoute || isAccountRoute) {
     return (
       <>
-        <Navbar companyName={companyName} logoUrl={logoUrl} />
+        <Navbar companyName={companyName} logoUrl={logoUrl} galleryReady={galleryReady} />
         <main>{children}</main>
       </>
     );
@@ -33,7 +41,7 @@ export default function StoreChrome({ children, company, siteSettings, companyNa
 
   return (
     <>
-      <Navbar companyName={companyName} logoUrl={logoUrl} />
+      <Navbar companyName={companyName} logoUrl={logoUrl} galleryReady={galleryReady} />
       <main>{children}</main>
       <Footer company={company} settings={siteSettings} />
       <BackToTop />
