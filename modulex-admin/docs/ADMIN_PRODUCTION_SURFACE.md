@@ -1,7 +1,7 @@
 # Modulex Admin Production Surface Inventory
 
 Last reviewed: 2026-08-29
-Baseline branch: `phase-a0/admin-dashboard-production-truth`
+Baseline main: `6cbd27198d930cb129b912fa4faece3bf967e292`
 
 This inventory classifies the Admin route/navigation surface for Phase A0. It is intentionally conservative: a route is removed only when it is clearly TailAdmin/demo residue. Business modules whose long-term scope is still under review remain explicit rather than being silently deleted.
 
@@ -53,12 +53,13 @@ The following sample routes are prohibited from the production Admin surface and
 - `/blank`
 - `/calendar`
 - `/api-test`
+- `/error-404` — explicit TailAdmin template route; global `not-found.tsx` is the single intentional 404 surface
 
 `/api-test` was also removed from the authenticated sidebar navigation.
 
 ## Guardrails
 
-`npm run smoke:production-surface` fails when a known TailAdmin/demo route file is reintroduced or when `/api-test` is added back to navigation. The contract also asserts that the intentional `/profile` surface remains present, the operational dashboard continues to source KPIs/recent movements from the production RPC boundary, and dashboard Quick Actions resolve the active profile and filter through `canAccessPath()`.
+`npm run smoke:production-surface` fails when a known TailAdmin/demo route file is reintroduced or when `/api-test` is added back to navigation. The contract also asserts that the intentional `/profile` surface remains present, the operational dashboard continues to source KPIs/recent movements from the production RPC boundary, dashboard Quick Actions resolve the active profile and filter through `canAccessPath()`, the global 404 does not expose TailAdmin branding, and production Sign In does not preload the known developer account.
 
 Phase A0.2 navigation/direct-route permission truth is documented in `docs/ADMIN_RBAC_MATRIX.md`. `npm run smoke:rbac` compares every sidebar path with `requiredPermissionForPath()`, verifies all active roles can reach `/profile`, protects manage-only Store and warehouse mutation routes, and keeps intentional route aliases aligned with their canonical permissions.
 
@@ -66,6 +67,5 @@ These UI/route guards do not replace Supabase RLS/RPC/API authorization; data au
 
 ## Remaining A0 work
 
-- Audit placeholder links/text, dead buttons, and development-only controls across the remaining retained Admin surfaces.
-- Complete runtime/package/environment cleanup tasks listed in `ADMIN_ROADMAP.md`.
+- Complete runtime/package/environment cleanup tasks listed in `ADMIN_ROADMAP.md` (A0.3).
 - Keep A6 Personnel/Finance/Training/Approvals scope decisions explicit rather than treating them as template residue.
