@@ -5,6 +5,8 @@ import process from "node:process";
 const root = process.cwd();
 const pagePath = path.join(root, "src/app/(admin)/customers/[id]/page.tsx");
 const cardPath = path.join(root, "src/components/customers/CustomerCard.tsx");
+const orderActionsPath = path.join(root, "src/components/customers/CustomerOrderActions.tsx");
+const customerInstallationsPath = path.join(root, "src/app/(admin)/customers/[id]/installations/page.tsx");
 const portalCardPath = path.join(root, "src/components/customers/CustomerPortalAccessCard.tsx");
 const sqlPath = path.join(root, "sql/customer-address-integrity.sql");
 const packagePath = path.join(root, "package.json");
@@ -23,12 +25,16 @@ function requireNoMatch(source, pattern, message) {
 
 const page = read(pagePath);
 const card = read(cardPath);
+const orderActions = read(orderActionsPath);
+const customerInstallations = read(customerInstallationsPath);
 const portalCard = read(portalCardPath);
 const sql = read(sqlPath);
 const pkg = JSON.parse(read(packagePath));
 
 requireNoMatch(page, /legacy-customer-card|<style>/, "Customer detail must not hide legacy actions with route-level CSS.");
 requireMatch(page, /<CustomerOrderActions\s*\/>[\s\S]*<CustomerCard\s*\/>[\s\S]*<CustomerPortalAccessCard\s+customerId=\{id\}\s*\/>[\s\S]*<CustomerDocumentsPanel\s+customerId=\{id\}\s*\/>/, "Customer detail hierarchy must keep global order actions first, core customer data second, then secure portal and document management.");
+requireMatch(orderActions, /\/customers\/\$\{customerId\}\/installations/, "Customer operations must link to a real customer-scoped installations route.");
+requireMatch(customerInstallations, /<CustomerInstallationsList\s+customerId=\{id\}\s*\/>/, "Customer-scoped installations route must pass the customer id into CustomerInstallationsList.");
 
 requireNoMatch(card, /["']Web \/ Portal["']/, "Legacy Web / Portal tab must be removed from CustomerCard.");
 requireNoMatch(card, /\.from\(["']customer_portal_users["']\)\.(insert|update|delete)/, "CustomerCard must not mutate portal users directly from the browser.");
