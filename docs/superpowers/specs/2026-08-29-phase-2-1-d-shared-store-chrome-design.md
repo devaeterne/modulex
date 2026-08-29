@@ -67,7 +67,7 @@ Both tables accept only:
 
 Reject empty labels, empty hrefs, `javascript:` URLs, hash-only placeholders, and legacy `.html` destinations.
 
-Admin validation provides immediate feedback; database constraints/helpers should enforce the essential invariant so malformed data is not publishable merely by bypassing the UI.
+Admin validation provides immediate feedback; database constraints/helpers enforce the essential invariant so malformed data is not made public merely by bypassing the UI.
 
 ## Authorization and Public RPCs
 
@@ -101,11 +101,31 @@ Functions use fixed projections, safe pinned search paths, and the same narrow e
 
 ## Initial Data and Rollout Safety
 
-The migration may seed only the **current already-production-approved** navigation/footer destinations copied from the main branch at implementation time. It must not resurrect Services, Blog, legacy Gallery templates, or other disabled routes.
+Seed only the current already-production-approved code-owned destinations so the migration does not change public behavior by itself.
 
-If seed data is used, the implementation PR must enumerate the exact destinations in its description so reviewers can verify each one against current production behavior.
+Primary navigation seed:
 
-The public UI also keeps a safe code fallback for an unavailable/empty RPC result. The fallback is the current production-safe link set, not template links. This prevents a transient CMS/RPC problem from creating an empty navigation or removing the user's path back to the public site.
+- `Home` → `/`
+- `About` → `/about`
+- `Products` → `/products`
+- `Dealers` → `/dealers/apply`
+
+Footer seed:
+
+- `Products / Product Catalog` → `/products`
+- `Products / Product Support` → `/contact`
+- `Company / About` → `/about`
+- `Company / Contact` → `/contact`
+
+Do **not** seed Gallery. After Package C has a published `gallery` page plus at least one published project, an Admin may add `/gallery` through the new CMS. This prevents the chrome migration from exposing Gallery before the route is production-ready.
+
+Do not seed Services, Blog, legacy Gallery/detail pages, legacy index variants, `.html` routes, account/dealer portal internals, or APIs.
+
+The public UI keeps the same safe link set above as a code fallback for unavailable/empty RPC results. A transient CMS/RPC issue therefore cannot produce an empty Navbar/Footer or remove the path back to the public site.
+
+## Migration Location
+
+Use `modulex-store/supabase/migrations` and the existing timestamped SQL migration convention.
 
 ## Admin Management Surface
 
@@ -153,7 +173,7 @@ Always code-owned:
 
 This prevents a CMS editing mistake from removing account access or the principal public contact path.
 
-If navigation RPC data is empty/unavailable, render the safe current fallback links.
+If navigation RPC data is empty/unavailable, render the exact safe fallback links listed in Initial Data.
 
 ## Footer Rendering
 
@@ -167,7 +187,7 @@ Existing sources remain authoritative for:
 
 Footer link records are grouped by `section_key` and ordered by `section_sort_order` + item `sort_order`.
 
-If footer-link RPC data is empty/unavailable, use the current safe footer-link fallback rather than rendering template/demo content.
+If footer-link RPC data is empty/unavailable, render the exact safe footer fallback listed in Initial Data rather than template/demo content.
 
 ## Portal Coexistence
 
@@ -198,7 +218,7 @@ Admin tests/contracts prove:
 
 Store tests/contracts prove:
 
-8. Navbar uses public CMS projection with safe fallback;
+8. Navbar uses public CMS projection with the exact safe fallback;
 9. Account and Contact controls remain code-owned;
 10. Footer keeps company/contact/social ownership unchanged;
 11. public-navbar/portal regression coverage continues to pass;
