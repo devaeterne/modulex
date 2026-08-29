@@ -7,6 +7,7 @@ on:
       - "modulex-admin/src/layout/AppHeader.tsx"
       - "modulex-admin/src/layout/AppSidebar.tsx"
       - "modulex-admin/scripts/dashboard-shell-ui-contract.mjs"
+      - "modulex-admin/scripts/admin-production-surface-contract.mjs"
       - ".github/workflows/admin-dashboard-shell-ui.yml"
   pull_request:
     paths:
@@ -14,6 +15,7 @@ on:
       - "modulex-admin/src/layout/AppHeader.tsx"
       - "modulex-admin/src/layout/AppSidebar.tsx"
       - "modulex-admin/scripts/dashboard-shell-ui-contract.mjs"
+      - "modulex-admin/scripts/admin-production-surface-contract.mjs"
       - ".github/workflows/admin-dashboard-shell-ui.yml"
 
 permissions:
