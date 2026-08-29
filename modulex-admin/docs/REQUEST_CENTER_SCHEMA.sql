@@ -1,6 +1,6 @@
 -- Modulex Admin Request Center
 -- Apply through the normal Supabase deployment flow after review.
--- New request: panel + email delivery for info@dasoft.me (active super_admin).
+-- New request: panel notifications for active request managers and email delivery for managers with an email address.
 -- Admin action: panel notification only for the original requester.
 
 create table if not exists public.support_requests (
@@ -35,12 +35,21 @@ on public.support_requests
 for select
 to authenticated
 using (
-  requester_id = auth.uid()
+  requester_id = (select auth.uid())
   or exists (
-    select 1 from public.profiles p
-    where p.id = auth.uid()
+    select 1
+    from public.profiles p
+    where p.id = (select auth.uid())
       and p.is_active = true
-      and p.role in ('super_admin', 'admin')
+      and (
+        p.role in ('super_admin', 'admin')
+        or exists (
+          select 1
+          from public.user_roles ur
+          where ur.user_id = p.id
+            and ur.role in ('super_admin', 'admin')
+        )
+      )
   )
 );
 
@@ -74,7 +83,7 @@ create policy user_notifications_select_own
 on public.user_notifications
 for select
 to authenticated
-using (user_id = auth.uid());
+using (user_id = (select auth.uid()));
 
 create table if not exists public.support_request_email_deliveries (
   id uuid primary key default gen_random_uuid(),
@@ -113,7 +122,8 @@ as $$
 declare
   v_profile public.profiles%rowtype;
   v_request public.support_requests%rowtype;
-  v_super_admin_id uuid;
+  v_manager record;
+  v_manager_count integer := 0;
 begin
   if auth.uid() is null then
     raise exception 'Authentication required';
@@ -139,17 +149,6 @@ begin
     raise exception 'Invalid request category';
   end if;
 
-  select id into v_super_admin_id
-  from public.profiles
-  where lower(email) = 'info@dasoft.me'
-    and role = 'super_admin'
-    and is_active = true
-  limit 1;
-
-  if v_super_admin_id is null then
-    raise exception 'Request notification super admin is not configured';
-  end if;
-
   insert into public.support_requests (
     requester_id, requester_name, requester_email, title, category, description
   ) values (
@@ -162,30 +161,50 @@ begin
   )
   returning * into v_request;
 
-  insert into public.user_notifications (
-    user_id, event_type, title, description, severity, href, sound_enabled, payload
-  ) values (
-    v_super_admin_id,
-    'request_created',
-    'New request',
-    format('%s · %s', coalesce(v_request.requester_name, v_request.requester_email, 'User'), v_request.title),
-    'info',
-    '/requests?request=' || v_request.id::text,
-    true,
-    jsonb_build_object(
-      'request_id', v_request.id,
-      'requester_id', v_request.requester_id,
-      'requester_name', v_request.requester_name,
-      'requester_email', v_request.requester_email,
-      'category', v_request.category
-    )
-  );
+  for v_manager in
+    select distinct p.id, p.email
+    from public.profiles p
+    left join public.user_roles ur on ur.user_id = p.id
+    where p.is_active = true
+      and (
+        p.role in ('super_admin', 'admin')
+        or ur.role in ('super_admin', 'admin')
+      )
+  loop
+    v_manager_count := v_manager_count + 1;
 
-  insert into public.support_request_email_deliveries (
-    request_id, event_type, recipient_email
-  ) values (
-    v_request.id, 'request_created', 'info@dasoft.me'
-  );
+    insert into public.user_notifications (
+      user_id, event_type, title, description, severity, href, sound_enabled, payload
+    ) values (
+      v_manager.id,
+      'request_created',
+      'New request',
+      format('%s · %s', coalesce(v_request.requester_name, v_request.requester_email, 'User'), v_request.title),
+      'info',
+      '/requests?request=' || v_request.id::text,
+      true,
+      jsonb_build_object(
+        'request_id', v_request.id,
+        'requester_id', v_request.requester_id,
+        'requester_name', v_request.requester_name,
+        'requester_email', v_request.requester_email,
+        'category', v_request.category
+      )
+    );
+
+    if nullif(btrim(v_manager.email), '') is not null then
+      insert into public.support_request_email_deliveries (
+        request_id, event_type, recipient_email
+      ) values (
+        v_request.id, 'request_created', btrim(v_manager.email)
+      )
+      on conflict (request_id, event_type, recipient_email) do nothing;
+    end if;
+  end loop;
+
+  if v_manager_count = 0 then
+    raise exception 'Request notification manager is not configured';
+  end if;
 
   return v_request;
 end;
@@ -205,7 +224,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  v_role text;
+  v_can_manage boolean;
   v_before public.support_requests%rowtype;
   v_request public.support_requests%rowtype;
   v_note text;
@@ -216,11 +235,23 @@ begin
     raise exception 'Authentication required';
   end if;
 
-  select role into v_role
-  from public.profiles
-  where id = auth.uid() and is_active = true;
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.is_active = true
+      and (
+        p.role in ('super_admin', 'admin')
+        or exists (
+          select 1
+          from public.user_roles ur
+          where ur.user_id = p.id
+            and ur.role in ('super_admin', 'admin')
+        )
+      )
+  ) into v_can_manage;
 
-  if v_role is null or v_role not in ('super_admin', 'admin') then
+  if not coalesce(v_can_manage, false) then
     raise exception 'Admin access required';
   end if;
 
@@ -262,19 +293,28 @@ begin
   where id = p_request_id
   returning * into v_request;
 
-  v_event_type := case when p_status = 'completed' then 'request_completed' else 'request_updated' end;
+  v_event_type := case
+    when p_status = 'completed' then 'request_completed'
+    else 'request_updated'
+  end;
 
   insert into public.user_notifications (
     user_id, event_type, title, description, severity, href, sound_enabled, payload
   ) values (
     v_request.requester_id,
     v_event_type,
-    case when v_event_type = 'request_completed' then 'Request completed' else 'Request updated' end,
+    case
+      when v_event_type = 'request_completed' then 'Request completed'
+      else 'Request updated'
+    end,
     format(
       '%s · Status: %s%s',
       v_request.title,
       replace(v_request.status, '_', ' '),
-      case when v_request.resolution_note is not null then ' · ' || v_request.resolution_note else '' end
+      case
+        when v_request.resolution_note is not null then ' · ' || v_request.resolution_note
+        else ''
+      end
     ),
     case when v_event_type = 'request_completed' then 'success' else 'info' end,
     '/requests?request=' || v_request.id::text,
