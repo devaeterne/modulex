@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `f248d04864c9e55111d416f99a1cced4ee4f02f3`
+Main baseline: `45458e1f1402614b5e4a408394706df4c4aa757d`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
 Current cross-roadmap package: **Store Phase 2.1C — About live accepted; Gallery/Projects content acceptance pending**
 
@@ -65,8 +65,9 @@ These rules are mandatory for all future Modulex Admin work:
   - Removed the `API Test` System navigation entry.
   - **Done when:** no generic TailAdmin sample page is reachable through normal Admin navigation unless explicitly required.
 
-- [ ] Audit dashboard widgets for template/sample data.
-  - Replace invented/demo values with real operational data or remove the widget.
+- [~] Audit dashboard widgets for template/sample data.
+  - Existing Modulex dashboard KPIs and recent stock movements are sourced from production RPCs (`get_dashboard_kpis`, `get_recent_inventory_movements`); no invented metric values were found.
+  - Active package: make dashboard Quick Actions permission-aware through the existing direct-route authorization truth.
 
 - [ ] Audit placeholder links, sample text, fake metrics, dead buttons, and development-only controls across Admin.
 
