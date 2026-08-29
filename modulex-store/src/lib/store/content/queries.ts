@@ -4,6 +4,7 @@ import { cache } from "react";
 import { callPublicRpc, getPublicStorageObjectUrl } from "@/lib/supabase/public-rest";
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const GALLERY_REVALIDATE_SECONDS = 60;
 
 export type StorePublicPage = {
   slug: string;
@@ -143,26 +144,47 @@ export const getStorePublicPage = cache(async (slug: string): Promise<StorePubli
   return rows[0] ? mapPage(rows[0]) : null;
 });
 
+export const getStoreGalleryPage = cache(async (): Promise<StorePublicPage | null> => {
+  const rows = await callPublicRpc<PageRpcRow[]>(
+    "get_store_public_page",
+    { p_slug: "gallery" },
+    { revalidate: GALLERY_REVALIDATE_SECONDS },
+  );
+  return rows[0] ? mapPage(rows[0]) : null;
+});
+
 export const getStorePublicProjects = cache(async (): Promise<StorePublicProject[]> => {
-  const rows = await callPublicRpc<ProjectRpcRow[]>("get_store_public_projects", {}, { revalidate: 900 });
+  const rows = await callPublicRpc<ProjectRpcRow[]>(
+    "get_store_public_projects",
+    {},
+    { revalidate: GALLERY_REVALIDATE_SECONDS },
+  );
   return rows.map(mapProject).filter((project): project is StorePublicProject => project !== null);
 });
 
 export const getStorePublicProject = cache(async (slug: string): Promise<StorePublicProject | null> => {
   const normalizedSlug = normalizeSlug(slug);
   if (!normalizedSlug) return null;
-  const rows = await callPublicRpc<ProjectRpcRow[]>("get_store_public_project", { p_slug: normalizedSlug }, { revalidate: 900 });
+  const rows = await callPublicRpc<ProjectRpcRow[]>(
+    "get_store_public_project",
+    { p_slug: normalizedSlug },
+    { revalidate: GALLERY_REVALIDATE_SECONDS },
+  );
   return rows[0] ? mapProject(rows[0]) : null;
 });
 
 export const getStorePublicProjectMedia = cache(async (slug: string): Promise<StorePublicProjectMedia[]> => {
   const normalizedSlug = normalizeSlug(slug);
   if (!normalizedSlug) return [];
-  const rows = await callPublicRpc<ProjectMediaRpcRow[]>("get_store_public_project_media", { p_slug: normalizedSlug }, { revalidate: 900 });
+  const rows = await callPublicRpc<ProjectMediaRpcRow[]>(
+    "get_store_public_project_media",
+    { p_slug: normalizedSlug },
+    { revalidate: GALLERY_REVALIDATE_SECONDS },
+  );
   return rows.map(mapProjectMedia).filter((media): media is StorePublicProjectMedia => media !== null);
 });
 
 export const getStoreGalleryReadiness = cache(async () => {
-  const [page, projects] = await Promise.all([getStorePublicPage("gallery"), getStorePublicProjects()]);
+  const [page, projects] = await Promise.all([getStoreGalleryPage(), getStorePublicProjects()]);
   return { page, projects, isReady: Boolean(page && projects.length > 0) };
 });

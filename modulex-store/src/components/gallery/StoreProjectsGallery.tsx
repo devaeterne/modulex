@@ -43,8 +43,28 @@ function ProjectAttribution({ project }: { project: StorePublicProject }) {
 
 export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryProps) {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState("All");
+
+  const categories = useMemo(() => {
+    const values = entries
+      .map((entry) => entry.project.category?.trim())
+      .filter((category): category is string => Boolean(category));
+    return Array.from(new Set(values));
+  }, [entries]);
+
+  const visibleEntries = useMemo(
+    () => activeCategory === "All" ? entries : entries.filter((entry) => entry.project.category === activeCategory),
+    [activeCategory, entries],
+  );
+
   const selected = useMemo(() => entries.find((entry) => entry.project.slug === selectedSlug) ?? null, [entries, selectedSlug]);
   const selectedMedia = selected ? getDisplayMedia(selected) : [];
+
+  useEffect(() => {
+    if (activeCategory !== "All" && !categories.includes(activeCategory)) {
+      setActiveCategory("All");
+    }
+  }, [activeCategory, categories]);
 
   useEffect(() => {
     if (!selected) return;
@@ -60,8 +80,32 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
 
   return (
     <>
+      {categories.length > 1 ? (
+        <div className="d-flex flex-wrap justify-content-center gap-2 mb-4" role="group" aria-label="Filter projects by category">
+          <button
+            type="button"
+            className={`btn btn-sm ${activeCategory === "All" ? "btn-dark" : "btn-outline-dark"}`}
+            aria-pressed={activeCategory === "All"}
+            onClick={() => setActiveCategory("All")}
+          >
+            All
+          </button>
+          {categories.map((category) => (
+            <button
+              type="button"
+              className={`btn btn-sm ${activeCategory === category ? "btn-dark" : "btn-outline-dark"}`}
+              aria-pressed={activeCategory === category}
+              onClick={() => setActiveCategory(category)}
+              key={category}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="row g-4">
-        {entries.map((entry) => (
+        {visibleEntries.map((entry) => (
           <div className="col-md-6 col-lg-4" key={entry.project.slug}>
             <article className="h-100 border rounded-3 overflow-hidden bg-white shadow-sm">
               <button type="button" className="w-100 border-0 bg-transparent p-0 text-start" onClick={() => setSelectedSlug(entry.project.slug)} aria-label={`View ${entry.project.title} project media`}>
