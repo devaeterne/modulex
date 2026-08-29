@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `adfd9210740c77a4196a4938caa6a41a2f71556e`
+Main baseline: `16ba530f91a7229c25cef5df626e609b5ba63ffe`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
 Current cross-roadmap package: **Store Phase 2.1C — About live accepted; Gallery/Projects content acceptance pending**
 
@@ -79,17 +79,22 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A0.2 Navigation and RBAC truth
 
-- [~] Inventory all Admin navigation entries and map each to required roles/permissions.
-  - Active bounded package: align sidebar visibility, `requiredPermissionForPath()`, direct-route access, and mutation-route requirements without introducing a new authorization system.
-- [~] Verify hidden navigation is also enforced at route/data level; hidden UI alone is not authorization.
-  - Known parity gap before implementation: `/profile` is linked for every authenticated role but currently has no explicit route rule, so non-admin roles are denied by the fallback.
-  - Store CMS routes shown with `store.manage` must require the same permission on direct URL access.
-- [~] Remove duplicated or conflicting navigation destinations.
-  - Keep `/customers/payment-methods` only as an intentional legacy redirect to `/settings/payment-methods`; do not expose it as a second navigation destination.
-- [~] Verify direct URL access behavior for unauthorized roles.
-  - Warehouse/location mutation routes such as `/warehouses/new` and edit mutation surfaces must require `warehouse.manage` rather than inheriting broad `warehouse.view` access.
-- [~] Document role expectations for `super_admin`, `admin`, `sales`, `finance`, `hr`, `warehouse`, and `shipping`.
-  - Extend deterministic RBAC coverage with navigation/direct-route parity and negative-access cases before marking this package complete.
+- [x] Inventory all Admin navigation entries and map each to required roles/permissions.
+  - `docs/ADMIN_RBAC_MATRIX.md` is the authoritative navigation → permission → role inventory for current production roles.
+  - `scripts/rbac-smoke.mjs` now parses sidebar entries and asserts direct-route permission parity.
+- [x] Verify hidden navigation is also enforced at route/data level; hidden UI alone is not authorization.
+  - `/profile` now has explicit `profile.view` access for every active Admin role.
+  - Store CMS manage-only routes (`content`, `marketing`, `colors`, Pages/Projects and mutation details) require `store.manage` on direct URL access.
+  - Supabase RLS/RPC/API authorization remains independently authoritative and is not replaced by the UI route guard.
+- [x] Remove duplicated or conflicting navigation destinations.
+  - `/customers/payment-methods` remains only as an intentional legacy redirect to `/settings/payment-methods` and now shares the canonical `finance.manage` permission.
+- [x] Verify direct URL access behavior for unauthorized roles.
+  - Warehouse/zone/location create/edit routes require `warehouse.manage`; `warehouse` and `shipping` retain read-only warehouse-structure access and are denied mutation URLs.
+  - Personnel Departments/Positions direct routes now match their sidebar `personnel.manage` requirement.
+- [x] Document role expectations for `super_admin`, `admin`, `sales`, `finance`, `hr`, `warehouse`, and `shipping`.
+  - Role expectations, route families, mutation rules, aliases, and enforcement layers are documented in `docs/ADMIN_RBAC_MATRIX.md`.
+  - TDD evidence: run `33249649439` failed on the pre-fix parity gaps; targeted GREEN run `33249708946` passed 12/12 RBAC checks.
+  - Full verification run `33249988130` passed RBAC parity, production-surface, secondary CMS, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
 
 ## A0.3 Runtime/config cleanup
 
@@ -108,7 +113,8 @@ These rules are mandatory for all future Modulex Admin work:
   - Full local Admin smoke passed on 2026-08-29 through RBAC, API/RLS, Phase 1 API/DB, dealer onboarding/DB, portal Admin contracts, auth recovery, and polling. Package B additionally has a fresh targeted CMS contract plus deterministic contract verification.
 - [x] Production navigation contains only intentional Modulex business or explicitly decision-pending surfaces.
   - Route/navigation classification is documented in `docs/ADMIN_PRODUCTION_SURFACE.md`; `API Test` was removed from navigation.
-- [ ] Unauthorized direct route access is denied consistently.
+- [x] Unauthorized direct route access is denied consistently.
+  - A0.2 route-permission parity and negative direct-URL cases passed in full verification run `33249988130`; data authorization remains independently enforced by RLS/RPC/API contracts.
 - [x] No known TailAdmin demo/sample route remains exposed unintentionally.
   - Production-surface contract plus the fresh production build guard the removed route set.
 
@@ -491,12 +497,12 @@ Record material decisions here when they affect future phases.
 
 Primary Admin roadmap work remains **Phase A0 — Production Surface & Operational Truth Cleanup**.
 
-A0.1 production-surface cleanup is merged and live. **A0.2 — Navigation and RBAC truth is now the active package.**
+A0.1 production-surface cleanup is live and **A0.2 Navigation & RBAC truth is implementation-complete and fully verified**. Next:
 
-1. Build the authoritative navigation → permission → role inventory from the existing sidebar and permission matrix.
-2. Fix direct-route parity gaps already identified for `/profile`, Store CMS manage-only routes, and warehouse/location mutation routes.
-3. Preserve intentional aliases such as `/customers/payment-methods` only as redirects; remove or prevent conflicting navigation destinations.
-4. Expand deterministic RBAC smoke coverage with positive and negative direct-URL cases for every current production role.
-5. Document final role expectations and only then mark A0.2 complete; dashboard/sample-data and runtime/config cleanup remain the following A0 packages.
+1. Audit dashboard widgets for template/sample/fake data; replace with real operational data or remove the widget.
+2. Audit placeholder links/text, fake metrics, dead buttons, and development-only controls across retained Admin surfaces.
+3. Execute A0.3 runtime/config cleanup: package identity, `.env.example` contract, Vercel Admin-domain assumptions, and client/server secret boundaries.
+4. Re-run the relevant Admin verification chain after each package and keep this roadmap current.
+5. Close Phase A0 only after the remaining dashboard/surface audit and runtime/config tasks satisfy their exit criteria.
 
 **Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published and live-accepted. Package D returns to Admin A4.1 after that Gallery acceptance for configurable ordinary navigation/footer links while Account and Contact remain code-owned.
