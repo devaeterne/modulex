@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -25,6 +25,11 @@ type CustomerLookup = {
   id: string;
   customer_code: string;
   name: string;
+};
+
+type OrderDirectoryRow = CustomerOrder & {
+  customer_code: string;
+  customer_name: string;
 };
 
 type OrderSummary = {
@@ -92,9 +97,8 @@ function parsePositiveInteger(value: string | null, fallback: number) {
 }
 
 export default function CustomerOrdersList({ customerId }: { customerId?: string }) {
-  const [customers, setCustomers] = useState<CustomerLookup[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerLookup | null>(null);
-  const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [orders, setOrders] = useState<OrderDirectoryRow[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const [urlReady, setUrlReady] = useState(false);
@@ -114,11 +118,6 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
     totalValue: 0,
     currencyCode: null,
   });
-
-  const customerMap = useMemo(
-    () => new Map(customers.map((customer) => [customer.id, customer])),
-    [customers]
-  );
 
   const normalizedSearch = debouncedSearch.trim().toLowerCase();
   const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
@@ -259,30 +258,8 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
       setIsLoading(true);
       setErrorMessage(null);
 
-      let searchCustomerIds: string[] = [];
-      if (normalizedSearch) {
-        const customerPattern = quotePostgrestValue(`%${debouncedSearch.trim()}%`);
-        let customerSearch = supabase
-          .from("customers")
-          .select("id")
-          .or(`customer_code.ilike.${customerPattern},name.ilike.${customerPattern}`);
-        if (customerId) customerSearch = customerSearch.eq("id", customerId);
-
-        const customerSearchResult = await customerSearch;
-        if (cancelled) return;
-        if (customerSearchResult.error) {
-          setErrorMessage(customerSearchResult.error.message);
-          setOrders([]);
-          setCustomers([]);
-          setFilteredCount(0);
-          setIsLoading(false);
-          return;
-        }
-        searchCustomerIds = (customerSearchResult.data ?? []).map((row) => row.id);
-      }
-
       let query = supabase
-        .from("customer_orders")
+        .from("customer_order_directory")
         .select("*", { count: "exact" });
 
       if (customerId) query = query.eq("customer_id", customerId);
@@ -290,15 +267,13 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
 
       if (normalizedSearch) {
         const pattern = quotePostgrestValue(`%${debouncedSearch.trim()}%`);
-        const filters = [
+        query = query.or([
           `order_number.ilike.${pattern}`,
           `customer_reference.ilike.${pattern}`,
           `payment_method_name_snapshot.ilike.${pattern}`,
-        ];
-        if (searchCustomerIds.length) {
-          filters.push(`customer_id.in.(${searchCustomerIds.join(",")})`);
-        }
-        query = query.or(filters.join(","));
+          `customer_code.ilike.${pattern}`,
+          `customer_name.ilike.${pattern}`,
+        ].join(","));
       }
 
       const from = (currentPage - 1) * pageSize;
@@ -311,39 +286,12 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
       if (ordersResult.error) {
         setErrorMessage(ordersResult.error.message);
         setOrders([]);
-        setCustomers([]);
         setFilteredCount(0);
         setIsLoading(false);
         return;
       }
 
-      const pageOrders = (ordersResult.data ?? []) as CustomerOrder[];
-      let pageCustomers: CustomerLookup[] = selectedCustomer ? [selectedCustomer] : [];
-
-      if (!customerId) {
-        const customerIds = [...new Set(pageOrders.map((order) => order.customer_id))];
-        if (customerIds.length) {
-          const customerResult = await supabase
-            .from("customers")
-            .select("id, customer_code, name")
-            .in("id", customerIds);
-          if (cancelled) return;
-          if (customerResult.error) {
-            setErrorMessage(customerResult.error.message);
-            setOrders([]);
-            setCustomers([]);
-            setFilteredCount(0);
-            setIsLoading(false);
-            return;
-          }
-          pageCustomers = (customerResult.data ?? []) as CustomerLookup[];
-        } else {
-          pageCustomers = [];
-        }
-      }
-
-      setOrders(pageOrders);
-      setCustomers(pageCustomers);
+      setOrders((ordersResult.data ?? []) as OrderDirectoryRow[]);
       setFilteredCount(ordersResult.count ?? 0);
       setIsLoading(false);
     }
@@ -356,7 +304,6 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
     authReady,
     urlReady,
     customerId,
-    selectedCustomer,
     currentPage,
     pageSize,
     status,
@@ -450,32 +397,29 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {orders.map((order) => {
-                const customer = selectedCustomer ?? customerMap.get(order.customer_id);
-                return (
-                  <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+              {orders.map((order) => (
+                <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                  <td className="px-5 py-4">
+                    <Link href={`/customers/${order.customer_id}/orders/${order.id}`} className="text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400">
+                      {order.order_number}
+                    </Link>
+                    <p className="mt-0.5 text-xs text-gray-400">{order.customer_reference || "No reference"}</p>
+                  </td>
+                  {!selectedCustomer && (
                     <td className="px-5 py-4">
-                      <Link href={`/customers/${order.customer_id}/orders/${order.id}`} className="text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400">
-                        {order.order_number}
+                      <Link href={`/customers/${order.customer_id}`} className="text-sm font-medium text-gray-800 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400">
+                        {order.customer_name}
                       </Link>
-                      <p className="mt-0.5 text-xs text-gray-400">{order.customer_reference || "No reference"}</p>
+                      <p className="text-xs text-gray-400">{order.customer_code}</p>
                     </td>
-                    {!selectedCustomer && (
-                      <td className="px-5 py-4">
-                        <Link href={`/customers/${order.customer_id}`} className="text-sm font-medium text-gray-800 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400">
-                          {customer?.name ?? "Unknown"}
-                        </Link>
-                        <p className="text-xs text-gray-400">{customer?.customer_code}</p>
-                      </td>
-                    )}
-                    <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{date(order.order_date)}</td>
-                    <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{titleCase(order.fulfillment_type || "delivery")}</td>
-                    <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge(order.status)}`}>{titleCase(order.status)}</span></td>
-                    <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{order.item_count}</td>
-                    <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{money(grandTotal(order), order.currency_code)}</td>
-                  </tr>
-                );
-              })}
+                  )}
+                  <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{date(order.order_date)}</td>
+                  <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{titleCase(order.fulfillment_type || "delivery")}</td>
+                  <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge(order.status)}`}>{titleCase(order.status)}</span></td>
+                  <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{order.item_count}</td>
+                  <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{money(grandTotal(order), order.currency_code)}</td>
+                </tr>
+              ))}
               {orders.length === 0 && (
                 <tr><td colSpan={selectedCustomer ? 6 : 7} className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">No orders found.</td></tr>
               )}
