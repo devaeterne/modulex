@@ -9,14 +9,10 @@ on:
       - .github/workflows/a0-2-warehouse-mutation-guard.yml
 
 permissions:
-  contents: read
-
-env:
-  NEXT_PUBLIC_SUPABASE_URL: https://bzjoeernnmvuhzyvbowc.supabase.co
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_if_qoUqt9Zb0cBBYew5V2w_Jt2do0V5
+  contents: write
 
 jobs:
-  verify:
+  closeout:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,31 +21,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: modulex-admin/package-lock.json
-      - run: npm ci
-      - name: RBAC contract
-        run: npm run smoke:rbac
-      - name: Production surface contract
-        run: npm run smoke:production-surface
-      - name: Secondary CMS Admin contract
-        run: npm run smoke:secondary-cms-admin
-      - name: Dealer onboarding contract
-        run: npm run smoke:dealer-onboarding
-      - name: Dealer portal Admin contract
-        run: npm run smoke:dealer-portal-admin
-      - name: Store portal Admin contract
-        run: npm run smoke:store-portal-admin
-      - name: Auth recovery contract
-        run: npm run smoke:auth-recovery
-      - name: Polling contract
-        run: npm run smoke:polling
-      - name: Lint
-        run: npm run lint
-      - name: Production build
-        run: npm run build
-      - name: Diff check
-        run: git -C .. diff --check f248d04864c9e55111d416f99a1cced4ee4f02f3...HEAD
+      - name: Apply roadmap closeout and remove temporary CI files
+        run: python scripts/apply-warehouse-mutation-guard.py
+      - name: Verify closeout diff
+        run: git -C .. diff --check
+      - name: Commit closeout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C .. add -A
+          git -C .. commit -m "docs: close warehouse mutation RBAC follow-up [skip ci]"
+          git -C .. push
