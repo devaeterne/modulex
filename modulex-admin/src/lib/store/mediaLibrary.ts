@@ -105,6 +105,16 @@ export function validateMediaReviewUpdate(input: StoreMediaReviewInput) {
   };
 }
 
+export function isProjectEligibleMediaAsset(asset: StoreMediaAsset) {
+  return asset.status === "published"
+    && asset.media_type === "image"
+    && asset.cabinet_relevance === "relevant"
+    && asset.attribution_classification !== "unverified_hold"
+    && asset.public_bucket === "store-media"
+    && Boolean(asset.public_path?.trim())
+    && Boolean(asset.default_alt_text?.trim());
+}
+
 export function formatMediaBytes(bytes: number | null) {
   if (!bytes || bytes <= 0) return "—";
   if (bytes < 1024) return `${bytes} B`;
