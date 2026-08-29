@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
-import { getCurrentProfile } from "@/lib/supabase/profile";
-import { hasPermission } from "@/lib/auth/permissions";
+import { loadOrderDetail, setCustomerOrderStatus } from "@/lib/customers/order-domain";
 import type {
   Customer,
   CustomerOrder,
@@ -85,56 +83,24 @@ export default function CustomerOrderDetail() {
 
   async function load() {
     setIsLoading(true);
-
-    const [customerResult, orderResult, itemsResult, historyResult, approvalsResult] = await Promise.all([
-      supabase.from("customers").select("*").eq("id", customerId).single(),
-      supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
-      supabase.from("customer_order_items").select("*").eq("order_id", orderId).order("line_no"),
-      supabase.from("customer_order_status_history").select("*").eq("order_id", orderId).order("created_at", { ascending: false }),
-      supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("entity_type", "order").eq("entity_id", orderId).eq("status", "pending"),
-    ]);
-
-    const firstError = customerResult.error || orderResult.error || itemsResult.error || historyResult.error;
-    if (firstError) {
-      setErrorMessage(firstError.message);
+    try {
+      const context = await loadOrderDetail(customerId, orderId);
+      setCustomer(context.customer);
+      setOrder(context.order);
+      setItems(context.items);
+      setHistory(context.history);
+      setPendingApprovals(context.pendingApprovals);
+      setCanManage(context.canManage);
+      setNewStatus(context.order.status);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to load order detail.");
+    } finally {
       setIsLoading(false);
-      return;
     }
-
-    const loadedOrder = orderResult.data as CustomerOrder;
-    setCustomer(customerResult.data as Customer);
-    setOrder(loadedOrder);
-    setItems((itemsResult.data ?? []) as CustomerOrderItem[]);
-    setHistory((historyResult.data ?? []) as CustomerOrderStatusHistory[]);
-    setPendingApprovals(approvalsResult.error ? 0 : approvalsResult.count ?? 0);
-    setNewStatus(loadedOrder.status);
-    setIsLoading(false);
   }
 
   useEffect(() => {
-    let mounted = true;
-
-    async function init() {
-      const { profile, error } = await getCurrentProfile();
-      if (!mounted) return;
-      if (error || !profile) {
-        setErrorMessage(error?.message ?? "User profile could not be loaded.");
-        setIsLoading(false);
-        return;
-      }
-      if (!hasPermission(profile.role, "orders.view")) {
-        setErrorMessage("You do not have permission to view customer orders.");
-        setIsLoading(false);
-        return;
-      }
-      setCanManage(hasPermission(profile.role, "orders.manage"));
-      await load();
-    }
-
-    void init();
-    return () => {
-      mounted = false;
-    };
+    void load();
   }, [customerId, orderId]);
 
   async function updateStatus() {
@@ -143,26 +109,25 @@ export default function CustomerOrderDetail() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const { data, error } = await supabase.rpc("set_customer_order_status", {
-      p_order_id: order.id,
-      p_status: newStatus,
-      p_note: statusNote.trim() || null,
-    });
+    try {
+      const result = await setCustomerOrderStatus({
+        orderId: order.id,
+        status: newStatus,
+        note: statusNote,
+      });
 
-    if (error) {
-      setErrorMessage(error.message);
+      await load();
+      setStatusNote("");
+      setSuccessMessage(
+        result === "approval_requested"
+          ? "Approval requested. The order status was not changed yet."
+          : "Order status updated."
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to update order status.");
+    } finally {
       setIsSaving(false);
-      return;
     }
-
-    await load();
-    setStatusNote("");
-    setSuccessMessage(
-      data === "approval_requested"
-        ? "Approval requested. The order status was not changed yet."
-        : "Order status updated."
-    );
-    setIsSaving(false);
   }
 
   if (isLoading) return <Loading />;
