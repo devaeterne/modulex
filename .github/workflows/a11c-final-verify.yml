@@ -19,6 +19,8 @@ jobs:
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: test-publishable-key
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -42,4 +44,4 @@ jobs:
         run: npm run build
       - name: Diff whitespace check
         working-directory: .
-        run: git diff --check HEAD~1 HEAD
+        run: git diff --check origin/main...HEAD
