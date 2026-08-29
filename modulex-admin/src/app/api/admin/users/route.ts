@@ -34,17 +34,19 @@ type UserProfile = ProfileRow & {
   roles: UserRole[];
 };
 
+type RoleValidationResult =
+  | { ok: true; roles: UserRole[] }
+  | { ok: false; error: string };
+
 function isUserRole(value: unknown): value is UserRole {
   return typeof value === "string" && VALID_ROLES.has(value as UserRole);
 }
 
-function normalizeRequestedRoles(value: unknown):
-  | { roles: UserRole[]; error?: never }
-  | { roles?: never; error: string } {
+function normalizeRequestedRoles(value: unknown): RoleValidationResult {
   const rawRoles = Array.isArray(value) ? value : [value];
 
   if (rawRoles.length === 0 || rawRoles.some((role) => !isUserRole(role))) {
-    return { error: "At least one valid user role is required." };
+    return { ok: false, error: "At least one valid user role is required." };
   }
 
   const roles = Array.from(new Set(rawRoles as UserRole[])).sort(
@@ -55,11 +57,12 @@ function normalizeRequestedRoles(value: unknown):
 
   if (hasElevatedRole && roles.length > 1) {
     return {
+      ok: false,
       error: "Admin and Super Admin roles must be assigned exclusively.",
     };
   }
 
-  return { roles };
+  return { ok: true, roles };
 }
 
 function normalizeEmail(value: unknown) {
@@ -285,7 +288,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (roleResult.error) {
+  if (!roleResult.ok) {
     return jsonError(roleResult.error, 400);
   }
 
@@ -473,7 +476,7 @@ export async function PATCH(request: Request) {
 
   const roleResult = normalizeRequestedRoles(body.roles ?? body.role);
 
-  if (roleResult.error) {
+  if (!roleResult.ok) {
     return jsonError(roleResult.error, 400);
   }
 
