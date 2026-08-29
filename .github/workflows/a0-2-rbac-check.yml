@@ -1,19 +1,18 @@
-name: A0.2 RBAC check
+name: A0.2 Admin verification
 
 on:
   push:
     branches:
       - phase-a0/admin-rbac-truth
     paths:
-      - modulex-admin/scripts/rbac-smoke.mjs
-      - modulex-admin/src/lib/auth/permissions.ts
+      - modulex-admin/**
       - .github/workflows/a0-2-rbac-check.yml
 
 permissions:
   contents: read
 
 jobs:
-  rbac:
+  verify:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,4 +25,25 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
-      - run: npm run smoke:rbac
+      - name: RBAC parity contract
+        run: npm run smoke:rbac
+      - name: Production surface contract
+        run: npm run smoke:production-surface
+      - name: Secondary CMS Admin contract
+        run: npm run smoke:secondary-cms-admin
+      - name: Dealer onboarding contract
+        run: npm run smoke:dealer-onboarding
+      - name: Dealer portal Admin contract
+        run: npm run smoke:dealer-portal-admin
+      - name: Store portal Admin contract
+        run: npm run smoke:store-portal-admin
+      - name: Auth recovery contract
+        run: npm run smoke:auth-recovery
+      - name: Polling contract
+        run: npm run smoke:polling
+      - name: Lint
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Diff check
+        run: git -C .. diff --check 16ba530f91a7229c25cef5df626e609b5ba63ffe...HEAD
