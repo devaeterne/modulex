@@ -5,6 +5,9 @@ on:
     branches:
       - phase-2-1/c-store-public-pages
 
+permissions:
+  contents: write
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -33,3 +36,12 @@ jobs:
         run: npm run smoke
       - name: Build
         run: npm run build
+      - name: Reconcile Store and Admin roadmaps
+        working-directory: .
+        run: |
+          node .github/scripts/reconcile-phase-2-1-c-roadmaps.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-store/STORE_ROADMAP.md modulex-admin/ADMIN_ROADMAP.md
+          git commit -m "docs: reconcile Phase 2.1C roadmaps [skip ci]"
+          git push
