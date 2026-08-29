@@ -1,8 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `3802aa9276bb2fe17c7fce0959a2e38b04ba041c`
+Main baseline: `41aa1f0b1c27460e5ef298242162518c2bf93606`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
+Current cross-roadmap package: **Store Phase 2.1B — Admin Pages/Projects CMS complete; next dependency is Store Phase 2.1C**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -86,9 +87,12 @@ These rules are mandatory for all future Modulex Admin work:
 
 ### Phase A0 Exit Gate
 
-- [ ] `npm run lint` passes.
-- [ ] `npm run build` passes.
-- [ ] `npm run smoke` passes.
+- [x] `npm run lint` passes.
+  - Fresh Package B CI evidence: 0 errors / 35 existing warnings.
+- [x] `npm run build` passes.
+  - Fresh Package B Next.js/TypeScript build passed in GitHub Actions.
+- [x] `npm run smoke` passes.
+  - Full local Admin smoke passed on 2026-08-29 through RBAC, API/RLS, Phase 1 API/DB, dealer onboarding/DB, portal Admin contracts, auth recovery, and polling. Package B additionally has a fresh targeted CMS contract plus deterministic contract verification.
 - [ ] Production navigation contains only intentional Modulex business surfaces.
 - [ ] Unauthorized direct route access is denied consistently.
 - [ ] No known TailAdmin demo/sample route remains exposed unintentionally.
@@ -229,11 +233,15 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Homepage Store content/settings foundation exists.
 - [x] Store product content/media/color management foundation exists.
 - [x] Store marketing/analytics settings foundation exists.
-- [~] Expand CMS for production secondary pages in coordination with `STORE_ROADMAP.md` Phase 2.1.
-  - Approved architecture is split into ordered Store Phase 2.1 packages A → B → C → D; written spec review is pending before implementation.
+- [x] Expand CMS for production secondary pages in coordination with `STORE_ROADMAP.md` Phase 2.1.
+  - Approved architecture is split into ordered Store Phase 2.1 packages A → B → C → D; all four written specs are approved.
   - Package B adds dedicated `/store/pages` and `/store/projects` management rather than extending the large existing Site Content editor.
-- [ ] Add draft/published workflow where required.
-- [ ] Add SEO/OG/media fields with validation.
+  - Implemented with `store.manage` route/sidebar enforcement, admin/super_admin mutation controls, and existing production RLS as the real write boundary.
+  - Verification: targeted secondary CMS Admin contract, lint, deterministic Admin contracts, and build passed in GitHub Actions run `33243001683`.
+- [x] Add draft/published workflow where required.
+  - Pages and Projects expose separate Save draft / Publish / Unpublish actions; uploads do not auto-publish.
+- [x] Add SEO/OG/media fields with validation.
+  - Page hero/OG and project cover/OG uploads use `store-media` with JPEG/PNG/WebP/AVIF ≤20 MB validation; project media also supports external public video URLs with required alt text.
 - [~] Review navigation/footer configurability needs.
   - Package D design keeps Account and Contact controls code-owned while ordinary navigation/footer link groups become `store.manage` CMS data.
 
@@ -347,6 +355,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
 - [x] Dealer onboarding contracts exist.
 - [x] Dealer portal Admin contract exists.
 - [x] Store portal Admin contract exists.
+- [x] Secondary CMS Admin contract exists and protects Pages/Projects routes, RBAC, lifecycle actions, media constraints, and service-role exclusion.
 - [x] Auth recovery contract exists.
 - [x] Polling regression contract exists.
 - [ ] Add production-surface/demo-route contract.
@@ -434,6 +443,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] Store lead list/detail surfaces exist.
 - [x] Dealer onboarding and portal activation Admin flows have contract coverage.
 - [x] Customer document dealer-visibility controls exist.
+- [x] Phase 2.1B secondary Pages/Projects CMS exists with controlled page slugs, project/media management, explicit publishing, SEO/OG fields, and Store media validation.
 
 ## Security and testing
 
@@ -463,9 +473,9 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin work remains **Phase A0 — Production Surface & Operational Truth Cleanup**.
+Primary Admin roadmap work remains **Phase A0 — Production Surface & Operational Truth Cleanup**.
 
-Recommended first A0 implementation package:
+Recommended first A0 implementation package remains:
 
 1. Build a route/navigation inventory and classify every current Admin route as production, planned, or demo/template.
 2. Add a production-surface contract that detects TailAdmin demo routes/navigation.
@@ -473,4 +483,4 @@ Recommended first A0 implementation package:
 4. Verify direct-route RBAC behavior for the remaining business surfaces.
 5. Run full Admin lint/build/smoke verification and update this roadmap with the result.
 
-**Cross-roadmap coordination:** Store Phase 2.1 architecture is documented in `docs/superpowers/specs/2026-08-29-phase-2-1-{a,b,c,d}-*.md`. After written-spec approval and Store Phase 2.0 formal closeout, implement the Store CMS expansion in dependency order A → B → C → D; Packages B and D contain the Admin A4.1 work and must update this roadmap in their implementation PRs.
+**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete. The next Store dependency is **Phase 2.1C — CMS-backed About + Gallery/Projects**. Package D later returns to Admin A4.1 for configurable ordinary navigation/footer links while Account and Contact remain code-owned.

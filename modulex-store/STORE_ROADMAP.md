@@ -1,8 +1,8 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `3802aa9276bb2fe17c7fce0959a2e38b04ba041c`
-Current phase: **Phase 2.0 — Production Truth & Cleanup**
+Main baseline: `41aa1f0b1c27460e5ef298242162518c2bf93606`
+Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
 
@@ -91,9 +91,10 @@ These rules are mandatory for all future Modulex Store work:
   - **Done when:** no demo marketing page can be reached from a normal URL without an intentional redirect/not-found.
   - Production `/index-premium`, `/index-slider`, and `/gallery/detail` all return not-found.
 
-- [~] Remove all production placeholders across Store.
+- [x] Remove all production placeholders across Store.
   - Search for `+1555`, `href="#"`, `.html` legacy links, fake offers, demo author/testimonial names, and template-only copy.
   - **Done when:** automated contract test passes with zero blocked placeholder patterns.
+  - Verified by the public-production contract in the passing Store smoke chain; no blocked production placeholder pattern remains in the guarded surface.
 
 ## 2.0.2 Indexing and route exposure hardening
 
@@ -109,22 +110,24 @@ These rules are mandatory for all future Modulex Store work:
 - [x] Verify all Customer and Dealer auth/portal layouts have `noindex, nofollow` coverage.
   - Production `/account/login` and `/dealer/login` both emit `<meta name="robots" content="noindex, nofollow">` on main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c`.
 
-- [~] Add a public-production content contract.
+- [x] Add a public-production content contract.
   - Fail on fake phone numbers, placeholder `href="#"`, legacy `.html` links, known demo names/claims, or accidentally indexable portal routes.
   - Add it to `npm run smoke`.
-  - Contract is implemented and wired to smoke; execution evidence for the full smoke chain is still required.
+  - Contract is implemented, wired to `npm run smoke`, and passed in the fresh local full Store smoke run on 2026-08-29.
 
 ### Phase 2.0 Exit Gate
 
-- [ ] `npm run lint` passes.
+- [x] `npm run lint` passes.
+  - Fresh local evidence: 0 errors / 11 existing `@next/next/no-img-element` warnings.
 - [x] `npm run build` passes.
   - Vercel production build for main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c` compiled successfully, passed TypeScript, generated all routes, and deployed READY.
-- [ ] `npm run smoke` passes.
+- [x] `npm run smoke` passes.
+  - Fresh local full smoke passed public production, secondary CMS, client, API, dealer auth/activation, portal experience/auth guard, and public-navbar contracts.
 - [x] Public route crawl shows no fake/demo content.
   - Verified production routes include `/about`, `/gallery`, `/gallery/detail`, `/services`, `/services/residential`, `/blog`, an arbitrary `/blog/[slug]`, `/index-premium`, and `/index-slider`.
 - [x] Sitemap contains only production-approved routes.
 
-**Phase 2.0 closeout blocker:** production merge/deploy, build, indexing protections, sitemap, and the complete known demo/deep-route crawl are verified. The strict exit gate now has only two missing command-level proofs: fresh `npm run lint` and full `npm run smoke`. Phase 2.1 design work may proceed, but Phase 2.1 must not become the primary implementation phase until this gate is formally closed.
+**Phase 2.0 closeout:** formally closed on 2026-08-29. Production truth/indexing/crawl checks, build, fresh lint, and the full Store smoke chain are all verified.
 
 ---
 
@@ -132,32 +135,35 @@ These rules are mandatory for all future Modulex Store work:
 
 **Goal:** Move official public content out of hard-coded page templates and into controlled Store CMS data managed from `modulex-admin`.
 
-**Approved architecture (written-spec review pending):** implement as four ordered packages: **A) secondary CMS data/RPC foundation → B) Admin Pages/Projects CMS → C) Store About + Gallery/Projects → D) configurable Navbar/Footer and phase closeout**. Blog strategy is **Option B: keep Blog disabled until a real editorial workflow is required**.
+**Approved architecture and written specs:** implement as four ordered packages: **A) secondary CMS data/RPC foundation → B) Admin Pages/Projects CMS → C) Store About + Gallery/Projects → D) configurable Navbar/Footer and phase closeout**. Blog strategy is **Option B: keep Blog disabled until a real editorial workflow is required**.
 
 ## 2.1.1 Shared page-content model
 
-- [~] Define the CMS model for secondary public pages.
+- [x] Define the CMS model for secondary public pages.
   - Controlled first-iteration surfaces: About and Gallery/Projects.
   - Prefer structured fields over an unrestricted page builder for the first iteration.
   - Design: `docs/superpowers/specs/2026-08-29-phase-2-1-a-secondary-cms-foundation-design.md`.
 
-- [ ] Add migrations/RPCs for approved public page content.
+- [x] Add migrations/RPCs for approved public page content.
   - Anonymous users get read-only published projections through narrow RPCs.
   - Admin edits remain authenticated and role-controlled.
+  - Package A migration is merged and applied to production Supabase; `store_pages`, `store_projects`, `store_project_media`, RLS boundaries, and the four narrow published-only public RPCs were verified in production.
 
-- [ ] Add corresponding Admin CMS screens.
+- [x] Add corresponding Admin CMS screens.
   - Draft/published state.
   - Sort order.
   - SEO title/description/OG image where applicable.
   - Media selection and alt text.
   - Design: `docs/superpowers/specs/2026-08-29-phase-2-1-b-admin-secondary-cms-design.md`.
+  - Package B implementation adds `/store/pages` and `/store/projects`, explicit draft/publish/unpublish actions, SEO/OG fields, validated Store media uploads, external video media, and `store.manage` route/sidebar enforcement.
+  - Verification: secondary CMS Admin contract, lint (0 errors / 35 existing warnings), deterministic Admin contracts, and Next.js/TypeScript build all passed in GitHub Actions run `33243001683`.
 
 - [ ] Convert About page to CMS-backed production content.
 
 - [ ] Convert Gallery/Projects page to CMS-backed data.
   - Design for both public routes: `docs/superpowers/specs/2026-08-29-phase-2-1-c-store-public-pages-design.md`.
 
-- [~] Decide Blog strategy.
+- [x] Decide Blog strategy.
   - Decision: **Option B — no Blog CMS in Phase 2.1.** Keep `/blog` disabled/not-found until editorial workflow is actually required.
   - Do not keep or rebuild a fake blog merely for template completeness.
 
@@ -176,8 +182,10 @@ These rules are mandatory for all future Modulex Store work:
 
 - [ ] No major public marketing page requires code changes for ordinary content updates.
 - [ ] Public page content is read through controlled RPCs.
-- [ ] Admin roles can manage the supported content without direct database work.
-- [ ] Draft content is not publicly visible.
+- [x] Admin roles can manage the supported content without direct database work.
+  - Package B provides controlled Pages/Projects CRUD and publish workflows under existing authenticated RLS.
+- [x] Draft content is not publicly visible.
+  - Package A public RPCs filter to `status = 'published'`; Admin writes remain behind authenticated RLS.
 
 ---
 
@@ -522,7 +530,12 @@ The items below are already present in the current Store architecture. Keep them
 
 # Next Action
 
-1. **Formally close Phase 2.0:** obtain fresh `npm run lint` and full `npm run smoke` evidence. Production main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c` is already merged, deployed READY, build/TypeScript verified, account/dealer `noindex, nofollow` verified live, and the known disabled/demo route crawl is complete.
-2. **Review the written Phase 2.1 architecture specs** in `docs/superpowers/specs/2026-08-29-phase-2-1-{a,b,c,d}-*.md` and record explicit spec approval before implementation.
-3. After written-spec approval and Phase 2.0 formal closeout, implement Phase 2.1 in strict dependency order: **A → B → C → D**.
-4. Each implementation package must update both Store/Admin roadmaps where affected and must not mark downstream tasks complete before verification.
+Primary Store work is now **Phase 2.1C — Store About + Gallery/Projects**.
+
+1. Wire `modulex-store/src/lib/store/content/queries.ts` to the approved published-only Package A RPCs.
+2. Convert About to CMS-backed copy while retaining canonical company-profile identity/contact data and the factual fallback.
+3. Enable Gallery only when the Gallery page is published and at least one project is published; otherwise keep deliberate not-found behavior and omit it from sitemap/navigation.
+4. Bind real project/media data to the existing gallery/lightbox experience without adding a public project-detail route in Phase 2.1.
+5. Add metadata/sitemap/contract coverage, run Store lint/build/smoke/live verification, and update both roadmaps where cross-project behavior changes.
+
+**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete. Package D navigation/footer configurability remains after Package C.
