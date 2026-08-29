@@ -205,6 +205,8 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path.startsWith("/store/leads/"), permission: "leads.manage" },
   {
     match: (path) =>
+      path === "/store/company" ||
+      path.startsWith("/store/company/") ||
       path === "/store/pages" ||
       path.startsWith("/store/pages/") ||
       path === "/store/projects" ||
