@@ -22,6 +22,10 @@ A later RED contract proved that the GC-5 Store migration incorrectly depended o
 
 Actions run `33278682720` captured RED for the requirement that a project using any `parent_attributed` cover/gallery image cannot publish as `oakwell_owned`. The migration now derives this with `private.store_project_requires_parent_attribution(uuid)` across both the cover asset and linked project image assets. A parent-attributed project still requires explicit non-empty attribution text and an HTTPS source page URL; those values are not guessed or auto-seeded.
 
+### Referenced asset immutability
+
+Actions run `33278823414` captured RED for a second lifecycle invariant: a Media Library asset referenced by a published project must not be able to change its content-addressed public object path or attribution identity behind that project. `private.protect_published_project_media_asset()` now treats publication-critical fields as immutable while the asset is referenced by a published project: lifecycle status, media type, public bucket/path, cabinet relevance, and attribution classification. Unpublish/review changes require the project reference to be removed or unpublished first.
+
 ## CI build environment note
 
 Admin build verification requires the public Supabase runtime variables to exist during Next.js prerendering. The branch-only verification workflow supplies non-secret placeholder public configuration for the build step only. It does not use a service-role/elevated credential and does not mutate production.
