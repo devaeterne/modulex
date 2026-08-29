@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
+import { canAccessPath } from "@/lib/auth/permissions";
 
 type DashboardKpis = {
   total_products: number;
@@ -49,6 +51,13 @@ const emptyKpis: DashboardKpis = {
   total_inventory_value: 0,
   total_movements: 0,
 };
+
+const quickActions = [
+  { href: "/qr-labels", label: "Print QR Labels" },
+  { href: "/scan", label: "Scan QR / Barcode" },
+  { href: "/inventory", label: "View Stock Overview" },
+  { href: "/low-stock", label: "Check Low Stock" },
+] as const;
 
 const numberFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
@@ -115,6 +124,28 @@ export default function ModulexDashboard() {
   const [recentMovements, setRecentMovements] = useState<RecentMovement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeRole, setActiveRole] = useState<UserRole | null>(null);
+  const [profileResolved, setProfileResolved] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void getCurrentProfile()
+      .then(({ profile }) => {
+        if (!mounted) return;
+        setActiveRole(profile?.role ?? null);
+        setProfileResolved(true);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setActiveRole(null);
+        setProfileResolved(true);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -210,6 +241,10 @@ export default function ModulexDashboard() {
       helper: "Available shelf locations",
     },
   ];
+
+  const visibleQuickActions = profileResolved
+    ? quickActions.filter(action => canAccessPath(activeRole, action.href))
+    : [];
 
   return (
     <div className="space-y-6">
@@ -326,34 +361,29 @@ export default function ModulexDashboard() {
             Quick Actions
           </h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Common warehouse operations.
+            Common operations available to your role.
           </p>
 
           <div className="mt-5 grid grid-cols-1 gap-3">
-            <Link
-              href="/qr-labels"
-              className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-            >
-              Print QR Labels
-            </Link>
-            <Link
-              href="/scan"
-              className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-            >
-              Scan QR / Barcode
-            </Link>
-            <Link
-              href="/inventory"
-              className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-            >
-              View Stock Overview
-            </Link>
-            <Link
-              href="/low-stock"
-              className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-            >
-              Check Low Stock
-            </Link>
+            {!profileResolved ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Loading available actions...
+              </p>
+            ) : visibleQuickActions.length === 0 ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                No quick actions are available for this account.
+              </p>
+            ) : (
+              visibleQuickActions.map((action) => (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                >
+                  {action.label}
+                </Link>
+              ))
+            )}
           </div>
         </div>
       </div>
