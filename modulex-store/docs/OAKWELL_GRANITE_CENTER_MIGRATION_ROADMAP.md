@@ -9,6 +9,7 @@ Architecture design: `modulex-store/docs/superpowers/specs/2026-08-29-oakwell-dy
 GC-0 truth/ownership lock: `modulex-store/docs/GC0_BUSINESS_TRUTH_LOCK.md`
 GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`
 GC-2 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc2-media-library-optimization-implementation.md`
+GC-2 production acceptance: `modulex-store/docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`
 GC-1 manifest: `modulex-store/docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md` + `gc1-source-manifest.json`
 
 > Purpose: identify which verified Granite & Cabinet Center business data, media, social proof, forms, showroom information, and cabinet-related content should be adapted into Oakwell Cabinetry without cloning the parent website or importing stale/irrelevant WordPress content.
@@ -447,25 +448,27 @@ Plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-
 
 Goal: create reusable, traceable Oakwell-controlled media without visual degradation.
 
+Status: `[x]` production-accepted on 2026-08-29.
+
 **Package status**
 
 - `[x]` **GC-2A — schema/security foundation:** reusable asset/provenance tables and private staging boundary are production-verified.
 - `[x]` **GC-2B — importer/optimizer capability:** bounded Granite acquisition, verified metadata/hash, no-upscale WebP optimization, private staging writer/idempotency, rollback, credential gate, reporting and `--publish` prohibition are verified. A real `media-showroom-01` dry-run succeeded in Actions `33260112614` with zero production DB/Storage writes.
 - `[x]` **GC-2C — Admin Media Library:** `/store/media`, `store.manage` RBAC, metadata/provenance review, private signed staging previews, and controlled server-side publish/unpublish/delete lifecycle are verified; production intake remains zero and deferred to GC-2D.
-- `[~]` **GC-2D — controlled production intake:** the Admin/Vercel Node boundary with caller JWT + existing RLS, private staging, publish prohibition, pinned `sharp@0.35.4`, and Webpack Sharp tracing is live-proven. The representative asset completed import/review/publish, exact-SHA duplicate import, unpublish, and same immutable-path republish acceptance. A follow-up audit found the private original was later removed through the Supabase Management API outside the Admin lifecycle while optimized staging/public derivatives remained intact; the verified duplicate-intake self-heal restores only missing exact private staging bytes and preserves published state. Merge/deploy/re-import repair verification remains before GC-2 closeout.
+- `[x]` **GC-2D — controlled production intake:** the Admin/Vercel Node boundary with caller JWT + existing RLS, private staging, publish prohibition, pinned `sharp@0.35.4`, and Webpack Sharp tracing is production-accepted. The representative asset completed import/review/publish, exact-SHA duplicate import, unpublish, same immutable-path republish, and post-PR #128 missing-private-original self-heal. Final state remained one asset/provenance/public object with both private staging objects present. Full evidence: `docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`.
 
 - `[x]` design/implement reusable media asset domain and Admin management required by migration;
-- `[ ]` download approved originals;
-- `[ ]` verify metadata and SHA-256 dedupe;
-- `[ ]` optional perceptual dedupe where useful;
-- `[ ]` strip unnecessary EXIF/GPS;
-- `[ ]` resize/encode conservatively without upscaling;
-- `[ ]` upload to controlled Supabase Storage;
-- `[ ]` register provenance/attribution/review status;
-- `[ ]` verify responsive AVIF/WebP delivery;
-- `[ ]` verify import idempotency/no duplicate uploads.
+- `[x]` download approved originals;
+- `[x]` verify metadata and SHA-256 dedupe;
+- `[ ]` optional perceptual dedupe where useful — not required for GC-2 exact-SHA representative acceptance; reconsider only if GC-5 source sets expose near-duplicates;
+- `[x]` strip unnecessary EXIF/GPS;
+- `[x]` resize/encode conservatively without upscaling;
+- `[x]` upload to controlled Supabase Storage;
+- `[x]` register provenance/attribution/review status;
+- `[x]` verify optimized WebP public delivery; responsive Store rendering remains consumer acceptance in GC-5 when media is attached to projects;
+- `[x]` verify import idempotency/no duplicate uploads.
 
-**Exit gate:** approved media library exists in controlled Storage/CMS with Admin management and traceable source metadata.
+**Exit gate:** `[x]` approved media library exists in controlled Storage/CMS with Admin management and traceable source metadata. Production acceptance is recorded in `docs/granite-center/GC2_PRODUCTION_ACCEPTANCE.md`; GC-3 is next and GC-5 retains project/media association ownership.
 
 ## GC-3 — Company identity, contact, About & Showroom
 
