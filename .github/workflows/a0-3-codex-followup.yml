@@ -6,7 +6,7 @@ on:
       - fix/admin-a03-codex-followup
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   verify:
@@ -29,16 +29,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
-      - name: Apply bounded follow-up patch
-        run: |
-          python3 scripts/tmp-a03-codex-followup.py
-          if ! git diff --quiet -- src/app/api/admin/dealer-portal/route.ts ADMIN_ROADMAP.md; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add src/app/api/admin/dealer-portal/route.ts ADMIN_ROADMAP.md
-            git commit -m "fix(admin): close A0.3 Codex runtime gaps"
-            git push
-          fi
       - name: Install dependencies
         run: npm ci
       - name: Prove privileged public env leakage is rejected
@@ -81,13 +71,3 @@ jobs:
         run: npm run build
       - name: Diff check
         run: git diff --check f6d7f9673dc874b5c254e47c750ff1bd4793c7c3...HEAD -- .
-      - name: Record verified follow-up closeout
-        run: |
-          python3 scripts/tmp-a03-codex-followup.py closeout "${{ github.run_id }}"
-          if ! git diff --quiet -- ADMIN_ROADMAP.md; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add ADMIN_ROADMAP.md
-            git commit -m "docs(admin): verify A0.3 Codex follow-up"
-            git push
-          fi
