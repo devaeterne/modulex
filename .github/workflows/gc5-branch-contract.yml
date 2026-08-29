@@ -19,6 +19,16 @@ jobs:
         with:
           node-version: 20
       - name: Store GC-5 contract
+        id: store_contract
+        continue-on-error: true
         run: node modulex-store/scripts/gc5-gallery-projects-contract.mjs
       - name: Admin GC-5 contract
+        id: admin_contract
+        continue-on-error: true
         run: node modulex-admin/scripts/gc5-gallery-projects-admin-contract.mjs
+      - name: Require both contracts
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.store_contract.outcome }}" = "success"
+          test "${{ steps.admin_contract.outcome }}" = "success"
