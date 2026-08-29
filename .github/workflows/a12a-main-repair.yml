@@ -1,0 +1,19 @@
+name: A1.2A main repair verification
+
+on:
+  push:
+    branches:
+      - repair/a12a-order-list-main
+
+jobs:
+  red-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: A1.2A RED contract
+        run: |
+          cd modulex-admin
+          node scripts/a12a-main-red.mjs
