@@ -42,6 +42,8 @@ assert.doesNotMatch(intake, /storage\.from\(["']store-media["']\)/, "GC-2D intak
 assert.match(intake, /original_sha256/, "GC-2D intake must dedupe by the exact original SHA-256");
 assert.match(intake, /select\(["']id,status,staging_original_path,staging_optimized_path["']\)/, "Duplicate lookup must retain current lifecycle status");
 assert.match(intake, /duplicate\.status\s*===\s*["']published["']/, "Duplicate intake must report the existing published state without mutating it");
+assert.match(intake, /async function ensureDuplicateStagingObjects/, "Duplicate intake must verify and repair its private staging objects");
+assert.match(intake, /ensureDuplicateStagingObjects\(client, duplicate, source, processed\)/, "Duplicate intake must self-heal staging before returning the existing asset");
 assert.match(intake, /createHash\(["']sha256["']\)/, "GC-2D intake must hash source and optimized bytes");
 assert.match(intake, /\.rotate\(\)/, "GC-2D optimization must auto-orient source images");
 assert.match(intake, /webp\(\{[\s\S]*quality:\s*80[\s\S]*smartSubsample:\s*true/, "GC-2D optimization must retain the approved WebP settings");

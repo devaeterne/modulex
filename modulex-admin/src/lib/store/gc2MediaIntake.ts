@@ -96,8 +96,27 @@ type ProcessedImage = {
   optimizedBytes: Buffer;
 };
 
+type DuplicateAsset = {
+  id: string;
+  status: string;
+  staging_original_path: string | null;
+  staging_optimized_path: string | null;
+};
+
+type StorageErrorLike = {
+  message?: string;
+  status?: number;
+  statusCode?: number | string;
+};
+
 function sha256(bytes: Buffer) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function isMissingStorageObject(error: unknown) {
+  const candidate = error as StorageErrorLike | null;
+  const status = candidate?.statusCode ?? candidate?.status;
+  return status === 404 || status === "404" || /not found|does not exist/i.test(candidate?.message ?? "");
 }
 
 function requireSupabasePublicConfig() {
@@ -345,6 +364,50 @@ async function upsertProvenance(client: SupabaseClient, assetId: string) {
   if (error) throw error;
 }
 
+async function ensureDuplicateStagingObjects(
+  client: SupabaseClient,
+  duplicate: DuplicateAsset,
+  source: SourceDownload,
+  processed: ProcessedImage,
+) {
+  if (!duplicate.staging_original_path || !duplicate.staging_optimized_path) {
+    throw new Gc2dIntakeError("Duplicate media is missing private staging locator metadata.", 409);
+  }
+
+  const expected = [
+    {
+      path: duplicate.staging_original_path,
+      bytes: source.bytes,
+      contentType: processed.original.mimeType,
+      sha256: processed.original.sha256,
+    },
+    {
+      path: duplicate.staging_optimized_path,
+      bytes: processed.optimizedBytes,
+      contentType: processed.optimized.mimeType,
+      sha256: processed.optimized.sha256,
+    },
+  ];
+
+  for (const item of expected) {
+    const { data, error } = await client.storage.from(STAGING_BUCKET).download(item.path);
+    if (!error && data) {
+      const existingBytes = Buffer.from(await data.arrayBuffer());
+      if (existingBytes.byteLength !== item.bytes.byteLength || sha256(existingBytes) !== item.sha256) {
+        throw new Gc2dIntakeError(`Duplicate staging object failed integrity verification: ${item.path}`, 409);
+      }
+      continue;
+    }
+    if (!isMissingStorageObject(error)) throw error;
+
+    const { error: uploadError } = await client.storage.from(STAGING_BUCKET).upload(item.path, item.bytes, {
+      contentType: item.contentType,
+      upsert: false,
+    });
+    if (uploadError) throw uploadError;
+  }
+}
+
 function resultFrom(
   status: Gc2dIntakeResult["status"],
   assetId: string,
@@ -400,6 +463,7 @@ export async function importGc2dRepresentativeCandidate(
   if (duplicateError) throw duplicateError;
 
   if (duplicate?.id) {
+    await ensureDuplicateStagingObjects(client, duplicate, source, processed);
     await upsertProvenance(client, duplicate.id);
     return resultFrom(
       "duplicate",
