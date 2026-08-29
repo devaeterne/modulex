@@ -1,7 +1,17 @@
 export type StoreLeadType = "contact" | "dealer_application";
+export type StoreLeadRequestKind = "general_inquiry" | "project_consultation";
+export type StoreLeadFormOptionGroup = "project_type" | "consultation_intent";
+
+export type StoreLeadFormOption = {
+  option_group: StoreLeadFormOptionGroup;
+  option_key: string;
+  label: string;
+  sort_order: number;
+};
 
 export type StoreLeadSubmission = {
   lead_type: StoreLeadType;
+  request_kind?: StoreLeadRequestKind;
   first_name: string;
   last_name: string;
   email: string;
@@ -29,6 +39,12 @@ export type StoreLeadSubmission = {
   referrer?: string;
   website_hp?: string;
   document_upload_token?: string;
+  project_type?: string;
+  consultation_intent?: string;
+  project_address?: string;
+  project_city?: string;
+  project_postal_code?: string;
+  preferred_consultation_date?: string;
 };
 
 export type StoreLeadSubmissionResult = {

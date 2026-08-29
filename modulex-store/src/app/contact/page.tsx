@@ -8,16 +8,17 @@ import {
   type StorePublicCompanyContactChannel,
   type StorePublicCompanyLocation,
 } from "@/lib/store/company/queries";
+import { getStorePublicLeadFormOptions } from "@/lib/store/leads/options";
 
 export const revalidate = 900;
 
 export const metadata: Metadata = {
   title: "Contact",
-  description: "Contact Oakwell Cabinetry for product information, dealer support, and general inquiries.",
+  description: "Contact Oakwell Cabinetry for product information, project consultation, dealer support, and general inquiries.",
   alternates: { canonical: "/contact" },
   openGraph: {
     title: "Contact | Oakwell Cabinetry",
-    description: "Contact Oakwell Cabinetry for product information, dealer support, and general inquiries.",
+    description: "Contact Oakwell Cabinetry for product information, project consultation, dealer support, and general inquiries.",
     url: "/contact",
   },
 };
@@ -54,16 +55,19 @@ function LocationCard({ location }: { location: StorePublicCompanyLocation }) {
 }
 
 export default async function Contact() {
-  const [companyResult, structureResult] = await Promise.allSettled([
+  const [companyResult, structureResult, optionResult] = await Promise.allSettled([
     getStorePublicCompanyProfile(),
     getStorePublicCompanyLocations(),
+    getStorePublicLeadFormOptions(),
   ]);
 
   const company = companyResult.status === "fulfilled" ? companyResult.value : null;
   const structure = structureResult.status === "fulfilled" ? structureResult.value : { contactChannels: [], locations: [] };
+  const formOptions = optionResult.status === "fulfilled" ? optionResult.value : [];
 
   if (companyResult.status === "rejected") console.error("Unable to load public company contact details", companyResult.reason);
   if (structureResult.status === "rejected") console.error("Unable to load public structured company details", structureResult.reason);
+  if (optionResult.status === "rejected") console.error("Unable to load public lead form options", optionResult.reason);
 
   const companyName = company?.companyName || "Oakwell Cabinetry";
   const hasUsableLocality = Boolean(company?.city && (company?.stateRegion || company?.postalCode));
@@ -90,7 +94,7 @@ export default async function Contact() {
 
       <section className="contact-section" id="contact" aria-labelledby="contact-heading">
         <div className="container">
-          <div className="section-header text-center"><span className="section-tag">{companyName}</span><h2 id="contact-heading">Get in Touch</h2><p>Contact our team for product information, cabinet specifications, dealer support, and general inquiries.</p></div>
+          <div className="section-header text-center"><span className="section-tag">{companyName}</span><h2 id="contact-heading">Get in Touch</h2><p>Contact our team for product information, project consultation, cabinet specifications, dealer support, and general inquiries.</p></div>
 
           <div className="row g-4 justify-content-center">
             {company?.email ? <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><i className="bi bi-envelope"></i></div><h3>Email</h3><p><TrackedLink href={`mailto:${company.email}`} event="email_click" payload={{ context: "contact_page" }}>{company.email}</TrackedLink></p></div></div> : null}
@@ -103,7 +107,7 @@ export default async function Contact() {
 
           {!hasDirectContact ? <div className="py-4 text-center"><p className="text-muted mb-0">Official direct contact details are being updated. You can still send an inquiry below.</p></div> : null}
 
-          <div className="row justify-content-center mt-5"><div className="col-xl-9 col-lg-10"><div className="contact-form-wrapper"><div className="mb-4"><h3>Send an Inquiry</h3><p className="text-muted mb-0">Use this form for product questions, specifications, availability information, or general support.</p></div><LeadForm type="contact" /></div></div></div>
+          <div className="row justify-content-center mt-5"><div className="col-xl-9 col-lg-10"><div className="contact-form-wrapper"><div className="mb-4"><h3>Contact or Project Consultation</h3><p className="text-muted mb-0">Send a general inquiry or share project details so our team can follow up about a consultation.</p></div><LeadForm type="contact" formOptions={formOptions} /></div></div></div>
 
           <div className="mt-5 text-center"><p className="text-muted mb-3">Interested in representing Oakwell Cabinetry?</p><Link href="/dealers/apply" className="btn-primary">Apply to Become a Dealer</Link></div>
         </div>
