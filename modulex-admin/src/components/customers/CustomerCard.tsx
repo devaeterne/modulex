@@ -142,6 +142,34 @@ export default function CustomerCard() {
     setIsSaving(false);
   }
 
+  async function saveCustomerMaster() {
+    if (!customer || !canEdit) return;
+    clearMessages(); setIsSaving(true);
+    const { data, error } = await supabase.rpc("update_customer_master", {
+      p_customer_id: customer.id,
+      p_name: customer.name.trim(),
+      p_legal_name: customer.legal_name,
+      p_customer_type_id: customer.customer_type_id,
+      p_status: customer.status,
+      p_tax_number: customer.tax_number,
+      p_registration_number: customer.registration_number,
+      p_email: customer.email,
+      p_phone: customer.phone,
+      p_website: customer.website,
+      p_country_code: customer.country_code,
+      p_language_code: customer.language_code,
+      p_currency_code: customer.currency_code,
+      p_sales_rep_id: customer.sales_rep_id,
+      p_customer_since: customer.customer_since,
+    });
+    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
+    setCustomer(data as Customer);
+    const { data: activityData } = await supabase.from("customer_activity").select("*").eq("customer_id", customer.id).order("created_at", { ascending: false }).limit(100);
+    setActivities((activityData ?? []) as CustomerActivity[]);
+    setSuccessMessage("Customer updated successfully.");
+    setIsSaving(false);
+  }
+
   async function savePricing() {
     if (!customer || !canEdit) return;
     clearMessages(); setIsSaving(true);
@@ -261,7 +289,7 @@ export default function CustomerCard() {
       <Field label="Language"><input value={customer.language_code} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, language_code: e.target.value })} className={inputClass} /></Field>
       <Field label="Currency"><input maxLength={3} value={customer.currency_code} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, currency_code: e.target.value.toUpperCase() })} className={inputClass} /></Field>
       <Field label="Sales Representative"><select value={customer.sales_rep_id ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, sales_rep_id: e.target.value || null })} className={inputClass}><option value="">Unassigned</option>{profiles.filter((item) => ["super_admin", "admin", "sales"].includes(item.role)).map((item) => <option key={item.id} value={item.id}>{item.full_name || item.email}</option>)}</select></Field>
-    </div>{canEdit && <div className="mt-5 flex justify-end"><button disabled={isSaving || !customer.name.trim()} onClick={() => void saveCustomer({ name: customer.name.trim(), legal_name: customer.legal_name, customer_type_id: customer.customer_type_id, status: customer.status, tax_number: customer.tax_number, registration_number: customer.registration_number, email: customer.email, phone: customer.phone, website: customer.website, country_code: customer.country_code, language_code: customer.language_code, currency_code: customer.currency_code, sales_rep_id: customer.sales_rep_id, customer_since: customer.customer_since }, "General customer information updated")} className={primaryButtonClass}>{isSaving ? "Saving..." : "Save General"}</button></div>}</Section>}
+    </div>{canEdit && <div className="mt-5 flex justify-end"><button disabled={isSaving || !customer.name.trim()} onClick={() => void saveCustomerMaster()} className={primaryButtonClass}>{isSaving ? "Saving..." : "Save General"}</button></div>}</Section>}
 
     {activeTab === "Contacts" && <Section title="Contacts" description="People associated with this customer account."><div className="grid gap-3 lg:grid-cols-2">{contacts.map((contact) => <Card key={contact.id}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold text-gray-800 dark:text-white/90">{contact.first_name} {contact.last_name}</h3>{contact.is_primary && <Badge>Primary</Badge>}</div><p className="mt-1 text-sm text-gray-500">{[contact.job_title, contact.department].filter(Boolean).join(" • ") || "No role"}</p><p className="mt-3 text-sm text-gray-600 dark:text-gray-300">{contact.email || "—"}</p><p className="text-sm text-gray-500">{contact.mobile || contact.phone || "—"}</p><div className="mt-3 flex flex-wrap gap-1">{contact.is_billing_contact && <Badge>Billing</Badge>}{contact.is_shipping_contact && <Badge>Shipping</Badge>}{contact.is_order_contact && <Badge>Orders</Badge>}</div></div>{canEdit && <button onClick={() => void removeContact(contact.id)} className={dangerButtonClass}>Remove</button>}</div></Card>)}</div>{canEdit && <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]"><h3 className="mb-4 text-sm font-semibold text-gray-800 dark:text-white/90">Add Contact</h3><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{(["first_name", "last_name", "job_title", "department", "email", "phone", "mobile"] as const).map((key) => <Field key={key} label={titleCase(key)}><input value={contactForm[key]} onChange={(e) => setContactForm({ ...contactForm, [key]: e.target.value })} className={inputClass} /></Field>)}</div><div className="mt-4 flex flex-wrap gap-4"><Check label="Primary" checked={contactForm.is_primary} onChange={(v) => setContactForm({ ...contactForm, is_primary: v })} /><Check label="Billing" checked={contactForm.is_billing_contact} onChange={(v) => setContactForm({ ...contactForm, is_billing_contact: v })} /><Check label="Shipping" checked={contactForm.is_shipping_contact} onChange={(v) => setContactForm({ ...contactForm, is_shipping_contact: v })} /><Check label="Orders" checked={contactForm.is_order_contact} onChange={(v) => setContactForm({ ...contactForm, is_order_contact: v })} /></div><div className="mt-4 flex justify-end"><button onClick={() => void addContact()} disabled={isSaving} className={primaryButtonClass}>Add Contact</button></div></div>}</Section>}
 

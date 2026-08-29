@@ -3,15 +3,18 @@
 Until the project is moved to Supabase CLI migrations under `supabase/migrations`, apply the admin SQL files in this order on a fresh database:
 
 1. `general-settings.sql`
-2. `customer-orders.sql`
-3. `customer-order-payments.sql`
-4. `customer-order-payment-override.sql`
-5. `customer-order-editing.sql`
-6. `customer-invoices.sql`
-7. `customer-invoice-payment-terms.sql`
-8. `customer-shipments.sql`
-9. `customer-installations.sql`
-10. `performance-rls.sql`
+2. `customer-master-mutation.sql`
+3. `customer-orders.sql`
+4. `customer-order-payments.sql`
+5. `customer-order-payment-override.sql`
+6. `customer-order-editing.sql`
+7. `customer-invoices.sql`
+8. `customer-invoice-payment-terms.sql`
+9. `customer-shipments.sql`
+10. `customer-installations.sql`
+11. `performance-rls.sql`
+
+`customer-master-mutation.sql` hardens the existing customer master tables with validated status/type mutations and atomic audit logging. It assumes the base `customers`, `customer_types`, `customer_activity`, `profiles`, and role-helper objects already exist.
 
 `performance-rls.sql` is a query-planning hardening step. It preserves the existing RLS role rules while converting known stable role/permission helper predicates to one-time statement checks. Apply it after all schema files that create those policies. Existing environments can apply it once as the final performance migration.
 
