@@ -1,0 +1,87 @@
+name: Resolve PR141 Conflict
+
+on:
+  push:
+    branches:
+      - docs-gc4-production-acceptance
+
+permissions:
+  contents: write
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs-gc4-production-acceptance
+          fetch-depth: 0
+      - name: Merge latest main and resolve roadmap conflict
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+
+          if git merge-base --is-ancestor origin/main HEAD; then
+            echo "Branch already contains latest main"
+            exit 0
+          fi
+
+          set +e
+          git merge --no-commit --no-ff origin/main
+          merge_status=$?
+          set -e
+
+          if [ "$merge_status" -ne 0 ]; then
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            expected="modulex-admin/ADMIN_ROADMAP.md"
+            if [ "$conflicts" != "$expected" ]; then
+              echo "Unexpected conflicts:"
+              printf '%s\n' "$conflicts"
+              exit 1
+            fi
+
+            git checkout --theirs -- modulex-admin/ADMIN_ROADMAP.md
+
+            python - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          path = Path("modulex-admin/ADMIN_ROADMAP.md")
+          lines = path.read_text().splitlines()
+          main_sha = subprocess.check_output(["git", "rev-parse", "origin/main"], text=True).strip()
+
+          cross = (
+              "Current cross-roadmap package: **Granite Center → Oakwell GC-4 Contact / Project Consultation "
+              "is production-accepted and complete. GC-5 — Projects / Gallery is the next Granite package; "
+              "Admin primary Phase A1 work remains independently owned by its current roadmap next action.**"
+          )
+
+          out = []
+          saw_baseline = False
+          saw_cross = False
+          for line in lines:
+              if line.startswith("Main baseline: `"):
+                  out.append(f"Main baseline: `{main_sha}`")
+                  saw_baseline = True
+              elif line.startswith("Current cross-roadmap package:"):
+                  out.append(cross)
+                  saw_cross = True
+              else:
+                  out.append(line)
+
+          if not saw_baseline or not saw_cross:
+              raise SystemExit("Expected Admin roadmap header markers not found")
+
+          path.write_text("\n".join(out) + "\n")
+          PY
+
+            git add modulex-admin/ADMIN_ROADMAP.md
+          fi
+
+          git rm .github/workflows/resolve-pr141-conflict.yml
+          git add -A
+          git commit -m "chore: resolve PR 141 against latest main"
+          git push origin HEAD:docs-gc4-production-acceptance
