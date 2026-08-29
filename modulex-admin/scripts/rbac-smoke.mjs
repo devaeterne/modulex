@@ -29,6 +29,18 @@ function loadModule(filePath) {
 const permissions = loadModule(resolve(process.cwd(), "src/lib/auth/permissions.ts"));
 const { hasPermission, requiredPermissionForPath, canAccessPath } = permissions;
 const sidebarSource = readFileSync(resolve(process.cwd(), "src/layout/AppSidebar.tsx"), "utf8");
+const warehouseTableSource = readFileSync(
+  resolve(process.cwd(), "src/components/warehouses/WarehousesTable.tsx"),
+  "utf8"
+);
+const zonesTableSource = readFileSync(
+  resolve(process.cwd(), "src/components/zones/ZonesTable.tsx"),
+  "utf8"
+);
+const locationsTableSource = readFileSync(
+  resolve(process.cwd(), "src/components/locations/LocationsTable.tsx"),
+  "utf8"
+);
 
 const checks = [];
 function check(name, fn) {
@@ -130,6 +142,40 @@ check("Warehouse structure mutation routes require warehouse.manage", () => {
     assert.equal(canAccessPath("warehouse", path), false, `warehouse role should not mutate ${path}`);
     assert.equal(canAccessPath("shipping", path), false, `shipping role should not mutate ${path}`);
     assert.equal(canAccessPath("admin", path), true, `admin should mutate ${path}`);
+  }
+});
+
+check("Warehouse structure list mutations require warehouse.manage in the UI", () => {
+  const tables = [
+    ["WarehousesTable", warehouseTableSource, 2],
+    ["ZonesTable", zonesTableSource, 3],
+    ["LocationsTable", locationsTableSource, 3],
+  ];
+
+  for (const [name, source, expectedHandlerGuards] of tables) {
+    assert.match(source, /getCurrentProfile/, `${name} should resolve the active profile`);
+    assert.match(
+      source,
+      /hasPermission\(profile\.role,\s*"warehouse\.manage"\)/,
+      `${name} should derive warehouse.manage from the active role`
+    );
+    assert.match(
+      source,
+      /onDoubleClick=\{canManage\s*\?/,
+      `${name} should disable double-click editing for read-only roles`
+    );
+
+    const handlerGuards = source.match(/if \(!canManage\) return;/g) ?? [];
+    assert.ok(
+      handlerGuards.length >= expectedHandlerGuards,
+      `${name} should guard every mutation handler with warehouse.manage`
+    );
+
+    const conditionalMutationGroups = source.match(/\{canManage && \(/g) ?? [];
+    assert.ok(
+      conditionalMutationGroups.length >= 2,
+      `${name} should hide add/edit/status/delete mutation controls for read-only roles`
+    );
   }
 });
 
