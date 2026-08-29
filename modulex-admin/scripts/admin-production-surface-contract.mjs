@@ -72,7 +72,7 @@ assert.match(
 );
 assert.match(
   dashboard,
-  /quickActions\.filter\([^)]*canAccessPath/s,
+  /quickActions\.filter\(\(?action\)?\s*=>\s*canAccessPath\(activeRole,\s*action\.href\)\)/,
   "Dashboard Quick Actions must be filtered by direct-route authorization",
 );
 
