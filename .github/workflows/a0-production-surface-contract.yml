@@ -1,0 +1,25 @@
+name: A0 production surface contract
+
+on:
+  push:
+    branches:
+      - phase-a0/admin-production-surface-cleanup
+  pull_request:
+    paths:
+      - "modulex-admin/**"
+      - ".github/workflows/a0-production-surface-contract.yml"
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: node scripts/admin-production-surface-contract.mjs
