@@ -1,5 +1,19 @@
 -- A1.2A customer order list consistency
--- Aggregate order-list summary without downloading the full order table to the browser.
+-- Server-side directory search/pagination plus aggregate summary under existing RLS.
+
+create or replace view public.customer_order_directory
+with (security_invoker = true)
+as
+select
+  o.*,
+  c.customer_code,
+  c.name as customer_name
+from public.customer_orders o
+join public.customers c on c.id = o.customer_id;
+
+revoke all on public.customer_order_directory from public;
+revoke all on public.customer_order_directory from anon;
+grant select on public.customer_order_directory to authenticated;
 
 create or replace function public.get_customer_order_list_summary(
   p_customer_id uuid default null
