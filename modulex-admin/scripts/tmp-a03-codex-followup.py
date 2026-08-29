@@ -1,6 +1,10 @@
 from pathlib import Path
+import re
+import sys
 
 baseline = "f6d7f9673dc874b5c254e47c750ff1bd4793c7c3"
+mode = sys.argv[1] if len(sys.argv) > 1 else "apply"
+run_id = sys.argv[2] if len(sys.argv) > 2 else None
 
 route = Path("src/app/api/admin/dealer-portal/route.ts")
 route_text = route.read_text()
@@ -20,7 +24,6 @@ route.write_text(route_text)
 
 roadmap = Path("ADMIN_ROADMAP.md")
 text = roadmap.read_text()
-import re
 text, count = re.subn(r"Main baseline: `[^`]+`", f"Main baseline: `{baseline}`", text, count=1)
 if count != 1:
     raise SystemExit("roadmap baseline not found")
@@ -52,4 +55,21 @@ if old_next in text:
     text = text.replace(old_next, new_next, 1)
 elif new_next not in text:
     raise SystemExit("roadmap Next Action anchor not found")
+
+if mode == "closeout":
+    if not run_id:
+        raise SystemExit("closeout requires run id")
+    old_status = "- [~] Close post-merge Codex runtime/config findings before Phase A0 exit."
+    new_status = "- [x] Close post-merge Codex runtime/config findings before Phase A0 exit."
+    if old_status in text:
+        text = text.replace(old_status, new_status, 1)
+    elif new_status not in text:
+        raise SystemExit("follow-up status anchor not found")
+    evidence_anchor = "  - TDD RED: Actions run `33256670583` proved the previous runtime contract did not reject an injected `NEXT_PUBLIC_DATABASE_URL` source reference.\n"
+    evidence = evidence_anchor + "  - Targeted GREEN: Actions run `33256841429` rejected the negative fixture and passed the positive runtime-config contract.\n  - Full deterministic verification: Actions run `" + run_id + "` passed runtime-config, production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.\n"
+    if "Targeted GREEN: Actions run `33256841429`" not in text:
+        if evidence_anchor not in text:
+            raise SystemExit("follow-up evidence anchor not found")
+        text = text.replace(evidence_anchor, evidence, 1)
+
 roadmap.write_text(text)
