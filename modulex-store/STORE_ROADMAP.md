@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `41aa1f0b1c27460e5ef298242162518c2bf93606`
+Main baseline: `be710a72b1b69c0cdc41f39f08e6223ce646328b`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -158,10 +158,14 @@ These rules are mandatory for all future Modulex Store work:
   - Package B implementation adds `/store/pages` and `/store/projects`, explicit draft/publish/unpublish actions, SEO/OG fields, validated Store media uploads, external video media, and `store.manage` route/sidebar enforcement.
   - Verification: secondary CMS Admin contract, lint (0 errors / 35 existing warnings), deterministic Admin contracts, and Next.js/TypeScript build all passed in GitHub Actions run `33243001683`.
 
-- [ ] Convert About page to CMS-backed production content.
+- [~] Convert About page to CMS-backed production content.
+  - Package C implementation reads the published `about` projection through the approved RPC query layer, keeps company-profile identity/contact canonical, generates CMS metadata, and retains the factual fallback when CMS data is missing or unavailable.
+  - Branch verification passed in GitHub Actions run `33244098018`; completion remains pending merge/deploy plus production acceptance with approved published About content.
 
-- [ ] Convert Gallery/Projects page to CMS-backed data.
+- [~] Convert Gallery/Projects page to CMS-backed data.
   - Design for both public routes: `docs/superpowers/specs/2026-08-29-phase-2-1-c-store-public-pages-design.md`.
+  - Package C implementation adds published-only project/media rendering, fail-closed `notFound()`, CMS metadata, accessible image/video interaction, and shared readiness gating for route navigation and sitemap exposure.
+  - No public project-detail route or `/gallery/detail` was reintroduced. Completion remains pending merge/deploy plus production acceptance with a published Gallery page and at least one approved published project.
 
 - [x] Decide Blog strategy.
   - Decision: **Option B — no Blog CMS in Phase 2.1.** Keep `/blog` disabled/not-found until editorial workflow is actually required.
@@ -181,7 +185,8 @@ These rules are mandatory for all future Modulex Store work:
 ### Phase 2.1 Exit Gate
 
 - [ ] No major public marketing page requires code changes for ordinary content updates.
-- [ ] Public page content is read through controlled RPCs.
+- [x] Public page content is read through controlled RPCs.
+  - Package C uses only `get_store_public_page`, `get_store_public_projects`, `get_store_public_project`, and `get_store_public_project_media` through the server-only query boundary; no direct public table reads were added.
 - [x] Admin roles can manage the supported content without direct database work.
   - Package B provides controlled Pages/Projects CRUD and publish workflows under existing authenticated RLS.
 - [x] Draft content is not publicly visible.
@@ -530,12 +535,14 @@ The items below are already present in the current Store architecture. Keep them
 
 # Next Action
 
-Primary Store work is now **Phase 2.1C — Store About + Gallery/Projects**.
+Phase 2.1C implementation is **code-complete and verified on the feature branch**, but About/Gallery remain `[~]` until production acceptance.
 
-1. Wire `modulex-store/src/lib/store/content/queries.ts` to the approved published-only Package A RPCs.
-2. Convert About to CMS-backed copy while retaining canonical company-profile identity/contact data and the factual fallback.
-3. Enable Gallery only when the Gallery page is published and at least one project is published; otherwise keep deliberate not-found behavior and omit it from sitemap/navigation.
-4. Bind real project/media data to the existing gallery/lightbox experience without adding a public project-detail route in Phase 2.1.
-5. Add metadata/sitemap/contract coverage, run Store lint/build/smoke/live verification, and update both roadmaps where cross-project behavior changes.
+1. Review and merge the Phase 2.1C PR to `main`, then deploy Store production.
+2. In Admin, publish approved real `about` content. The existing factual About fallback remains safe until that content is published.
+3. Publish an approved `gallery` page plus at least one approved project with cover image/alt text; only then should Gallery appear in Navbar and sitemap.
+4. Verify production `/about`, `/gallery`, Navbar readiness behavior, sitemap exposure, metadata, project media/lightbox, and confirm `/gallery/detail` remains not-found.
+5. After live acceptance, mark About/Gallery `[x]` and proceed to **Phase 2.1D — configurable Navbar/Footer and phase closeout**.
 
-**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete. Package D navigation/footer configurability remains after Package C.
+**Package C branch verification:** GitHub Actions run `33244098018` passed the Phase 2.1C public-content contract, public-production contract, full Store smoke, lint, and Next.js/TypeScript build.
+
+**Completed dependency chain:** Phase 2.0 closed → Phase 2.1A production data/RPC foundation complete → Phase 2.1B Admin Pages/Projects CMS complete → Phase 2.1C implementation verified/pending live acceptance.
