@@ -3,7 +3,7 @@
 Last reviewed: 2026-08-29
 Main baseline: `6cbd27198d930cb129b912fa4faece3bf967e292`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
-Current cross-roadmap package: **Granite Center → Oakwell dynamic-content architecture approved; GC-1 source manifest next; Gallery/Projects content acceptance pending**
+Current cross-roadmap package: **Granite Center → Oakwell GC-1 source manifest complete for review; GC-2 media library/optimization next; Gallery/Projects content acceptance pending**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -539,6 +539,6 @@ A0.1 production-surface cleanup and retained-surface residue audit are implement
 2. Re-run the relevant Admin verification chain after the A0.3 package and keep this roadmap current.
 3. Close Phase A0 only after A0.3 satisfies its runtime/config exit criteria.
 
-**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. The Granite migration architecture is approved and GC-0 is merged; the next migration package is **GC-1 source content/media manifest**, which is discovery/docs/contract work and does not mutate Admin runtime or production DB. GC-2+ will add Admin-managed media/contact/content domains incrementally as required. Package D configurable navigation/footer remains an A4.1 obligation and will be completed under the same dynamic-content rule.
+**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, and Phase 2.1C About is production-accepted. Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1 is source discovery/classification only and is complete for review with 32 pages, 55 content candidates, 62 media candidates and 7 conflict classes; it introduces no Admin runtime or production DB mutation. GC-2+ will add Admin-managed media/contact/content domains incrementally as required. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule.
 
 **Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A0 or other concurrently merged Admin work is preserved rather than overwritten.

@@ -1,0 +1,2690 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "brand": "Granite & Cabinet Center",
+    "origin": "https://granitecenterva.com/",
+    "auditedAt": "2026-08-29"
+  },
+  "pages": [
+    {
+      "id": "page-home",
+      "url": "https://granitecenterva.com/",
+      "canonicalUrl": "https://granitecenterva.com/",
+      "title": "Granite & Cabinet Center",
+      "surface": "home",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "notes": "Use only selective cabinet/showroom structure; volatile promotions, parent phones and unsupported claims do not migrate."
+    },
+    {
+      "id": "page-about",
+      "url": "https://granitecenterva.com/about-us/",
+      "canonicalUrl": "https://granitecenterva.com/about-us/",
+      "title": "About Us",
+      "surface": "about",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_pages",
+      "notes": "Parent-company context may support Oakwell About only with correct attribution and rewrite."
+    },
+    {
+      "id": "page-showroom",
+      "url": "https://granitecenterva.com/about-us/showroom/",
+      "canonicalUrl": "https://granitecenterva.com/about-us/showroom/",
+      "title": "Showroom",
+      "surface": "showroom",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "notes": "Strong showroom/media source; hours remain unconfirmed for Oakwell and WordPress plugin artifacts are excluded."
+    },
+    {
+      "id": "page-contact",
+      "url": "https://granitecenterva.com/contact-us/",
+      "canonicalUrl": "https://granitecenterva.com/contact-us/",
+      "title": "Contact Us",
+      "surface": "contact",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "company_contact_channels",
+      "notes": "Parent phone/address/fax/hours are evidence only and conflict with canonical Oakwell profile or lack Oakwell structured fields."
+    },
+    {
+      "id": "page-residential",
+      "url": "https://granitecenterva.com/residential/",
+      "canonicalUrl": "https://granitecenterva.com/residential/",
+      "title": "Residential Projects",
+      "surface": "projects_residential",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_projects",
+      "notes": "Selective cabinet/kitchen/vanity candidates only; countertop-only media excluded."
+    },
+    {
+      "id": "page-commercial",
+      "url": "https://granitecenterva.com/commercial/",
+      "canonicalUrl": "https://granitecenterva.com/commercial/",
+      "title": "Commercial Projects",
+      "surface": "projects_commercial",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "store_projects",
+      "notes": "Project names/media inventoried but launch scope remains hold until cabinetry relevance and attribution are confirmed."
+    },
+    {
+      "id": "page-kitchen-cabinet-sale",
+      "url": "https://granitecenterva.com/kitchen-cabinet-sale/",
+      "canonicalUrl": "https://granitecenterva.com/kitchen-cabinet-sale/",
+      "title": "Kitchen Cabinet Sale",
+      "surface": "cabinet_marketing",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "notes": "Process and construction concepts may be rewritten; discounts, free/SLA/guarantee claims are excluded or confirmation-required."
+    },
+    {
+      "id": "page-kitchen-cabinet-deals",
+      "url": "https://granitecenterva.com/kitchen-cabinet-deals/",
+      "canonicalUrl": "https://granitecenterva.com/kitchen-cabinet-deals/",
+      "title": "Kitchen Cabinet Deals",
+      "surface": "cabinet_marketing",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "notes": "Cabinet-focused structure may inform Oakwell; promotional pricing/discounts are not migrated."
+    },
+    {
+      "id": "page-remodeling",
+      "url": "https://granitecenterva.com/kitchen-bathroom-remodeling/",
+      "canonicalUrl": "https://granitecenterva.com/kitchen-bathroom-remodeling/",
+      "title": "Kitchen & Bathroom Remodeling",
+      "surface": "remodeling",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "store_pages",
+      "notes": "Parent remodeling scope does not automatically become Oakwell service scope."
+    },
+    {
+      "id": "page-faq",
+      "url": "https://granitecenterva.com/about-us/faq/",
+      "canonicalUrl": "https://granitecenterva.com/about-us/faq/",
+      "title": "FAQ",
+      "surface": "faq",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "exclude",
+      "targetDomain": "store_faq",
+      "notes": "Source FAQ is stone/granite-focused; content excluded, but future Oakwell cabinetry FAQ remains a typed CMS need."
+    },
+    {
+      "id": "page-services",
+      "url": "https://granitecenterva.com/services/",
+      "canonicalUrl": "https://granitecenterva.com/services/",
+      "title": "Services",
+      "surface": "services",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "notes": "Countertop repair/service fee content is outside Oakwell cabinetry core."
+    },
+    {
+      "id": "page-career",
+      "url": "https://granitecenterva.com/career/",
+      "canonicalUrl": "https://granitecenterva.com/career/",
+      "title": "Career",
+      "surface": "career",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "notes": "Careers excluded from initial Oakwell migration."
+    },
+    {
+      "id": "page-home-office",
+      "url": "https://granitecenterva.com/custom-home-office/",
+      "canonicalUrl": "https://granitecenterva.com/custom-home-office/",
+      "title": "Custom Home Office",
+      "surface": "home_office",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "store_pages",
+      "notes": "Cabinetry-adjacent content, but Oakwell built-in/home-office scope is not yet confirmed."
+    },
+    {
+      "id": "page-garden",
+      "url": "https://granitecenterva.com/garden/",
+      "canonicalUrl": "https://granitecenterva.com/garden/",
+      "title": "Garden",
+      "surface": "garden",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Not part of initial Oakwell cabinetry scope."
+    },
+    {
+      "id": "page-faucets",
+      "url": "https://granitecenterva.com/faucets",
+      "canonicalUrl": "https://granitecenterva.com/faucets",
+      "title": "Faucets",
+      "surface": "accessories",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Real parent accessory catalog, but Oakwell accessory scope is not approved."
+    },
+    {
+      "id": "page-single-bowl-sinks",
+      "url": "https://granitecenterva.com/single-bowl-sinks/",
+      "canonicalUrl": "https://granitecenterva.com/single-bowl-sinks/",
+      "title": "Single Bowl Sinks",
+      "surface": "accessories",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Accessory scope hold."
+    },
+    {
+      "id": "page-double-bowl-sinks",
+      "url": "https://granitecenterva.com/double-bowl-sinks/",
+      "canonicalUrl": "https://granitecenterva.com/double-bowl-sinks/",
+      "title": "Double Bowl Sinks",
+      "surface": "accessories",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Accessory scope hold."
+    },
+    {
+      "id": "page-bar-sinks",
+      "url": "https://granitecenterva.com/bar-sinks/",
+      "canonicalUrl": "https://granitecenterva.com/bar-sinks/",
+      "title": "Bar Sinks",
+      "surface": "accessories",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Accessory scope hold."
+    },
+    {
+      "id": "page-handmade-sinks",
+      "url": "https://granitecenterva.com/handmade-sinks/",
+      "canonicalUrl": "https://granitecenterva.com/handmade-sinks/",
+      "title": "Handmade Sinks",
+      "surface": "accessories",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Accessory scope hold."
+    },
+    {
+      "id": "page-apron-sinks",
+      "url": "https://granitecenterva.com/apron-sinks/",
+      "canonicalUrl": "https://granitecenterva.com/apron-sinks/",
+      "title": "Apron Sinks",
+      "surface": "accessories",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Accessory scope hold."
+    },
+    {
+      "id": "page-vanity-sinks",
+      "url": "https://granitecenterva.com/vanity-sinks-2/",
+      "canonicalUrl": "https://granitecenterva.com/vanity-sinks-2/",
+      "title": "Vanity Sinks",
+      "surface": "accessories",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Accessory scope hold."
+    },
+    {
+      "id": "page-duragranit-sinks",
+      "url": "https://granitecenterva.com/duragranit-sinks/",
+      "canonicalUrl": "https://granitecenterva.com/duragranit-sinks/",
+      "title": "DuraGranit Sinks",
+      "surface": "accessories",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Accessory scope hold."
+    },
+    {
+      "id": "page-sink-grids",
+      "url": "https://granitecenterva.com/grid/",
+      "canonicalUrl": "https://granitecenterva.com/grid/",
+      "title": "Sink Grids",
+      "surface": "accessories",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Accessory scope hold."
+    },
+    {
+      "id": "page-brand-adelphi",
+      "url": "https://granitecenterva.com/adelphi-kitchen-cabinets/",
+      "canonicalUrl": "https://granitecenterva.com/adelphi-kitchen-cabinets/",
+      "title": "Adelphi Kitchen Cabinets",
+      "surface": "cabinet_brand",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Parent cabinet-brand context; reuse only if the brand is confirmed in approved Oakwell catalog scope."
+    },
+    {
+      "id": "page-brand-timberlake",
+      "url": "https://granitecenterva.com/timberlake-kitchen-cabinets/",
+      "canonicalUrl": "https://granitecenterva.com/timberlake-kitchen-cabinets/",
+      "title": "Timberlake Kitchen Cabinets",
+      "surface": "cabinet_brand",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Parent cabinet-brand context; reuse only if the brand is confirmed in approved Oakwell catalog scope."
+    },
+    {
+      "id": "page-brand-golden-homes",
+      "url": "https://granitecenterva.com/golden-homes-cabinets/",
+      "canonicalUrl": "https://granitecenterva.com/golden-homes-cabinets/",
+      "title": "Golden Homes Cabinets",
+      "surface": "cabinet_brand",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Parent cabinet-brand context; reuse only if the brand is confirmed in approved Oakwell catalog scope."
+    },
+    {
+      "id": "page-brand-crystal",
+      "url": "https://granitecenterva.com/crystal-cabinets/",
+      "canonicalUrl": "https://granitecenterva.com/crystal-cabinets/",
+      "title": "Crystal Cabinets",
+      "surface": "cabinet_brand",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Parent cabinet-brand context; reuse only if the brand is confirmed in approved Oakwell catalog scope."
+    },
+    {
+      "id": "page-brand-stonehill",
+      "url": "https://granitecenterva.com/stonehill-cabinetry/",
+      "canonicalUrl": "https://granitecenterva.com/stonehill-cabinetry/",
+      "title": "StoneHill Cabinetry",
+      "surface": "cabinet_brand",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Parent cabinet-brand context; reuse only if the brand is confirmed in approved Oakwell catalog scope."
+    },
+    {
+      "id": "page-brand-jk",
+      "url": "https://granitecenterva.com/jk-cabinetry/",
+      "canonicalUrl": "https://granitecenterva.com/jk-cabinetry/",
+      "title": "J&K Cabinetry",
+      "surface": "cabinet_brand",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Parent cabinet-brand context; reuse only if the brand is confirmed in approved Oakwell catalog scope."
+    },
+    {
+      "id": "page-brand-21st-century",
+      "url": "https://granitecenterva.com/21st-century-cabinetry/",
+      "canonicalUrl": "https://granitecenterva.com/21st-century-cabinetry/",
+      "title": "21st Century Cabinetry",
+      "surface": "cabinet_brand",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Parent cabinet-brand context; reuse only if the brand is confirmed in approved Oakwell catalog scope."
+    },
+    {
+      "id": "page-brand-vita",
+      "url": "https://granitecenterva.com/vita-cabinetry/",
+      "canonicalUrl": "https://granitecenterva.com/vita-cabinetry/",
+      "title": "Vita Cabinetry",
+      "surface": "cabinet_brand",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Parent cabinet-brand context; reuse only if the brand is confirmed in approved Oakwell catalog scope."
+    },
+    {
+      "id": "page-brand-forevermark",
+      "url": "https://granitecenterva.com/forevermark-cabinetry/",
+      "canonicalUrl": "https://granitecenterva.com/forevermark-cabinetry/",
+      "title": "Forevermark Cabinetry",
+      "surface": "cabinet_brand",
+      "crawlStatus": "reviewed",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "notes": "Parent cabinet-brand context; reuse only if the brand is confirmed in approved Oakwell catalog scope."
+    }
+  ],
+  "contentCandidates": [
+    {
+      "id": "content-parent-brand-relationship",
+      "sourcePageId": "page-about",
+      "kind": "identity",
+      "sourceLabel": "Granite & Cabinet Center relationship",
+      "summary": "Parent-company relationship context may support transparent Oakwell brand attribution.",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_pages",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "parent_context",
+        "gc0_relationship_lock"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/about-us/"
+      ]
+    },
+    {
+      "id": "content-parent-phone-header",
+      "sourcePageId": "page-home",
+      "kind": "contact",
+      "sourceLabel": "Header phone 703-956-9470",
+      "summary": "Parent header phone is source evidence only; it is not the canonical Oakwell phone.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "company_contact_channels",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "conflicts_with_oakwell_profile",
+        "source_evidence_only"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    },
+    {
+      "id": "content-parent-phone-contact",
+      "sourcePageId": "page-contact",
+      "kind": "contact",
+      "sourceLabel": "Contact phone 703-439-1040",
+      "summary": "Parent Contact phone differs from header and Oakwell canonical profile.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "company_contact_channels",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "parent_internal_conflict",
+        "conflicts_with_oakwell_profile"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/contact-us/"
+      ]
+    },
+    {
+      "id": "content-parent-fax",
+      "sourcePageId": "page-contact",
+      "kind": "contact",
+      "sourceLabel": "Fax (703) 956-9649",
+      "summary": "Parent fax is not an Oakwell public requirement.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "gc0_exclude_fax"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/contact-us/"
+      ]
+    },
+    {
+      "id": "content-parent-address-contact",
+      "sourcePageId": "page-contact",
+      "kind": "location",
+      "sourceLabel": "22446 Davis Dr #109, Sterling, VA 20164",
+      "summary": "Parent Contact address variant is evidence only; Oakwell keeps canonical profile address.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "company_locations",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "address_variant",
+        "canonical_profile_wins"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/contact-us/"
+      ]
+    },
+    {
+      "id": "content-parent-address-showroom",
+      "sourcePageId": "page-showroom",
+      "kind": "location",
+      "sourceLabel": "22446 Davis Dr ste 109 Sterling, VA 20164",
+      "summary": "Showroom source uses a different suite format than Oakwell canonical profile.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "company_locations",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "address_variant",
+        "canonical_profile_wins"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/about-us/showroom/"
+      ]
+    },
+    {
+      "id": "content-parent-hours",
+      "sourcePageId": "page-showroom",
+      "kind": "hours",
+      "sourceLabel": "Mon–Sat 8am–6pm",
+      "summary": "Parent showroom hours are source evidence; Oakwell has no approved structured hours source yet.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "company_location_hours",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "no_canonical_oakwell_hours",
+        "do_not_infer_sunday"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/about-us/showroom/"
+      ]
+    },
+    {
+      "id": "content-parent-service-area",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "service_area",
+      "sourceLabel": "VA / MD / Washington D.C.",
+      "summary": "Parent service-area wording does not automatically become an Oakwell coverage promise.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "store_pages",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "gc0_service_area_lock"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-since-2011",
+      "sourcePageId": "page-home",
+      "kind": "history_claim",
+      "sourceLabel": "Since 2011",
+      "summary": "Parent-company history may only be used with clear parent attribution if later approved.",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_pages",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "parent_history_only",
+        "not_oakwell_founding_date"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    },
+    {
+      "id": "content-family-owned",
+      "sourcePageId": "page-home",
+      "kind": "history_claim",
+      "sourceLabel": "Family-owned business",
+      "summary": "Parent positioning is not approved as an Oakwell-specific claim.",
+      "oakwellAction": "hold",
+      "targetDomain": "store_pages",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "requires_business_approval"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    },
+    {
+      "id": "content-five-day-turnaround",
+      "sourcePageId": "page-home",
+      "kind": "marketing_claim",
+      "sourceLabel": "Guaranteed 5 days turnaround",
+      "summary": "Volatile/unsupported turnaround claim must not migrate.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "gc0_sla_exclusion",
+        "volatile_claim"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    },
+    {
+      "id": "content-home-promotions",
+      "sourcePageId": "page-home",
+      "kind": "marketing_claim",
+      "sourceLabel": "50% off / package pricing / color-count claims",
+      "summary": "Promotional and inventory-count claims are volatile and excluded from Oakwell migration.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "gc0_promotion_exclusion",
+        "volatile_claim"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    },
+    {
+      "id": "content-about-one-stop",
+      "sourcePageId": "page-about",
+      "kind": "other",
+      "sourceLabel": "One stop shopping / broad remodeling assortment",
+      "summary": "Use only cabinet/showroom support concepts; do not copy broad parent assortment claims.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "rewrite_not_copy",
+        "cabinet_focus"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/about-us/"
+      ]
+    },
+    {
+      "id": "content-showroom-intro",
+      "sourcePageId": "page-showroom",
+      "kind": "location",
+      "sourceLabel": "Showroom introduction",
+      "summary": "Physical showroom context can support Oakwell when location truth is sourced from controlled profile/location data.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "showroom_relevant",
+        "dynamic_location_data_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/about-us/showroom/"
+      ]
+    },
+    {
+      "id": "content-showroom-plugin-artifacts",
+      "sourcePageId": "page-showroom",
+      "kind": "other",
+      "sourceLabel": "Contact Form 7 / Trustindex artifacts",
+      "summary": "Broken WordPress shortcodes/widgets are excluded.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "plugin_artifact",
+        "never_migrate"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/about-us/showroom/"
+      ]
+    },
+    {
+      "id": "content-project-consultation-concept",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "form_field",
+      "sourceLabel": "Project estimate / consultation intake",
+      "summary": "Adapt the consultation concept to Oakwell native lead flow without inheriting free/SLA promises.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_form_configuration",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "native_lead_flow",
+        "no_free_sla_claim"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-form-project-type",
+      "sourcePageId": "page-contact",
+      "kind": "form_field",
+      "sourceLabel": "Project type",
+      "summary": "Configurable project type is a useful first-party lead field.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_form_configuration",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "useful_lead_context"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/contact-us/"
+      ]
+    },
+    {
+      "id": "content-form-showroom-intent",
+      "sourcePageId": "page-contact",
+      "kind": "form_field",
+      "sourceLabel": "Showroom/design consultation intent",
+      "summary": "Allow an operator-managed consultation-intent choice in the Oakwell native form.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_form_configuration",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "useful_lead_context"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/contact-us/"
+      ]
+    },
+    {
+      "id": "content-form-project-location",
+      "sourcePageId": "page-contact",
+      "kind": "form_field",
+      "sourceLabel": "Project address / city / ZIP",
+      "summary": "Project-location context may be captured when operationally useful.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_form_configuration",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "useful_lead_context"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/contact-us/"
+      ]
+    },
+    {
+      "id": "content-form-date-preference",
+      "sourcePageId": "page-contact",
+      "kind": "form_field",
+      "sourceLabel": "Desired consultation / estimate date",
+      "summary": "Optional preference may be captured without promising appointment availability.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_form_configuration",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "preference_not_sla"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/contact-us/"
+      ]
+    },
+    {
+      "id": "content-form-project-notes",
+      "sourcePageId": "page-contact",
+      "kind": "form_field",
+      "sourceLabel": "Project notes",
+      "summary": "Project notes map naturally to the native Oakwell lead flow.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_form_configuration",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "useful_lead_context"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/contact-us/"
+      ]
+    },
+    {
+      "id": "content-form-file-upload",
+      "sourcePageId": "page-contact",
+      "kind": "form_field",
+      "sourceLabel": "Drawing / estimate upload",
+      "summary": "Customer contact uploads remain outside initial migration by GC-0 decision.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "gc0_customer_upload_excluded"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/contact-us/"
+      ]
+    },
+    {
+      "id": "content-process-predesign",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "process",
+      "sourceLabel": "Pre-Design Meeting",
+      "summary": "Cabinet customer-journey step may be rewritten for Oakwell.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "cabinet_relevant",
+        "rewrite_not_copy"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-process-preliminary",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "process",
+      "sourceLabel": "Preliminary Design Meeting",
+      "summary": "Cabinet customer-journey step may be rewritten for Oakwell.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "cabinet_relevant",
+        "rewrite_not_copy"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-process-3d",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "process",
+      "sourceLabel": "3D Design Presentation, Modifications and Finalization",
+      "summary": "Process concept may be adapted; no 24-hour/free promise may be inherited.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "cabinet_relevant",
+        "exclude_source_sla"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-process-installation",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "process",
+      "sourceLabel": "Installation",
+      "summary": "Parent installation step is evidence only until Oakwell installation promise is confirmed.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "store_pages",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "gc0_installation_lock"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-construction-soft-close",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "product_brand_context",
+      "sourceLabel": "Soft-close drawers and doors",
+      "summary": "Construction feature should publish only when confirmed against Oakwell products.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "store_pages",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "product_truth_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-construction-plywood",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "product_brand_context",
+      "sourceLabel": "Plywood box",
+      "summary": "Construction feature should publish only when confirmed against Oakwell products.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "store_pages",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "product_truth_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-construction-dovetail",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "product_brand_context",
+      "sourceLabel": "Dovetail drawers",
+      "summary": "Construction feature should publish only when confirmed against Oakwell products.",
+      "oakwellAction": "business_confirmation_required",
+      "targetDomain": "store_pages",
+      "attribution": "not_public",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "product_truth_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-free-3d-24h",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "marketing_claim",
+      "sourceLabel": "Free 3D design within 24 business hours",
+      "summary": "Do not migrate free/SLA wording.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "gc0_free_design_sla_exclusion"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-cabinet-discount-leadtime",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "marketing_claim",
+      "sourceLabel": "50% off / 2–4 weeks",
+      "summary": "Do not migrate volatile discount or lead-time promises.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "gc0_promotion_exclusion",
+        "gc0_sla_exclusion"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-satisfaction-guarantee",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "marketing_claim",
+      "sourceLabel": "100% Satisfaction Guarantee",
+      "summary": "Do not migrate unverified guarantee.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "gc0_guarantee_exclusion"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-licensed-bonded-insured",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "marketing_claim",
+      "sourceLabel": "Licensed, bonded & insured",
+      "summary": "Parent credential claim is not automatically an Oakwell claim.",
+      "oakwellAction": "hold",
+      "targetDomain": "store_pages",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "requires_business_approval",
+        "parent_claim"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-residential-kitchen-projects",
+      "sourcePageId": "page-residential",
+      "kind": "project",
+      "sourceLabel": "Kitchen projects",
+      "summary": "Cabinet-relevant parent residential kitchen work may be curated as parent portfolio.",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_projects",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "cabinet_relevant",
+        "parent_portfolio"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/residential/"
+      ]
+    },
+    {
+      "id": "content-residential-vanity-projects",
+      "sourcePageId": "page-residential",
+      "kind": "project",
+      "sourceLabel": "Bathroom Vanity projects",
+      "summary": "Vanity/cabinet-relevant parent residential work may be curated as parent portfolio.",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_projects",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "cabinet_relevant",
+        "parent_portfolio"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/residential/"
+      ]
+    },
+    {
+      "id": "content-commercial-projects",
+      "sourcePageId": "page-commercial",
+      "kind": "project",
+      "sourceLabel": "Commercial project portfolio",
+      "summary": "Commercial names/media are inventoried but launch scope stays on hold.",
+      "oakwellAction": "hold",
+      "targetDomain": "store_projects",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "gc0_commercial_hold",
+        "scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/commercial/"
+      ]
+    },
+    {
+      "id": "content-stone-faq",
+      "sourcePageId": "page-faq",
+      "kind": "faq",
+      "sourceLabel": "Granite / natural-stone FAQ",
+      "summary": "Source FAQ text is not relevant to Oakwell cabinetry and is excluded.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "stone_specific",
+        "not_oakwell_content"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/about-us/faq/"
+      ]
+    },
+    {
+      "id": "content-cabinet-faq-domain",
+      "sourcePageId": "page-faq",
+      "kind": "faq",
+      "sourceLabel": "FAQ content-domain concept",
+      "summary": "Retain the CMS/UX concept but author Oakwell-specific cabinetry questions later.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_faq",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "concept_only",
+        "source_text_not_reused"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/about-us/faq/"
+      ]
+    },
+    {
+      "id": "content-parent-reviews",
+      "sourcePageId": "page-home",
+      "kind": "review",
+      "sourceLabel": "Parent testimonials / review content",
+      "summary": "Parent social proof may only be used with Granite & Cabinet Center attribution and review approval.",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_reviews",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "gc0_review_attribution",
+        "review_approval_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    },
+    {
+      "id": "content-primary-navigation",
+      "sourcePageId": "page-home",
+      "kind": "navigation",
+      "sourceLabel": "Primary navigation structure",
+      "summary": "Useful destination concepts can inform Oakwell; displayed labels/order/visibility must be Admin-managed.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_navigation",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "dynamic_navigation_rule"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    },
+    {
+      "id": "content-footer-structure",
+      "sourcePageId": "page-home",
+      "kind": "footer",
+      "sourceLabel": "Footer contact/social/navigation structure",
+      "summary": "Structure can inform Oakwell while values come from canonical settings/CMS.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_footer",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "dynamic_footer_rule",
+        "canonical_contact_data"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    },
+    {
+      "id": "content-seo-cabinet-topics",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "kind": "seo",
+      "sourceLabel": "Cabinet design/showroom topic coverage",
+      "summary": "Use source topics as research only; Oakwell SEO copy must be original and CMS-managed.",
+      "oakwellAction": "adapt",
+      "targetDomain": "store_pages",
+      "attribution": "rewrite_for_oakwell",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "rewrite_not_copy",
+        "dynamic_seo_rule"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/kitchen-cabinet-sale/"
+      ]
+    },
+    {
+      "id": "content-home-office-scope",
+      "sourcePageId": "page-home-office",
+      "kind": "product_brand_context",
+      "sourceLabel": "Custom Home Office",
+      "summary": "Relevant cabinetry-adjacent category remains hold until Oakwell scope is confirmed.",
+      "oakwellAction": "hold",
+      "targetDomain": "store_pages",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "gc0_home_office_hold"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/custom-home-office/"
+      ]
+    },
+    {
+      "id": "content-accessories-scope",
+      "sourcePageId": "page-faucets",
+      "kind": "product_brand_context",
+      "sourceLabel": "Sinks / faucets / grids accessories",
+      "summary": "Parent accessory catalog exists but Oakwell scope is unapproved.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "gc0_accessories_hold"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/faucets"
+      ]
+    },
+    {
+      "id": "content-brand-adelphi",
+      "sourcePageId": "page-brand-adelphi",
+      "kind": "product_brand_context",
+      "sourceLabel": "Adelphi Kitchen Cabinets",
+      "summary": "Parent Adelphi Kitchen Cabinets context may only be used if this brand is confirmed in Oakwell catalog scope.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "catalog_scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/adelphi-kitchen-cabinets/"
+      ]
+    },
+    {
+      "id": "content-brand-timberlake",
+      "sourcePageId": "page-brand-timberlake",
+      "kind": "product_brand_context",
+      "sourceLabel": "Timberlake Kitchen Cabinets",
+      "summary": "Parent Timberlake Kitchen Cabinets context may only be used if this brand is confirmed in Oakwell catalog scope.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "catalog_scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/timberlake-kitchen-cabinets/"
+      ]
+    },
+    {
+      "id": "content-brand-golden-homes",
+      "sourcePageId": "page-brand-golden-homes",
+      "kind": "product_brand_context",
+      "sourceLabel": "Golden Homes Cabinets",
+      "summary": "Parent Golden Homes Cabinets context may only be used if this brand is confirmed in Oakwell catalog scope.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "catalog_scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/golden-homes-cabinets/"
+      ]
+    },
+    {
+      "id": "content-brand-crystal",
+      "sourcePageId": "page-brand-crystal",
+      "kind": "product_brand_context",
+      "sourceLabel": "Crystal Cabinets",
+      "summary": "Parent Crystal Cabinets context may only be used if this brand is confirmed in Oakwell catalog scope.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "catalog_scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/crystal-cabinets/"
+      ]
+    },
+    {
+      "id": "content-brand-stonehill",
+      "sourcePageId": "page-brand-stonehill",
+      "kind": "product_brand_context",
+      "sourceLabel": "StoneHill Cabinetry",
+      "summary": "Parent StoneHill Cabinetry context may only be used if this brand is confirmed in Oakwell catalog scope.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "catalog_scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/stonehill-cabinetry/"
+      ]
+    },
+    {
+      "id": "content-brand-jk",
+      "sourcePageId": "page-brand-jk",
+      "kind": "product_brand_context",
+      "sourceLabel": "J&K Cabinetry",
+      "summary": "Parent J&K Cabinetry context may only be used if this brand is confirmed in Oakwell catalog scope.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "catalog_scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/jk-cabinetry/"
+      ]
+    },
+    {
+      "id": "content-brand-21st-century",
+      "sourcePageId": "page-brand-21st-century",
+      "kind": "product_brand_context",
+      "sourceLabel": "21st Century Cabinetry",
+      "summary": "Parent 21st Century Cabinetry context may only be used if this brand is confirmed in Oakwell catalog scope.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "catalog_scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/21st-century-cabinetry/"
+      ]
+    },
+    {
+      "id": "content-brand-vita",
+      "sourcePageId": "page-brand-vita",
+      "kind": "product_brand_context",
+      "sourceLabel": "Vita Cabinetry",
+      "summary": "Parent Vita Cabinetry context may only be used if this brand is confirmed in Oakwell catalog scope.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "catalog_scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/vita-cabinetry/"
+      ]
+    },
+    {
+      "id": "content-brand-forevermark",
+      "sourcePageId": "page-brand-forevermark",
+      "kind": "product_brand_context",
+      "sourceLabel": "Forevermark Cabinetry",
+      "summary": "Parent Forevermark Cabinetry context may only be used if this brand is confirmed in Oakwell catalog scope.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "catalog_scope_confirmation_required"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/forevermark-cabinetry/"
+      ]
+    },
+    {
+      "id": "content-accessory-ada-nav-unresolved",
+      "sourcePageId": "page-home",
+      "kind": "navigation",
+      "sourceLabel": "Ada Compliant Sinks navigation item",
+      "summary": "The source navigation exposes this accessory label, but the audit did not resolve a stable Granite Center page URL; no URL is guessed.",
+      "oakwellAction": "hold",
+      "targetDomain": "none",
+      "attribution": "parent_required",
+      "businessConfirmationRequired": true,
+      "reasons": [
+        "source_link_unresolved",
+        "gc0_accessories_hold"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    },
+    {
+      "id": "content-payment-nav",
+      "sourcePageId": "page-home",
+      "kind": "navigation",
+      "sourceLabel": "PAY / CardPointe",
+      "summary": "Parent payment destination is external and excluded from initial Oakwell navigation.",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "attribution": "not_public",
+      "businessConfirmationRequired": false,
+      "reasons": [
+        "gc0_payment_exclusion",
+        "external_parent_flow"
+      ],
+      "sourceEvidence": [
+        "https://granitecenterva.com/"
+      ]
+    }
+  ],
+  "mediaCandidates": [
+    {
+      "id": "media-showroom-07",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom7.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-showroom-08",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom8.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-showroom-09",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom9.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-showroom-10",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom10.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-showroom-01",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom1.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-showroom-02",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom2.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-showroom-03",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom3.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-showroom-04",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom4.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-showroom-05",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom5.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-showroom-06",
+      "sourcePageId": "page-showroom",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Showroom6.jpg",
+      "sourceAlt": "SHOWROOM",
+      "mediaKind": "image",
+      "subject": "showroom",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Source showroom asset; GC-2 must acquire/verify/optimize before any production use."
+    },
+    {
+      "id": "media-vanity-1",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Bathroom-Vanity-1.jpg",
+      "sourceAlt": "BATHROOM VANITY",
+      "mediaKind": "image",
+      "subject": "vanity_bath_cabinetry",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential vanity candidate; visual/cabinet relevance reviewed at category level, final use remains curated."
+    },
+    {
+      "id": "media-vanity-2",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Bathroom-Vanity-2.jpg",
+      "sourceAlt": "BATHROOM VANITY",
+      "mediaKind": "image",
+      "subject": "vanity_bath_cabinetry",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential vanity candidate; visual/cabinet relevance reviewed at category level, final use remains curated."
+    },
+    {
+      "id": "media-vanity-3",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Bathroom-Vanity-3.jpg",
+      "sourceAlt": "BATHROOM VANITY",
+      "mediaKind": "image",
+      "subject": "vanity_bath_cabinetry",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential vanity candidate; visual/cabinet relevance reviewed at category level, final use remains curated."
+    },
+    {
+      "id": "media-vanity-base",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Bathroom-Vanity.jpg",
+      "sourceAlt": "BATHROOM VANITY",
+      "mediaKind": "image",
+      "subject": "vanity_bath_cabinetry",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential vanity candidate; visual/cabinet relevance reviewed at category level, final use remains curated."
+    },
+    {
+      "id": "media-kitchen-01",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-1.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-02",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-2-683x1024.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-03",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-3.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-04",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-4.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-05",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-5.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-06",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-6.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-07",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-7.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-08",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-8.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-09",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-9.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-10",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen.jpeg",
+      "sourceAlt": "KITCHEN",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Parent residential kitchen candidate; GC-2 must verify bytes and final visual suitability."
+    },
+    {
+      "id": "media-kitchen-cabinet-countertop-1",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-Cabinet-Granite-Countertop-1.jpg",
+      "sourceAlt": "KITCHEN CABINET GRANITE COUNTERTOP",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Mixed cabinet/countertop source asset; retain only if cabinetry is the approved visible subject."
+    },
+    {
+      "id": "media-kitchen-cabinet-countertop-2",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-Cabinet-Granite-Countertop-2.jpg",
+      "sourceAlt": "KITCHEN CABINET GRANITE COUNTERTOP",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Mixed cabinet/countertop source asset; retain only if cabinetry is the approved visible subject."
+    },
+    {
+      "id": "media-kitchen-cabinet-countertop-base",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Kitchen-Cabinet-Granite-Countertop.jpg",
+      "sourceAlt": "KITCHEN CABINET GRANITE COUNTERTOP",
+      "mediaKind": "image",
+      "subject": "residential_kitchen",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Mixed cabinet/countertop source asset; retain only if cabinetry is the approved visible subject."
+    },
+    {
+      "id": "media-countertop-only-example",
+      "sourcePageId": "page-residential",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Granite-Countertop-1.jpg",
+      "sourceAlt": "GRANITE COUNTERTOP",
+      "mediaKind": "image",
+      "subject": "countertop_only",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "cabinetRelevance": "none",
+      "attribution": "not_public",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Representative countertop-only source asset; excluded from Oakwell core."
+    },
+    {
+      "id": "media-commercial-01",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Alba-Osteria-Washington-DC-1.png",
+      "sourceAlt": "Alba Osteria Washington DC 1",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-02",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Alba-Osteria-Washington-DC-2.png",
+      "sourceAlt": "Alba Osteria Washington DC 2",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-03",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Alba-Osteria-Washington-DC-3.png",
+      "sourceAlt": "Alba Osteria Washington DC 3",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-04",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Alba-Osteria-Washington-DC-4.png",
+      "sourceAlt": "Alba Osteria Washington DC 4",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-05",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Alba-Osteria-Washington-DC.png",
+      "sourceAlt": "Alba Osteria Washington DC",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-06",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Cafe-Cantina-Harbour-Washington-DC.jpg",
+      "sourceAlt": "Cafe Cantina Harbour Washington DC",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-07",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/L%E2%80%99Hommage-Washington-DC-1.jpg",
+      "sourceAlt": "L’Hommage Washington DC 1",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-08",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/L%E2%80%99Hommage-Washington-DC-2.jpg",
+      "sourceAlt": "L’Hommage Washington DC 2",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-09",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/L%E2%80%99Hommage-Washington-DC-3.jpg",
+      "sourceAlt": "L’Hommage Washington DC 3",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-10",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/L%E2%80%99Hommage-Washington-DC.jpg",
+      "sourceAlt": "L’Hommage Washington DC",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-11",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/National-Airport-Grill-Washington-DC.jpg",
+      "sourceAlt": "National Airport Grill Washington DC",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-12",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Ottoman-Taverna-Washington-DC-1.jpg",
+      "sourceAlt": "Ottoman Taverna Washington DC 1",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-13",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Ottoman-Taverna-Washington-DC-2.jpg",
+      "sourceAlt": "Ottoman Taverna Washington DC 2",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-14",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Ottoman-Taverna-Washington-DC.jpg",
+      "sourceAlt": "Ottoman Taverna Washington DC",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-15",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/Planet-Fitness-Fredericksburg-VA.png",
+      "sourceAlt": "Planet Fitness Fredericksburg VA",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-16",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/The-Greene-Turtle-Sports-Bar-Grille-Arlington.jpg",
+      "sourceAlt": "The Greene Turtle Sports Bar Grille Arlington",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-17",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/The-Greene-Turtle-Sports-Bar-Grille-Dulles-Town-Center.jpg",
+      "sourceAlt": "The Greene Turtle Sports Bar Grille Dulles Town Center",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-18",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/The-Wharf-Washington-DC-1.jpg",
+      "sourceAlt": "The Wharf Washington DC 1",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-commercial-19",
+      "sourcePageId": "page-commercial",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2016/11/The-Wharf-Washington-DC.jpg",
+      "sourceAlt": "The Wharf Washington DC",
+      "mediaKind": "image",
+      "subject": "commercial_hold",
+      "oakwellAction": "hold",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "unknown",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Commercial portfolio source asset; hold until cabinetry relevance and launch scope are explicitly approved."
+    },
+    {
+      "id": "media-cabinet-sale-07",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-7.jpg",
+      "sourceAlt": "cabinet 7",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-08",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-8.jpg",
+      "sourceAlt": "cabinet 8",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-06",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-6.jpg",
+      "sourceAlt": "cabinet 6",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-02",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-2.jpg",
+      "sourceAlt": "cabinet 2",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-01",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-1.jpg",
+      "sourceAlt": "cabinet 1",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-03",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-3.jpg",
+      "sourceAlt": "cabinet 3",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-09",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-9.jpg",
+      "sourceAlt": "cabinet 9",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-04",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-4.jpg",
+      "sourceAlt": "cabinet 4",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-10",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-10.jpg",
+      "sourceAlt": "cabinet 10",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-05",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-5.jpg",
+      "sourceAlt": "cabinet 5",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-cabinet-sale-11",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/05/cabinet-11.jpg",
+      "sourceAlt": "cabinet 11",
+      "mediaKind": "image",
+      "subject": "cabinet_marketing",
+      "oakwellAction": "parent_attributed",
+      "targetDomain": "store_media_assets",
+      "cabinetRelevance": "high",
+      "attribution": "parent_required",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Cabinet-focused source asset; GC-2 must verify ownership/bytes and determine final reusable crop/master."
+    },
+    {
+      "id": "media-process-icon-1",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/06/1.png",
+      "sourceAlt": "1",
+      "mediaKind": "image",
+      "subject": "decorative_process_icon",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "cabinetRelevance": "low",
+      "attribution": "not_public",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Generic source process icon; process concept may be rewritten but this decorative asset is not needed."
+    },
+    {
+      "id": "media-process-icon-3",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/06/3.png",
+      "sourceAlt": "3",
+      "mediaKind": "image",
+      "subject": "decorative_process_icon",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "cabinetRelevance": "low",
+      "attribution": "not_public",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Generic source process icon; process concept may be rewritten but this decorative asset is not needed."
+    },
+    {
+      "id": "media-process-icon-2",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/06/2.png",
+      "sourceAlt": "2",
+      "mediaKind": "image",
+      "subject": "decorative_process_icon",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "cabinetRelevance": "low",
+      "attribution": "not_public",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Generic source process icon; process concept may be rewritten but this decorative asset is not needed."
+    },
+    {
+      "id": "media-process-icon-4",
+      "sourcePageId": "page-kitchen-cabinet-sale",
+      "sourceUrl": "https://granitecenterva.com/wp-content/uploads/2023/06/4.png",
+      "sourceAlt": "4",
+      "mediaKind": "image",
+      "subject": "decorative_process_icon",
+      "oakwellAction": "exclude",
+      "targetDomain": "none",
+      "cabinetRelevance": "low",
+      "attribution": "not_public",
+      "verifiedMetadata": {
+        "width": null,
+        "height": null,
+        "bytes": null,
+        "mimeType": null,
+        "sha256": null
+      },
+      "notes": "Generic source process icon; process concept may be rewritten but this decorative asset is not needed."
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "conflict-phone-parent",
+      "topic": "phone",
+      "sourcePageIds": [
+        "page-home",
+        "page-contact"
+      ],
+      "observedValues": [
+        "703-956-9470",
+        "703-439-1040",
+        "Oakwell canonical +1 (703) 678-8488"
+      ],
+      "gc0Rule": "Parent phone variants are evidence only; do not overwrite the canonical Oakwell company profile automatically.",
+      "resolution": "business_confirmation_required",
+      "publicMigrationAllowed": false
+    },
+    {
+      "id": "conflict-address-parent",
+      "topic": "address",
+      "sourcePageIds": [
+        "page-home",
+        "page-contact",
+        "page-showroom",
+        "page-kitchen-cabinet-sale"
+      ],
+      "observedValues": [
+        "22446 DAVIS DR #109-127 STERLING, VA 20164",
+        "22446 Davis Dr #109, Sterling, VA 20164",
+        "22446 Davis Dr ste 109 Sterling, VA 20164",
+        "22446 DAVIS DR #109 STERLING, VA 20164"
+      ],
+      "gc0Rule": "Oakwell continues to use its canonical company-profile address until the controlled source is intentionally changed.",
+      "resolution": "business_confirmation_required",
+      "publicMigrationAllowed": false
+    },
+    {
+      "id": "conflict-hours-parent",
+      "topic": "hours",
+      "sourcePageIds": [
+        "page-contact",
+        "page-showroom"
+      ],
+      "observedValues": [
+        "Monday-Friday 8am-6pm; Saturday 8am-6pm",
+        "Mon-Sat 8am-6pm",
+        "Sunday not stated"
+      ],
+      "gc0Rule": "Do not publish Oakwell hours until a structured canonical field is added and the business confirms the schedule; never infer Sunday.",
+      "resolution": "business_confirmation_required",
+      "publicMigrationAllowed": false
+    },
+    {
+      "id": "conflict-service-area",
+      "topic": "service_area",
+      "sourcePageIds": [
+        "page-kitchen-cabinet-sale"
+      ],
+      "observedValues": [
+        "Virginia, Maryland & Washington D.C.",
+        "all of the D.C. area"
+      ],
+      "gc0Rule": "Parent service territory does not automatically become an Oakwell service-area promise.",
+      "resolution": "business_confirmation_required",
+      "publicMigrationAllowed": false
+    },
+    {
+      "id": "conflict-history-claims",
+      "topic": "history_claims",
+      "sourcePageIds": [
+        "page-home",
+        "page-about"
+      ],
+      "observedValues": [
+        "Since 2011",
+        "family-owned",
+        "over 20 years"
+      ],
+      "gc0Rule": "Parent history may only be used with explicit parent attribution and business approval; it must not become Oakwell founding/history copy.",
+      "resolution": "parent_attributed",
+      "publicMigrationAllowed": false
+    },
+    {
+      "id": "conflict-service-promises",
+      "topic": "service_promises",
+      "sourcePageIds": [
+        "page-home",
+        "page-kitchen-cabinet-sale"
+      ],
+      "observedValues": [
+        "Guaranteed 5 days turnaround",
+        "FREE Design Consultation",
+        "complimentary 3D design within 24 business hours",
+        "2-4 Weeks",
+        "100% Satisfaction Guarantee",
+        "installation team"
+      ],
+      "gc0Rule": "Do not migrate unconfirmed Oakwell installation promises, free-design claims, SLAs, guarantees, discounts or turnaround statements.",
+      "resolution": "exclude",
+      "publicMigrationAllowed": false
+    },
+    {
+      "id": "conflict-parent-social-proof-projects",
+      "topic": "attribution",
+      "sourcePageIds": [
+        "page-home",
+        "page-showroom",
+        "page-residential",
+        "page-commercial",
+        "page-kitchen-cabinet-sale"
+      ],
+      "observedValues": [
+        "Granite & Cabinet Center reviews/testimonials",
+        "parent residential projects",
+        "parent commercial projects"
+      ],
+      "gc0Rule": "Parent reviews/projects may only appear with clear Granite & Cabinet Center attribution unless specifically confirmed as Oakwell work.",
+      "resolution": "parent_attributed",
+      "publicMigrationAllowed": false
+    }
+  ]
+}

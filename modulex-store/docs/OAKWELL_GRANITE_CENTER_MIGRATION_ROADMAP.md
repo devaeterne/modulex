@@ -8,6 +8,7 @@ Target: `devaeterne/modulex` → `modulex-store` + controlled CMS in `modulex-ad
 Architecture design: `modulex-store/docs/superpowers/specs/2026-08-29-oakwell-dynamic-content-cms-design.md`
 GC-0 truth/ownership lock: `modulex-store/docs/GC0_BUSINESS_TRUTH_LOCK.md`
 GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`
+GC-1 manifest: `modulex-store/docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md` + `gc1-source-manifest.json`
 
 > Purpose: identify which verified Granite & Cabinet Center business data, media, social proof, forms, showroom information, and cabinet-related content should be adapted into Oakwell Cabinetry without cloning the parent website or importing stale/irrelevant WordPress content.
 
@@ -430,14 +431,14 @@ Goal: create a complete, machine-checkable migration inventory before touching p
 
 Plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`
 
-- `[ ]` crawl/review parent navigation + cabinet-relevant landing pages;
-- `[ ]` record page-level disposition using `adapt`, `parent_attributed`, `hold`, `exclude`, `business_confirmation_required`;
-- `[ ]` inventory content candidates and conflict evidence;
-- `[ ]` inventory source media references and qualitative relevance;
-- `[ ]` map each accepted candidate to its proposed controlled CMS domain;
-- `[ ]` keep unverified byte metadata null;
-- `[ ]` validate manifest with a deterministic Node contract;
-- `[ ]` update Store/Admin roadmaps without overwriting parallel work.
+- `[x]` crawl/review parent navigation + cabinet-relevant landing pages;
+- `[x]` record page-level disposition using `adapt`, `parent_attributed`, `hold`, `exclude`, `business_confirmation_required`;
+- `[x]` inventory content candidates and conflict evidence;
+- `[x]` inventory source media references and qualitative relevance;
+- `[x]` map each accepted candidate to its proposed controlled CMS domain;
+- `[x]` keep unverified byte metadata null;
+- `[x]` validate manifest with a deterministic Node contract;
+- `[x]` update Store/Admin roadmaps without overwriting parallel work.
 
 **Exit gate:** every candidate page/content/media/conflict record has a valid disposition and target-domain mapping; deterministic manifest contract passes. No production DB/schema/content/media mutation occurs in GC-1.
 
@@ -574,11 +575,10 @@ Goal: add trust signals with correct source identity.
 
 # 10. Next Action
 
-The dedicated workstream is approved and GC-0 has established factual/data-ownership rules.
+GC-0 truth/data ownership is locked and GC-1 source discovery/classification is complete for review.
 
-1. Merge the dynamic-content architecture/governance documentation package.
-2. Begin **GC-1 — Source crawl & content/media manifest** from the latest `main` using `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`.
-3. GC-1 performs discovery/classification only; it does not create production CMS rows, schema, uploads or runtime changes.
-4. GC-2 begins only after the GC-1 manifest is reviewed and merged.
-5. Every later GC package that introduces a new structured domain gets its own current-schema review, implementation plan, tests and reviewed PR.
-6. Keep the existing Phase 2.1 Gallery/Projects production-content blocker visible until GC-5 or another approved content package satisfies its live acceptance gate.
+1. Review and merge the GC-1 manifest PR.
+2. Start **GC-2 — Media library & optimization pipeline** from the latest `main`.
+3. GC-2 must acquire source bytes, verify dimensions/bytes/MIME, compute SHA-256 hashes, review exact/near duplicates, strip unnecessary metadata, optimize without upscaling, upload approved assets to Oakwell-controlled Supabase Storage, and provide the Admin-managed reusable media domain required by later GC packages.
+4. Do not publish source media directly from Granite Center URLs; source URLs remain provenance only.
+5. Re-read current Store/Admin roadmaps before GC-2 implementation because parallel PRs may have merged.
