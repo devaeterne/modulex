@@ -38,7 +38,7 @@ export default async function Contact() {
       ? [company?.city, company?.stateRegion, company?.postalCode].filter(Boolean).join(", ")
       : null,
   ].filter(Boolean) as string[];
-  const hasDirectContact = Boolean(company?.email || company?.phone || company?.website || addressLines.length > 0);
+  const hasDirectContact = Boolean(company?.email || company?.phone || addressLines.length > 0);
 
   return (
     <>
@@ -102,16 +102,6 @@ export default async function Contact() {
                   <div className="service-icon" aria-hidden="true"><i className="bi bi-geo-alt"></i></div>
                   <h3>Location</h3>
                   <p>{addressLines.map((line, index) => <span key={`${line}-${index}`}>{line}{index < addressLines.length - 1 ? <br /> : null}</span>)}</p>
-                </div>
-              </div>
-            ) : null}
-
-            {company?.website ? (
-              <div className="col-lg-4 col-md-6">
-                <div className="service-card h-100">
-                  <div className="service-icon" aria-hidden="true"><i className="bi bi-globe"></i></div>
-                  <h3>Website</h3>
-                  <p><a href={company.website} target="_blank" rel="noopener noreferrer">{company.website}</a></p>
                 </div>
               </div>
             ) : null}
