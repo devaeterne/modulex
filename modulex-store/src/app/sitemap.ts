@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { siteConfig } from "@/config/site";
+import { getStoreGalleryReadiness } from "@/lib/store/content/queries";
 import { getAllStoreCatalogProducts } from "@/lib/store/products/queries";
 
 const staticRoutes = [
@@ -17,18 +18,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: route === "" ? 1 : route === "/products" ? 0.9 : 0.7,
   }));
 
-  try {
-    const products = await getAllStoreCatalogProducts({ maxItems: 5000 });
-    const productEntries: MetadataRoute.Sitemap = products.map((product) => ({
+  const [productsResult, galleryResult] = await Promise.allSettled([
+    getAllStoreCatalogProducts({ maxItems: 5000 }),
+    getStoreGalleryReadiness(),
+  ]);
+
+  let productEntries: MetadataRoute.Sitemap = [];
+  if (productsResult.status === "fulfilled") {
+    productEntries = productsResult.value.map((product) => ({
       url: `${siteConfig.url}/products/${product.slug}`,
       lastModified: product.updatedAt,
       changeFrequency: "monthly",
       priority: 0.8,
     }));
-
-    return [...staticEntries, ...productEntries];
-  } catch (error) {
-    console.error("Unable to load product URLs for sitemap", error);
-    return staticEntries;
+  } else {
+    console.error("Unable to load product URLs for sitemap");
   }
+
+  let galleryEntries: MetadataRoute.Sitemap = [];
+  if (galleryResult.status === "fulfilled" && galleryResult.value.isReady && galleryResult.value.page) {
+    galleryEntries = [
+      {
+        url: `${siteConfig.url}/gallery`,
+        lastModified: galleryResult.value.page.updatedAt,
+        changeFrequency: "monthly",
+        priority: 0.7,
+      },
+    ];
+  } else if (galleryResult.status === "rejected") {
+    console.error("Unable to determine Gallery readiness for sitemap");
+  }
+
+  return [...staticEntries, ...galleryEntries, ...productEntries];
 }
