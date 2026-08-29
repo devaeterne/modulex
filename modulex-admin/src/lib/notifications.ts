@@ -14,7 +14,10 @@ export type NotificationEventType =
   | "invoice_issued"
   | "approval_requested"
   | "approval_approved"
-  | "approval_rejected";
+  | "approval_rejected"
+  | "request_created"
+  | "request_updated"
+  | "request_completed";
 
 export type NotificationSeverity =
   | "critical"
@@ -50,6 +53,9 @@ const NOTIFICATION_PERMISSION_POLICY: Record<
   approval_requested: "approvals.view",
   approval_approved: "approvals.view",
   approval_rejected: "approvals.view",
+  request_created: "requests.manage",
+  request_updated: "requests.view",
+  request_completed: "requests.view",
 };
 
 export function canRoleSeeNotification(
@@ -73,4 +79,7 @@ export const NOTIFICATION_LABELS: Record<NotificationEventType, string> = {
   approval_requested: "Approval Requested",
   approval_approved: "Approval Approved",
   approval_rejected: "Approval Rejected",
+  request_created: "New Request",
+  request_updated: "Request Updated",
+  request_completed: "Request Completed",
 };
