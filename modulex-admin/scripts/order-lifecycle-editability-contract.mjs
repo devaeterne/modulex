@@ -95,6 +95,8 @@ const sql = fs.readFileSync(sqlPath, "utf8");
 assert(sql.includes("customer_order_revision_mode"), "DB contract must centralize order revision mode");
 assert(sql.includes("v_revision_mode = 'locked'"), "DB update wrapper must reject locked lifecycle revisions");
 assert(sql.includes("v_revision_mode = 'approval'"), "DB update wrapper must preserve Sales approval behavior before fulfillment starts");
+assert(sql.includes("p_role is null or p_role not in"), "DB revision mode must lock profiles-less/null roles explicitly");
+assert(sql.includes("v_role is null or v_role not in"), "DB update wrapper must deny profiles-less/null roles explicitly");
 for (const status of ["shipped", "delivered", "installation_scheduled", "installation_in_progress", "completed", "cancelled"]) {
   assert(sql.includes(`'${status}'`), `DB lock contract must include ${status}`);
 }
