@@ -142,6 +142,38 @@ revoke all on function private.store_project_media_asset_is_eligible(uuid) from 
 revoke all on function private.store_project_media_asset_is_eligible(uuid) from anon, authenticated;
 grant execute on function private.store_project_media_asset_is_eligible(uuid) to service_role;
 
+create or replace function private.store_project_requires_parent_attribution(p_project_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(
+    exists (
+      select 1
+      from public.store_projects p
+      join public.store_media_assets a on a.id = p.cover_media_asset_id
+      where p.id = p_project_id
+        and a.attribution_classification = 'parent_attributed'
+    )
+    or exists (
+      select 1
+      from public.store_project_media m
+      join public.store_media_assets a on a.id = m.media_asset_id
+      where m.project_id = p_project_id
+        and m.media_type = 'image'
+        and m.media_asset_id is not null
+        and a.attribution_classification = 'parent_attributed'
+    ),
+    false
+  );
+$$;
+
+revoke all on function private.store_project_requires_parent_attribution(uuid) from public;
+revoke all on function private.store_project_requires_parent_attribution(uuid) from anon, authenticated;
+grant execute on function private.store_project_requires_parent_attribution(uuid) to service_role;
+
 create or replace function private.store_project_is_publishable(p_project_id uuid)
 returns boolean
 language sql
@@ -160,7 +192,10 @@ as $$
         and nullif(btrim(p.cover_image_alt), '') is not null
         and private.store_project_media_asset_is_eligible(p.cover_media_asset_id)
         and (
-          p.attribution_classification = 'oakwell_owned'
+          (
+            p.attribution_classification = 'oakwell_owned'
+            and not private.store_project_requires_parent_attribution(p.id)
+          )
           or (
             p.attribution_classification = 'parent_attributed'
             and nullif(btrim(p.attribution_text), '') is not null
