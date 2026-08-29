@@ -1,0 +1,38 @@
+name: A1.2A closeout patch
+
+on:
+  push:
+    branches:
+      - docs/admin-a1-2a-production-acceptance
+
+permissions:
+  contents: write
+
+jobs:
+  patch-roadmap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply roadmap closeout
+        working-directory: modulex-admin
+        run: node scripts/apply-a12a-closeout.mjs
+      - name: Verify closeout text
+        run: |
+          grep -F 'Current Admin next action: **A1.2B — verify create/edit/detail flows use one domain contract**' modulex-admin/ADMIN_ROADMAP.md
+          grep -F -- '- [x] Review global and customer-scoped order list consistency. (A1.2A)' modulex-admin/ADMIN_ROADMAP.md
+          grep -F '20260829193058_customer_order_list_summary' modulex-admin/ADMIN_ROADMAP.md
+          git diff --check
+      - name: Commit roadmap and remove temporary helpers
+        run: |
+          rm modulex-admin/scripts/apply-a12a-closeout.mjs
+          rm .github/workflows/a12a-closeout-patch.yml
+          git config user.name devaeterne
+          git config user.email info@safaksariyildiz.com
+          git add -A
+          git commit -m 'docs(admin): close A1.2A production acceptance'
+          git push
