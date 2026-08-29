@@ -1,4 +1,5 @@
 export type StoreLeadType = "contact" | "dealer_application";
+export type StoreLeadRequestKind = "general_inquiry" | "project_consultation";
 export type StoreLeadStatus =
   | "new"
   | "under_review"
@@ -12,6 +13,7 @@ export type StoreLead = {
   id: string;
   reference_code: string;
   lead_type: StoreLeadType;
+  request_kind: StoreLeadRequestKind;
   status: StoreLeadStatus;
   first_name: string;
   last_name: string;
@@ -38,11 +40,29 @@ export type StoreLead = {
   utm_term: string | null;
   landing_page: string | null;
   referrer: string | null;
+  project_type: string | null;
+  consultation_intent: string | null;
+  project_address: string | null;
+  project_city: string | null;
+  project_postal_code: string | null;
+  preferred_consultation_date: string | null;
   assigned_to: string | null;
   internal_notes: string | null;
   converted_customer_id: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+export type StoreLeadFormOption = {
+  id: string;
+  option_group: "project_type" | "consultation_intent";
+  option_key: string;
+  label: string;
+  is_active: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
   updated_by: string | null;
