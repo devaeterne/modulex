@@ -6,6 +6,7 @@ const root = process.cwd();
 const list = fs.readFileSync(path.join(root, "src/components/customers/CustomerOrdersList.tsx"), "utf8");
 const globalRoute = fs.readFileSync(path.join(root, "src/app/(admin)/customers/orders/page.tsx"), "utf8");
 const scopedRoute = fs.readFileSync(path.join(root, "src/app/(admin)/customers/[id]/orders/page.tsx"), "utf8");
+const summarySql = fs.readFileSync(path.join(root, "sql/customer-order-list-summary.sql"), "utf8");
 const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 
 function assert(condition, message) {
@@ -26,7 +27,11 @@ assert(list.includes("searchCustomerIds"), "order search must preserve customer 
 assert(list.includes(".or("), "order search must be applied at the Supabase query layer");
 assert(list.includes("new URLSearchParams(window.location.search)") && list.includes("window.history.replaceState"), "order search/filter/page state must round-trip through the URL");
 assert(list.includes('supabase.rpc("get_customer_order_list_summary"'), "order summary cards must use a database aggregate instead of the paged rows");
-assert(list.includes("setFilteredCount(count ?? 0)"), "filtered count must drive pagination metadata");
+assert(/setFilteredCount\(ordersResult\.count\s*\?\?\s*0\)/.test(list), "filtered count must drive pagination metadata");
+assert(/create or replace function public\.get_customer_order_list_summary/i.test(summarySql), "A1.2A SQL must define the order-list summary RPC");
+assert(/security\s+invoker/i.test(summarySql) && !/security\s+definer/i.test(summarySql), "order-list summary RPC must preserve caller RLS with SECURITY INVOKER");
+assert(/revoke all on function public\.get_customer_order_list_summary\(uuid\) from public/i.test(summarySql), "order-list summary RPC must revoke PUBLIC execute");
+assert(/grant execute on function public\.get_customer_order_list_summary\(uuid\) to authenticated/i.test(summarySql), "order-list summary RPC must grant authenticated execute");
 assert(pkg.scripts?.["smoke:order-list"] === "node scripts/order-list-consistency-contract.mjs", "package.json must expose smoke:order-list");
 assert(pkg.scripts?.smoke?.includes("smoke:order-list"), "main Admin smoke chain must include smoke:order-list");
 
