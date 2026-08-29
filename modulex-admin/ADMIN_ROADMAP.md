@@ -1,9 +1,9 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `836bc0b28379b39c8e0ad33199650a9bc944b60f`
+Main baseline: `afaa8ba6e0717b97f9979d61b413541072ed155c`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-2A media schema/security production-verified; GC-2B importer/optimizer next; Gallery/Projects content acceptance remains pending**
+Current cross-roadmap package: **Granite Center → Oakwell GC-2B importer/optimizer capability verified with zero production media writes; GC-2C Admin Media Library next; Gallery/Projects content acceptance remains pending**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 

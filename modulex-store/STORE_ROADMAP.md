@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `142df0b28a56e87f1c128d407eca16fab2e11a49`
+Main baseline: `afaa8ba6e0717b97f9979d61b413541072ed155c`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -563,7 +563,7 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
   - Reviewed 32 Granite Center source pages and classified 55 content candidates, 62 media candidates, and 7 conflict classes.
   - Machine-readable manifest: `docs/granite-center/gc1-source-manifest.json`; human review: `docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md`.
   - Deterministic manifest contract passed in GitHub Actions run `33254382256`; byte-level media metadata remains intentionally unverified/null for GC-2.
-- [ ] GC-2 — Media library & optimization pipeline.
+- [~] GC-2 — Media library & optimization pipeline.
 - [ ] GC-3 — Company identity, contact, About & Showroom migration.
 - [ ] GC-4 — Contact / Project Consultation Form migration.
 - [ ] GC-5 — Projects / Gallery migration.
@@ -586,12 +586,17 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
     - `authenticated` table grants are narrowed to `SELECT/INSERT/UPDATE/DELETE`; `anon` has no direct table grant.
     - Existing public `store-media` remains public and unchanged; staging is private, 20 MB, image-only, and both buckets had zero objects at GC-2A acceptance.
     - TDD evidence: initial RED `33257908417`, grant-hardening RED `33258120507`, final GREEN `33258278549`.
-  - [ ] **GC-2B — importer/optimizer** is next: manifest selection, bounded source acquisition, verified MIME/dimensions/bytes, SHA-256 dedupe, auto-orientation, metadata stripping, no-upscale WebP optimization, private staging and idempotent registration.
-  - [ ] GC-2C Admin Media Library and GC-2D controlled production intake remain pending.
+  - [x] **GC-2B — importer/optimizer capability** is verified; production intake remains intentionally deferred to GC-2D.
+    - Pinned `sharp@0.35.4`; deterministic contracts cover manifest selection, HTTPS/host/redirect/20 MB download bounds, decoded metadata, original/optimized SHA-256, auto-orientation, EXIF stripping, no-upscale WebP q80 optimization, exact-hash dedupe, rollback, credential gating, and a hard `--publish` rejection.
+    - Real dry-run evidence: Actions `33260112614` processed `media-showroom-01` without DB/Storage writes: source JPEG 583×425 / 281,219 B / SHA-256 `c9a6cfab62d6e6ee7c885df9f7f7d0c635442a9b35ba2909eb1b27190906d32b`; optimized WebP 583×425 / 55,088 B / SHA-256 `a7a09a6ee877cccbaa607aaadcf2583722e1fc380bea3e078ac43c26b612ed7a`.
+    - Post-dry-run production verification: `store_media_assets = 0`, `store_media_asset_sources = 0`, `store-media-staging objects = 0`.
+    - TDD evidence includes selection RED `33259373457`, image RED `33259598195`, downloader RED `33259703991`, writer/CLI RED `33259849440`, and plan-aligned GREEN `33260212518`.
+  - [ ] **GC-2C — Admin Media Library review UI + lifecycle controls** is next.
+  - [ ] **GC-2D — controlled production intake** remains pending; GC-2B does not publish or seed production media.
 
 # Next Action
 
 The user-approved active workstream remains the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
 
-1. Execute **GC-2B — importer/optimizer** from the latest `main` after GC-2A is merged. GC-2B owns source-byte acquisition, verified MIME/dimensions/bytes, original SHA-256 exact deduplication, auto-orientation, EXIF/GPS stripping, conservative no-upscale WebP optimization, private staging upload, and idempotent asset/provenance registration. The importer must not publish.
-2. Preserve Gallery/Projects as `[~]`; GC-5 remains responsible for curated project/media association and final public Gallery acceptance.
+1. Execute **GC-2C — Admin Media Library** from the latest `main` after GC-2B is merged: `/store/media`, `store.manage` RBAC, review/edit lifecycle, verified metadata/provenance visibility, and controlled publish/unpublish/delete server actions.
+2. Keep GC-2 `[~]` until GC-2C and GC-2D are complete. Production Granite media intake remains deferred; Gallery/Projects stays `[~]` and GC-5 still owns project/media association and final public Gallery acceptance.

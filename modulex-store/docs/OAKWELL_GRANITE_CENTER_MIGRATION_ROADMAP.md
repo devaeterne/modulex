@@ -8,6 +8,7 @@ Target: `devaeterne/modulex` → `modulex-store` + controlled CMS in `modulex-ad
 Architecture design: `modulex-store/docs/superpowers/specs/2026-08-29-oakwell-dynamic-content-cms-design.md`
 GC-0 truth/ownership lock: `modulex-store/docs/GC0_BUSINESS_TRUTH_LOCK.md`
 GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-manifest.md`
+GC-2 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc2-media-library-optimization-implementation.md`
 GC-1 manifest: `modulex-store/docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md` + `gc1-source-manifest.json`
 
 > Purpose: identify which verified Granite & Cabinet Center business data, media, social proof, forms, showroom information, and cabinet-related content should be adapted into Oakwell Cabinetry without cloning the parent website or importing stale/irrelevant WordPress content.
@@ -445,6 +446,13 @@ Plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-source-content-media-
 ## GC-2 — Media library & optimization pipeline
 
 Goal: create reusable, traceable Oakwell-controlled media without visual degradation.
+
+**Package status**
+
+- `[x]` **GC-2A — schema/security foundation:** reusable asset/provenance tables and private staging boundary are production-verified.
+- `[x]` **GC-2B — importer/optimizer capability:** bounded Granite acquisition, verified metadata/hash, no-upscale WebP optimization, private staging writer/idempotency, rollback, credential gate, reporting and `--publish` prohibition are verified. A real `media-showroom-01` dry-run succeeded in Actions `33260112614` with zero production DB/Storage writes.
+- `[ ]` **GC-2C — Admin Media Library:** review/edit + publish/unpublish/delete controls remain next.
+- `[ ]` **GC-2D — controlled production intake:** actual approved Granite assets are not yet imported.
 
 - `[ ]` design/implement reusable media asset domain and Admin management required by migration;
 - `[ ]` download approved originals;
