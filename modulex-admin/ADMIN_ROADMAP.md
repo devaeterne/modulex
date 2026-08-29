@@ -193,7 +193,8 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A1.2 Orders
 
-- [ ] Review global and customer-scoped order list consistency.
+- [~] Review global and customer-scoped order list consistency.
+  - A1.2A keeps both routes on the shared `CustomerOrdersList`, moves search/status/exact count/page windows to Supabase, resolves only matching/page customer lookups, and moves unfiltered summary aggregation to a SECURITY INVOKER RPC under existing order RLS.
 - [ ] Verify create/edit/detail flows use one domain contract.
 - [ ] Define immutable vs editable fields by order lifecycle state.
 - [ ] Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.

@@ -370,7 +370,7 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
 
   const totalValueLabel =
     summary.currencyCount <= 1
-      ? money(summary.totalValue, summary.currencyCode || selectedCustomer?.id ? summary.currencyCode || "USD" : summary.currencyCode || "USD")
+      ? money(summary.totalValue, summary.currencyCode || "USD")
       : "Multiple currencies";
 
   if (isLoading && !orders.length) {
