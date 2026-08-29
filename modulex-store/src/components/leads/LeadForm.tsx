@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
-import type { StoreLeadType } from "@/lib/store/leads/types";
+import { FormEvent, useMemo, useRef, useState } from "react";
+import type { StoreLeadFormOption, StoreLeadRequestKind, StoreLeadType } from "@/lib/store/leads/types";
 import { captureSessionAttribution, getSessionAttribution } from "@/lib/analytics/attribution";
 import { pushAnalyticsEvent } from "@/lib/analytics/events";
 
-type LeadFormProps = { type: StoreLeadType };
+type LeadFormProps = { type: StoreLeadType; formOptions?: StoreLeadFormOption[] };
 type DocumentType = "business_license" | "resale_certificate" | "showroom_company_documentation" | "other";
 
 const salesChannels = ["Showroom", "Retail", "Trade / Contractor", "E-commerce", "Project Sales"];
@@ -14,14 +14,18 @@ const allowedFileTypes = new Set(["application/pdf", "image/jpeg", "image/png"])
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_DOCUMENTS = 4;
 
-export default function LeadForm({ type }: LeadFormProps) {
+export default function LeadForm({ type, formOptions = [] }: LeadFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [referenceCode, setReferenceCode] = useState<string | null>(null);
   const [documents, setDocuments] = useState<File[]>([]);
   const [documentType, setDocumentType] = useState<DocumentType>("other");
+  const [requestKind, setRequestKind] = useState<StoreLeadRequestKind>("general_inquiry");
   const started = useRef(false);
   const dealer = type === "dealer_application";
+  const projectConsultation = !dealer && requestKind === "project_consultation";
+  const projectTypes = useMemo(() => formOptions.filter((item) => item.option_group === "project_type"), [formOptions]);
+  const consultationIntents = useMemo(() => formOptions.filter((item) => item.option_group === "consultation_intent"), [formOptions]);
 
   function markStarted() {
     if (started.current) return;
@@ -60,6 +64,7 @@ export default function LeadForm({ type }: LeadFormProps) {
     const showroomValue = String(data.get("has_showroom") || "");
     const payload = {
       lead_type: type,
+      request_kind: dealer ? "general_inquiry" : requestKind,
       first_name: String(data.get("first_name") || ""), last_name: String(data.get("last_name") || ""),
       email: String(data.get("email") || ""), phone: String(data.get("phone") || ""),
       company_name: String(data.get("company_name") || ""), company_website: String(data.get("company_website") || ""),
@@ -75,6 +80,12 @@ export default function LeadForm({ type }: LeadFormProps) {
       utm_term: attribution?.utmTerm || params.get("utm_term") || "", landing_page: attribution?.landingPage || window.location.href,
       referrer: attribution?.referrer || document.referrer,
       supporting_document_count: dealer ? documents.length : 0,
+      project_type: projectConsultation ? String(data.get("project_type") || "") : "",
+      consultation_intent: projectConsultation ? String(data.get("consultation_intent") || "") : "",
+      project_address: projectConsultation ? String(data.get("project_address") || "") : "",
+      project_city: projectConsultation ? String(data.get("project_city") || "") : "",
+      project_postal_code: projectConsultation ? String(data.get("project_postal_code") || "") : "",
+      preferred_consultation_date: projectConsultation ? String(data.get("preferred_consultation_date") || "") : "",
     };
 
     try {
@@ -98,10 +109,11 @@ export default function LeadForm({ type }: LeadFormProps) {
         }
       }
 
-      pushAnalyticsEvent(dealer ? "dealer_application_submit" : "contact_form_submit", { form_type: type });
+      pushAnalyticsEvent(dealer ? "dealer_application_submit" : "contact_form_submit", { form_type: type, request_kind: dealer ? "dealer_application" : requestKind });
       form.reset();
       setDocuments([]);
       setDocumentType("other");
+      setRequestKind("general_inquiry");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to submit your request.");
     } finally { setSubmitting(false); }
@@ -112,6 +124,7 @@ export default function LeadForm({ type }: LeadFormProps) {
       <div aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }}>
         <label htmlFor={`${type}-website-hp`}>Website</label><input id={`${type}-website-hp`} name="website_hp" type="text" tabIndex={-1} autoComplete="off" />
       </div>
+      {!dealer ? <div className="form-group"><label htmlFor="contact-request-kind">How can we help? *</label><select id="contact-request-kind" name="request_kind" value={requestKind} onChange={(event) => setRequestKind(event.target.value as StoreLeadRequestKind)} required><option value="general_inquiry">General Inquiry</option><option value="project_consultation">Project Consultation</option></select></div> : null}
       <div className="form-row">
         <div className="form-group"><label htmlFor={`${type}-first-name`}>First Name *</label><input id={`${type}-first-name`} name="first_name" type="text" maxLength={120} required autoComplete="given-name" /></div>
         <div className="form-group"><label htmlFor={`${type}-last-name`}>Last Name *</label><input id={`${type}-last-name`} name="last_name" type="text" maxLength={120} required autoComplete="family-name" /></div>
@@ -120,6 +133,18 @@ export default function LeadForm({ type }: LeadFormProps) {
         <div className="form-group"><label htmlFor={`${type}-email`}>Email *</label><input id={`${type}-email`} name="email" type="email" maxLength={320} required autoComplete="email" /></div>
         <div className="form-group"><label htmlFor={`${type}-phone`}>Phone</label><input id={`${type}-phone`} name="phone" type="tel" maxLength={80} autoComplete="tel" /></div>
       </div>
+      {projectConsultation ? <>
+        {(projectTypes.length > 0 || consultationIntents.length > 0) ? <div className="form-row">
+          {projectTypes.length > 0 ? <div className="form-group"><label htmlFor="project-type">Project Type</label><select id="project-type" name="project_type" defaultValue=""><option value="">Select</option>{projectTypes.map((option) => <option key={option.option_key} value={option.option_key}>{option.label}</option>)}</select></div> : null}
+          {consultationIntents.length > 0 ? <div className="form-group"><label htmlFor="consultation-intent">Consultation Request</label><select id="consultation-intent" name="consultation_intent" defaultValue=""><option value="">Select</option>{consultationIntents.map((option) => <option key={option.option_key} value={option.option_key}>{option.label}</option>)}</select></div> : null}
+        </div> : null}
+        <div className="form-group"><label htmlFor="project-address">Project Address</label><input id="project-address" name="project_address" type="text" maxLength={300} autoComplete="street-address" /></div>
+        <div className="form-row">
+          <div className="form-group"><label htmlFor="project-city">Project City</label><input id="project-city" name="project_city" type="text" maxLength={160} autoComplete="address-level2" /></div>
+          <div className="form-group"><label htmlFor="project-postal-code">Project ZIP / Postal Code</label><input id="project-postal-code" name="project_postal_code" type="text" maxLength={32} autoComplete="postal-code" /></div>
+        </div>
+        <div className="form-group"><label htmlFor="preferred-consultation-date">Preferred Consultation Date</label><input id="preferred-consultation-date" name="preferred_consultation_date" type="date" /><small className="d-block mt-2">This is a preferred date only. We will confirm availability when we respond.</small></div>
+      </> : null}
       {dealer ? <>
         <div className="form-row">
           <div className="form-group"><label htmlFor="dealer-company">Company Name *</label><input id="dealer-company" name="company_name" type="text" maxLength={200} required autoComplete="organization" /></div>
@@ -142,12 +167,12 @@ export default function LeadForm({ type }: LeadFormProps) {
         </div>
         {documents.length > 0 ? <div className="form-group"><ul className="mb-0">{documents.map((file) => <li key={`${file.name}-${file.size}`}>{file.name}</li>)}</ul></div> : null}
       </> : null}
-      <div className="form-group"><label htmlFor={`${type}-message`}>{dealer ? "Tell us about your business" : "Message"} *</label><textarea id={`${type}-message`} name="message" rows={6} maxLength={5000} required /></div>
+      <div className="form-group"><label htmlFor={`${type}-message`}>{dealer ? "Tell us about your business" : projectConsultation ? "Project Notes" : "Message"} *</label><textarea id={`${type}-message`} name="message" rows={6} maxLength={5000} required /></div>
       <div className="form-group checkbox-group"><label className="checkbox-label"><input type="checkbox" name="privacy_accepted" required /><span>I agree that Oakwell Cabinetry may use this information to respond to my request. *</span></label></div>
       <div className="form-group checkbox-group"><label className="checkbox-label"><input type="checkbox" name="marketing_consent" /><span>I would also like to receive occasional Oakwell product and dealer updates.</span></label></div>
       {error ? <div className="alert alert-danger" role="alert">{error}</div> : null}
       {referenceCode ? <div className="alert alert-success" role="status" aria-live="polite">Thank you. Your request was submitted successfully. Reference: <strong>{referenceCode}</strong></div> : null}
-      <button type="submit" className="btn-submit" disabled={submitting}><span>{submitting ? "Submitting..." : dealer ? "Submit Dealer Application" : "Send Inquiry"}</span><span className="submit-icon" aria-hidden="true"><i className="bi bi-chevron-right"></i></span></button>
+      <button type="submit" className="btn-submit" disabled={submitting}><span>{submitting ? "Submitting..." : dealer ? "Submit Dealer Application" : projectConsultation ? "Request Consultation" : "Send Inquiry"}</span><span className="submit-icon" aria-hidden="true"><i className="bi bi-chevron-right"></i></span></button>
     </form>
   );
 }
