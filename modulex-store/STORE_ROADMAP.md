@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `ed30e1bdd3807a21f2f9da2389df8549b3a45d05`
+Main baseline: `3802aa9276bb2fe17c7fce0959a2e38b04ba041c`
 Current phase: **Phase 2.0 — Production Truth & Cleanup**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
@@ -53,36 +53,43 @@ These rules are mandatory for all future Modulex Store work:
 
 ## 2.0.1 Public route audit and truth cleanup
 
-- [~] Replace or temporarily remove template content from `/about`.
+- [x] Replace or temporarily remove template content from `/about`.
   - Remove invented people, biographies, awards, unsupported company history, fake claims, and fake phone numbers.
   - Replace with verified Oakwell company content or a minimal factual page fed from approved settings/CMS data.
   - **Done when:** page contains no unsupported company claims and all contact data comes from approved source data.
+  - Verified in production on main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c`: factual company-profile-backed About renders successfully.
 
-- [~] Replace or remove template content from `/services`.
+- [x] Replace or remove template content from `/services`.
   - Remove generic interior-design packages and placeholder service claims that do not describe Oakwell Cabinetry.
   - Decide whether the final route should become Product Support / Dealer Support / Cabinet Solutions, or be removed from navigation.
   - **Done when:** route purpose matches the actual Oakwell business and all links resolve to real Store routes.
+  - Current deliberate treatment: route removed and production `/services` returns not-found.
 
-- [~] Replace or remove template content from `/services/residential`.
+- [x] Replace or remove template content from `/services/residential`.
   - Remove Manhattan/Brooklyn projects, fake testimonials, demo 360 links, fake phone number, and design-studio language.
   - **Done when:** route is production-truthful or permanently redirected/removed.
+  - Route file is removed and production `/services/residential` returns not-found.
 
-- [~] Replace or temporarily disable `/blog` until a real content source exists.
+- [x] Replace or temporarily disable `/blog` until a real content source exists.
   - Remove fake articles, dates, categories, duplicate cards, placeholder pagination, and dead links.
   - **Done when:** route either renders real published content or returns a deliberate redirect/not-found behavior.
+  - Current deliberate treatment: route removed and production `/blog` returns not-found.
 
-- [~] Replace or temporarily disable `/blog/[slug]` demo content.
+- [x] Replace or temporarily disable `/blog/[slug]` demo content.
   - Remove fake author profiles, comments, categories, recent posts, forms, and placeholder social links.
   - **Done when:** only real published article content can resolve a slug.
+  - Route file is removed and an arbitrary production slug (`/blog/phase-2-0-verification`) returns not-found.
 
-- [~] Replace Gallery template dataset with approved Oakwell project/media content.
+- [x] Replace Gallery template dataset with approved Oakwell project/media content.
   - Remove invented project names/categories/locations and fake CTA phone number.
   - Preserve lightbox behavior only for real media.
   - **Done when:** every visible gallery item maps to approved source data.
+  - Current deliberate treatment: Gallery is disabled and production `/gallery` returns not-found until Phase 2.1 provides published CMS projects.
 
-- [~] Audit and remove legacy/demo routes such as `/index-premium` and any other unused template variants.
+- [x] Audit and remove legacy/demo routes such as `/index-premium` and any other unused template variants.
   - Prefer deletion or permanent redirect over leaving discoverable stale pages.
   - **Done when:** no demo marketing page can be reached from a normal URL without an intentional redirect/not-found.
+  - Production `/index-premium`, `/index-slider`, and `/gallery/detail` all return not-found.
 
 - [~] Remove all production placeholders across Store.
   - Search for `+1555`, `href="#"`, `.html` legacy links, fake offers, demo author/testimonial names, and template-only copy.
@@ -90,29 +97,34 @@ These rules are mandatory for all future Modulex Store work:
 
 ## 2.0.2 Indexing and route exposure hardening
 
-- [~] Review sitemap routes after public cleanup.
+- [x] Review sitemap routes after public cleanup.
   - Only include production-ready public routes.
   - Exclude disabled Blog/Services/Gallery routes if they are not production-ready.
 
-- [~] Harden `robots.ts` for portal/auth namespaces.
+- [x] Harden `robots.ts` for portal/auth namespaces.
   - Explicitly disallow `/dealer/`, `/account/`, and `/api/`.
   - Keep route-level `noindex` metadata as a second layer.
+  - Verified in production after PR #88/#89 deployment.
 
-- [~] Verify all Customer and Dealer auth/portal layouts have `noindex, nofollow` coverage.
-  - Dealer namespace already has root `noindex, nofollow` metadata.
-  - Customer `/account/*` root metadata is being added on `fix/store-account-noindex` and enforced by the public-production contract.
+- [x] Verify all Customer and Dealer auth/portal layouts have `noindex, nofollow` coverage.
+  - Production `/account/login` and `/dealer/login` both emit `<meta name="robots" content="noindex, nofollow">` on main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c`.
 
 - [~] Add a public-production content contract.
   - Fail on fake phone numbers, placeholder `href="#"`, legacy `.html` links, known demo names/claims, or accidentally indexable portal routes.
   - Add it to `npm run smoke`.
+  - Contract is implemented and wired to smoke; execution evidence for the full smoke chain is still required.
 
 ### Phase 2.0 Exit Gate
 
 - [ ] `npm run lint` passes.
-- [ ] `npm run build` passes.
+- [x] `npm run build` passes.
+  - Vercel production build for main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c` compiled successfully, passed TypeScript, generated all routes, and deployed READY.
 - [ ] `npm run smoke` passes.
-- [~] Public route crawl shows no fake/demo content.
+- [x] Public route crawl shows no fake/demo content.
+  - Verified production routes include `/about`, `/gallery`, `/gallery/detail`, `/services`, `/services/residential`, `/blog`, an arbitrary `/blog/[slug]`, `/index-premium`, and `/index-slider`.
 - [x] Sitemap contains only production-approved routes.
+
+**Phase 2.0 closeout blocker:** production merge/deploy, build, indexing protections, sitemap, and the complete known demo/deep-route crawl are verified. The strict exit gate now has only two missing command-level proofs: fresh `npm run lint` and full `npm run smoke`. Phase 2.1 design work may proceed, but Phase 2.1 must not become the primary implementation phase until this gate is formally closed.
 
 ---
 
@@ -120,11 +132,14 @@ These rules are mandatory for all future Modulex Store work:
 
 **Goal:** Move official public content out of hard-coded page templates and into controlled Store CMS data managed from `modulex-admin`.
 
+**Approved architecture (written-spec review pending):** implement as four ordered packages: **A) secondary CMS data/RPC foundation → B) Admin Pages/Projects CMS → C) Store About + Gallery/Projects → D) configurable Navbar/Footer and phase closeout**. Blog strategy is **Option B: keep Blog disabled until a real editorial workflow is required**.
+
 ## 2.1.1 Shared page-content model
 
-- [ ] Define the CMS model for secondary public pages.
-  - Candidate surfaces: About, Gallery/Projects, Resources, Dealer landing content, generic CTA blocks.
+- [~] Define the CMS model for secondary public pages.
+  - Controlled first-iteration surfaces: About and Gallery/Projects.
   - Prefer structured fields over an unrestricted page builder for the first iteration.
+  - Design: `docs/superpowers/specs/2026-08-29-phase-2-1-a-secondary-cms-foundation-design.md`.
 
 - [ ] Add migrations/RPCs for approved public page content.
   - Anonymous users get read-only published projections through narrow RPCs.
@@ -135,15 +150,16 @@ These rules are mandatory for all future Modulex Store work:
   - Sort order.
   - SEO title/description/OG image where applicable.
   - Media selection and alt text.
+  - Design: `docs/superpowers/specs/2026-08-29-phase-2-1-b-admin-secondary-cms-design.md`.
 
 - [ ] Convert About page to CMS-backed production content.
 
 - [ ] Convert Gallery/Projects page to CMS-backed data.
+  - Design for both public routes: `docs/superpowers/specs/2026-08-29-phase-2-1-c-store-public-pages-design.md`.
 
-- [ ] Decide Blog strategy.
-  - Option A: structured CMS articles in Supabase.
-  - Option B: no Blog until editorial workflow is actually required.
-  - Do not keep a fake blog merely for template completeness.
+- [~] Decide Blog strategy.
+  - Decision: **Option B — no Blog CMS in Phase 2.1.** Keep `/blog` disabled/not-found until editorial workflow is actually required.
+  - Do not keep or rebuild a fake blog merely for template completeness.
 
 ## 2.1.2 Shared Store chrome
 
@@ -154,6 +170,7 @@ These rules are mandatory for all future Modulex Store work:
 - [ ] Ensure public Navbar and portal Navbar coexist without breaking the portal sidebar experience.
 
 - [ ] Add a clear path from Customer/Dealer portal back to the public site.
+  - Shared chrome design: `docs/superpowers/specs/2026-08-29-phase-2-1-d-shared-store-chrome-design.md`.
 
 ### Phase 2.1 Exit Gate
 
@@ -505,20 +522,7 @@ The items below are already present in the current Store architecture. Keep them
 
 # Next Action
 
-Verify the **Phase 2.0 portal indexing follow-up** on branch `fix/store-account-noindex`.
-
-Production verification already completed for merged PR #88 / main `ed30e1bdd3807a21f2f9da2389df8549b3a45d05`:
-- Vercel production build and TypeScript completed successfully.
-- `/about` returns the factual company-profile-backed page.
-- `/sitemap.xml` contains only approved public routes.
-- `/robots.txt` disallows `/api/`, `/account/`, and `/dealer/`.
-- disabled `/gallery`, `/services`, and `/blog` routes return deliberate 404 responses.
-
-Required verification for the follow-up before closing Phase 2.0 items:
-
-1. Run `npm run smoke:public-production` and confirm account/dealer route-level robots metadata is enforced.
-2. Run full `npm run smoke`.
-3. Run `npm run lint`.
-4. Run `npm run build`.
-5. Deploy and verify `/account/login` and `/dealer/login` emit `noindex, nofollow` metadata.
-6. Mark verified Phase 2.0 tasks `[x]`; only then move the primary workstream to Phase 2.1.
+1. **Formally close Phase 2.0:** obtain fresh `npm run lint` and full `npm run smoke` evidence. Production main `3802aa9276bb2fe17c7fce0959a2e38b04ba041c` is already merged, deployed READY, build/TypeScript verified, account/dealer `noindex, nofollow` verified live, and the known disabled/demo route crawl is complete.
+2. **Review the written Phase 2.1 architecture specs** in `docs/superpowers/specs/2026-08-29-phase-2-1-{a,b,c,d}-*.md` and record explicit spec approval before implementation.
+3. After written-spec approval and Phase 2.0 formal closeout, implement Phase 2.1 in strict dependency order: **A → B → C → D**.
+4. Each implementation package must update both Store/Admin roadmaps where affected and must not mark downstream tasks complete before verification.

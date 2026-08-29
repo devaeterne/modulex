@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `16257885c5278fddb078a6460bd8518f5255d794`
+Main baseline: `3802aa9276bb2fe17c7fce0959a2e38b04ba041c`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
@@ -229,10 +229,13 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Homepage Store content/settings foundation exists.
 - [x] Store product content/media/color management foundation exists.
 - [x] Store marketing/analytics settings foundation exists.
-- [ ] Expand CMS for production secondary pages in coordination with `STORE_ROADMAP.md` Phase 2.1.
+- [~] Expand CMS for production secondary pages in coordination with `STORE_ROADMAP.md` Phase 2.1.
+  - Approved architecture is split into ordered Store Phase 2.1 packages A → B → C → D; written spec review is pending before implementation.
+  - Package B adds dedicated `/store/pages` and `/store/projects` management rather than extending the large existing Site Content editor.
 - [ ] Add draft/published workflow where required.
 - [ ] Add SEO/OG/media fields with validation.
-- [ ] Review navigation/footer configurability needs.
+- [~] Review navigation/footer configurability needs.
+  - Package D design keeps Account and Contact controls code-owned while ordinary navigation/footer link groups become `store.manage` CMS data.
 
 ## A4.2 Leads
 
@@ -454,18 +457,20 @@ Record material decisions here when they affect future phases.
 - [ ] Which Personnel/Finance/Training/Approvals modules are committed production scope versus template/planned surface?
 - [ ] What exact roles beyond the current core Admin roles need operational permission matrices?
 - [ ] Which customer financial capabilities, if any, should ever be exposed to the Customer/Dealer portals?
-- [ ] Which secondary public Store pages should be editable from Admin in the first CMS expansion?
+- [x] Phase 2.1 first secondary CMS scope is **About + Gallery/Projects**; Blog remains disabled until a real editorial workflow is required. Ordinary Navbar/Footer links become configurable in Package D while Account and Contact remain code-owned.
 
 ---
 
 # Next Action
 
-Start with **Phase A0 — Production Surface & Operational Truth Cleanup**.
+Primary Admin work remains **Phase A0 — Production Surface & Operational Truth Cleanup**.
 
-Recommended first implementation package:
+Recommended first A0 implementation package:
 
 1. Build a route/navigation inventory and classify every current Admin route as production, planned, or demo/template.
 2. Add a production-surface contract that detects TailAdmin demo routes/navigation.
 3. Remove/hide the clearly unused demo pages and navigation entries.
 4. Verify direct-route RBAC behavior for the remaining business surfaces.
 5. Run full Admin lint/build/smoke verification and update this roadmap with the result.
+
+**Cross-roadmap coordination:** Store Phase 2.1 architecture is documented in `docs/superpowers/specs/2026-08-29-phase-2-1-{a,b,c,d}-*.md`. After written-spec approval and Store Phase 2.0 formal closeout, implement the Store CMS expansion in dependency order A → B → C → D; Packages B and D contain the Admin A4.1 work and must update this roadmap in their implementation PRs.
