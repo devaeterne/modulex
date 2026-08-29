@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-29
-Main baseline: `16ba530f91a7229c25cef5df626e609b5ba63ffe`
+Main baseline: `f248d04864c9e55111d416f99a1cced4ee4f02f3`
 Current phase: **Phase A0 — Production Surface & Operational Truth Cleanup**
 Current cross-roadmap package: **Store Phase 2.1C — About live accepted; Gallery/Projects content acceptance pending**
 
@@ -91,6 +91,11 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Verify direct URL access behavior for unauthorized roles.
   - Warehouse/zone/location create/edit routes require `warehouse.manage`; `warehouse` and `shipping` retain read-only warehouse-structure access and are denied mutation URLs.
   - Personnel Departments/Positions direct routes now match their sidebar `personnel.manage` requirement.
+- [x] Gate warehouse-structure list-page mutation controls and handlers with `warehouse.manage`.
+  - Post-merge Codex review on PR #103 identified a P1 gap: `/warehouses`, `/zones`, and `/locations` correctly remained readable through `warehouse.view`, but their list components still exposed mutation controls/handlers to read-only roles.
+  - Add/Edit, activate/deactivate, delete, and double-click edit behavior now fail closed unless the active profile has `warehouse.manage`; read-only navigation such as Warehouses → Zones and Zones → Locations remains available.
+  - TDD evidence: run `33251261334` failed 12/13 on the missing list-page mutation guard before the fix; targeted GREEN run `33251331146` passed 13/13 RBAC checks after the fix.
+  - Full verification run `33251372987` passed RBAC, production-surface, secondary CMS, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint (0 errors / 35 existing warnings), Next.js production build, and diff-check.
 - [x] Document role expectations for `super_admin`, `admin`, `sales`, `finance`, `hr`, `warehouse`, and `shipping`.
   - Role expectations, route families, mutation rules, aliases, and enforcement layers are documented in `docs/ADMIN_RBAC_MATRIX.md`.
   - TDD evidence: run `33249649439` failed on the pre-fix parity gaps; targeted GREEN run `33249708946` passed 12/12 RBAC checks.
@@ -114,7 +119,7 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Production navigation contains only intentional Modulex business or explicitly decision-pending surfaces.
   - Route/navigation classification is documented in `docs/ADMIN_PRODUCTION_SURFACE.md`; `API Test` was removed from navigation.
 - [x] Unauthorized direct route access is denied consistently.
-  - A0.2 route-permission parity and negative direct-URL cases passed in full verification run `33249988130`; data authorization remains independently enforced by RLS/RPC/API contracts.
+  - A0.2 route-permission parity, negative direct-URL cases, and warehouse-structure list mutation UI guards passed in full verification runs `33249988130` and `33251372987`; data authorization remains independently enforced by RLS/RPC/API contracts.
 - [x] No known TailAdmin demo/sample route remains exposed unintentionally.
   - Production-surface contract plus the fresh production build guard the removed route set.
 
