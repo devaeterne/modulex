@@ -1,9 +1,9 @@
 name: Admin Users Store UI
 on:
   push:
-    paths: ["modulex-admin/src/app/(admin)/users/**", "modulex-admin/src/app/(admin)/roles/**", "modulex-admin/src/app/(admin)/store/**", "modulex-admin/src/components/users/**", "modulex-admin/src/components/store/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/scripts/users-store-ui-contract.mjs", ".github/workflows/admin-users-store-ui.yml"]
+    paths: ["modulex-admin/src/app/(admin)/users/**", "modulex-admin/src/app/(admin)/roles/**", "modulex-admin/src/app/(admin)/store/**", "modulex-admin/src/components/users/**", "modulex-admin/src/components/store/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/users-store-ui-contract.mjs", ".github/workflows/admin-users-store-ui.yml"]
   pull_request:
-    paths: ["modulex-admin/src/app/(admin)/users/**", "modulex-admin/src/app/(admin)/roles/**", "modulex-admin/src/app/(admin)/store/**", "modulex-admin/src/components/users/**", "modulex-admin/src/components/store/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/scripts/users-store-ui-contract.mjs", ".github/workflows/admin-users-store-ui.yml"]
+    paths: ["modulex-admin/src/app/(admin)/users/**", "modulex-admin/src/app/(admin)/roles/**", "modulex-admin/src/app/(admin)/store/**", "modulex-admin/src/components/users/**", "modulex-admin/src/components/store/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/users-store-ui-contract.mjs", ".github/workflows/admin-users-store-ui.yml"]
 permissions: { contents: read }
 jobs:
   users-store-verification:
