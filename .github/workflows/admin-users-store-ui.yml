@@ -1,0 +1,23 @@
+name: Admin Users Store UI
+on:
+  push:
+    paths: ["modulex-admin/src/app/(admin)/users/**", "modulex-admin/src/app/(admin)/roles/**", "modulex-admin/src/app/(admin)/store/**", "modulex-admin/src/components/users/**", "modulex-admin/src/components/store/**", "modulex-admin/scripts/users-store-ui-contract.mjs", ".github/workflows/admin-users-store-ui.yml"]
+  pull_request:
+    paths: ["modulex-admin/src/app/(admin)/users/**", "modulex-admin/src/app/(admin)/roles/**", "modulex-admin/src/app/(admin)/store/**", "modulex-admin/src/components/users/**", "modulex-admin/src/components/store/**", "modulex-admin/scripts/users-store-ui-contract.mjs", ".github/workflows/admin-users-store-ui.yml"]
+permissions: { contents: read }
+jobs:
+  users-store-verification:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: modulex-admin } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: modulex-admin/package-lock.json }
+      - run: npm ci
+      - run: node scripts/users-store-ui-contract.mjs
+      - run: npm run smoke:production-surface
+      - run: npm run smoke:rbac
+      - run: npm run lint
+      - name: Build
+        env: { NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key }
+        run: npm run build
