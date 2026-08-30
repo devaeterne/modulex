@@ -556,7 +556,7 @@ Goal: add trust signals with correct source identity.
 
 ### GC-8A — Managed Store chrome + technical SEO
 
-Status: `[~]` implementation/data/CI complete; PR merge/deploy + live acceptance pending.
+Status: `[x]` production-accepted on 2026-08-30 after PR #169 merge/deploy and live verification.
 
 - `[x]` add typed `store_chrome_items` with code-owned placement/destination allowlists, Admin-only direct access and narrow published-only public RPC;
 - `[x]` preserve current public chrome as exactly 11 approved rows: 6 primary + 2 Footer Products + 3 Footer Company;
@@ -568,9 +568,9 @@ Status: `[~]` implementation/data/CI complete; PR merge/deploy + live acceptance
 - `[x]` model Oakwell as the public Organization/Brand and Granite & Cabinet Center as `parentOrganization` when the legal parent differs;
 - `[x]` audit canonical/robots/sitemap readiness and reject Granite runtime backend/media hotlinks;
 - `[x]` Store/Admin contracts, RBAC, scoped lint and production builds verified; final conflict-safe branch is based on latest `main` with no A1 business files or `ADMIN_ROADMAP.md` changes;
-- `[~]` post-merge live acceptance: nav/footer, portal coexistence, JSON-LD, titles, canonical/robots/sitemap and deployment commit match.
+- `[x]` post-merge live acceptance: production deployment matches merge commit `d41f7c19ce81016b6a1a05166d0a4089104bfe52`; nav/footer ordering, `/account` + `/dealer` coexistence, Oakwell Organization/Brand JSON-LD with Granite parent attribution, managed-title de-duplication, canonical/robots/sitemap behavior and Granite runtime-backend/media independence are verified live.
 
-**GC-8A exit gate:** code/data/CI are complete; mark `[x]` only after merge/deploy and live production acceptance.
+**GC-8A exit gate:** `[x]` code/data/CI, merge/deploy and live production acceptance are complete. Acceptance record: `docs/granite-center/GC8A_PRODUCTION_ACCEPTANCE.md`.
 
 ### GC-8B — Accessibility + performance acceptance
 
@@ -620,6 +620,6 @@ Status: `[~]` implementation/data/CI complete; PR merge/deploy + live acceptance
 
 # 10. Next Action
 
-1. Complete GC-8A PR merge/deploy and live acceptance; do not mark GC-8A `[x]` before the production deployment/commit and public/portal/SEO checks pass.
-2. Then execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from the latest `main`.
+1. Execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from latest `main`.
+2. Close overall GC-8 only after accessibility, performance, indexing and final production verification pass.
 3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend.
