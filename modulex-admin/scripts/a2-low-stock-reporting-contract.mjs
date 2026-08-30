@@ -71,14 +71,15 @@ expectIncludes(movementReport, [
 ], "MovementReport");
 expectExcludes(movementReport, [".limit(1000)", '.from("v_inventory_movement_history")'], "MovementReport");
 
-expect(exists(acceptancePath), "A2.4 production acceptance artifact must exist");
+expect(exists(acceptancePath), "A2.4 release-candidate acceptance artifact must exist");
 const acceptance = read(acceptancePath);
 expectIncludes(acceptance, [
-  "A2.4 production acceptance: PASS",
+  "A2.4 release candidate acceptance: PASS",
+  "Production migration: PENDING POST-MERGE",
   "0 = unset",
   "Out of Stock is threshold-independent",
-  "Inventory reconciliation: PASS",
-  "Movement reconciliation: PASS",
+  "Inventory reconciliation preflight: PASS",
+  "Movement reconciliation preflight: PASS",
   "Production inventory/movement mutation: NONE",
 ], "A2.4 acceptance artifact");
 
