@@ -1,0 +1,31 @@
+name: GC-8B Accessibility Performance
+
+on:
+  push:
+    branches:
+      - feat/gc8b-accessibility-performance
+    paths:
+      - "modulex-store/**"
+      - ".github/workflows/gc8b-accessibility-performance.yml"
+  pull_request:
+    paths:
+      - "modulex-store/**"
+      - ".github/workflows/gc8b-accessibility-performance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  accessibility-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-store
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: GC-8B accessibility contract
+        run: node scripts/gc8b-accessibility-contract.mjs
