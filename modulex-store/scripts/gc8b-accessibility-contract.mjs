@@ -7,12 +7,13 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [globalLightbox, projectGallery, navbar, leadForm, contentQueries] = await Promise.all([
+const [globalLightbox, projectGallery, navbar, leadForm, contentQueries, storeIcon] = await Promise.all([
   read("src/components/GalleryLightbox.tsx"),
   read("src/components/gallery/StoreProjectsGallery.tsx"),
   read("src/components/Navbar.tsx"),
   read("src/components/leads/LeadForm.tsx"),
   read("src/lib/store/content/queries.ts"),
+  read("src/components/StoreIcon.tsx"),
 ]);
 
 // Global legacy lightbox must not expose inactive controls to assistive tech/focus order.
@@ -25,7 +26,8 @@ assert.match(globalLightbox, /role=["']dialog["']/, "Open global lightbox must e
 assert.match(globalLightbox, /aria-modal=["']true["']/, "Open global lightbox must be modal");
 assert.match(globalLightbox, /aria-label=["'][^"']+["']/, "Global lightbox dialog must have an accessible name");
 assert.match(globalLightbox, /aria-label=["']Close[^"']*["']/, "Global lightbox close button must have an accessible name");
-assert.match(globalLightbox, /bi bi-x-lg[^>]*aria-hidden=["']true["']/, "Decorative close icon must be hidden from assistive tech");
+assert.match(globalLightbox, /<StoreIcon\s+name=["']x["']\s*\/>/, "Global lightbox close control must use the decorative inline icon");
+assert.match(storeIcon, /aria-hidden=["']true["']/, "Inline decorative icons must be hidden from assistive tech");
 assert.match(globalLightbox, /iframe[\s\S]*title=["'][^"']+["']/, "Panorama iframe must have an accessible title");
 assert.match(globalLightbox, /event\.key\s*===\s*["']Escape["']/, "Global lightbox must close with Escape");
 
