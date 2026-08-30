@@ -138,12 +138,12 @@ export default function AdminLayout({
         <Backdrop />
       </div>
 
-      <div className={`flex-1 transition-all duration-300 ease-in-out print:ml-0 ${mainContentMargin}`}>
+      <div className={`min-w-0 flex-1 transition-all duration-300 ease-in-out print:ml-0 ${mainContentMargin}`}>
         <div className="print:hidden">
           <AppHeader />
         </div>
 
-        <div className="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6 print:max-w-none print:p-0">
+        <div className="w-full p-4 md:p-6 print:p-0">
           {allowed ? children : <AccessDenied roles={roles} />}
         </div>
       </div>
