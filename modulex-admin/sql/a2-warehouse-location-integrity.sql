@@ -1,15 +1,22 @@
 -- Phase A2.1 — Warehouse / Location Model Integrity
 --
 -- Goals:
--- 1. Keep warehouse structure writes aligned with warehouse.manage (Admin/Super Admin).
--- 2. Make warehouse -> zone -> location -> inventory relationships fail closed.
--- 3. Prevent deactivation/deletion from orphaning active stock or operational provenance.
--- 4. Preserve existing audit triggers; this patch only adds integrity guards and policy/FK hardening.
+-- 1. Keep warehouse structure master-data writes aligned with warehouse.manage.
+-- 2. Preserve the warehouse role's existing narrow QR-operation capability.
+-- 3. Make warehouse -> zone -> location -> inventory relationships fail closed.
+-- 4. Prevent deactivation/deletion from orphaning active stock or operational provenance.
+-- 5. Preserve existing audit triggers; this patch only adds integrity guards and policy/FK hardening.
 
 begin;
 
 -- -----------------------------------------------------------------------------
--- Role parity: locations are warehouse master data, not warehouse-operator data.
+-- Role parity.
+--
+-- Location creation is warehouse master-data work and therefore Admin-only.
+-- UPDATE keeps the existing warehouse-role RLS capability because the current
+-- SECURITY INVOKER QR RPCs update locations.qr_code. A BEFORE UPDATE trigger
+-- below makes that exception field-scoped: warehouse users may touch QR
+-- operational fields but may not change location master data.
 -- -----------------------------------------------------------------------------
 
 drop policy if exists locations_insert_admin_or_warehouse on public.locations;
@@ -23,12 +30,57 @@ for insert
 to authenticated
 with check ((select public.is_admin()));
 
-create policy locations_update_admin_only
+create policy locations_update_admin_or_warehouse
 on public.locations
 for update
 to authenticated
-using ((select public.is_admin()))
-with check ((select public.is_admin()));
+using (
+  public.has_role(
+    array['super_admin', 'admin', 'warehouse']::public.user_role[]
+  )
+)
+with check (
+  public.has_role(
+    array['super_admin', 'admin', 'warehouse']::public.user_role[]
+  )
+);
+
+create or replace function private.guard_location_master_role()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $$
+begin
+  if public.is_admin() then
+    return new;
+  end if;
+
+  if public.has_role(array['warehouse']::public.user_role[]) then
+    if new.warehouse_id is distinct from old.warehouse_id
+       or new.zone_id is distinct from old.zone_id
+       or new.name is distinct from old.name
+       or new.code is distinct from old.code
+       or new.location_type is distinct from old.location_type
+       or new.aisle is distinct from old.aisle
+       or new.rack is distinct from old.rack
+       or new.shelf is distinct from old.shelf
+       or new.bin is distinct from old.bin
+       or new.max_capacity is distinct from old.max_capacity
+       or new.current_capacity is distinct from old.current_capacity
+       or new.is_active is distinct from old.is_active then
+      raise exception using
+        errcode = '42501',
+        message = 'Warehouse role may only update location QR operational fields. Location master data requires Admin access.';
+    end if;
+
+    return new;
+  end if;
+
+  raise exception using
+    errcode = '42501',
+    message = 'Location updates require Admin access or an approved warehouse QR operation.';
+end;
+$$;
 
 -- -----------------------------------------------------------------------------
 -- Hierarchy guards.
@@ -288,8 +340,15 @@ begin
 end;
 $$;
 
--- Trigger ordering is explicit through names so hierarchy/parent validation runs
--- before lifecycle checks where both apply to the same update.
+-- Trigger ordering is explicit through names so the A2 guards run before the
+-- existing updated_at/QR triggers where both apply to the same UPDATE.
+
+drop trigger if exists trg_a2_location_master_role on public.locations;
+create trigger trg_a2_location_master_role
+before update
+on public.locations
+for each row
+execute function private.guard_location_master_role();
 
 drop trigger if exists trg_a2_zone_parent_state on public.zones;
 create trigger trg_a2_zone_parent_state
