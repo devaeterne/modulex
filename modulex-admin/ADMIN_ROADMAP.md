@@ -388,7 +388,7 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Review media management: primary image, color-specific media, documents, video, alt text, sort order.
 - [x] Review Store color management and swatches.
 
-Implementation contract is complete on `feat/a3-2-store-product-publishing`; production migration, deployment, and authenticated acceptance remain before Phase A3.2 closeout.
+A3.2 implementation, migration, production deployment, authenticated route smoke, and RPC reconciliation are complete. Detailed evidence: `docs/acceptance/a3-2-store-product-publishing.md`.
 
 ## A3.3 Pricing
 
@@ -690,10 +690,10 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin roadmap work is **A3.2 — Store product publishing**. A3.1 Product Master Data is production-accepted and closed.
+Primary Admin roadmap work is **A3.3 — Pricing**. A3.1 Product Master Data and A3.2 Store Product Publishing are production-accepted and closed.
 
-1. Begin A3.2 `/store/products` publish/unpublish, publish-guard, slug, media, and color-management review.
-2. Preserve the A3.1 canonical taxonomy/family/color/lifecycle/export contract and the Store canonical taxonomy public-RPC boundary while changing publication behavior.
+1. Begin A3.3 pricing dashboard, product pricing, price-group lifecycle, and dealer pricing-boundary review.
+2. Preserve the A3.1 canonical taxonomy/family/color/lifecycle/export contract and the A3.2 Store publication/public-RPC boundaries.
 
 **Cross-roadmap coordination:** A3.1 changes shared product-master semantics, but Store remains on the existing approved canonical `brand_id` / `category_id` read projection. The A3.1 Admin closeout does not widen Store public data or portal pricing visibility.
 
