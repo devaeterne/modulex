@@ -39,10 +39,6 @@ expect(
   "Low Stock view filter needs an explicit accessible label"
 );
 expect(
-  manager.includes('id="low-stock-page-size"') && manager.includes('htmlFor="low-stock-page-size"'),
-  "Low Stock page-size control needs an explicit accessible label"
-);
-expect(
   manager.includes("focus-visible:ring-2"),
   "Low Stock interactive controls need visible keyboard focus states"
 );
@@ -51,32 +47,29 @@ expect(
   "Low Stock table needs an explicit responsive minimum width"
 );
 expect(
-  manager.includes("const [currentPage, setCurrentPage] = useState(1)"),
-  "Low Stock needs explicit pagination state"
+  manager.includes("const PAGE_SIZE = 25") &&
+    manager.includes('rpc("search_low_stock_page"') &&
+    manager.includes("p_offset: nextOffset") &&
+    manager.includes("p_limit: PAGE_SIZE") &&
+    manager.includes("total_count"),
+  "Low Stock must use deterministic server-side pagination"
 );
 expect(
-  manager.includes("const paginatedRows = useMemo"),
-  "Low Stock must paginate filtered rows"
+  !manager.includes("const paginatedRows = useMemo") && !manager.includes('id="low-stock-page-size"'),
+  "Low Stock must not retain the previous client-side page slicing/page-size control"
 );
 expect(
-  manager.includes("if (currentPage > totalPages)"),
-  "Low Stock pagination must clamp an out-of-range page after filtering"
+  manager.includes('aria-label="Low stock pagination"') &&
+    manager.includes('<span aria-live="polite">Page {currentPage} of {totalPages}</span>'),
+  "Low Stock server pagination needs an accessible current-page announcement"
 );
 expect(
-  manager.includes('aria-current={currentPage === page ? "page" : undefined}'),
-  "Low Stock pagination must expose the current page"
-);
-expect(
-  manager.includes('aria-label="Low stock pagination"'),
-  "Low Stock pagination needs an accessible navigation label"
+  manager.includes("Showing {firstVisible}–{lastVisible} of {totalCount}"),
+  "Low Stock needs a server-filtered result summary"
 );
 expect(
   manager.includes('aria-live="polite"'),
   "Low Stock must announce dynamic results/status feedback"
-);
-expect(
-  manager.includes("Showing {startRow}–{endRow} of {filteredRows.length}"),
-  "Low Stock needs a filtered result summary"
 );
 expect(
   !manager.includes('type="checkbox"'),
@@ -88,6 +81,10 @@ expect(
     manager.includes("void saveThreshold(retryAction.row)") &&
     manager.includes('retryAction.type === "load" ? "Retry" : "Retry update"'),
   "Low Stock must preserve the failed threshold draft and retry the mutation instead of refreshing it"
+);
+expect(
+  manager.includes("0 means unset") && manager.includes("Out of Stock is independent of thresholds"),
+  "Low Stock UI must explain A2.4 threshold and out-of-stock semantics"
 );
 expect(
   tracker.includes("### [x] 03 — Product List (`/products`)") &&
