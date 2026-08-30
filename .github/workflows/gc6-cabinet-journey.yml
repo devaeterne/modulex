@@ -14,8 +14,11 @@ permissions:
   contents: read
 
 jobs:
-  gc6-contract:
+  store-gc6-verification:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-store
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,6 +26,47 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-store/package-lock.json
+      - name: Install
+        run: npm ci
       - name: GC-6 contract
-        working-directory: modulex-store
-        run: node scripts/gc6-cabinet-journey-contract.mjs
+        run: npm run smoke:gc6-cabinet-journey
+      - name: Company regression
+        run: npm run smoke:gc3-company-public
+      - name: Gallery regression
+        run: npm run smoke:gc5-gallery-projects
+      - name: Showroom SEO regression
+        run: npm run smoke:seo-showroom
+      - name: Scoped lint
+        run: npx eslint src/app/cabinet-process/page.tsx src/app/sitemap.ts src/lib/store/content/queries.ts scripts/gc6-cabinet-journey-contract.mjs
+      - name: Production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+          NEXT_PUBLIC_SITE_URL: https://oakwellcabinetry.com
+        run: npm run build
+
+  admin-gc6-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Scoped lint
+        run: npx eslint 'src/app/(admin)/store/cabinet-content/page.tsx' src/components/store/StoreCabinetContentManager.tsx src/components/store/StorePagesManager.tsx src/layout/AppSidebar.tsx src/lib/store/cabinetContent.ts src/lib/store/secondaryCms.ts
+      - name: Production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build
