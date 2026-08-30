@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { useCallback, useEffect, useState } from "react";
 import { downloadCsv } from "@/lib/reports/csv";
+import { supabase } from "@/lib/supabase/client";
 
 type MovementRow = {
   movement_id: string;
@@ -31,12 +31,39 @@ type MovementRow = {
   created_by_email: string | null;
   created_by_name: string | null;
   created_at: string;
+  total_count: number | string;
+  summary_units: number | string;
+  summary_inbound: number | string;
+  summary_outbound: number | string;
+  summary_transfers: number | string;
+  summary_reservations: number | string;
+  summary_releases: number | string;
 };
 
 type WarehouseOption = { id: string; code: string; name: string };
+type FacetRow = {
+  categories: string[] | null;
+  brands: string[] | null;
+  warehouses: WarehouseOption[] | null;
+  movement_types: string[] | null;
+};
 
+type Filters = {
+  query: string;
+  movementType: string;
+  warehouseId: string;
+  dateFrom: string;
+  dateTo: string;
+};
+
+const PAGE_SIZE = 50;
+const EXPORT_PAGE_SIZE = 500;
+const EMPTY_FILTERS: Filters = { query: "", movementType: "", warehouseId: "", dateFrom: "", dateTo: "" };
 const controlClass =
-  "h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90";
+  "h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-theme-xs outline-none focus-visible:border-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500/20 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90";
+const focusClass =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900";
+const numberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
 function n(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
@@ -44,11 +71,11 @@ function n(value: number | string | null | undefined) {
 }
 
 function formatNumber(value: number | string | null | undefined) {
-  return n(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return numberFormatter.format(n(value));
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function movementLabel(value: string) {
@@ -65,142 +92,216 @@ function movementClass(type: string) {
   return "bg-gray-100 text-gray-700 dark:bg-white/5 dark:text-gray-300";
 }
 
+function dateStartIso(value: string) {
+  return value ? new Date(`${value}T00:00:00`).toISOString() : null;
+}
+
+function dateEndIso(value: string) {
+  return value ? new Date(`${value}T23:59:59.999`).toISOString() : null;
+}
+
+function reportError(context: string, error: unknown) {
+  console.error(`[Movement Report] ${context}`, error);
+}
+
 export default function MovementReport() {
   const [rows, setRows] = useState<MovementRow[]>([]);
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [warehouseFilter, setWarehouseFilter] = useState("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
+  const [movementTypes, setMovementTypes] = useState<string[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [summary, setSummary] = useState({
+    summary_units: 0,
+    summary_inbound: 0,
+    summary_outbound: 0,
+    summary_transfers: 0,
+    summary_reservations: 0,
+    summary_releases: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  async function loadReport() {
-    setIsLoading(true);
-    setErrorMessage(null);
-    const { data, error } = await supabase
-      .from("v_inventory_movement_history")
-      .select("movement_id,product_id,sku,product_name,barcode,movement_type,quantity,reference_no,reason,notes,from_warehouse_id,from_warehouse_code,from_warehouse_name,from_location_id,from_location_code,from_location_name,to_warehouse_id,to_warehouse_code,to_warehouse_name,to_location_id,to_location_code,to_location_name,created_by_id,created_by_email,created_by_name,created_at")
-      .order("created_at", { ascending: false })
-      .limit(1000);
-
+  const loadFacets = useCallback(async () => {
+    const { data, error } = await supabase.rpc("get_inventory_report_facets");
     if (error) {
-      setRows([]);
-      setErrorMessage(error.message);
-    } else {
-      setRows((data ?? []) as MovementRow[]);
+      reportError("facets load failed", error);
+      return;
     }
-    setIsLoading(false);
-  }
-
-  useEffect(() => {
-    loadReport();
+    const facet = ((data as FacetRow[]) ?? [])[0];
+    setWarehouses(Array.isArray(facet?.warehouses) ? facet.warehouses : []);
+    setMovementTypes(facet?.movement_types ?? []);
   }, []);
 
-  const movementTypes = useMemo(() => [...new Set(rows.map((row) => row.movement_type))].sort(), [rows]);
-
-  const warehouses = useMemo(() => {
-    const map = new Map<string, WarehouseOption>();
-    rows.forEach((row) => {
-      if (row.from_warehouse_id) map.set(row.from_warehouse_id, { id: row.from_warehouse_id, code: row.from_warehouse_code || "—", name: row.from_warehouse_name || "Warehouse" });
-      if (row.to_warehouse_id) map.set(row.to_warehouse_id, { id: row.to_warehouse_id, code: row.to_warehouse_code || "—", name: row.to_warehouse_name || "Warehouse" });
+  const loadPage = useCallback(async (nextFilters: Filters, nextOffset: number) => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    const { data, error } = await supabase.rpc("search_inventory_movement_report_page", {
+      p_query: nextFilters.query || null,
+      p_movement_type: nextFilters.movementType || null,
+      p_warehouse_id: nextFilters.warehouseId || null,
+      p_created_from: dateStartIso(nextFilters.dateFrom),
+      p_created_to: dateEndIso(nextFilters.dateTo),
+      p_offset: nextOffset,
+      p_limit: PAGE_SIZE,
     });
-    return [...map.values()].sort((a, b) => a.code.localeCompare(b.code));
-  }, [rows]);
-
-  const filteredRows = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
-    const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
-    return rows.filter((row) => {
-      if (typeFilter !== "all" && row.movement_type !== typeFilter) return false;
-      if (warehouseFilter !== "all" && row.from_warehouse_id !== warehouseFilter && row.to_warehouse_id !== warehouseFilter) return false;
-      const created = new Date(row.created_at).getTime();
-      if (fromTime !== null && created < fromTime) return false;
-      if (toTime !== null && created > toTime) return false;
-      if (!normalized) return true;
-      return [row.reference_no, row.sku, row.product_name, row.barcode, row.reason, row.notes, row.created_by_name, row.created_by_email, row.from_location_code, row.to_location_code]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized));
+    if (error) {
+      reportError("load failed", error);
+      setRows([]);
+      setTotalCount(0);
+      setErrorMessage("Movement report is temporarily unavailable. Please try again.");
+      setIsLoading(false);
+      return;
+    }
+    const nextRows = (data as MovementRow[]) ?? [];
+    const first = nextRows[0];
+    setRows(nextRows);
+    setTotalCount(n(first?.total_count));
+    setSummary({
+      summary_units: n(first?.summary_units),
+      summary_inbound: n(first?.summary_inbound),
+      summary_outbound: n(first?.summary_outbound),
+      summary_transfers: n(first?.summary_transfers),
+      summary_reservations: n(first?.summary_reservations),
+      summary_releases: n(first?.summary_releases),
     });
-  }, [rows, query, typeFilter, warehouseFilter, dateFrom, dateTo]);
+    setOffset(nextOffset);
+    setIsLoading(false);
+  }, []);
 
-  const summary = useMemo(() => ({
-    events: filteredRows.length,
-    units: filteredRows.reduce((sum, row) => sum + n(row.quantity), 0),
-    inbound: filteredRows.filter((row) => row.movement_type === "in" || row.movement_type === "return").reduce((sum, row) => sum + n(row.quantity), 0),
-    outbound: filteredRows.filter((row) => row.movement_type === "out" || row.movement_type === "damage").reduce((sum, row) => sum + n(row.quantity), 0),
-    transfers: filteredRows.filter((row) => row.movement_type === "transfer").reduce((sum, row) => sum + n(row.quantity), 0),
-    reservations: filteredRows.filter((row) => row.movement_type === "reservation").reduce((sum, row) => sum + n(row.quantity), 0),
-  }), [filteredRows]);
+  useEffect(() => {
+    void loadFacets();
+    void loadPage(EMPTY_FILTERS, 0);
+  }, [loadFacets, loadPage]);
 
-  function clearFilters() {
-    setQuery("");
-    setTypeFilter("all");
-    setWarehouseFilter("all");
-    setDateFrom("");
-    setDateTo("");
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const firstVisible = totalCount === 0 ? 0 : offset + 1;
+  const lastVisible = Math.min(offset + rows.length, totalCount);
+
+  function applyFilters() {
+    const nextFilters = { ...filters, query: filters.query.trim() };
+    setAppliedFilters(nextFilters);
+    void loadPage(nextFilters, 0);
   }
 
-  function exportReport() {
-    const date = new Date().toISOString().slice(0, 10);
-    downloadCsv(`movement-report-${date}.csv`, ["Date", "Reference", "SKU", "Product", "Movement Type", "Quantity", "From Warehouse", "From Location", "To Warehouse", "To Location", "Reason", "Notes", "User"], filteredRows.map((row) => [formatDate(row.created_at), row.reference_no ?? "", row.sku, row.product_name, movementLabel(row.movement_type), row.quantity, row.from_warehouse_code ?? "", row.from_location_code ?? "", row.to_warehouse_code ?? "", row.to_location_code ?? "", row.reason ?? "", row.notes ?? "", row.created_by_name || row.created_by_email || "System"]));
+  function clearFilters() {
+    setFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    void loadPage(EMPTY_FILTERS, 0);
+  }
+
+  async function exportReport() {
+    setIsExporting(true);
+    setErrorMessage(null);
+    try {
+      const allRows: MovementRow[] = [];
+      let exportOffset = 0;
+      let exportTotal = Number.POSITIVE_INFINITY;
+      while (exportOffset < exportTotal) {
+        const { data, error } = await supabase.rpc("search_inventory_movement_report_page", {
+          p_query: appliedFilters.query || null,
+          p_movement_type: appliedFilters.movementType || null,
+          p_warehouse_id: appliedFilters.warehouseId || null,
+          p_created_from: dateStartIso(appliedFilters.dateFrom),
+          p_created_to: dateEndIso(appliedFilters.dateTo),
+          p_offset: exportOffset,
+          p_limit: EXPORT_PAGE_SIZE,
+        });
+        if (error) throw error;
+        const page = (data as MovementRow[]) ?? [];
+        exportTotal = n(page[0]?.total_count);
+        allRows.push(...page);
+        if (page.length === 0) break;
+        exportOffset += page.length;
+      }
+      const date = new Date().toISOString().slice(0, 10);
+      downloadCsv(
+        `movement-report-${date}.csv`,
+        ["Date", "Reference", "SKU", "Product", "Movement Type", "Quantity", "From Warehouse", "From Location", "To Warehouse", "To Location", "Reason", "Notes", "User"],
+        allRows.map((row) => [formatDate(row.created_at), row.reference_no ?? "", row.sku, row.product_name, movementLabel(row.movement_type), row.quantity, row.from_warehouse_code ?? "", row.from_location_code ?? "", row.to_warehouse_code ?? "", row.to_location_code ?? "", row.reason ?? "", row.notes ?? "", row.created_by_name || row.created_by_email || "System"])
+      );
+    } catch (error) {
+      reportError("export failed", error);
+      setErrorMessage("The filtered movement report could not be exported. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" aria-busy={isLoading}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <Metric label="Events" value={String(summary.events)} />
-        <Metric label="Units Moved" value={formatNumber(summary.units)} />
-        <Metric label="Stock In" value={formatNumber(summary.inbound)} />
-        <Metric label="Stock Out" value={formatNumber(summary.outbound)} />
-        <Metric label="Transfers" value={formatNumber(summary.transfers)} />
-        <Metric label="Reservations" value={formatNumber(summary.reservations)} />
+        <Metric label="Events" value={formatNumber(totalCount)} />
+        <Metric label="Units Moved" value={formatNumber(summary.summary_units)} />
+        <Metric label="Stock In" value={formatNumber(summary.summary_inbound)} />
+        <Metric label="Stock Out" value={formatNumber(summary.summary_outbound)} />
+        <Metric label="Transfers" value={formatNumber(summary.summary_transfers)} />
+        <Metric label="Reserve / Release" value={`${formatNumber(summary.summary_reservations)} / ${formatNumber(summary.summary_releases)}`} />
       </div>
 
-      {rows.length === 1000 && <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">This report currently loads the latest 1,000 movement records. Narrow the report with date and warehouse filters for operational analysis.</div>}
-      {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
+      {errorMessage ? <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div> : null}
 
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Inventory Movement Report</h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Analyze receipts, issues, transfers, adjustments, reservations, releases, returns, and damage movements.</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Server-side filters, pagination, aggregate totals, and complete paged CSV export.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={loadReport} className="h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]">Refresh</button>
-              <button type="button" onClick={exportReport} disabled={filteredRows.length === 0} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">Export CSV</button>
+              <button type="button" onClick={() => void loadPage(appliedFilters, offset)} className={`h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 dark:border-gray-800 dark:text-gray-300 ${focusClass}`}>Refresh</button>
+              <button type="button" onClick={() => void exportReport()} disabled={totalCount === 0 || isExporting} className={`h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 ${focusClass}`}>{isExporting ? "Exporting..." : "Export CSV"}</button>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-6">
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search reference, SKU, user..." className={`${controlClass} xl:col-span-2`} />
-            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={controlClass}><option value="all">All Types</option>{movementTypes.map((type) => <option key={type} value={type}>{movementLabel(type)}</option>)}</select>
-            <select value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} className={controlClass}><option value="all">All Warehouses</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</option>)}</select>
-            <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} aria-label="Date from" className={controlClass} />
-            <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} aria-label="Date to" className={controlClass} />
-          </div>
-          <div className="mt-3 flex justify-end"><button type="button" onClick={clearFilters} className="text-sm font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">Clear filters</button></div>
+          <form onSubmit={(event) => { event.preventDefault(); applyFilters(); }} className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-6">
+            <input value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))} placeholder="Search reference, SKU, user..." className={`${controlClass} xl:col-span-2`} />
+            <select value={filters.movementType} onChange={(event) => setFilters((current) => ({ ...current, movementType: event.target.value }))} className={controlClass} aria-label="Movement type">
+              <option value="">All Types</option>{movementTypes.map((type) => <option key={type} value={type}>{movementLabel(type)}</option>)}
+            </select>
+            <select value={filters.warehouseId} onChange={(event) => setFilters((current) => ({ ...current, warehouseId: event.target.value }))} className={controlClass} aria-label="Warehouse">
+              <option value="">All Warehouses</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</option>)}
+            </select>
+            <input type="date" value={filters.dateFrom} onChange={(event) => setFilters((current) => ({ ...current, dateFrom: event.target.value }))} aria-label="Date from" className={controlClass} />
+            <input type="date" value={filters.dateTo} onChange={(event) => setFilters((current) => ({ ...current, dateTo: event.target.value }))} aria-label="Date to" className={controlClass} />
+            <div className="flex gap-2 xl:col-span-6 xl:justify-end">
+              <button type="button" onClick={clearFilters} className={`h-9 px-3 text-sm font-medium text-gray-500 ${focusClass}`}>Clear filters</button>
+              <button type="submit" className={`h-9 rounded-lg bg-gray-900 px-4 text-sm font-medium text-white dark:bg-white dark:text-gray-900 ${focusClass}`}>Apply</button>
+            </div>
+          </form>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Date","Reference","Product","Type","Quantity","From","To","Reason","User"].map((label) => <th key={label} className={`${label === "Quantity" ? "text-right" : "text-left"} px-5 py-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400`}>{label}</th>)}</tr></thead>
+          <table className="min-w-[1280px] divide-y divide-gray-100 dark:divide-gray-800">
+            <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Date", "Reference", "Product", "Type", "Quantity", "From", "To", "Reason", "User"].map((label) => <th key={label} scope="col" className={`${label === "Quantity" ? "text-right" : "text-left"} px-5 py-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400`}>{label}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {isLoading ? <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">Loading movement report...</td></tr> : filteredRows.length === 0 ? <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">No movements match the current filters.</td></tr> : filteredRows.map((row) => <tr key={row.movement_id}>
-                <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(row.created_at)}</td>
-                <td className="px-5 py-4"><p className="text-sm font-medium text-gray-800 dark:text-white/90">{row.reference_no || "—"}</p>{row.notes && <p className="max-w-[220px] truncate text-xs text-gray-400">{row.notes}</p>}</td>
-                <td className="px-5 py-4"><p className="text-sm font-semibold text-gray-800 dark:text-white/90">{row.sku}</p><p className="text-xs text-gray-500">{row.product_name}</p></td>
-                <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${movementClass(row.movement_type)}`}>{movementLabel(row.movement_type)}</span></td>
-                <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{formatNumber(row.quantity)}</td>
-                <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{row.from_location_code ? <><p className="font-medium text-gray-800 dark:text-white/90">{row.from_location_code}</p><p className="text-xs text-gray-400">{row.from_warehouse_code || "—"}</p></> : "—"}</td>
-                <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{row.to_location_code ? <><p className="font-medium text-gray-800 dark:text-white/90">{row.to_location_code}</p><p className="text-xs text-gray-400">{row.to_warehouse_code || "—"}</p></> : "—"}</td>
-                <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{row.reason || "—"}</td>
-                <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300"><p>{row.created_by_name || "System"}</p>{row.created_by_email && <p className="text-xs text-gray-400">{row.created_by_email}</p>}</td>
-              </tr>)}
+              {isLoading ? <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">Loading movement report...</td></tr> : rows.length === 0 ? <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">No movements match the current filters.</td></tr> : rows.map((row) => (
+                <tr key={row.movement_id}>
+                  <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(row.created_at)}</td>
+                  <td className="px-5 py-4"><p className="text-sm font-medium text-gray-800 dark:text-white/90">{row.reference_no || "—"}</p>{row.notes ? <p className="max-w-[220px] truncate text-xs text-gray-400">{row.notes}</p> : null}</td>
+                  <td className="px-5 py-4"><p className="text-sm font-semibold text-gray-800 dark:text-white/90">{row.sku}</p><p className="text-xs text-gray-500">{row.product_name}</p></td>
+                  <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${movementClass(row.movement_type)}`}>{movementLabel(row.movement_type)}</span></td>
+                  <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{formatNumber(row.quantity)}</td>
+                  <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{row.from_location_code ? <><p className="font-medium">{row.from_location_code}</p><p className="text-xs text-gray-400">{row.from_warehouse_code || "—"}</p></> : "—"}</td>
+                  <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{row.to_location_code ? <><p className="font-medium">{row.to_location_code}</p><p className="text-xs text-gray-400">{row.to_warehouse_code || "—"}</p></> : "—"}</td>
+                  <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{row.reason || "—"}</td>
+                  <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300"><p>{row.created_by_name || "System"}</p>{row.created_by_email ? <p className="text-xs text-gray-400">{row.created_by_email}</p> : null}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
+          <p>Showing {firstVisible}–{lastVisible} of {totalCount}</p>
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={offset === 0 || isLoading} onClick={() => void loadPage(appliedFilters, Math.max(0, offset - PAGE_SIZE))} className={`h-9 rounded-lg border border-gray-200 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 ${focusClass}`}>Previous</button>
+            <span>Page {currentPage} of {totalPages}</span>
+            <button type="button" disabled={offset + PAGE_SIZE >= totalCount || isLoading} onClick={() => void loadPage(appliedFilters, offset + PAGE_SIZE)} className={`h-9 rounded-lg border border-gray-200 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 ${focusClass}`}>Next</button>
+          </div>
         </div>
       </div>
     </div>
