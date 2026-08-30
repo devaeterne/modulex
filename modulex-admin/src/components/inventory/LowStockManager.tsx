@@ -26,6 +26,7 @@ type StockRow = {
   is_low_stock: boolean;
   stock_status: string;
   last_inventory_update: string | null;
+  total_count?: number | string;
 };
 
 type RetryAction =
@@ -33,6 +34,7 @@ type RetryAction =
   | { type: "threshold"; row: StockRow };
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
+const RPC_PAGE_SIZE = 100;
 
 const focusClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900";
@@ -114,22 +116,31 @@ export default function LowStockManager() {
     setErrorMessage(null);
     setRetryAction(null);
 
-    const { data, error } = await supabase
-      .from("v_product_stock_summary")
-      .select(
-        "product_id,sku,barcode,product_name,brand,category,unit,min_stock_level,product_status,location_count,warehouse_count,total_quantity,total_reserved_quantity,total_available_quantity,is_low_stock,stock_status,last_inventory_update"
-      )
-      .eq("product_status", "active")
-      .order("sku")
-      .limit(1000);
+    const nextRows: StockRow[] = [];
+    let nextOffset = 0;
+    let loadError: unknown = null;
+    do {
+      const { data, error } = await supabase.rpc("search_low_stock_page", {
+        p_query: "", p_view: "all", p_offset: nextOffset,
+        p_limit: RPC_PAGE_SIZE, p_export_all: false,
+      });
+      if (error) {
+        loadError = error;
+        break;
+      }
+      const page = (data ?? []) as StockRow[];
+      nextRows.push(...page);
+      nextOffset += page.length;
+      if (page.length === 0 || nextOffset >= numberValue(page[0]?.total_count)) break;
+    } while (true);
 
-    if (error) {
-      reportLowStockError("stock summary load failed", error);
+    if (loadError) {
+      reportLowStockError("stock summary load failed", loadError);
       setRows([]);
       setErrorMessage("Low-stock data is temporarily unavailable. Please try again.");
       setRetryAction({ type: "load" });
     } else {
-      setRows((data ?? []) as StockRow[]);
+      setRows(nextRows);
       setThresholdDrafts({});
     }
     setIsLoading(false);
@@ -235,8 +246,25 @@ export default function LowStockManager() {
     await loadRows();
   }
 
-  function exportAlerts() {
-    const alertRows = rows.filter((row) => row.is_low_stock);
+  async function exportAlerts() {
+    setErrorMessage(null);
+    const alertRows: StockRow[] = [];
+    let exportOffset = 0;
+    do {
+      const { data, error } = await supabase.rpc("search_low_stock_page", {
+        p_query: query.trim(), p_view: "alerts", p_offset: exportOffset,
+        p_limit: RPC_PAGE_SIZE, p_export_all: false,
+      });
+      if (error) {
+        reportLowStockError("alert export failed", error);
+        setErrorMessage("Low-stock export is temporarily unavailable. Please try again.");
+        return;
+      }
+      const page = (data ?? []) as StockRow[];
+      alertRows.push(...page);
+      exportOffset += page.length;
+      if (page.length === 0 || exportOffset >= numberValue(page[0]?.total_count)) break;
+    } while (true);
     const header = [
       "SKU",
       "Product",
@@ -388,7 +416,7 @@ export default function LowStockManager() {
             </button>
             <button
               type="button"
-              onClick={exportAlerts}
+              onClick={() => void exportAlerts()}
               disabled={summary.alerts === 0}
               className={`h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 ${focusClass}`}
             >

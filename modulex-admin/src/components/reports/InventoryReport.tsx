@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { downloadCsv } from "@/lib/reports/csv";
 
@@ -25,6 +25,7 @@ type ProductStockRow = {
   is_low_stock: boolean;
   stock_status: string;
   last_inventory_update: string | null;
+  total_count?: number | string;
 };
 
 type LocationStockRow = {
@@ -46,7 +47,11 @@ type LocationStockRow = {
   current_capacity: number | string;
   capacity_usage_percent: number | string | null;
   is_active: boolean;
+  total_count?: number | string;
 };
+type FilterOption = { filter_kind: "brand" | "category" | "warehouse"; filter_key: string; filter_label: string };
+
+const PAGE_SIZE = 50;
 
 const controlClass =
   "h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90";
@@ -84,45 +89,70 @@ export default function InventoryReport() {
   const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [productOffset, setProductOffset] = useState(0);
+  const [locationOffset, setLocationOffset] = useState(0);
+  const [productTotal, setProductTotal] = useState(0);
+  const [locationTotal, setLocationTotal] = useState(0);
+  const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
+  const requestIdRef = useRef(0);
 
-  async function loadReport() {
+  async function loadReport(nextProductOffset = 0, nextLocationOffset = 0) {
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setErrorMessage(null);
     const [productResult, locationResult] = await Promise.all([
-      supabase
-        .from("v_product_stock_summary")
-        .select("product_id,sku,barcode,product_name,brand,category,unit,min_stock_level,product_status,location_count,warehouse_count,total_quantity,total_reserved_quantity,total_available_quantity,is_low_stock,stock_status,last_inventory_update")
-        .eq("product_status", "active")
-        .order("sku")
-        .limit(1000),
-      supabase
-        .from("v_location_stock_summary")
-        .select("location_id,location_code,location_name,location_type,warehouse_id,warehouse_code,warehouse_name,zone_id,zone_code,zone_name,product_count,total_quantity,total_reserved_quantity,total_available_quantity,max_capacity,current_capacity,capacity_usage_percent,is_active")
-        .eq("is_active", true)
-        .order("warehouse_code")
-        .order("location_code")
-        .limit(1000),
+      supabase.rpc("search_inventory_product_report_page", {
+        p_query: query.trim(), p_status: statusFilter, p_category: categoryFilter,
+        p_brand: brandFilter, p_offset: nextProductOffset, p_limit: PAGE_SIZE,
+        p_export_all: false,
+      }),
+      supabase.rpc("search_inventory_location_report_page", {
+        p_query: query.trim(), p_warehouse_id: warehouseFilter === "all" ? null : warehouseFilter,
+        p_offset: nextLocationOffset, p_limit: PAGE_SIZE, p_export_all: false,
+      }),
     ]);
 
     const error = productResult.error || locationResult.error;
+    if (requestId !== requestIdRef.current) return;
     if (error) {
       setErrorMessage(error.message);
       setProducts([]);
       setLocations([]);
+      setProductTotal(0);
+      setLocationTotal(0);
+      setProductOffset(0);
+      setLocationOffset(0);
     } else {
       setProducts((productResult.data ?? []) as ProductStockRow[]);
       setLocations((locationResult.data ?? []) as LocationStockRow[]);
+      const nextProducts = (productResult.data ?? []) as ProductStockRow[];
+      const nextLocations = (locationResult.data ?? []) as LocationStockRow[];
+      setProductTotal(n(nextProducts[0]?.total_count));
+      setLocationTotal(n(nextLocations[0]?.total_count));
+      setProductOffset(nextProductOffset);
+      setLocationOffset(nextLocationOffset);
     }
     setIsLoading(false);
   }
 
   useEffect(() => {
-    loadReport();
+    const timer = window.setTimeout(() => { void loadReport(0, 0); }, 250);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, statusFilter, categoryFilter, brandFilter, warehouseFilter]);
+
+  useEffect(() => {
+    async function loadFilterOptions() {
+      const { data, error } = await supabase.rpc("get_inventory_report_filter_options");
+      if (error) { setErrorMessage("Report filters are temporarily unavailable."); return; }
+      setFilterOptions((data ?? []) as FilterOption[]);
+    }
+    void loadFilterOptions();
   }, []);
 
-  const categories = useMemo(() => [...new Set(products.map((row) => row.category).filter((value): value is string => Boolean(value)))].sort(), [products]);
-  const brands = useMemo(() => [...new Set(products.map((row) => row.brand).filter((value): value is string => Boolean(value)))].sort(), [products]);
-  const warehouses = useMemo(() => [...new Map(locations.map((row) => [row.warehouse_id, { id: row.warehouse_id, code: row.warehouse_code, name: row.warehouse_name }])).values()].sort((a, b) => a.code.localeCompare(b.code)), [locations]);
+  const categories = useMemo(() => filterOptions.filter((option) => option.filter_kind === "category"), [filterOptions]);
+  const brands = useMemo(() => filterOptions.filter((option) => option.filter_kind === "brand"), [filterOptions]);
+  const warehouses = useMemo(() => filterOptions.filter((option) => option.filter_kind === "warehouse"), [filterOptions]);
 
   const filteredProducts = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -165,29 +195,53 @@ export default function InventoryReport() {
     available: filteredLocations.reduce((sum, row) => sum + n(row.total_available_quantity), 0),
   }), [filteredLocations]);
 
-  function exportCurrent() {
+  async function exportCurrent() {
     const date = new Date().toISOString().slice(0, 10);
     if (tab === "products") {
-      downloadCsv(`inventory-product-summary-${date}.csv`, ["SKU", "Product", "Brand", "Category", "Warehouses", "Locations", "On Hand", "Reserved", "Available", "Minimum", "Status", "Last Update"], filteredProducts.map((row) => [row.sku, row.product_name, row.brand ?? "", row.category ?? "", row.warehouse_count, row.location_count, row.total_quantity, row.total_reserved_quantity, row.total_available_quantity, row.min_stock_level, productState(row).label, row.last_inventory_update ?? ""]));
+      const exportRows: ProductStockRow[] = [];
+      let offset = 0;
+      do {
+        const { data, error } = await supabase.rpc("search_inventory_product_report_page", {
+          p_query: query.trim(), p_status: statusFilter, p_category: categoryFilter,
+          p_brand: brandFilter, p_offset: offset, p_limit: 100, p_export_all: false,
+        });
+        if (error) { setErrorMessage("Inventory export is temporarily unavailable."); return; }
+        const page = (data ?? []) as ProductStockRow[];
+        exportRows.push(...page); offset += page.length;
+        if (page.length === 0 || offset >= n(page[0]?.total_count)) break;
+      } while (true);
+      downloadCsv(`inventory-product-summary-${date}.csv`, ["SKU", "Product", "Brand", "Category", "Warehouses", "Locations", "On Hand", "Reserved", "Available", "Minimum", "Status", "Last Update"], exportRows.map((row) => [row.sku, row.product_name, row.brand ?? "", row.category ?? "", row.warehouse_count, row.location_count, row.total_quantity, row.total_reserved_quantity, row.total_available_quantity, row.min_stock_level, productState(row).label, row.last_inventory_update ?? ""]));
     } else {
-      downloadCsv(`inventory-location-summary-${date}.csv`, ["Warehouse", "Zone", "Location", "Type", "Products", "On Hand", "Reserved", "Available", "Max Capacity", "Current Capacity", "Capacity Usage %"], filteredLocations.map((row) => [row.warehouse_code, row.zone_code ?? "", row.location_code, row.location_type, row.product_count, row.total_quantity, row.total_reserved_quantity, row.total_available_quantity, row.max_capacity ?? "", row.current_capacity, row.capacity_usage_percent ?? ""]));
+      const exportRows: LocationStockRow[] = [];
+      let offset = 0;
+      do {
+        const { data, error } = await supabase.rpc("search_inventory_location_report_page", {
+          p_query: query.trim(), p_warehouse_id: warehouseFilter === "all" ? null : warehouseFilter,
+          p_offset: offset, p_limit: 100, p_export_all: false,
+        });
+        if (error) { setErrorMessage("Inventory export is temporarily unavailable."); return; }
+        const page = (data ?? []) as LocationStockRow[];
+        exportRows.push(...page); offset += page.length;
+        if (page.length === 0 || offset >= n(page[0]?.total_count)) break;
+      } while (true);
+      downloadCsv(`inventory-location-summary-${date}.csv`, ["Warehouse", "Zone", "Location", "Type", "Products", "On Hand", "Reserved", "Available", "Max Capacity", "Current Capacity", "Capacity Usage %"], exportRows.map((row) => [row.warehouse_code, row.zone_code ?? "", row.location_code, row.location_type, row.product_count, row.total_quantity, row.total_reserved_quantity, row.total_available_quantity, row.max_capacity ?? "", row.current_capacity, row.capacity_usage_percent ?? ""]));
     }
   }
 
   const summaryCards = tab === "products"
     ? [
-        ["Products", productSummary.products],
-        ["On Hand", formatNumber(productSummary.onHand)],
-        ["Reserved", formatNumber(productSummary.reserved)],
-        ["Available", formatNumber(productSummary.available)],
-        ["Low Stock", productSummary.lowStock],
+        ["Products", productTotal],
+        ["Page On Hand", formatNumber(productSummary.onHand)],
+        ["Page Reserved", formatNumber(productSummary.reserved)],
+        ["Page Available", formatNumber(productSummary.available)],
+        ["Page Low Stock", productSummary.lowStock],
       ]
     : [
-        ["Locations", locationSummary.locations],
-        ["Occupied", locationSummary.occupied],
-        ["Product Slots", formatNumber(locationSummary.products)],
-        ["On Hand", formatNumber(locationSummary.onHand)],
-        ["Available", formatNumber(locationSummary.available)],
+        ["Locations", locationTotal],
+        ["Page Occupied", locationSummary.occupied],
+        ["Page Product Slots", formatNumber(locationSummary.products)],
+        ["Page On Hand", formatNumber(locationSummary.onHand)],
+        ["Page Available", formatNumber(locationSummary.available)],
       ];
 
   return (
@@ -213,11 +267,11 @@ export default function InventoryReport() {
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "products" ? "Search product..." : "Search location..."} className={`${controlClass} w-[240px]`} />
             {tab === "products" ? <>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as ProductStatusFilter)} className={controlClass}><option value="all">All Statuses</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="reserved">Reserved</option><option value="ok">OK</option></select>
-              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={controlClass}><option value="all">All Categories</option>{categories.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-              <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)} className={controlClass}><option value="all">All Brands</option>{brands.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-            </> : <select value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} className={controlClass}><option value="all">All Warehouses</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</option>)}</select>}
-            <button type="button" onClick={loadReport} className="h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]">Refresh</button>
-            <button type="button" onClick={exportCurrent} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">Export CSV</button>
+              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={controlClass}><option value="all">All Categories</option>{categories.map((option) => <option key={option.filter_key} value={option.filter_key}>{option.filter_label}</option>)}</select>
+              <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)} className={controlClass}><option value="all">All Brands</option>{brands.map((option) => <option key={option.filter_key} value={option.filter_key}>{option.filter_label}</option>)}</select>
+            </> : <select value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} className={controlClass}><option value="all">All Warehouses</option>{warehouses.map((option) => <option key={option.filter_key} value={option.filter_key}>{option.filter_label}</option>)}</select>}
+            <button type="button" onClick={() => void loadReport(0, 0)} className="h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]">Refresh</button>
+            <button type="button" onClick={() => void exportCurrent()} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">Export CSV</button>
           </div>
         </div>
 
@@ -238,9 +292,21 @@ export default function InventoryReport() {
             </table>
           )}
         </div>
+        <ReportPagination
+          offset={tab === "products" ? productOffset : locationOffset}
+          total={tab === "products" ? productTotal : locationTotal}
+          loading={isLoading}
+          onPage={(nextOffset) => void loadReport(tab === "products" ? nextOffset : productOffset, tab === "locations" ? nextOffset : locationOffset)}
+        />
       </div>
     </div>
   );
+}
+
+function ReportPagination({ offset, total, loading, onPage }: { offset: number; total: number; loading: boolean; onPage: (offset: number) => void }) {
+  const first = total === 0 ? 0 : offset + 1;
+  const last = Math.min(offset + PAGE_SIZE, total);
+  return <div className="flex items-center justify-between border-t border-gray-200 px-5 py-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400"><span>Showing {first}–{last} of {total}</span><div className="flex gap-2"><button type="button" disabled={loading || offset === 0} onClick={() => onPage(Math.max(0, offset - PAGE_SIZE))} className="rounded-lg border px-3 py-2 disabled:opacity-50">Previous</button><button type="button" disabled={loading || offset + PAGE_SIZE >= total} onClick={() => onPage(offset + PAGE_SIZE)} className="rounded-lg border px-3 py-2 disabled:opacity-50">Next</button></div></div>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

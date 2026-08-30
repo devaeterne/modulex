@@ -338,9 +338,13 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A2.4 Low-stock and reporting
 
-- [ ] Define low-stock threshold source of truth.
-- [ ] Verify low-stock views use efficient queries/indexes.
-- [ ] Review inventory and movement reports for correctness and export needs.
+- [x] Define low-stock threshold source of truth.
+  - `products.min_stock_level` is authoritative; `0` means not configured. A configured product is low only when A2.2 Available (`On Hand - Reserved`) is less than or equal to the threshold.
+- [x] Verify low-stock views use efficient queries/indexes.
+  - The A2.4 SQL package keeps security-invoker views, adds narrow paginated/filterable reporting RPCs with exact counts and deterministic ordering, and adds movement created-at/from/to warehouse indexes.
+- [x] Review inventory and movement reports for correctness and export needs.
+  - Inventory/location/movement and low-stock CSV paths page through bounded filtered RPC calls to the exact count rather than inheriting the former 1,000-row client ceiling. Permanent repository verification is `smoke:a2-low-stock-reporting` plus `.github/workflows/admin-a2-low-stock-reporting.yml`.
+  - Repository acceptance: `docs/acceptance/a2-4-low-stock-reporting.md`. Production migration `20260830155834` is applied; source/RPC reconciliation and Advisor review passed. A2.4 remains NOT CLOSED only because production deployment `c5c9af0` predates the A2.4 merge, so authenticated browser/CSV verification of the accepted merge SHA is still outstanding.
 
 ### Phase A2 Exit Gate
 
@@ -670,13 +674,11 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. **A2.3 — Stock Operations & Scanning is production-accepted and closed.**
+Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. A2.1–A2.3 are production-accepted. A2.4 migration, reconciliation, authenticated API/RLS smoke, and Advisor review are complete; deployed UI acceptance remains open because production is still at the A2.3 SHA `c5c9af0`.
 
-1. Merge/deploy the A2.3 acceptance package after final branch checks remain GREEN; verify Admin production is on the merge SHA and has no new runtime errors.
-2. Start **A2.4 — Low-stock & Reporting** from the resulting current `main`.
-3. Define the low-stock threshold source of truth against A2.2 Available semantics and product minimum-stock configuration.
-4. Verify low-stock/report queries and indexes, then reconcile inventory and movement reports against source records and decide export requirements.
-5. Close the Phase A2 exit gate only after A2.4 reporting reconciliation is complete.
+1. Merge the accepted A2.4 repository package and deploy Admin from that merge SHA.
+2. Authenticated-browser verify `/low-stock`, `/reports/inventory`, `/reports/movements`, pagination/filter behavior, and full filtered CSV exports against production.
+3. Record the deployed SHA and smoke evidence, then mark the Phase A2 inventory-report reconciliation exit gate complete.
 
 **Cross-roadmap coordination:** A2.3 is Admin-only acceptance/hardening and introduces no Store runtime, shared schema, or production stock mutation change; Store production acceptance remains tracked by the Store roadmap.
 

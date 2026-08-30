@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { downloadCsv } from "@/lib/reports/csv";
 
@@ -31,12 +31,15 @@ type MovementRow = {
   created_by_email: string | null;
   created_by_name: string | null;
   created_at: string;
+  total_count?: number | string;
 };
 
-type WarehouseOption = { id: string; code: string; name: string };
+type FilterOption = { filter_kind: "brand" | "category" | "warehouse"; filter_key: string; filter_label: string };
+const MOVEMENT_TYPES = ["in", "out", "transfer", "adjustment", "reservation", "release", "return", "damage"];
 
 const controlClass =
   "h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90";
+const PAGE_SIZE = 50;
 
 function n(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
@@ -65,6 +68,13 @@ function movementClass(type: string) {
   return "bg-gray-100 text-gray-700 dark:bg-white/5 dark:text-gray-300";
 }
 
+function exclusiveDateTo(value: string) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  date.setDate(date.getDate() + 1);
+  return date.toISOString();
+}
+
 export default function MovementReport() {
   const [rows, setRows] = useState<MovementRow[]>([]);
   const [query, setQuery] = useState("");
@@ -74,39 +84,57 @@ export default function MovementReport() {
   const [dateTo, setDateTo] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
+  const requestIdRef = useRef(0);
 
-  async function loadReport() {
+  async function loadReport(nextOffset = 0) {
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setErrorMessage(null);
-    const { data, error } = await supabase
-      .from("v_inventory_movement_history")
-      .select("movement_id,product_id,sku,product_name,barcode,movement_type,quantity,reference_no,reason,notes,from_warehouse_id,from_warehouse_code,from_warehouse_name,from_location_id,from_location_code,from_location_name,to_warehouse_id,to_warehouse_code,to_warehouse_name,to_location_id,to_location_code,to_location_name,created_by_id,created_by_email,created_by_name,created_at")
-      .order("created_at", { ascending: false })
-      .limit(1000);
+    const { data, error } = await supabase.rpc("search_inventory_movement_report_page", {
+      p_query: query.trim(),
+      p_movement_type: typeFilter === "all" ? null : typeFilter,
+      p_warehouse_id: warehouseFilter === "all" ? null : warehouseFilter,
+      p_date_from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : null,
+      p_date_to: exclusiveDateTo(dateTo),
+      p_offset: nextOffset,
+      p_limit: PAGE_SIZE,
+      p_export_all: false,
+    });
 
+    if (requestId !== requestIdRef.current) return;
     if (error) {
       setRows([]);
+      setTotalCount(0);
+      setOffset(0);
       setErrorMessage(error.message);
     } else {
-      setRows((data ?? []) as MovementRow[]);
+      const nextRows = (data ?? []) as MovementRow[];
+      setRows(nextRows);
+      setTotalCount(n(nextRows[0]?.total_count));
+      setOffset(nextOffset);
     }
     setIsLoading(false);
   }
 
   useEffect(() => {
-    loadReport();
+    const timer = window.setTimeout(() => { void loadReport(0); }, 250);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, typeFilter, warehouseFilter, dateFrom, dateTo]);
+
+  useEffect(() => {
+    async function loadFilterOptions() {
+      const { data, error } = await supabase.rpc("get_inventory_report_filter_options");
+      if (error) { setErrorMessage("Report filters are temporarily unavailable."); return; }
+      setFilterOptions((data ?? []) as FilterOption[]);
+    }
+    void loadFilterOptions();
   }, []);
 
-  const movementTypes = useMemo(() => [...new Set(rows.map((row) => row.movement_type))].sort(), [rows]);
-
-  const warehouses = useMemo(() => {
-    const map = new Map<string, WarehouseOption>();
-    rows.forEach((row) => {
-      if (row.from_warehouse_id) map.set(row.from_warehouse_id, { id: row.from_warehouse_id, code: row.from_warehouse_code || "—", name: row.from_warehouse_name || "Warehouse" });
-      if (row.to_warehouse_id) map.set(row.to_warehouse_id, { id: row.to_warehouse_id, code: row.to_warehouse_code || "—", name: row.to_warehouse_name || "Warehouse" });
-    });
-    return [...map.values()].sort((a, b) => a.code.localeCompare(b.code));
-  }, [rows]);
+  const warehouses = useMemo(() => filterOptions.filter((option) => option.filter_kind === "warehouse"), [filterOptions]);
 
   const filteredRows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -142,23 +170,37 @@ export default function MovementReport() {
     setDateTo("");
   }
 
-  function exportReport() {
+  async function exportReport() {
     const date = new Date().toISOString().slice(0, 10);
-    downloadCsv(`movement-report-${date}.csv`, ["Date", "Reference", "SKU", "Product", "Movement Type", "Quantity", "From Warehouse", "From Location", "To Warehouse", "To Location", "Reason", "Notes", "User"], filteredRows.map((row) => [formatDate(row.created_at), row.reference_no ?? "", row.sku, row.product_name, movementLabel(row.movement_type), row.quantity, row.from_warehouse_code ?? "", row.from_location_code ?? "", row.to_warehouse_code ?? "", row.to_location_code ?? "", row.reason ?? "", row.notes ?? "", row.created_by_name || row.created_by_email || "System"]));
+    const exportRows: MovementRow[] = [];
+    let exportOffset = 0;
+    do {
+      const { data, error } = await supabase.rpc("search_inventory_movement_report_page", {
+        p_query: query.trim(), p_movement_type: typeFilter === "all" ? null : typeFilter,
+        p_warehouse_id: warehouseFilter === "all" ? null : warehouseFilter,
+        p_date_from: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : null,
+        p_date_to: exclusiveDateTo(dateTo), p_offset: exportOffset,
+        p_limit: 200, p_export_all: false,
+      });
+      if (error) { setErrorMessage("Movement export is temporarily unavailable."); return; }
+      const page = (data ?? []) as MovementRow[];
+      exportRows.push(...page); exportOffset += page.length;
+      if (page.length === 0 || exportOffset >= n(page[0]?.total_count)) break;
+    } while (true);
+    downloadCsv(`movement-report-${date}.csv`, ["Date", "Reference", "SKU", "Product", "Movement Type", "Quantity", "From Warehouse", "From Location", "To Warehouse", "To Location", "Reason", "Notes", "User"], exportRows.map((row) => [formatDate(row.created_at), row.reference_no ?? "", row.sku, row.product_name, movementLabel(row.movement_type), row.quantity, row.from_warehouse_code ?? "", row.from_location_code ?? "", row.to_warehouse_code ?? "", row.to_location_code ?? "", row.reason ?? "", row.notes ?? "", row.created_by_name || row.created_by_email || "System"]));
   }
 
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <Metric label="Events" value={String(summary.events)} />
-        <Metric label="Units Moved" value={formatNumber(summary.units)} />
-        <Metric label="Stock In" value={formatNumber(summary.inbound)} />
-        <Metric label="Stock Out" value={formatNumber(summary.outbound)} />
-        <Metric label="Transfers" value={formatNumber(summary.transfers)} />
-        <Metric label="Reservations" value={formatNumber(summary.reservations)} />
+        <Metric label="Events" value={String(totalCount)} />
+        <Metric label="Page Units Moved" value={formatNumber(summary.units)} />
+        <Metric label="Page Stock In" value={formatNumber(summary.inbound)} />
+        <Metric label="Page Stock Out" value={formatNumber(summary.outbound)} />
+        <Metric label="Page Transfers" value={formatNumber(summary.transfers)} />
+        <Metric label="Page Reservations" value={formatNumber(summary.reservations)} />
       </div>
 
-      {rows.length === 1000 && <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">This report currently loads the latest 1,000 movement records. Narrow the report with date and warehouse filters for operational analysis.</div>}
       {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
 
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -169,15 +211,15 @@ export default function MovementReport() {
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Analyze receipts, issues, transfers, adjustments, reservations, releases, returns, and damage movements.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={loadReport} className="h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]">Refresh</button>
-              <button type="button" onClick={exportReport} disabled={filteredRows.length === 0} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">Export CSV</button>
+              <button type="button" onClick={() => void loadReport(0)} className="h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]">Refresh</button>
+              <button type="button" onClick={() => void exportReport()} disabled={totalCount === 0} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">Export CSV</button>
             </div>
           </div>
 
           <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-6">
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search reference, SKU, user..." className={`${controlClass} xl:col-span-2`} />
-            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={controlClass}><option value="all">All Types</option>{movementTypes.map((type) => <option key={type} value={type}>{movementLabel(type)}</option>)}</select>
-            <select value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} className={controlClass}><option value="all">All Warehouses</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</option>)}</select>
+            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={controlClass}><option value="all">All Types</option>{MOVEMENT_TYPES.map((type) => <option key={type} value={type}>{movementLabel(type)}</option>)}</select>
+            <select value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} className={controlClass}><option value="all">All Warehouses</option>{warehouses.map((option) => <option key={option.filter_key} value={option.filter_key}>{option.filter_label}</option>)}</select>
             <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} aria-label="Date from" className={controlClass} />
             <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} aria-label="Date to" className={controlClass} />
           </div>
@@ -202,6 +244,7 @@ export default function MovementReport() {
             </tbody>
           </table>
         </div>
+        <div className="flex items-center justify-between border-t border-gray-200 px-5 py-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400"><span>Showing {totalCount === 0 ? 0 : offset + 1}–{Math.min(offset + rows.length, totalCount)} of {totalCount}</span><div className="flex gap-2"><button type="button" disabled={isLoading || offset === 0} onClick={() => void loadReport(Math.max(0, offset - PAGE_SIZE))} className="rounded-lg border px-3 py-2 disabled:opacity-50">Previous</button><button type="button" disabled={isLoading || offset + PAGE_SIZE >= totalCount} onClick={() => void loadReport(offset + PAGE_SIZE)} className="rounded-lg border px-3 py-2 disabled:opacity-50">Next</button></div></div>
       </div>
     </div>
   );
