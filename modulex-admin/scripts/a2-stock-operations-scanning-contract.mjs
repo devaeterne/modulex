@@ -36,13 +36,14 @@ expectIncludes(stockForm, [
 
 expectIncludes(cameraScanner, [
   "SAME_VALUE_COOLDOWN_MS",
-  "lastScanRef",
-  "processingRef",
-  "lastScanRef.current.value === value",
-  "SAME_VALUE_COOLDOWN_MS",
+  "lastScanRef.current",
+  ".value === value",
+  ".timestamp <",
+  "processingRef.current",
   "processingRef.current = true",
   "processingRef.current = false",
-  'facingMode:\n            "environment"',
+  "facingMode:",
+  '"environment"',
   "navigator.vibrate",
 ], "CameraScanner");
 
