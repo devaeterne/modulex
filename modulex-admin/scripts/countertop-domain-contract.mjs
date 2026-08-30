@@ -28,6 +28,8 @@ assert(sql.includes("inventory") && sql.includes("reserved_quantity"), "existing
 assert(sql.includes("countertop_configurations") && sql.includes("pricing_snapshot"), "immutable countertop snapshot table must exist");
 assert(sql.includes("countertop_material_price_bands") && sql.includes("countertop_stone_product_profiles"), "stone material bands and product profiles must be relational");
 for (const key of ["manual_override", "edge_profile_id", "commercial_price_group_id", "service_id", "applicable_measure", "totals"]) assert(sql.includes(key), `snapshot field ${key} missing`);
+assert(sql.includes("edge_profile_id=excluded.edge_profile_id") && sql.includes("p_edge_profile_id,p_sqft"), "attach RPC must persist the authoritative edge reference");
+assert(sql.includes("service_selection") && configurator.includes("service_selection"), "selected service references must be persisted for snapshot enrichment");
 for (const [code, price] of [["B1",34],["R1",45],["R22",150]]) assert(sql.includes(`'${code}',${price}`), `${code} material band seed missing`);
 assert(sql.includes("slab_quantity") && sql.includes("countertop_reservation_quantity"), "commercial quantity and slab reservation quantity must be distinct");
 assert(!sql.includes("reserve_countertop_slab_delta") && !sql.includes("countertop_slab_reservation"), "countertop must not create a second reservation engine");
