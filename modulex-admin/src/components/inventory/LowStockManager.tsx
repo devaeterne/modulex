@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
@@ -104,7 +104,7 @@ export default function LowStockManager() {
 
   const canEditThresholds = hasPermission(profile?.roles, "products.manage");
 
-  async function loadRows() {
+  const loadRows = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -126,7 +126,7 @@ export default function LowStockManager() {
       setThresholdDrafts({});
     }
     setIsLoading(false);
-  }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -146,7 +146,7 @@ export default function LowStockManager() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadRows]);
 
   const summary = useMemo(() => {
     const alerts = rows.filter((row) => row.is_low_stock);
