@@ -54,11 +54,12 @@ export default function RolesAccess() {
 
         <div className="overflow-x-auto">
           <table className="min-w-full">
+            <caption className="sr-only">Permissions granted to each Modulex administrative role</caption>
             <thead>
               <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                <th className="px-5 py-3 font-medium">Permission</th>
+                <th scope="col" className="px-5 py-3 font-medium">Permission</th>
                 {roles.map((role) => (
-                  <th key={role} className="px-5 py-3 text-center font-medium">
+                  <th scope="col" key={role} className="px-5 py-3 text-center font-medium">
                     {ROLE_LABELS[role]}
                   </th>
                 ))}
@@ -67,21 +68,22 @@ export default function RolesAccess() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {permissions.map((permission) => (
                 <tr key={permission}>
-                  <td className="px-5 py-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <th scope="row" className="px-5 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-300">
                     {PERMISSION_LABELS[permission]}
-                  </td>
+                  </th>
                   {roles.map((role) => {
                     const allowed = ROLE_PERMISSIONS[role].includes(permission);
                     return (
                       <td key={role} className="px-5 py-3 text-center">
                         <span
+                          aria-label={`${ROLE_LABELS[role]}: ${PERMISSION_LABELS[permission]} ${allowed ? "allowed" : "not allowed"}`}
                           className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${
                             allowed
                               ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400"
                               : "bg-gray-100 text-gray-400 dark:bg-white/10 dark:text-gray-500"
                           }`}
                         >
-                          {allowed ? "✓" : "–"}
+                          <span aria-hidden="true">{allowed ? "✓" : "–"}</span>
                         </span>
                       </td>
                     );
