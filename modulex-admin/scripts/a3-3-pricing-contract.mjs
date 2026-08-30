@@ -30,6 +30,11 @@ assert.match(migration, /lower\(tg_op\)::public\.audit_action/, "Audit action mu
 assert.match(migration, /identity cannot be removed/i, "Base group identity must be immutable");
 assert.match(migration, /cannot be deleted/i, "Base group deletion must be blocked");
 assert.match(migration, /trg_product_margin_settings_audit/, "Product-specific margin changes must be audited");
+const lifecycle = migration.match(/create or replace function public\.guard_price_group_lifecycle\([\s\S]*?\$\$;/i)?.[0] ?? "";
+assert.match(lifecycle, /if tg_op = 'DELETE'[\s\S]*?old\.is_base_price[\s\S]*?raise exception/i, "Base-group delete must fail closed");
+assert.match(lifecycle, /if tg_op = 'DELETE'[\s\S]*?return old;/i, "Non-base group delete must return OLD");
+assert.match(lifecycle, /old\.is_base_price[\s\S]*?not new\.is_base_price[\s\S]*?raise exception/i, "Base identity demotion must fail closed");
+assert.match(lifecycle, /old\.is_base_price[\s\S]*?not new\.is_active[\s\S]*?raise exception/i, "Base deactivation must fail closed");
 assert.match(productPrices, /hasPermission\(profile\?\.roles,\s*["']pricing\.manage["']\)/, "Product pricing writes must use effective pricing.manage permission");
 assert.match(groups, /hasPermission\(profile\?\.roles,\s*["']pricing\.manage["']\)/, "Price-group writes must use effective pricing.manage permission");
 assert.match(costMargin, /hasPermission\(profile\?\.roles,\s*["']pricing\.(?:manage|cost\.view)["']\)/, "Cost/margin access must use effective pricing permission");

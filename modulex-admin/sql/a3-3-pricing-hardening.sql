@@ -21,7 +21,10 @@ create or replace function public.guard_price_group_lifecycle()
 returns trigger language plpgsql set search_path = pg_catalog, public
 as $$
 begin
-  if tg_op = 'DELETE' and old.is_base_price then raise exception 'Base price group cannot be deleted'; end if;
+  if tg_op = 'DELETE' then
+    if old.is_base_price then raise exception 'Base price group cannot be deleted'; end if;
+    return old;
+  end if;
   if old.is_base_price and not new.is_base_price then raise exception 'Base price group identity cannot be removed'; end if;
   if old.is_base_price and not new.is_active then raise exception 'Base price group cannot be deactivated'; end if;
   return new;
