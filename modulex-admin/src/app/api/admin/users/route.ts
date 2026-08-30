@@ -215,38 +215,39 @@ export async function GET(request: Request) {
 
   const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
 
-  const users = data.users.map((user) => {
-    const profile = profileMap.get(user.id);
-    const fallbackRole = profile?.role ?? "warehouse";
-    const assignedRoles = roleMap.get(user.id) ?? [];
-    const roles = Array.from(new Set(assignedRoles)).sort(
-      (a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b)
-    );
+  const users = data.users
+    .filter((user) => profileMap.has(user.id))
+    .map((user) => {
+      const profile = profileMap.get(user.id)!;
+      const assignedRoles = roleMap.get(user.id) ?? [];
+      const roles = Array.from(new Set(assignedRoles)).sort(
+        (a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b)
+      );
 
-    return {
-      id: user.id,
-      email: user.email ?? profile?.email ?? null,
-      full_name:
-        profile?.full_name ??
-        (typeof user.user_metadata?.full_name === "string"
-          ? user.user_metadata.full_name
-          : null),
-      phone: profile?.phone ?? user.phone ?? null,
-      role: fallbackRole,
-      roles: roles.length > 0 ? roles : [fallbackRole],
-      is_active: profile?.is_active ?? true,
-      email_confirmed_at: user.email_confirmed_at ?? null,
-      last_sign_in_at: user.last_sign_in_at ?? null,
-      created_at: profile?.created_at ?? user.created_at,
-      updated_at: profile?.updated_at ?? user.updated_at ?? user.created_at,
-    };
-  });
+      return {
+        id: user.id,
+        email: user.email ?? profile.email ?? null,
+        full_name:
+          profile.full_name ??
+          (typeof user.user_metadata?.full_name === "string"
+            ? user.user_metadata.full_name
+            : null),
+        phone: profile.phone ?? user.phone ?? null,
+        role: profile.role,
+        roles: roles.length > 0 ? roles : [profile.role],
+        is_active: profile.is_active,
+        email_confirmed_at: user.email_confirmed_at ?? null,
+        last_sign_in_at: user.last_sign_in_at ?? null,
+        created_at: profile.created_at,
+        updated_at: profile.updated_at,
+      };
+    });
 
   return Response.json({
     users,
     page,
     perPage,
-    total: data.total ?? users.length,
+    total: users.length,
     actor: {
       id: auth.actor.user.id,
       role: auth.actor.profile.role,
