@@ -1,9 +1,9 @@
 name: Admin Personnel UI
 on:
   push:
-    paths: ["modulex-admin/src/app/(admin)/personnel/**", "modulex-admin/src/components/hr/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/scripts/personnel-ui-contract.mjs", ".github/workflows/admin-personnel-ui.yml"]
+    paths: ["modulex-admin/src/app/(admin)/personnel/**", "modulex-admin/src/components/hr/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/personnel-ui-contract.mjs", ".github/workflows/admin-personnel-ui.yml"]
   pull_request:
-    paths: ["modulex-admin/src/app/(admin)/personnel/**", "modulex-admin/src/components/hr/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/scripts/personnel-ui-contract.mjs", ".github/workflows/admin-personnel-ui.yml"]
+    paths: ["modulex-admin/src/app/(admin)/personnel/**", "modulex-admin/src/components/hr/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/personnel-ui-contract.mjs", ".github/workflows/admin-personnel-ui.yml"]
 permissions: { contents: read }
 jobs:
   personnel-verification:
