@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `9e92f1eb3b89b996d17005538012b6587c24f99f`
+Main baseline: `ef4e6339aaaca7db8374108bcd94f41b008cb533`
 Current phase: **Phase A2 — Inventory, Warehouses & Physical Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A2 work is isolated from Store scope; post-merge Store production acceptance remains Store-owned.**
-Current Admin next action: **A2.3 Stock Operations & Scanning is production-accepted and CI-GREEN; proceed to A2.4 Low-stock & Reporting after merge/deploy verification.**
+Current Admin next action: **A2.4 Low-stock & Reporting is merged to `main`; verify the production Admin deployment and authenticated report/CSV flows, then close the Phase A2 exit gate.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -680,6 +680,6 @@ Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Op
 2. Authenticated-browser verify `/low-stock`, `/reports/inventory`, `/reports/movements`, pagination/filter behavior, and full filtered CSV exports against production.
 3. Record the deployed SHA and smoke evidence, then mark the Phase A2 inventory-report reconciliation exit gate complete.
 
-**Cross-roadmap coordination:** A2.3 is Admin-only acceptance/hardening and introduces no Store runtime, shared schema, or production stock mutation change; Store production acceptance remains tracked by the Store roadmap.
+**Cross-roadmap coordination:** A2.4 is Admin/shared-Supabase inventory reporting work only; it introduces no Store runtime change and did not mutate production inventory/movement source data. Store production acceptance remains tracked by the Store roadmap.
 
 **Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A2 or other concurrently merged Admin work is preserved rather than overwritten.
