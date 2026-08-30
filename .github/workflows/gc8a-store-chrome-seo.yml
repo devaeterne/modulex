@@ -99,7 +99,7 @@ jobs:
         run: npm run build
 
   sync-production-closeout:
-    if: github.actor != 'github-actions[bot]' && github.ref == 'refs/heads/docs/gc8a-production-closeout'
+    if: github.actor != 'github-actions[bot]' && (github.ref == 'refs/heads/docs/gc8a-production-closeout' || github.head_ref == 'docs/gc8a-production-closeout')
     needs:
       - store-gc8a-verification
       - admin-gc8a-verification
