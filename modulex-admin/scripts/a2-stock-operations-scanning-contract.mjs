@@ -13,6 +13,13 @@ const expectIncludes = (source, snippets, label) => {
     expect(source.includes(snippet), `${label} must include: ${snippet}`);
   }
 };
+const compact = (value) => value.replace(/\s+/g, "");
+const expectCompactIncludes = (source, snippets, label) => {
+  const compactSource = compact(source);
+  for (const snippet of snippets) {
+    expect(compactSource.includes(compact(snippet)), `${label} must include semantic fragment: ${snippet}`);
+  }
+};
 
 const stockForm = read("src/components/stock-operations/StockOperationForm.tsx");
 const cameraScanner = read("src/components/scan/CameraScanner.tsx");
@@ -34,16 +41,14 @@ expectIncludes(stockForm, [
   "isSubmitting",
 ], "StockOperationForm");
 
-expectIncludes(cameraScanner, [
+expectCompactIncludes(cameraScanner, [
   "SAME_VALUE_COOLDOWN_MS",
-  "lastScanRef.current",
-  ".value === value",
-  ".timestamp <",
-  "processingRef.current",
+  "lastScanRef.current.value === value",
+  "now - lastScanRef.current.timestamp < SAME_VALUE_COOLDOWN_MS",
+  "if (processingRef.current)",
   "processingRef.current = true",
   "processingRef.current = false",
-  "facingMode:",
-  '"environment"',
+  'facingMode: "environment"',
   "navigator.vibrate",
 ], "CameraScanner");
 
