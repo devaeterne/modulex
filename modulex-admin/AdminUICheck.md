@@ -18,14 +18,14 @@ This file tracks the Admin UI audit in sidebar order. A package is fully complet
 
 The original 01–64 audit remains historical evidence. Audit v2 covers cross-cutting issues discovered after later Admin feature work and nested-route growth.
 
-### [x] UI-2A — Admin Shell & Responsive Foundation
+### [~] UI-2A — Admin Shell & Responsive Foundation
 
 - [x] Admin content flex item can shrink with `min-w-0` while preserving 290px expanded and 90px collapsed sidebar offsets.
 - [x] Removed the global 1536px content cap so data-heavy pages can use the available viewport; individual surfaces retain responsibility for their own intentional width constraints.
 - [x] Admin shell workflow now runs when `(admin)/layout.tsx` changes.
 - [x] TDD RED: Actions run `33332911142` failed on the missing responsive shell width contract.
 - [x] GREEN: Actions run `33332954949` passed shell contract, production-surface, RBAC, lint, and production build.
-- [ ] Merge and production deploy.
+- [~] Merge and production deploy (pending for PR #184).
 
 ### [ ] UI-2B — Data Table System
 
