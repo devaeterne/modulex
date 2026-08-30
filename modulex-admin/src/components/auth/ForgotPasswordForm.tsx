@@ -34,7 +34,7 @@ export default function ForgotPasswordForm() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const redirectTo = `${getSiteUrl()}/reset-password`;
+    const redirectTo = `${getSiteUrl()}/reset-password?mode=recovery`;
     const { error } = await requestPasswordReset(cleanEmail, redirectTo);
 
     if (error) {
