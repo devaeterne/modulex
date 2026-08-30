@@ -10,7 +10,7 @@
 .project-gallery-filter .nav-link {
     border: 0;
     background: transparent;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-outfit), sans-serif;
     font-weight: 600;
     cursor: pointer;
     transition: color .25s ease, background .25s ease, transform .25s ease;
@@ -75,7 +75,7 @@
 
 .project-gallery-title,
 .project-gallery-dialog-title {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     color: var(--dark-brown);
     font-weight: 800;
 }
