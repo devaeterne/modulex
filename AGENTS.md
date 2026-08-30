@@ -35,3 +35,12 @@ These instructions apply repo-wide unless a more specific `AGENTS.md` overrides 
 - Mark roadmap work `[~]` while active and `[x]` only after its stated verification criteria pass.
 - Do not declare a package CLOSED before required production deployment/acceptance is complete.
 - Keep final reports compact (normally 10–15 lines): what changed, tests, migration/deploy status, blockers, branch, commit SHA, and PR.
+
+## Admin UI consistency
+
+- Before changing Admin UI, read `modulex-admin/docs/ADMIN_UI_GUIDE.md`.
+- Reuse existing shared Modulex components; do not create route-specific buttons, inputs, cards, tables, badges, modals, or page headers when a shared component exists.
+- Do not copy TailAdmin demo markup into production business surfaces.
+- Do not override shared component appearance with arbitrary Tailwind. If a required state is missing, extend the reviewed shared variant API.
+- New reusable visual patterns belong in the shared UI layer first.
+- UI-changing PRs must run the Admin UI regression contract.

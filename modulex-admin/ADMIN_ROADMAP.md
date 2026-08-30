@@ -398,6 +398,16 @@ A3.2 implementation, migration, production deployment, authenticated route smoke
 - [ ] Ensure missing dealer-tier price never silently falls back to public/list price unless business rules explicitly change.
 - [ ] Add validation/audit coverage for price changes.
 
+## Cross-cutting Admin UI hardening track (UI-2A → UI-2E)
+
+- [~] UI-2A responsive shell foundation is implemented in PR #184; merge/deploy acceptance remains pending.
+- [ ] UI-2B shared table viewport/shell standardization.
+- [ ] UI-2C shared component variants, semantic tokens, dark mode, and accessibility normalization.
+- [ ] UI-2D route-level consistency cleanup after shared primitives are ready.
+- [ ] UI-2E final Admin UI regression and production acceptance.
+
+A3.3 Pricing remains the primary functional Admin next action; UI-2A → UI-2E is a parallel cross-cutting quality track and does not replace the pricing roadmap.
+
 ### Phase A3 Exit Gate
 
 - [ ] Product and Store publish state is deterministic.
