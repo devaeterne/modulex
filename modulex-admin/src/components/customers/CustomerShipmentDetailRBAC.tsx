@@ -181,6 +181,7 @@ export default function CustomerShipmentDetailRBAC() {
     if (!shipment || !canManage) return;
     setIsSaving(true);
     setErrorMessage(null);
+    setSuccessMessage(null);
     const { error } = await supabase.rpc("set_customer_shipment_status", {
       p_shipment_id: shipment.id,
       p_status: status,
@@ -195,9 +196,10 @@ export default function CustomerShipmentDetailRBAC() {
   }
 
   async function ship() {
-    if (!shipment || !canManage) return;
+    if (!shipment || !canManage || shipment.status !== "packed") return;
     setIsSaving(true);
     setErrorMessage(null);
+    setSuccessMessage(null);
     const { error } = await supabase.rpc("ship_customer_shipment", {
       p_shipment_id: shipment.id,
       p_carrier: carrier.trim() || null,
@@ -214,9 +216,10 @@ export default function CustomerShipmentDetailRBAC() {
   }
 
   async function deliver() {
-    if (!shipment || !canManage) return;
+    if (!shipment || !canManage || shipment.status !== "shipped") return;
     setIsSaving(true);
     setErrorMessage(null);
+    setSuccessMessage(null);
     const { error } = await supabase.rpc("deliver_customer_shipment", { p_shipment_id: shipment.id });
     setIsSaving(false);
     if (error) {
@@ -231,6 +234,12 @@ export default function CustomerShipmentDetailRBAC() {
   if (!shipment) return <div className="rounded-2xl border border-error-200 bg-error-50 p-6 text-sm text-error-700">{errorMessage || "Shipment not found."}</div>;
 
   const editable = canManage && ["draft", "picking"].includes(shipment.status);
+  const canStartPicking = shipment.status === "draft";
+  const canPack = shipment.status === "picking";
+  const canShip = shipment.status === "packed";
+  const canDeliver = shipment.status === "shipped";
+  const canCancel = ["draft", "picking", "packed"].includes(shipment.status);
+  const trackingEditable = ["draft", "picking", "packed"].includes(shipment.status);
 
   return (
     <div className="space-y-5">
@@ -257,7 +266,7 @@ export default function CustomerShipmentDetailRBAC() {
         <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03] lg:col-span-2">
           <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
             <h2 className="font-semibold text-gray-800 dark:text-white/90">Fulfillment Lines</h2>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Source location and quantity are editable only for shipment operators.</p>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Source location and quantity are editable only before packing. The database validates reservation and remaining order quantity.</p>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full">
@@ -303,17 +312,18 @@ export default function CustomerShipmentDetailRBAC() {
       {canManage && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
           <h2 className="font-semibold text-gray-800 dark:text-white/90">Shipment Actions</h2>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Operational sequence is Draft → Picking → Packed → Shipped → Delivered. Cancellation is available only before shipment.</p>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <input disabled={shipment.status === "delivered" || shipment.status === "cancelled"} value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder="Carrier" className={inputClass} />
-            <input disabled={shipment.status === "delivered" || shipment.status === "cancelled"} value={serviceLevel} onChange={(event) => setServiceLevel(event.target.value)} placeholder="Service level" className={inputClass} />
-            <input disabled={shipment.status === "delivered" || shipment.status === "cancelled"} value={tracking} onChange={(event) => setTracking(event.target.value)} placeholder="Tracking number" className={inputClass} />
+            <input disabled={!trackingEditable} value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder="Carrier" className={inputClass} />
+            <input disabled={!trackingEditable} value={serviceLevel} onChange={(event) => setServiceLevel(event.target.value)} placeholder="Service level" className={inputClass} />
+            <input disabled={!trackingEditable} value={tracking} onChange={(event) => setTracking(event.target.value)} placeholder="Tracking number" className={inputClass} />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            {shipment.status === "draft" && <button disabled={isSaving} onClick={() => void setStatus("picking")} className={secondaryButton}>Start Picking</button>}
-            {["draft", "picking"].includes(shipment.status) && <button disabled={isSaving} onClick={() => void setStatus("packed")} className={secondaryButton}>Mark Packed</button>}
-            {["draft", "picking", "packed"].includes(shipment.status) && <button disabled={isSaving} onClick={() => void ship()} className="inline-flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-50">Ship</button>}
-            {shipment.status === "shipped" && <button disabled={isSaving} onClick={() => void deliver()} className="inline-flex h-10 items-center rounded-lg bg-success-600 px-4 text-sm font-medium text-white disabled:opacity-50">Mark Delivered</button>}
-            {["draft", "picking", "packed"].includes(shipment.status) && <button disabled={isSaving} onClick={() => void setStatus("cancelled")} className="inline-flex h-10 items-center rounded-lg border border-error-300 px-4 text-sm font-medium text-error-600 disabled:opacity-50">Cancel Shipment</button>}
+            {canStartPicking && <button disabled={isSaving} onClick={() => void setStatus("picking")} className={secondaryButton}>Start Picking</button>}
+            {canPack && <button disabled={isSaving} onClick={() => void setStatus("packed")} className={secondaryButton}>Mark Packed</button>}
+            {canShip && <button disabled={isSaving} onClick={() => void ship()} className="inline-flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-50">Ship</button>}
+            {canDeliver && <button disabled={isSaving} onClick={() => void deliver()} className="inline-flex h-10 items-center rounded-lg bg-success-600 px-4 text-sm font-medium text-white disabled:opacity-50">Mark Delivered</button>}
+            {canCancel && <button disabled={isSaving} onClick={() => void setStatus("cancelled")} className="inline-flex h-10 items-center rounded-lg border border-error-300 px-4 text-sm font-medium text-error-600 disabled:opacity-50">Cancel Shipment</button>}
           </div>
         </section>
       )}
