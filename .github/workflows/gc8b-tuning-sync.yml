@@ -1,0 +1,68 @@
+name: GC-8B Tuning Sync
+
+on:
+  push:
+    branches:
+      - feat/gc8b-accessibility-performance
+    paths:
+      - ".github/workflows/gc8b-tuning-sync.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  tune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/gc8b-accessibility-performance
+      - name: Apply measured delivery tuning
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          lead = Path("modulex-store/src/components/leads/LeadForm.tsx")
+          text = lead.read_text()
+          if 'import StoreIcon from "@/components/StoreIcon";' not in text:
+              text = text.replace('"use client";\n\n', '"use client";\n\nimport StoreIcon from "@/components/StoreIcon";\n', 1)
+          text = text.replace('<i className="bi bi-chevron-right"></i>', '<StoreIcon name="chevron-right" />')
+          assert 'bi bi-chevron-right' not in text
+          lead.write_text(text)
+
+          layout = Path("modulex-store/src/app/layout.tsx")
+          text = layout.read_text()
+          if 'next/font/google' not in text:
+              text = text.replace('import type { Metadata } from "next";\n', 'import type { Metadata } from "next";\nimport { Outfit, Playfair_Display } from "next/font/google";\n', 1)
+          text = text.replace('import "@/css/bootstrap-icons.css";\n', '')
+          font_block = '''\nconst outfit = Outfit({\n  subsets: ["latin"],\n  variable: "--font-outfit",\n  display: "swap",\n});\n\nconst playfair = Playfair_Display({\n  subsets: ["latin"],\n  variable: "--font-playfair",\n  display: "swap",\n});\n'''
+          if 'const outfit = Outfit({' not in text:
+              marker = 'import {\n  createOrganizationJsonLd,\n  createWebSiteJsonLd,\n} from "@/lib/seo/structured-data";\n'
+              assert marker in text
+              text = text.replace(marker, marker + font_block, 1)
+          text = text.replace('<html lang={siteConfig.language}>', '<html lang={siteConfig.language} className={`${outfit.variable} ${playfair.variable}`}>')
+          assert 'bootstrap-icons.css' not in text
+          assert 'next/font/google' in text
+          layout.write_text(text)
+
+          style = Path("modulex-store/src/css/style.css")
+          text = style.read_text()
+          text, removed = re.subn(r"@import\s+url\(['\"]?https://fonts\.googleapis\.com[^;]+;\s*", "", text, count=1, flags=re.I)
+          assert removed == 1, "Expected one Google Fonts @import"
+          text = re.sub(r"font-family:\s*['\"]Outfit['\"],\s*sans-serif;", "font-family: var(--font-outfit), sans-serif;", text)
+          text = re.sub(r"font-family:\s*['\"]Playfair Display['\"],\s*serif;", "font-family: var(--font-playfair), serif;", text)
+          assert 'fonts.googleapis.com' not in text
+          assert "font-family: 'Outfit'" not in text
+          assert "font-family: 'Playfair Display'" not in text
+          style.write_text(text)
+
+          Path(".github/workflows/gc8b-tuning-sync.yml").unlink()
+          PY
+      - name: Commit optimized delivery
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "perf(store): remove render-blocking icon and font delivery"
+          git push origin HEAD:feat/gc8b-accessibility-performance
