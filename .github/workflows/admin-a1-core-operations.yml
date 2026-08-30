@@ -12,7 +12,7 @@ on:
       - ".github/workflows/admin-a1-core-operations.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   admin-a1-verification:
@@ -77,3 +77,65 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
           NEXT_PUBLIC_SITE_URL: https://oakwellcabinetry.com
         run: npm run build
+
+  sync-final-docs:
+    if: github.actor != 'github-actions[bot]'
+    needs:
+      - admin-a1-verification
+      - store-portal-boundary-verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/a1-core-operations-hardening-active
+      - name: Sync roadmap and plan
+        shell: python
+        run: |
+          from pathlib import Path
+
+          roadmap = Path("modulex-admin/ADMIN_ROADMAP.md")
+          text = roadmap.read_text()
+          replacements = {
+            "Production migrations `a1_core_operations_hardening`, `a1_order_confirmation_validation`, and `a1_order_legacy_progression_compatibility` install DB-authoritative line/commercial guards plus explicit order/shipment/installation transition policies.":
+              "Production migrations `a1_core_operations_hardening`, `a1_order_confirmation_validation`, `a1_order_legacy_progression_compatibility`, `a1_fulfillment_order_status_compatibility`, and `a1_order_product_lifecycle_compatibility` install DB-authoritative line/commercial guards plus explicit order/shipment/installation transition policies.",
+            "TDD evidence: A1 workflow run `33304214076` failed on the missing legacy-compatibility contract before the fix; GREEN run `33304311685` passed the A1 contract, order regressions, Admin portal regression, RBAC, lint and production build.":
+              "TDD evidence: RED runs `33304214076`, `33304574072`, and `33304725633` caught missing compatibility guards; final GREEN run `33304761896` passed the A1 contract, order regressions, Admin portal regression, RBAC, Admin lint/build, Store portal boundaries, scoped Store lint and Store production build.",
+            "Admin actions now expose only valid next workflow operations; Draft can no longer jump directly to Packed or Shipped.":
+              "Admin actions now expose only valid next workflow operations; Draft can no longer jump directly to Packed or Shipped. Shipment RPCs also preserve later order lifecycle states (`installation_scheduled`, `installation_in_progress`, `completed`) instead of regressing the order when ship/deliver events arrive.",
+            "Store fulfillment contracts continue to exclude source warehouse/location IDs, stock-deduction metadata and internal notes; fresh portal boundary verification passed in Actions run `33304311685`.":
+              "Store fulfillment contracts continue to exclude source warehouse/location IDs, stock-deduction metadata and internal notes; fresh portal boundary verification passed in final Actions run `33304761896`.",
+            "Fresh Store order and fulfillment portal contracts passed in Actions run `33304311685`, protecting financial, source-stock, assignment and internal-note boundaries.":
+              "Fresh Store order and fulfillment portal contracts passed in final Actions run `33304761896`, protecting financial, source-stock, assignment and internal-note boundaries.",
+            "Post-DDL Supabase Security/Performance Advisor review found no A1-specific new finding; unrelated existing Store/support/HR/index backlog remains outside A1.":
+              "Final post-DDL Supabase Security/Performance Advisor review found no A1-specific new finding. Rollback acceptance also proved inactive products cannot confirm and left all 462 production products Active; unrelated existing Store/support/HR/index backlog remains outside A1."
+          }
+          for old, new in replacements.items():
+            if old not in text:
+              raise SystemExit(f"Roadmap marker missing: {old[:90]}")
+            text = text.replace(old, new, 1)
+          roadmap.write_text(text)
+
+          plan = Path("docs/superpowers/plans/2026-08-30-a1-core-operations-hardening.md")
+          p = plan.read_text()
+          plan_replacements = {
+            "Add one additive Supabase migration that centralizes validation/transition helpers and hardens the existing mutation functions; keep Store portal access read-only through the existing narrow RPC projections. Admin UI changes are limited to installation next-action affordances so the browser mirrors—but never replaces—the database transition policy.":
+              "Add focused Supabase SQL hardening patches that centralize validation/transition helpers and harden the existing mutation functions; keep Store portal access read-only through the existing narrow RPC projections. Admin shipment and installation actions mirror—but never replace—the database transition policy.",
+            "- Create: `modulex-admin/supabase/migrations/20260830100000_a1_core_operations_hardening.sql`":
+              "- Create: `modulex-admin/sql/a1-core-operations-hardening.sql` and focused A1 compatibility SQL patches under `modulex-admin/sql/`",
+            "Create private helpers for fulfillment/tax/shipping validation and forward lifecycle transition validation. Delivery and delivery+installation require a customer-owned active shipping address; configured active `order_tax_rules` are authoritative; new order products must be active; update lines may retain an inactive product only when it already belongs to the order; quantities must remain positive; server-derived pricing-source classification remains authoritative.":
+              "Create private helpers for fulfillment/tax/shipping validation and forward lifecycle transition validation. Delivery and delivery+installation require a customer-owned active shipping address; configured active `order_tax_rules` are authoritative; Draft records may remain editable, while confirmation/non-Draft commercial validation requires Active products; quantities must remain positive; server-derived pricing-source classification remains authoritative."
+          }
+          for old, new in plan_replacements.items():
+            if old not in p:
+              raise SystemExit(f"Plan marker missing: {old[:90]}")
+            p = p.replace(old, new, 1)
+          plan.write_text(p)
+      - name: Commit final docs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin/ADMIN_ROADMAP.md docs/superpowers/plans/2026-08-30-a1-core-operations-hardening.md
+          git diff --cached --quiet && exit 0
+          git commit -m "docs: record final A1 verification"
+          git push origin HEAD:feat/a1-core-operations-hardening-active
