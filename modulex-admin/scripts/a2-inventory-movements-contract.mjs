@@ -9,11 +9,14 @@ const expect = (ok, message) => {
 
 const migrationPath = "sql/a2-inventory-movements.sql";
 const reversalLockFixPath = "sql/a2-inventory-movements-reversal-lock-fix.sql";
+const truncatePrivilegeFixPath = "sql/a2-inventory-movements-truncate-privilege-fix.sql";
 expect(fs.existsSync(path.join(root, migrationPath)), "A2.2 migration must exist");
 expect(fs.existsSync(path.join(root, reversalLockFixPath)), "A2.2 reversal lock corrective migration must exist");
+expect(fs.existsSync(path.join(root, truncatePrivilegeFixPath)), "A2.2 TRUNCATE privilege corrective migration must exist");
 
 const migration = read(migrationPath);
 const reversalLockFix = read(reversalLockFixPath);
+const truncatePrivilegeFix = read(truncatePrivilegeFixPath);
 const inventoryTable = read("src/components/inventory/InventoryTable.tsx");
 const stockOperationForm = read("src/components/stock-operations/StockOperationForm.tsx");
 const guidedStockOperation = read("src/components/scan/GuidedStockOperation.tsx");
@@ -50,6 +53,13 @@ expect(/before\s+update\s+or\s+delete[\s\S]{0,220}inventory_movements/i.test(mig
 expect(/drop\s+policy\s+if\s+exists\s+inventory_movements_update_admin_only/i.test(migration), "Legacy movement UPDATE policy must be removed");
 expect(/drop\s+policy\s+if\s+exists\s+inventory_movements_delete_super_admin_only/i.test(migration), "Legacy movement DELETE policy must be removed");
 expect(/reason/i.test(migration) && /reference_no/i.test(migration), "Movement validation must explicitly address reason/reference traceability");
+
+// RLS does not protect TRUNCATE, so application-facing roles must never retain
+// table-level TRUNCATE privilege on the immutable movement ledger.
+expect(
+  /revoke\s+truncate\s+on\s+table\s+public\.inventory_movements\s+from\s+authenticated\s*,\s*anon\s*;/i.test(truncatePrivilegeFix),
+  "A2.2 must revoke TRUNCATE on inventory_movements from authenticated and anon roles",
+);
 
 // Reversal runs as SECURITY INVOKER after UPDATE is revoked on the ledger. The
 // corrective migration is part of the A2.2 bundle and must serialize corrections
