@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `edbea195973591cfe64f095a98011a9b6efe3091`
-Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite GC-5 Gallery and GC-6 Cabinet Journey are production-accepted. GC-7 Reviews / Social Proof is in progress: Admin now has a `store.manage`-gated Reviews & Social Proof editor with explicit draft/publish/unpublish/delete controls and mandatory parent attribution fields; production schema/data and Store/Admin CI are verified, while live homepage acceptance remains pending PR merge/deploy. Admin primary Phase A1 work remains independently owned by its current roadmap next action.**
-Current Admin next action: **Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.**
+Main baseline: `74013f90561e023b0453aea57cd010456de2c597`
+Current phase: **Phase A2 — Inventory, Warehouses & Physical Operations**
+Current cross-roadmap package: **Granite GC-5 Gallery and GC-6 Cabinet Journey are production-accepted. GC-7 Reviews / Social Proof is in progress: Admin now has a `store.manage`-gated Reviews & Social Proof editor with explicit draft/publish/unpublish/delete controls and mandatory parent attribution fields; production schema/data and Store/Admin CI are verified, while PR #167 is merged on `main`; live homepage acceptance was not re-verified during the A1 closeout. Admin primary roadmap work has advanced to Phase A2 after verified A1 closeout.**
+Current Admin next action: **Review warehouses CRUD and role restrictions, then verify the zones/locations hierarchy and active-stock integrity.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -23,7 +23,7 @@ This document is the operational source of truth for `modulex-admin` delivery pl
   - Parent-attributed records require source entity, HTTPS source URL and visible attribution before they can be valid public content.
   - Production contains two curated source-linked Granite & Cabinet Center excerpts; no third-party widget or inferred rating is used.
   - Admin RBAC, scoped lint and production build are verified.
-  - Live Store homepage acceptance remains pending PR merge/deploy.
+  - PR #167 is merged on `main`; live Store homepage acceptance remains a separate verification item.
 
 ## Mandatory Session & Change Tracking Protocol
 
@@ -227,35 +227,58 @@ These rules are mandatory for all future Modulex Admin work:
   - Production migration `20260829205817_customer_order_lifecycle_editability` installed the private lifecycle policy and hardened order-update wrapper. Live policy checks returned Draft Sales=`direct`, Confirmed Sales=`approval`, Ready for Shipment Admin=`direct`, and Shipped/Completed/Cancelled/null-role=`locked`.
   - Transaction-scoped authenticated acceptance proved a temporarily `shipped` order rejects commercial revision and a profiles-less authenticated subject is denied; both tests rolled back and the sample order remained `draft` with no acceptance-test data persistence.
   - Post-DDL security/performance advisors reported no A1.2C-specific new finding; unrelated existing Store/security and index/policy backlog remains separately tracked.
-- [ ] Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.
-- [ ] Verify customer portal order projections remain narrower than Admin order data.
+- [x] Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.
+  - Production migrations `a1_core_operations_hardening`, `a1_order_confirmation_validation`, `a1_order_legacy_progression_compatibility`, `a1_fulfillment_order_status_compatibility`, and `a1_order_product_lifecycle_compatibility` install DB-authoritative line/commercial guards plus explicit order/shipment/installation transition policies. Draft orders may remain incomplete, while new confirmation validates fulfillment readiness; historical Confirmed orders are not retroactively blocked by status-only progression.
+  - Transaction-scoped production acceptance proved Draft → Shipped is rejected and a legacy Confirmed → In Preparation progression is allowed; all acceptance writes were rolled back.
+  - TDD evidence: RED runs `33304214076`, `33304574072`, and `33304725633` caught missing compatibility guards; final GREEN run `33304761896` passed the A1 contract, order regressions, Admin portal regression, RBAC, Admin lint/build, Store portal boundaries, scoped Store lint and Store production build.
+- [x] Verify customer portal order projections remain narrower than Admin order data.
+  - Store `smoke:store-portal` continues to reject monetary/internal fields such as unit price, totals, payment commission and internal notes from the customer portal projection.
+  - Fresh A1 Store boundary verification passed in Actions run `33304311685`.
 
 ## A1.3 Shipments
 
-- [ ] Review shipment creation/edit/status workflow.
-- [ ] Verify shipment-to-order/customer associations.
-- [ ] Define tracking/carrier/reference fields and status transition rules.
-- [ ] Verify only approved fulfillment fields are exposed to portals.
+- [x] Review shipment creation/edit/status workflow.
+  - Shipment creation remains reservation-backed; source quantity/location edits remain limited to Draft/Picking. The operational lifecycle is now fail-closed as Draft → Picking → Packed → Shipped → Delivered, with cancellation allowed only before shipment.
+  - Admin actions now expose only valid next workflow operations; Draft can no longer jump directly to Packed or Shipped. Shipment RPCs also preserve later order lifecycle states (`installation_scheduled`, `installation_in_progress`, `completed`) instead of regressing the order when ship/deliver events arrive.
+- [x] Verify shipment-to-order/customer associations.
+  - `a1_customer_shipment_guard` rejects shipment rows whose customer does not match the source order; existing reservation/source-location checks remain authoritative for shipment lines.
+- [x] Define tracking/carrier/reference fields and status transition rules.
+  - `shipment_number` remains the canonical immutable shipment reference. Carrier, service level and tracking number remain optional operational metadata captured at ship time so local-delivery flows are not forced into carrier semantics. Status progression is enforced in DB and mirrored by Admin actions.
+- [x] Verify only approved fulfillment fields are exposed to portals.
+  - Store fulfillment contracts continue to exclude source warehouse/location IDs, stock-deduction metadata and internal notes; fresh portal boundary verification passed in final Actions run `33304761896`.
 
 ## A1.4 Installations
 
-- [ ] Review installation scheduling/status workflow.
-- [ ] Define installer/contact/location/date fields and transition rules.
-- [ ] Verify portal installation visibility and neutral foreign-ID behavior.
+- [x] Review installation scheduling/status workflow.
+  - Installation mutations now use controlled private cores behind authenticated `SECURITY INVOKER` public wrappers. Admin workflow is Scheduled → Confirmed → In Progress → Completed, with cancellation available before completion.
+  - Production rollback acceptance proved Scheduled → Completed is rejected while Scheduled → Confirmed succeeds.
+- [x] Define installer/contact/location/date fields and transition rules.
+  - `assigned_to` remains an internal staff identifier; team/contact fields are operational appointment metadata; the installation location remains the order-derived address snapshot. Scheduled start is required and scheduled end, when supplied, must be after start. Status transitions are now explicit and fail closed.
+- [x] Verify portal installation visibility and neutral foreign-ID behavior.
+  - Existing portal installation RPCs remain customer-scoped, omit internal assignment/notes fields, and return neutral `installation_unavailable` behavior for foreign/non-visible IDs; fresh Store portal experience contract passed in Actions run `33304311685`.
 
 ## A1.5 Invoices and payments boundary
 
-- [ ] Review current invoice list/detail/print behavior.
-- [ ] Define whether payment methods/payment records are active scope or intentionally deferred.
-- [ ] Keep portal invoice/payment visibility out of scope until explicitly approved.
-- [ ] Verify financial fields are protected by appropriate roles.
+- [x] Review current invoice list/detail/print behavior.
+  - Existing invoice list/detail/print surfaces and issue/paid/void workflow remain the active A1 financial operations surface; A1 hardening did not widen portal visibility or bypass invoice approval rules.
+- [x] Define whether payment methods/payment records are active scope or intentionally deferred.
+  - Payment Methods remain active order/invoice commercial configuration. Invoice `paid_amount`/status remains the current payment-recording boundary; a standalone payment transaction ledger is intentionally deferred beyond A1.
+- [x] Keep portal invoice/payment visibility out of scope until explicitly approved.
+  - A1 creates no Store portal invoice/payment RPC, projection or navigation surface; the permanent A1 contract guards this boundary.
+- [x] Verify financial fields are protected by appropriate roles.
+  - Admin permissions retain `invoices.view` / `invoices.manage`; Finance retains invoice management while portal projections continue excluding order financial/internal fields. Fresh RBAC and portal boundary tests passed in Actions run `33304311685`.
 
 ### Phase A1 Exit Gate
 
-- [ ] Customer → order → shipment/installation lifecycle can be operated without manual SQL.
-- [ ] Invalid status transitions are prevented or explicitly handled.
-- [ ] Portal-visible projections expose only approved fields.
-- [ ] Core customer/order/fulfillment smoke coverage exists.
+- [x] Customer → order → shipment/installation lifecycle can be operated without manual SQL.
+  - Existing Admin create/edit/detail operations now sit on the hardened RPC/DB lifecycle contracts; production acceptance used the same mutation boundaries and required no persistent manual data correction.
+- [x] Invalid status transitions are prevented or explicitly handled.
+  - Rollback-only production acceptance passed six lifecycle assertions: valid order/shipment/installation next steps succeeded and Draft → Shipped, Draft shipment → Packed, and Scheduled installation → Completed were rejected. Production row-status counts were unchanged after rollback.
+- [x] Portal-visible projections expose only approved fields.
+  - Fresh Store order and fulfillment portal contracts passed in final Actions run `33304761896`, protecting financial, source-stock, assignment and internal-note boundaries.
+- [x] Core customer/order/fulfillment smoke coverage exists.
+  - `smoke:a1-core-operations` is permanent in the Admin smoke chain and `.github/workflows/admin-a1-core-operations.yml` runs A1, order-domain/lifecycle, portal, RBAC, lint and production-build verification across Admin and Store.
+  - Final post-DDL Supabase Security/Performance Advisor review found no A1-specific new finding. Rollback acceptance also proved inactive products cannot confirm and left all 462 production products Active; unrelated existing Store/support/HR/index backlog remains outside A1.
 
 ---
 
