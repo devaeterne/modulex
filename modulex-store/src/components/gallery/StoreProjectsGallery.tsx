@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import StoreIcon from "@/components/StoreIcon";
 import type { StorePublicProject, StorePublicProjectMedia } from "@/lib/store/content/queries";
 
 export type StoreProjectGalleryEntry = { project: StorePublicProject; media: StorePublicProjectMedia[] };
@@ -183,7 +184,7 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
               onClick={closeProjectGallery}
               aria-label="Close project gallery"
             >
-              <i className="bi bi-x-lg" aria-hidden="true"></i>
+              <StoreIcon name="x" />
             </button>
             <div className="project-gallery-dialog-content">
               <div className="project-gallery-dialog-header">
