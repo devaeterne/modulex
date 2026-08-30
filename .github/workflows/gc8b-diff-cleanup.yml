@@ -1,0 +1,124 @@
+name: GC-8B Diff Cleanup
+
+on:
+  push:
+    branches:
+      - feat/gc8b-accessibility-performance
+    paths:
+      - ".github/workflows/gc8b-diff-cleanup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/gc8b-accessibility-performance
+          fetch-depth: 0
+      - name: Reapply tuning without formatting churn
+        run: |
+          git fetch origin main
+          git checkout origin/main -- \
+            modulex-store/src/css/style.css \
+            modulex-store/src/components/Home/Contact.tsx \
+            modulex-store/src/components/Home/HeroPremium.tsx \
+            modulex-store/src/components/Home/HeroSlider.tsx \
+            modulex-store/src/components/Home/Testimonials.tsx \
+            modulex-store/src/components/Home/VirtualTour.tsx
+          python - <<'PY'
+          from pathlib import Path
+
+          def transform(path, replacements, insert_after=None, insertion=None):
+              p = Path(path)
+              raw = p.read_bytes()
+              text = raw.decode("utf-8")
+              if insert_after and insertion and insertion not in text:
+                  assert insert_after in text, f"missing insertion marker in {path}"
+                  text = text.replace(insert_after, insert_after + insertion, 1)
+              for old, new in replacements:
+                  assert old in text, f"missing replacement in {path}: {old}"
+                  text = text.replace(old, new)
+              p.write_bytes(text.encode("utf-8"))
+
+          transform(
+              "modulex-store/src/components/Home/Contact.tsx",
+              [
+                  ('<i className="bi bi-geo-alt"></i>', '<StoreIcon name="geo-alt" />'),
+                  ('<i className="bi bi-telephone"></i>', '<StoreIcon name="telephone" />'),
+                  ('<i className="bi bi-envelope"></i>', '<StoreIcon name="envelope" />'),
+                  ('<i className="bi bi-clock"></i>', '<StoreIcon name="clock" />'),
+                  ('<i className="bi bi-facebook"></i>', '<StoreIcon name="facebook" />'),
+                  ('<i className="bi bi-instagram"></i>', '<StoreIcon name="instagram" />'),
+                  ('<i className="bi bi-twitter-x"></i>', '<StoreIcon name="twitter-x" />'),
+                  ('<i className="bi bi-pinterest"></i>', '<StoreIcon name="pinterest" />'),
+                  ('<i className="bi bi-linkedin"></i>', '<StoreIcon name="linkedin" />'),
+                  ('<i className="bi bi-chevron-right"></i>', '<StoreIcon name="chevron-right" />'),
+              ],
+              insert_after='import { useRef, useState } from "react";',
+              insertion='\r\nimport StoreIcon from "@/components/StoreIcon";' if '\r\n' in Path("modulex-store/src/components/Home/Contact.tsx").read_bytes().decode("utf-8") else '\nimport StoreIcon from "@/components/StoreIcon";',
+          )
+
+          for filename in ["HeroPremium.tsx", "HeroSlider.tsx"]:
+              path = f"modulex-store/src/components/Home/{filename}"
+              current = Path(path).read_bytes().decode("utf-8")
+              nl = "\r\n" if "\r\n" in current else "\n"
+              transform(
+                  path,
+                  [
+                      ('<i className="bi bi-chevron-left"></i>', '<StoreIcon name="chevron-left" />'),
+                      ('<i className="bi bi-chevron-right"></i>', '<StoreIcon name="chevron-right" />'),
+                  ],
+                  insert_after='import Link from "next/link";',
+                  insertion=nl + 'import StoreIcon from "@/components/StoreIcon";',
+              )
+
+          path = "modulex-store/src/components/Home/Testimonials.tsx"
+          current = Path(path).read_bytes().decode("utf-8")
+          nl = "\r\n" if "\r\n" in current else "\n"
+          transform(
+              path,
+              [
+                  ('<i className="bi bi-star-fill"></i>', '<StoreIcon name="star" />'),
+                  ('<i className="bi bi-chevron-left"></i>', '<StoreIcon name="chevron-left" />'),
+                  ('<i className="bi bi-chevron-right"></i>', '<StoreIcon name="chevron-right" />'),
+              ],
+              insert_after='import "swiper/css/pagination";',
+              insertion=nl + 'import StoreIcon from "@/components/StoreIcon";',
+          )
+
+          path = "modulex-store/src/components/Home/VirtualTour.tsx"
+          current = Path(path).read_bytes().decode("utf-8")
+          nl = "\r\n" if "\r\n" in current else "\n"
+          transform(
+              path,
+              [
+                  ('<i className="bi bi-house-door"></i>', '<StoreIcon name="house" />'),
+                  ('<i className="bi bi-bounding-box"></i>', '<StoreIcon name="bounding-box" />'),
+                  ('<i className="bi bi-palette"></i>', '<StoreIcon name="palette" />'),
+              ],
+              insert_after='import Image from "next/image";',
+              insertion=nl + 'import StoreIcon from "@/components/StoreIcon";',
+          )
+
+          style = Path("modulex-store/src/css/style.css")
+          text = style.read_bytes().decode("utf-8")
+          import_line = "@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;800;900&family=Outfit:wght@300;400;500;600;700&display=swap');"
+          assert import_line in text
+          text = text.replace(import_line, "", 1)
+          text = text.replace("font-family: 'Outfit', sans-serif;", "font-family: var(--font-outfit), sans-serif;")
+          text = text.replace("font-family: 'Playfair Display', serif;", "font-family: var(--font-playfair), serif;")
+          assert "fonts.googleapis.com" not in text
+          style.write_bytes(text.encode("utf-8"))
+
+          Path(".github/workflows/gc8b-diff-cleanup.yml").unlink()
+          PY
+      - name: Commit clean diff
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(store): minimize GC-8B tuning diff"
+          git push origin HEAD:feat/gc8b-accessibility-performance
