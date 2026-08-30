@@ -1,0 +1,23 @@
+name: Admin Personnel UI
+on:
+  push:
+    paths: ["modulex-admin/src/app/(admin)/personnel/**", "modulex-admin/src/components/hr/**", "modulex-admin/scripts/personnel-ui-contract.mjs", ".github/workflows/admin-personnel-ui.yml"]
+  pull_request:
+    paths: ["modulex-admin/src/app/(admin)/personnel/**", "modulex-admin/src/components/hr/**", "modulex-admin/scripts/personnel-ui-contract.mjs", ".github/workflows/admin-personnel-ui.yml"]
+permissions: { contents: read }
+jobs:
+  personnel-verification:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: modulex-admin } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: modulex-admin/package-lock.json }
+      - run: npm ci
+      - run: node scripts/personnel-ui-contract.mjs
+      - run: npm run smoke:production-surface
+      - run: npm run smoke:rbac
+      - run: npm run lint
+      - name: Build
+        env: { NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key }
+        run: npm run build
