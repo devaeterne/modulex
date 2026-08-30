@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase/client";
 export default function ResetPasswordForm() {
   const router = useRouter();
   const [tokenHash, setTokenHash] = useState("");
+  const [recoverySessionReady, setRecoverySessionReady] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [ready, setReady] = useState(false);
@@ -15,19 +16,94 @@ export default function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const token = params.get("token_hash") || "";
-    const type = params.get("type") || "";
+    let cancelled = false;
+    let validationStarted = false;
 
-    window.history.replaceState({}, "", window.location.pathname);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const searchParams = new URLSearchParams(window.location.search);
+    const token = hashParams.get("token_hash") || "";
+    const type = hashParams.get("type") || "";
+    const mode = searchParams.get("mode") || "";
+
+    const clearCallbackUrl = () => {
+      window.history.replaceState({}, "", window.location.pathname);
+    };
 
     if (token && type === "recovery") {
+      clearCallbackUrl();
       setTokenHash(token);
       setReady(true);
       return;
     }
 
-    setError("Open this page from a valid password reset email.");
+    const isImplicitRecoveryCallback = mode === "recovery" || type === "recovery";
+
+    if (!isImplicitRecoveryCallback) {
+      setError("Open this page from a valid password reset email.");
+      return;
+    }
+
+    async function validateImplicitRecovery() {
+      if (cancelled || validationStarted) return;
+      validationStarted = true;
+
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (cancelled) return;
+
+      if (sessionError || !session) {
+        validationStarted = false;
+        clearCallbackUrl();
+        setError("This password reset link is invalid or expired.");
+        return;
+      }
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (cancelled) return;
+
+      if (userError || !user) {
+        clearCallbackUrl();
+        await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+        setError("This password reset link is invalid or expired.");
+        return;
+      }
+
+      if (user.app_metadata?.account_type === "dealer_portal") {
+        clearCallbackUrl();
+        await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+        setError("This password reset link cannot be used here.");
+        return;
+      }
+
+      clearCallbackUrl();
+      setRecoverySessionReady(true);
+      setReady(true);
+      setError(null);
+    }
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" && session) {
+        window.setTimeout(() => {
+          void validateImplicitRecovery();
+        }, 0);
+      }
+    });
+
+    void validateImplicitRecovery();
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -35,7 +111,7 @@ export default function ResetPasswordForm() {
     setError(null);
     setMessage(null);
 
-    if (!tokenHash) {
+    if (!tokenHash && !recoverySessionReady) {
       setError("This password reset link is invalid or expired.");
       return;
     }
@@ -51,22 +127,37 @@ export default function ResetPasswordForm() {
     }
 
     setBusy(true);
-    let verifiedSession = false;
+    let verifiedSession = recoverySessionReady;
 
     try {
-      const { data: verified, error: verifyError } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: "recovery",
-      });
+      if (tokenHash) {
+        const { data: verified, error: verifyError } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: "recovery",
+        });
 
-      if (verifyError || !verified.user) {
-        throw new Error("This password reset link is invalid or expired.");
-      }
+        if (verifyError || !verified.user) {
+          throw new Error("This password reset link is invalid or expired.");
+        }
 
-      verifiedSession = true;
+        verifiedSession = true;
 
-      if (verified.user.app_metadata?.account_type === "dealer_portal") {
-        throw new Error("This password reset link cannot be used here.");
+        if (verified.user.app_metadata?.account_type === "dealer_portal") {
+          throw new Error("This password reset link cannot be used here.");
+        }
+      } else {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          throw new Error("This password reset link is invalid or expired.");
+        }
+
+        if (user.app_metadata?.account_type === "dealer_portal") {
+          throw new Error("This password reset link cannot be used here.");
+        }
       }
 
       const { error: updateError } = await supabase.auth.updateUser({ password });
@@ -80,6 +171,7 @@ export default function ResetPasswordForm() {
         await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
       }
       setTokenHash("");
+      setRecoverySessionReady(false);
       setReady(false);
       setError(caught instanceof Error ? caught.message : "Unable to update password.");
     } finally {
