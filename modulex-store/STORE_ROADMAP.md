@@ -1,9 +1,9 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `cc670f511225c6e57b48c1bae321ef986f7da93c`
+Main baseline: `d41f7c19ce81016b6a1a05166d0a4089104bfe52`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
-Current Granite migration status: **GC-5, GC-6 and GC-7 are production-accepted. GC-7 live homepage acceptance is recorded after PR #167 / commit `74013f90561e023b0453aea57cd010456de2c597`. GC-8A — managed public navigation/footer + technical SEO — is implementation/data/CI complete on its conflict-safe latest-main branch; PR merge/deploy and live acceptance remain the final closeout gate before `[x]`.**
+Current Granite migration status: **GC-5, GC-6, GC-7 and GC-8A are production-accepted. GC-8A live acceptance is recorded after PR #169 / merge commit `d41f7c19ce81016b6a1a05166d0a4089104bfe52`; managed public chrome, portal coexistence and technical SEO are verified live. GC-8B — accessibility + performance acceptance — is the active next package.**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
 
@@ -584,7 +584,7 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 - [x] GC-5 — Projects / Gallery migration.
 - [x] GC-6 — Cabinet content / customer journey.
 - [x] GC-7 — Reviews / social proof.
-- [~] GC-8 — Navigation/footer, SEO, accessibility & performance QA. GC-8A implementation/data/CI complete; live acceptance pending, GC-8B remains next.
+- [~] GC-8 — Navigation/footer, SEO, accessibility & performance QA. GC-8A is production-accepted; GC-8B accessibility/performance acceptance remains the final GC-8 package.
 
 **GC-0 truth lock:** Granite Center source content must never override canonical Oakwell company-profile data automatically. Unconfirmed hours, service area, installation/design SLAs, promotional claims, and other parent-site business claims fail closed and stay unpublished until explicitly approved in the controlled source/workstream.
 
@@ -626,6 +626,6 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 
 # Next Action
 
-1. Merge/deploy **GC-8A — managed Store chrome + technical SEO** only after final branch CI is green and the PR remains `behind_by = 0`.
-2. Post-merge, verify live public nav/footer order, portal coexistence, Oakwell-facing Organization JSON-LD with Granite & Cabinet Center as distinct parent, managed-title de-duplication, canonical/robots/sitemap behavior, and no Granite runtime backend/media dependency; then mark GC-8A `[x]` in the closeout.
-3. Proceed to **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning**.
+1. Execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from latest `main`.
+2. Keep GC-8 `[~]` until accessibility, performance, indexing and final live acceptance all pass; then close the overall GC-8 exit gate.
+3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend.
