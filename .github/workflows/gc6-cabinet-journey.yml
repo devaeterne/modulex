@@ -1,0 +1,28 @@
+name: GC-6 Cabinet Journey
+
+on:
+  push:
+    branches:
+      - feat/gc6-cabinet-journey
+  pull_request:
+    paths:
+      - "modulex-store/**"
+      - "modulex-admin/**"
+      - ".github/workflows/gc6-cabinet-journey.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  gc6-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: GC-6 contract
+        working-directory: modulex-store
+        run: node scripts/gc6-cabinet-journey-contract.mjs
