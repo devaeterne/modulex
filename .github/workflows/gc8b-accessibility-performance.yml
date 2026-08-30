@@ -1,5 +1,6 @@
 name: GC-8B Accessibility Performance
 
+# Final GC-8B acceptance gate: source contracts, build delivery, and production baseline.
 on:
   push:
     branches:
