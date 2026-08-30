@@ -48,9 +48,9 @@ PR: #148 — `fix(admin): harden Request Center UI and notifications`
 - [x] Merged and deployed.
 - [x] Production Supabase policy/function rollout applied and verified.
 
-## Current
+### [x] 03 — Product List (`/products`)
 
-### [ ] 03 — Product List (`/products`)
+PR: #151 — `fix(admin): harden Product List UI`
 
 - [x] Separate `products.view` from `products.manage` UI affordances.
 - [x] Hide Add/Edit/Activate/Deactivate/Duplicate/Archive actions from view-only roles.
@@ -62,12 +62,28 @@ PR: #148 — `fix(admin): harden Request Center UI and notifications`
 - [x] Replace native archive confirm with an in-app themed confirmation dialog.
 - [x] Remove package-scope lint warning for unused search-clear handler.
 - [x] Add Product List regression contract/workflow and verify production build.
+- [x] Merged and deployed.
+
+## Current
+
+### [ ] 04 — Low Stock (`/low-stock`)
+
+- [x] Keep the existing search/view filter behavior and reset pagination when filters change.
+- [x] Add client-side pagination, rows-per-page control, page continuity, and out-of-range page clamping.
+- [x] Add a filtered result summary and accessible pagination state.
+- [x] Keep the wide stock table horizontally scrollable with an explicit mobile-safe minimum width.
+- [x] Keep threshold editing single-row only; do not expose unsupported bulk selection/actions.
+- [x] Gate threshold editing through `products.manage` instead of hardcoded role names.
+- [x] Replace raw Supabase errors with controlled user-facing messages while retaining technical logging and retry.
+- [x] Replace hardcoded number locale with runtime locale formatting.
+- [x] Add explicit labels/ARIA/focus-visible states for search, filter, pagination, threshold inputs, and actions.
+- [x] Add Low Stock UI regression contract and dedicated workflow.
+- [x] Verify Low Stock contract, production-surface/RBAC regressions, lint, and production build in CI.
 - [ ] Merge and deploy.
 
 ## Queue — sidebar order
 
 ### Products
-- [ ] 04 — Low Stock (`/low-stock`)
 - [ ] 05 — Brands (`/brands`)
 - [ ] 06 — Categories (`/categories`)
 
