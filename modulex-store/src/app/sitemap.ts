@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { siteConfig } from "@/config/site";
 import { getStorePublicCompanyLocations } from "@/lib/store/company/queries";
-import { getStoreGalleryReadiness, getStorePublicPage } from "@/lib/store/content/queries";
+import { getStoreCabinetJourneyReadiness, getStoreGalleryReadiness, getStorePublicPage } from "@/lib/store/content/queries";
 import { getAllStoreCatalogProducts } from "@/lib/store/products/queries";
 
 const staticRoutes = [
@@ -19,11 +19,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: route === "" ? 1 : route === "/products" ? 0.9 : 0.7,
   }));
 
-  const [productsResult, galleryResult, showroomPageResult, locationsResult] = await Promise.allSettled([
+  const [productsResult, galleryResult, showroomPageResult, locationsResult, cabinetJourneyResult] = await Promise.allSettled([
     getAllStoreCatalogProducts({ maxItems: 5000 }),
     getStoreGalleryReadiness(),
     getStorePublicPage("showroom"),
     getStorePublicCompanyLocations(),
+    getStoreCabinetJourneyReadiness(),
   ]);
 
   let productEntries: MetadataRoute.Sitemap = [];
@@ -73,5 +74,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("Unable to determine Showroom readiness for sitemap");
   }
 
-  return [...staticEntries, ...galleryEntries, ...showroomEntries, ...productEntries];
+  let cabinetJourneyEntries: MetadataRoute.Sitemap = [];
+  if (cabinetJourneyResult.status === "fulfilled" && cabinetJourneyResult.value.isReady && cabinetJourneyResult.value.page) {
+    cabinetJourneyEntries = [
+      {
+        url: `${siteConfig.url}/cabinet-process`,
+        lastModified: cabinetJourneyResult.value.page.updatedAt,
+        changeFrequency: "monthly",
+        priority: 0.8,
+      },
+    ];
+  } else if (cabinetJourneyResult.status === "rejected") {
+    console.error("Unable to determine Cabinet Planning readiness for sitemap");
+  }
+
+  return [...staticEntries, ...galleryEntries, ...showroomEntries, ...cabinetJourneyEntries, ...productEntries];
 }

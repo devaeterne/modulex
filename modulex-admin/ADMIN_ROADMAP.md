@@ -1,12 +1,20 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-08-29
-Main baseline: `2dd1af00dc2c2291e95507b1961957a6c0ddc0bf`
+Last reviewed: 2026-08-30
+Main baseline: `e0ccbcc239a52ac734ede69ed80fcf205bc2a93d`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite Center → Oakwell GC-4 Contact / Project Consultation is production-accepted and complete. GC-5 — Projects / Gallery is the next Granite package; Admin primary Phase A1 work remains independently owned by its current roadmap next action.**
+Current cross-roadmap package: **Granite GC-5 Gallery/media migration is production-accepted. GC-6 Cabinet Journey is in progress: Admin now has a store.manage-gated Cabinet Content editor for process steps and cabinetry FAQ with explicit draft/publish/unpublish controls; production data and CI are verified, while live acceptance remains pending PR merge/deploy. Admin primary Phase A1 work remains independently owned by its current roadmap next action.**
 Current Admin next action: **Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
+
+## GC-6 Cabinet Content cross-roadmap status
+
+- [~] Add Admin-managed Cabinet Planning process and FAQ content.
+  - `/store/cabinet-content` manages typed process/FAQ records under `store.manage` with explicit draft/publish/unpublish/delete behavior and source attribution metadata.
+  - `cabinet-process` page-level copy, CTA and SEO remain managed through the existing Store Pages editor rather than a parallel page system.
+  - Production schema/data and Admin scoped lint + production build are verified.
+  - Live Admin/Store acceptance remains pending PR merge/deploy; do not mark complete before that gate.
 
 ## Mandatory Session & Change Tracking Protocol
 
