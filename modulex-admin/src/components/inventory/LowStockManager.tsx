@@ -28,6 +28,10 @@ type StockRow = {
   last_inventory_update: string | null;
 };
 
+type RetryAction =
+  | { type: "load" }
+  | { type: "threshold"; row: StockRow };
+
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
 const focusClass =
@@ -100,6 +104,7 @@ export default function LowStockManager() {
   const [pageSize, setPageSize] = useState(25);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retryAction, setRetryAction] = useState<RetryAction | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const canEditThresholds = hasPermission(profile?.roles, "products.manage");
@@ -107,6 +112,7 @@ export default function LowStockManager() {
   const loadRows = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
+    setRetryAction(null);
 
     const { data, error } = await supabase
       .from("v_product_stock_summary")
@@ -121,6 +127,7 @@ export default function LowStockManager() {
       reportLowStockError("stock summary load failed", error);
       setRows([]);
       setErrorMessage("Low-stock data is temporarily unavailable. Please try again.");
+      setRetryAction({ type: "load" });
     } else {
       setRows((data ?? []) as StockRow[]);
       setThresholdDrafts({});
@@ -201,11 +208,13 @@ export default function LowStockManager() {
     const nextValue = Number(raw);
     if (!Number.isFinite(nextValue) || nextValue < 0) {
       setErrorMessage("Minimum stock level must be zero or greater.");
+      setRetryAction(null);
       return;
     }
 
     setSavingId(row.product_id);
     setErrorMessage(null);
+    setRetryAction(null);
     setSuccessMessage(null);
     const { error } = await supabase
       .from("products")
@@ -215,11 +224,13 @@ export default function LowStockManager() {
     if (error) {
       reportLowStockError("minimum stock update failed", error);
       setErrorMessage("We couldn’t update the minimum stock level. Please try again.");
+      setRetryAction({ type: "threshold", row });
       setSavingId(null);
       return;
     }
 
     setSuccessMessage(`${row.sku} minimum stock level updated.`);
+    setRetryAction(null);
     setSavingId(null);
     await loadRows();
   }
@@ -300,13 +311,21 @@ export default function LowStockManager() {
           <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <span>{errorMessage}</span>
-              <button
-                type="button"
-                onClick={() => void loadRows()}
-                className={`font-medium text-error-800 underline underline-offset-2 dark:text-error-300 ${focusClass}`}
-              >
-                Retry
-              </button>
+              {retryAction ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (retryAction.type === "load") {
+                      void loadRows();
+                      return;
+                    }
+                    void saveThreshold(retryAction.row);
+                  }}
+                  className={`font-medium text-error-800 underline underline-offset-2 dark:text-error-300 ${focusClass}`}
+                >
+                  {retryAction.type === "load" ? "Retry" : "Retry update"}
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
