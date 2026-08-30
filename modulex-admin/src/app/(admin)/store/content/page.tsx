@@ -4,7 +4,7 @@ import StoreContentSettings from "@/components/store/StoreContentSettings";
 
 export const metadata: Metadata = {
   title: "Store Content | Modulex Admin",
-  description: "Manage Oakwell public site homepage, footer and social content",
+  description: "Manage Oakwell homepage, navigation, footer, social content and homepage SEO",
 };
 
 export default function StoreContentPage() {

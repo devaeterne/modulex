@@ -2,18 +2,35 @@ import Image from "next/image";
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import type { StorePublicCompanyProfile } from "@/lib/store/company/queries";
+import type { ResolvedStoreChromeItem } from "@/lib/store/chrome/destinations";
 import type { StoreSiteSettings } from "@/lib/store/site/queries";
 
 function phoneHref(phone: string) {
   return `tel:${phone.replace(/[^+\d]/g, "")}`;
 }
 
+function BusinessLink({ item, context }: { item: ResolvedStoreChromeItem; context: string }) {
+  if (item.destinationKey === "contact") {
+    return (
+      <TrackedLink href={item.href} event="contact_click" payload={{ context }}>
+        {item.label}
+      </TrackedLink>
+    );
+  }
+
+  return <Link href={item.href}>{item.label}</Link>;
+}
+
 export default function Footer({
   company,
   settings,
+  productLinks,
+  companyLinks,
 }: {
   company: StorePublicCompanyProfile | null;
   settings: StoreSiteSettings | null;
+  productLinks: ResolvedStoreChromeItem[];
+  companyLinks: ResolvedStoreChromeItem[];
 }) {
   const companyName = company?.companyName || "Oakwell Cabinetry";
   const addressLine = [company?.addressLine1, company?.addressLine2].filter(Boolean).join(", ");
@@ -57,25 +74,22 @@ export default function Footer({
         <div className="footer-links">
           <h3>Products</h3>
           <ul>
-            <li><Link href="/products">Product Catalog</Link></li>
-            <li>
-              <TrackedLink href="/contact" event="contact_click" payload={{ context: "footer_product_support" }}>
-                Product Support
-              </TrackedLink>
-            </li>
+            {productLinks.map((item) => (
+              <li key={item.id}>
+                <BusinessLink item={item} context="footer_product_support" />
+              </li>
+            ))}
           </ul>
         </div>
 
         <div className="footer-links">
           <h3>Company</h3>
           <ul>
-            <li><Link href="/about">About Us</Link></li>
-            <li><Link href="/showroom">Showroom</Link></li>
-            <li>
-              <TrackedLink href="/contact" event="contact_click" payload={{ context: "footer_company" }}>
-                Contact
-              </TrackedLink>
-            </li>
+            {companyLinks.map((item) => (
+              <li key={item.id}>
+                <BusinessLink item={item} context="footer_company" />
+              </li>
+            ))}
           </ul>
         </div>
 

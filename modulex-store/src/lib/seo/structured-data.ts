@@ -57,22 +57,26 @@ function buildLocationPostalAddress(location: StorePublicCompanyLocation) {
 
 export function createOrganizationJsonLd(company: StorePublicCompanyProfile | null = null) {
   const brandName = company?.companyName?.trim() || siteConfig.name;
-  const legalName = company?.legalName?.trim() || undefined;
-  const organizationName = legalName || brandName;
+  const parentName = company?.legalName?.trim() || undefined;
+  const hasDistinctParent = Boolean(parentName && parentName.toLocaleLowerCase() !== brandName.toLocaleLowerCase());
   const logo = company?.logoUrl?.trim() || undefined;
 
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
     "@id": new URL("#organization", siteConfig.url).toString(),
-    name: organizationName,
-    legalName,
-    alternateName: organizationName !== brandName ? brandName : undefined,
+    name: brandName,
     url: siteConfig.url,
     logo,
     email: company?.email?.trim() || undefined,
     telephone: company?.phone?.trim() || undefined,
     address: company ? buildPostalAddress(company) : undefined,
+    parentOrganization: hasDistinctParent
+      ? {
+          "@type": "Organization",
+          name: parentName,
+        }
+      : undefined,
     brand: {
       "@type": "Brand",
       name: brandName,

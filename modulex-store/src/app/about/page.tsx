@@ -5,6 +5,7 @@ import {
   type StorePublicCompanyProfile,
 } from "@/lib/store/company/queries";
 import { getStorePublicPage, type StorePublicPage } from "@/lib/store/content/queries";
+import { resolveManagedSeoTitle } from "@/lib/seo/metadata";
 
 export const revalidate = 900;
 
@@ -24,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
     const image = page.ogImageUrl || page.heroImageUrl;
     return {
-      title: page.seoTitle || page.title,
+      title: resolveManagedSeoTitle(page.seoTitle, page.title),
       description: page.seoDescription || page.intro || FALLBACK_DESCRIPTION,
       alternates: { canonical: "/about" },
       openGraph: image ? { images: [image] } : undefined,

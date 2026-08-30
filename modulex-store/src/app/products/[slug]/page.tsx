@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import AnalyticsEventOnView from "@/components/analytics/AnalyticsEventOnView";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import { siteConfig } from "@/config/site";
+import { resolveManagedSeoTitle } from "@/lib/seo/metadata";
 import { getStoreProductBySlug } from "@/lib/store/products/queries";
 import type { StoreProductDetail } from "@/lib/store/products/types";
 
@@ -45,7 +46,7 @@ export async function generateMetadata({
       product.media.find((item) => item.type === "image")?.url;
 
     return {
-      title: product.seoTitle || product.displayName,
+      title: resolveManagedSeoTitle(product.seoTitle, product.displayName),
       description,
       alternates: {
         canonical: `/products/${product.slug}`,

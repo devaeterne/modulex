@@ -1,9 +1,9 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `edbea195973591cfe64f095a98011a9b6efe3091`
+Main baseline: `cc670f511225c6e57b48c1bae321ef986f7da93c`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
-Current Granite migration status: **GC-5 Gallery and GC-6 Cabinet Journey are production-accepted. GC-6 live acceptance verified `/cabinet-process` HTTP 200 with 4 process steps, 6 FAQs, consultation CTA, FAQ structured data and sitemap inclusion. GC-7 Reviews / Social Proof is in progress: typed attributed testimonial CMS, Admin management, two source-linked parent-company excerpts in production, public attribution gating, RBAC, lint and Store/Admin production builds are verified; live homepage acceptance remains pending PR merge/deploy.**
+Current Granite migration status: **GC-5, GC-6 and GC-7 are production-accepted. GC-7 live homepage acceptance is recorded after PR #167 / commit `74013f90561e023b0453aea57cd010456de2c597`. GC-8A — managed public navigation/footer + technical SEO — is implementation/data/CI complete on its conflict-safe latest-main branch; PR merge/deploy and live acceptance remain the final closeout gate before `[x]`.**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
 
@@ -185,34 +185,27 @@ The broader Granite migration now has an approved dynamic-content architecture a
 
 ### Granite GC-6 — Cabinet Journey / FAQ extension
 
-- [~] Publish a CMS-backed cabinet planning/customer-journey surface.
-  - Typed `store_process_steps` and `store_faq_entries` domains, Admin `Cabinet Content` management, published-only public RPCs, CMS page SEO/CTA, conditional sitemap readiness and FAQ structured data are implemented on the GC-6 branch.
-  - Production migration is applied; 4 adapted process steps and 6 original Oakwell cabinetry FAQs are published in controlled data. Anonymous direct table reads remain denied and provenance is omitted from public projections.
-  - Source promotions, fixed SLAs, installation promises, guarantees and other unconfirmed Granite claims were deliberately not migrated.
-  - Branch verification: GC-6 contract, company/gallery/showroom regressions, changed-file lint and Store/Admin production builds pass.
-  - Completion remains `[~]` until the PR is merged/deployed and `/cabinet-process` receives live acceptance.
+- [x] Publish a CMS-backed cabinet planning/customer-journey surface.
+  - Production live acceptance is complete: `/cabinet-process` returns HTTP 200 with 4 process steps, 6 FAQs, consultation CTA, FAQ structured data and sitemap inclusion.
+  - Anonymous direct reads remain denied; unsupported source promotions, guarantees and SLAs remain omitted.
 
 ### Granite GC-7 — Reviews / Social Proof
 
-- [~] Publish source-identified social proof without converting parent-company reviews into Oakwell reviews.
-  - Typed `store_testimonials` CMS + narrow published-only public RPC are implemented; anon direct table reads remain denied.
-  - Admin `/store/reviews` is protected by `store.manage` and supports draft/publish/unpublish/delete.
-  - Two short source-linked Granite & Cabinet Center excerpts are published in production data with required source entity, HTTPS source link and visible attribution; no rating is inferred.
-  - Store homepage renders the section only when published rows exist and explicitly labels the content `Granite & Cabinet Center customer reviews` and `not Oakwell-specific reviews`.
-  - GC-7 contract, GC-6/GC-5/company regressions, Admin RBAC, scoped lint and Store/Admin production builds pass.
-  - Completion remains `[~]` until PR merge/deploy and live homepage acceptance.
+- [x] Publish source-identified social proof without converting parent-company reviews into Oakwell reviews.
+  - Production acceptance completed after PR #167 / commit `74013f90561e023b0453aea57cd010456de2c597`; live homepage verification confirmed two source-linked Granite & Cabinet Center excerpts with visible parent attribution and no inferred rating.
+  - Admin remains `store.manage`-gated; anon direct table reads remain denied and the public RPC exposes only published attributed rows.
 
 ## 2.1.2 Shared Store chrome
 
-- [ ] Make primary navigation configurable from approved site settings/CMS data if business navigation is expected to change without deployment.
+- [x] Make primary navigation configurable from approved site settings/CMS data if business navigation is expected to change without deployment.
   - Business-owned labels, order, visibility and configurable destinations are data-owned; route implementation/allowlists remain code-owned.
 
-- [ ] Review footer sections and links for CMS configurability.
+- [x] Review footer sections and links for CMS configurability.
   - Ordinary business-editable footer labels/links/social destinations must follow the dynamic-content rule rather than new hard-coded arrays.
 
-- [ ] Ensure public Navbar and portal Navbar coexist without breaking the portal sidebar experience.
+- [x] Ensure public Navbar and portal Navbar coexist without breaking the portal sidebar experience.
 
-- [ ] Add a clear path from Customer/Dealer portal back to the public site.
+- [x] Add a clear path from Customer/Dealer portal back to the public site.
   - Shared chrome design: `docs/superpowers/specs/2026-08-29-phase-2-1-d-shared-store-chrome-design.md`.
 
 ### Phase 2.1 Exit Gate
@@ -588,10 +581,10 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
   - Production acceptance: `docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`.
 - [x] GC-4 — Contact / Project Consultation Form migration.
   - Production acceptance: `docs/granite-center/GC4_PRODUCTION_ACCEPTANCE.md`.
-- [ ] GC-5 — Projects / Gallery migration.
-- [ ] GC-6 — Cabinet content / customer journey.
-- [ ] GC-7 — Reviews / social proof.
-- [ ] GC-8 — Navigation/footer, SEO, accessibility & performance QA.
+- [x] GC-5 — Projects / Gallery migration.
+- [x] GC-6 — Cabinet content / customer journey.
+- [x] GC-7 — Reviews / social proof.
+- [~] GC-8 — Navigation/footer, SEO, accessibility & performance QA. GC-8A implementation/data/CI complete; live acceptance pending, GC-8B remains next.
 
 **GC-0 truth lock:** Granite Center source content must never override canonical Oakwell company-profile data automatically. Unconfirmed hours, service area, installation/design SLAs, promotional claims, and other parent-site business claims fail closed and stay unpublished until explicitly approved in the controlled source/workstream.
 
@@ -633,8 +626,6 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 
 # Next Action
 
-The user-approved active workstream remains the Granite Center → Oakwell migration, executed sequentially by reviewed PRs. Existing Phase 2.1 Gallery/Projects acceptance remains a standing dependency/context and is not discarded.
-
-1. Start **GC-5 — Projects / Gallery migration** from the latest `main`; keep the existing Phase 2.1 Gallery/Projects `[~]` dependency explicit until curated production project/media acceptance closes it.
-2. GC-4 is production-accepted. Form option values remain intentionally empty until business-approved values are configured in Admin; do not seed guessed project types or consultation intents.
-3. Preserve GC-4's native `/api/leads`, attribution/privacy boundaries, dealer-document isolation, and public-wrapper/private-definer RPC architecture while GC-5 proceeds.
+1. Merge/deploy **GC-8A — managed Store chrome + technical SEO** only after final branch CI is green and the PR remains `behind_by = 0`.
+2. Post-merge, verify live public nav/footer order, portal coexistence, Oakwell-facing Organization JSON-LD with Granite & Cabinet Center as distinct parent, managed-title de-duplication, canonical/robots/sitemap behavior, and no Granite runtime backend/media dependency; then mark GC-8A `[x]` in the closeout.
+3. Proceed to **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning**.
