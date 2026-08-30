@@ -14,9 +14,12 @@ const read = (file) => {
 const exists = (file) => fs.existsSync(path.join(root, file));
 
 const sqlPath = "sql/a1-core-operations-hardening.sql";
+const confirmationPatchPath = "sql/a1-order-confirmation-validation.sql";
 assert.equal(exists(sqlPath), true, "A1 core operations hardening SQL contract must exist");
+assert.equal(exists(confirmationPatchPath), true, "A1 order confirmation validation patch must exist");
 
 const sql = read(sqlPath);
+const confirmationPatch = read(confirmationPatchPath);
 const shipmentDetail = read("src/components/customers/CustomerShipmentDetailRBAC.tsx");
 const installationDetail = read("src/components/customers/CustomerInstallationDetail.tsx");
 const permissions = read("src/lib/auth/permissions.ts");
@@ -31,6 +34,9 @@ assert.match(sql, /status\s*(?:<>|!=)\s*'archived'|status\s+in\s*\([^)]*'active'
 assert.match(sql, /order_tax_rules/i, "configured order tax rules must be authoritative");
 assert.match(sql, /shipping address[^;]{0,220}required/i, "delivery fulfillment must require a shipping address");
 assert.match(sql, /price_source/i, "pricing source classification must remain server-controlled");
+assert.match(confirmationPatch, /validate_customer_order_confirmation/i, "confirmation must have an explicit readiness validator");
+assert.match(confirmationPatch, /p_status\s*=\s*'confirmed'[\s\S]{0,260}validate_customer_order_confirmation/i, "confirmation transition must invoke the readiness validator");
+assert.match(confirmationPatch, /v_order\.status\s*<>\s*'draft'/i, "draft orders may remain incomplete while non-Draft orders enforce fulfillment readiness");
 
 // Shipments: strict warehouse flow, no backwards jumps.
 assert.match(sql, /customer_shipment_status_transition_allowed/i, "shipment transition helper must exist");
@@ -60,8 +66,8 @@ assert.match(installationDetail, /in_progress[\s\S]{0,260}completed/i, "in-progr
 // Invoice/payment boundary: active internal roles, no new portal invoice/payment surface.
 assert.match(permissions, /"invoices\.manage"/, "Admin permission model must retain invoice mutation permission");
 assert.match(permissions, /finance:[\s\S]*"invoices\.manage"/, "Finance must retain invoice management permission");
-assert.doesNotMatch(sql, /get_store_portal_(?:invoice|payment)/i, "A1 must not add portal invoice/payment RPCs");
-assert.doesNotMatch(sql, /create\s+table[\s\S]{0,80}(?:payment_transactions|customer_payments|payment_ledger)/i, "standalone payment ledger remains deferred");
+assert.doesNotMatch(sql + confirmationPatch, /get_store_portal_(?:invoice|payment)/i, "A1 must not add portal invoice/payment RPCs");
+assert.doesNotMatch(sql + confirmationPatch, /create\s+table[\s\S]{0,80}(?:payment_transactions|customer_payments|payment_ledger)/i, "standalone payment ledger remains deferred");
 
 // Existing Store contracts are the cross-roadmap proof that portal data is intentionally narrower.
 assert.match(storePortalContract, /unit_price\|subtotal\|tax_amount\|total_amount\|grand_total\|payment_commission_amount\|internal_notes/i, "Store order contract must guard financial/internal fields");
