@@ -1,5 +1,5 @@
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import BrandsTable from "@/components/brands/BrandsTable";
+import TaxonomyManager from "@/components/products/TaxonomyManager";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -11,7 +11,7 @@ export default function BrandsPage() {
   return (
     <div>
       <PageBreadcrumb pageTitle="Brands" />
-      <BrandsTable />
+      <TaxonomyManager entityLabel="Brand" entityLabelPlural="Brands" tableName="product_brands" />
     </div>
   );
 }
