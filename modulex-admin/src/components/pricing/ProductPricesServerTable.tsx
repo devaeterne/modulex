@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
+import { formatDbDecimal, parseDbDecimal } from "@/lib/validation";
 
 type ProductStatus = "active" | "inactive";
 type StockFilter = "all" | "in_stock" | "out_of_stock";
@@ -46,7 +47,7 @@ type Payload = {
   price_groups: PriceGroup[];
 };
 
-type PriceChange = { product_id: string; price_group_id: string; amount: number | null };
+type PriceChange = { product_id: string; price_group_id: string; amount: string | null };
 
 const pageSizes = [25, 50, 100];
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs outline-none focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
@@ -57,17 +58,13 @@ const primaryButtonClass = "inline-flex h-10 items-center justify-center rounded
 function key(productId: string, groupId: string) {
   return `${productId}:${groupId}`;
 }
+const PRICE_DECIMAL = { precision: 18, scale: 4, min: 0, allowNull: true } as const;
 function normalize(value: string | undefined) {
-  const raw = (value ?? "").trim().replace(",", ".");
-  if (!raw) return "";
-  const number = Number(raw);
-  return Number.isFinite(number) ? number.toFixed(4) : `invalid:${raw}`;
+  const parsed = parseDbDecimal(value, PRICE_DECIMAL);
+  return parsed.error ? `invalid:${(value ?? "").trim()}` : parsed.value ?? "";
 }
 function toInput(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === "") return "";
-  const number = Number(value);
-  if (!Number.isFinite(number)) return "";
-  return number.toFixed(2).replace(/\.?0+$/, "");
+  return formatDbDecimal(value, PRICE_DECIMAL);
 }
 function money(value: string) {
   const number = Number(value.replace(",", "."));
@@ -119,8 +116,8 @@ export default function ProductPricesServerTable() {
       const raw = current.trim().replace(",", ".");
       if (!raw) changes.push({ product_id, price_group_id, amount: null });
       else {
-        const amount = Number(raw);
-        if (Number.isFinite(amount) && amount >= 0) changes.push({ product_id, price_group_id, amount: Number(amount.toFixed(4)) });
+        const amount = parseDbDecimal(raw, PRICE_DECIMAL);
+        if (!amount.error) changes.push({ product_id, price_group_id, amount: amount.value });
       }
     }
     return changes;
@@ -285,7 +282,7 @@ export default function ProductPricesServerTable() {
           if (Number.isFinite(source)) result = source * (1 + adjustment / 100);
         }
         if (result === null || !Number.isFinite(result) || result < 0) { skipped += 1; continue; }
-        next[targetKey] = result.toFixed(2); applied += 1;
+        next[targetKey] = result.toFixed(4); applied += 1;
       }
       setDrafts(next);
       setSuccess(skipped ? `Bulk preview applied to ${applied} products; ${skipped} skipped.` : `Bulk preview applied to ${applied} products. Review and save.`);
@@ -296,8 +293,8 @@ export default function ProductPricesServerTable() {
     setError(null); setSuccess(null);
     for (const [priceKey, value] of Object.entries(drafts)) {
       if (normalize(value) === normalize(originals[priceKey])) continue;
-      const raw = value.trim().replace(",", ".");
-      if (raw && (!Number.isFinite(Number(raw)) || Number(raw) < 0)) { setError("One or more prices are invalid."); return; }
+      const parsed = parseDbDecimal(value, PRICE_DECIMAL);
+      if (parsed.error) { setError(`Price: ${parsed.error}`); return; }
     }
     if (!dirtyChanges.length) return;
     setIsSaving(true);

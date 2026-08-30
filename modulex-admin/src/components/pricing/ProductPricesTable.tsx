@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { formatDbDecimal, parseDbDecimal } from "@/lib/validation";
 
 type ProductStatus = "active" | "inactive";
 
@@ -131,15 +132,7 @@ function makePriceKey(
 function formatAmountForInput(
   value: string | number
 ) {
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return "";
-  }
-
-  return number
-    .toFixed(2)
-    .replace(/\.?0+$/, "");
+  return formatDbDecimal(value, { precision: 18, scale: 4, min: 0, allowNull: true });
 }
 
 function normalizeComparablePrice(
@@ -153,13 +146,11 @@ function normalizeComparablePrice(
     return "";
   }
 
-  const number = Number(raw);
-
-  if (!Number.isFinite(number)) {
+  const parsed = parseDbDecimal(raw, { precision: 18, scale: 4, min: 0, allowNull: true });
+  if (parsed.error) {
     return `invalid:${raw}`;
   }
-
-  return number.toFixed(4);
+  return parsed.value ?? "";
 }
 
 function parsePrice(
@@ -173,13 +164,8 @@ function parsePrice(
     return null;
   }
 
-  const number = Number(raw);
-
-  if (!Number.isFinite(number)) {
-    return null;
-  }
-
-  return number;
+  const parsed = parseDbDecimal(raw, { precision: 18, scale: 4, min: 0, allowNull: true });
+  return parsed.error || parsed.value === null ? null : Number(parsed.value);
 }
 
 function formatCurrency(
@@ -1425,7 +1411,7 @@ export default function ProductPricesTable() {
       nextValues[
         targetKey
       ] = result.toFixed(
-        2
+        4
       );
 
       applied += 1;
@@ -1479,7 +1465,7 @@ export default function ProductPricesTable() {
       product_id: string;
       price_group_id: string;
       amount:
-      | number
+      | string
       | null;
     }[] = [];
 
@@ -1493,19 +1479,13 @@ export default function ProductPricesTable() {
           .replace(",", ".");
 
       let amount:
-        | number
+        | string
         | null = null;
 
       if (raw) {
-        const parsed =
-          Number(raw);
+        const parsed = parseDbDecimal(raw, { precision: 18, scale: 4, min: 0, allowNull: true });
 
-        if (
-          !Number.isFinite(
-            parsed
-          ) ||
-          parsed < 0
-        ) {
+        if (parsed.error || parsed.value === null) {
           const product =
             products.find(
               (item) =>
@@ -1531,9 +1511,7 @@ export default function ProductPricesTable() {
           return;
         }
 
-        amount = Number(
-          parsed.toFixed(4)
-        );
+        amount = parsed.value;
       }
 
       payload.push({

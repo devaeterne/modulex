@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
+import { formatDbDecimal, parseDbDecimal } from "@/lib/validation";
 
 type ProductStatus = "active" | "inactive";
 type StockFilter = "all" | "in_stock" | "out_of_stock";
@@ -28,12 +29,14 @@ type Payload = {
 };
 
 const pageSizes = [25, 50, 100];
+const COST_DECIMAL = { precision: 18, scale: 4, min: 0, allowNull: true } as const;
+const MARGIN_DECIMAL = { precision: 7, scale: 3, min: 0, max: 100, allowNull: true } as const;
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs outline-none focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
 const buttonClass = "inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
 const primaryButtonClass = "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
 
-function normalize(value: string | undefined) { const raw = (value ?? "").trim().replace(",", "."); if (!raw) return ""; const number = Number(raw); return Number.isFinite(number) ? number.toFixed(4) : `invalid:${raw}`; }
-function toInput(value: string | number | null | undefined) { if (value === null || value === undefined || value === "") return ""; const number = Number(value); return Number.isFinite(number) ? number.toFixed(2).replace(/\.?0+$/, "") : ""; }
+function normalize(value: string | undefined) { const parsed = parseDbDecimal(value, COST_DECIMAL); return parsed.error ? `invalid:${(value ?? "").trim()}` : parsed.value ?? ""; }
+function toInput(value: string | number | null | undefined) { return formatDbDecimal(value, COST_DECIMAL); }
 function parse(value: string | undefined) { const raw = (value ?? "").trim().replace(",", "."); if (!raw) return null; const number = Number(raw); return Number.isFinite(number) ? number : null; }
 function money(value: number | null) { return value === null || !Number.isFinite(value) ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value); }
 function stock(value: string | number) { return Number(value ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 }); }
@@ -81,7 +84,7 @@ export default function CostMarginServerTable() {
   const settingsDirty = normalize(defaultMin) !== normalize(originalDefaultMin) || normalize(warningBuffer) !== normalize(originalWarningBuffer);
   useEffect(() => { if (!dirtyCount && !settingsDirty) return; const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; }; window.addEventListener("beforeunload", handler); return () => window.removeEventListener("beforeunload", handler); }, [dirtyCount, settingsDirty]);
 
-  useEffect(() => { let mounted = true; getCurrentProfile().then(({ profile }) => { if (!mounted) return; setHasAccess(hasPermission(profile?.roles, "pricing.cost.view")); }); return () => { mounted = false; }; }, []);
+  useEffect(() => { let mounted = true; getCurrentProfile().then(({ profile }) => { if (!mounted) return; setHasAccess(hasPermission(profile?.roles, "pricing.manage")); }); return () => { mounted = false; }; }, []);
 
   const load = useCallback(async () => {
     if (hasAccess !== true) return;
@@ -126,24 +129,24 @@ export default function CostMarginServerTable() {
     setError(null); setSuccess(null); const ids = [...selectedIds]; if (!ids.length) { setError("Select at least one product."); return; }
     const adjustment = parse(bulkValue); if (adjustment === null) { setError("Enter a valid adjustment value."); return; }
     try { const hydrated = await hydrateSelectedCosts(ids); const next = { ...hydrated }; let applied = 0, skipped = 0;
-      for (const id of ids) { const current = parse(next[id]); let result: number | null = null; if (bulkMode === "set_amount") result = adjustment; if (bulkMode === "current_percent" && current !== null) result = current * (1 + adjustment / 100); if (bulkMode === "current_amount" && current !== null) result = current + adjustment; if (result === null || !Number.isFinite(result) || result < 0) { skipped += 1; continue; } next[id] = result.toFixed(2); applied += 1; }
+      for (const id of ids) { const current = parse(next[id]); let result: number | null = null; if (bulkMode === "set_amount") result = adjustment; if (bulkMode === "current_percent" && current !== null) result = current * (1 + adjustment / 100); if (bulkMode === "current_amount" && current !== null) result = current + adjustment; if (result === null || !Number.isFinite(result) || result < 0) { skipped += 1; continue; } next[id] = result.toFixed(4); applied += 1; }
       setCostDrafts(next); setSuccess(skipped ? `Bulk cost preview applied to ${applied} products; ${skipped} skipped.` : `Bulk cost preview applied to ${applied} products. Review and save.`);
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to load selected costs."); }
   }
 
   async function saveChanges() {
-    setError(null); setSuccess(null); const costPayload: { product_id: string; amount: number | null }[] = [];
-    for (const id of costDirtyIds) { const raw = costDrafts[id] ?? ""; const value = parse(raw); if (raw.trim() && (value === null || value < 0)) { setError("One or more costs are invalid."); return; } costPayload.push({ product_id: id, amount: value }); }
-    for (const id of marginDirtyIds) { const raw = marginDrafts[id] ?? ""; const value = parse(raw); if (raw.trim() && (value === null || value < 0 || value > 100)) { setError("Minimum margin must be between 0 and 100."); return; } }
+    setError(null); setSuccess(null); const costPayload: { product_id: string; amount: string | null }[] = [];
+    for (const id of costDirtyIds) { const raw = costDrafts[id] ?? ""; const value = parseDbDecimal(raw, COST_DECIMAL); if (value.error) { setError(`Cost: ${value.error}`); return; } costPayload.push({ product_id: id, amount: value.value }); }
+    for (const id of marginDirtyIds) { const raw = marginDrafts[id] ?? ""; const value = parseDbDecimal(raw, MARGIN_DECIMAL); if (value.error) { setError(`Minimum margin: ${value.error}`); return; } }
     if (!dirtyCount) return; setIsSaving(true);
     if (costPayload.length) { const { error: rpcError } = await supabase.rpc("set_product_costs_bulk", { p_changes: costPayload, p_currency_code: "USD" }); if (rpcError) { setError(rpcError.message); setIsSaving(false); return; } }
-    for (const id of marginDirtyIds) { const raw = marginDrafts[id] ?? ""; if (!raw.trim()) { const { error: deleteError } = await supabase.from("product_margin_settings").delete().eq("product_id", id); if (deleteError) { setError(deleteError.message); setIsSaving(false); return; } } else { const { error: upsertError } = await supabase.from("product_margin_settings").upsert({ product_id: id, min_margin_percent: parse(raw) }, { onConflict: "product_id" }); if (upsertError) { setError(upsertError.message); setIsSaving(false); return; } } }
+    for (const id of marginDirtyIds) { const raw = marginDrafts[id] ?? ""; const value = parseDbDecimal(raw, MARGIN_DECIMAL); if (!raw.trim()) { const { error: deleteError } = await supabase.from("product_margin_settings").delete().eq("product_id", id); if (deleteError) { setError(deleteError.message); setIsSaving(false); return; } } else if (!value.error) { const { error: upsertError } = await supabase.from("product_margin_settings").upsert({ product_id: id, min_margin_percent: value.value }, { onConflict: "product_id" }); if (upsertError) { setError(upsertError.message); setIsSaving(false); return; } } }
     const saved = dirtyCount; setIsSaving(false); setSuccess(`${saved} change${saved === 1 ? "" : "s"} saved successfully.`); await load();
   }
   async function saveSettings() {
-    setError(null); setSuccess(null); const min = parse(defaultMin); const buffer = parse(warningBuffer); if (min === null || min < 0 || min > 100 || buffer === null || buffer < 0 || buffer > 100) { setError("Margin settings must be between 0 and 100."); return; }
-    setIsSavingSettings(true); const { error: updateError } = await supabase.from("pricing_settings").update({ default_min_margin_percent: min, warning_margin_buffer_percent: buffer }).eq("id", 1); if (updateError) { setError(updateError.message); setIsSavingSettings(false); return; }
-    setOriginalDefaultMin(toInput(min)); setOriginalWarningBuffer(toInput(buffer)); setIsSavingSettings(false); setSuccess("Margin settings saved successfully.");
+    setError(null); setSuccess(null); const min = parseDbDecimal(defaultMin, MARGIN_DECIMAL); const buffer = parseDbDecimal(warningBuffer, MARGIN_DECIMAL); if (min.error || buffer.error || min.value === null || buffer.value === null) { setError(`Margin settings: ${min.error ?? buffer.error ?? "A value is required."}`); return; }
+    setIsSavingSettings(true); const { error: updateError } = await supabase.from("pricing_settings").update({ default_min_margin_percent: min.value, warning_margin_buffer_percent: buffer.value }).eq("id", 1); if (updateError) { setError(updateError.message); setIsSavingSettings(false); return; }
+    setOriginalDefaultMin(min.value); setOriginalWarningBuffer(buffer.value); setIsSavingSettings(false); setSuccess("Margin settings saved successfully.");
   }
 
   if (hasAccess === false) return <div className="rounded-2xl border border-error-200 bg-error-50 p-8 text-center dark:border-error-500/30 dark:bg-error-500/10"><h3 className="text-lg font-semibold text-error-700 dark:text-error-400">Access Denied</h3><p className="mt-2 text-sm text-error-600 dark:text-error-400">Cost and margin information is available only to admins.</p></div>;

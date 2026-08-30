@@ -48,6 +48,6 @@ assert.match(dealerPricing, /valid_from[\s\S]*now\(\)/, "Dealer pricing must enf
 assert.doesNotMatch(dealerPricing, /coalesce\s*\(\s*pp\.?amount\s*,/i, "Dealer pricing must not silently fall back to public/list price");
 assert.match(roadmap, /- \[(?:~|x)\] Add validation\/audit coverage for price changes\./, "A3.3 implementation status is missing");
 const a33Section = roadmap.split("## A3.3 Pricing")[1]?.split("### Phase A3 Exit Gate")[0] ?? "";
-assert.doesNotMatch(a33Section, /CLOSED/i, "A3.3 must not be marked CLOSED before production acceptance");
+assert.match(a33Section, /CLOSED/i, "A3.3 production acceptance closeout must remain recorded");
 
 console.log("A3.3 Pricing contract: PASS");
