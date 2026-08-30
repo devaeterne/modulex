@@ -63,8 +63,10 @@ jobs:
           cache-dependency-path: modulex-admin/package-lock.json
       - name: Install
         run: npm ci
+      - name: RBAC regression
+        run: npm run smoke:rbac
       - name: Scoped lint
-        run: npx eslint 'src/app/(admin)/store/cabinet-content/page.tsx' src/components/store/StoreCabinetContentManager.tsx src/components/store/StorePagesManager.tsx src/layout/AppSidebar.tsx src/lib/store/cabinetContent.ts src/lib/store/secondaryCms.ts
+        run: npx eslint 'src/app/(admin)/store/cabinet-content/page.tsx' src/components/store/StoreCabinetContentManager.tsx src/components/store/StorePagesManager.tsx src/layout/AppSidebar.tsx src/lib/auth/permissions.ts src/lib/store/cabinetContent.ts src/lib/store/secondaryCms.ts
       - name: Production build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
