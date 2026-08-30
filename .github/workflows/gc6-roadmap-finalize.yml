@@ -1,0 +1,46 @@
+name: GC-6 Roadmap Finalize
+
+on:
+  push:
+    branches:
+      - feat/gc6-cabinet-journey
+    paths:
+      - ".github/workflows/gc6-roadmap-finalize.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/gc6-cabinet-journey
+      - name: Finalize migration checklist
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md")
+          text = p.read_text()
+          replacements = {
+            "- `[ ]` add provenance, title/category/location/summary/alt text;": "- `[x]` add provenance, title/category/location/summary/alt text;",
+            "- `[ ]` preserve parent attribution where required;": "- `[x]` preserve parent attribution where required;",
+            "- `[ ]` add approved consultation CTA content;": "- `[x]` add approved consultation CTA content;",
+            "- `[ ]` decide Home Office/accessory scope separately;": "- `[x]` decide Home Office/accessory scope separately — remains hold / outside initial Oakwell scope;",
+            "- `[ ]` omit unsupported guarantees/discounts/SLAs.": "- `[x]` omit unsupported guarantees/discounts/SLAs.",
+          }
+          for old, new in replacements.items():
+            text = text.replace(old, new)
+          status = "**GC-6 implementation status — 2026-08-30:** typed process and FAQ domains are migrated to production; 4 source-adapted cabinet-planning steps and 6 original Oakwell cabinetry FAQs are published in controlled data. Draft gating was verified at 0/0 public rows before publication; after publication the narrow RPCs return 4/6 while anon direct table selects remain denied and source provenance remains private. The CMS CTA is `Start a Project Consultation` → `/contact`; Home Office/accessories remain hold; source discounts, SLAs, guarantees and installation promises were omitted. Store/Admin CI is green. Final GC-6 completion remains pending PR merge/deploy and live `/cabinet-process` acceptance."
+          import re
+          text = re.sub(r"\*\*GC-6 implementation status — 2026-08-30:\*\*.*", status, text, count=1)
+          p.write_text(text)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: finalize GC-5 and GC-6 migration checklist"
+            git push origin HEAD:feat/gc6-cabinet-journey
+          fi
