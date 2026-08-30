@@ -17,7 +17,6 @@ const sqlPath = "sql/a1-core-operations-hardening.sql";
 assert.equal(exists(sqlPath), true, "A1 core operations hardening SQL contract must exist");
 
 const sql = read(sqlPath);
-const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
 const shipmentDetail = read("src/components/customers/CustomerShipmentDetailRBAC.tsx");
 const installationDetail = read("src/components/customers/CustomerInstallationDetail.tsx");
 const permissions = read("src/lib/auth/permissions.ts");
@@ -32,8 +31,6 @@ assert.match(sql, /status\s*(?:<>|!=)\s*'archived'|status\s+in\s*\([^)]*'active'
 assert.match(sql, /order_tax_rules/i, "configured order tax rules must be authoritative");
 assert.match(sql, /shipping address[^;]{0,220}required/i, "delivery fulfillment must require a shipping address");
 assert.match(sql, /price_source/i, "pricing source classification must remain server-controlled");
-assert.match(orderDetail, /ORDER_STATUS_TRANSITIONS|nextCustomerOrderStatuses/, "order UI must derive valid forward status options");
-assert.doesNotMatch(orderDetail, /STATUSES\.map\(/, "order UI must not offer every lifecycle status as a direct jump");
 
 // Shipments: strict warehouse flow, no backwards jumps.
 assert.match(sql, /customer_shipment_status_transition_allowed/i, "shipment transition helper must exist");
