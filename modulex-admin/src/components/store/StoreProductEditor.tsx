@@ -61,6 +61,7 @@ function sanitizeFileName(fileName: string) {
 
 export default function StoreProductEditor({ productContentId }: { productContentId: string }) {
   const [content, setContent] = useState<StoreContent | null>(null);
+  const [initialSlug, setInitialSlug] = useState<string | null>(null);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [media, setMedia] = useState<StoreMedia[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -116,6 +117,7 @@ export default function StoreProductEditor({ productContentId }: { productConten
     }
 
     setContent(nextContent);
+    setInitialSlug(nextContent.slug);
     setVariants((variantRows ?? []) as ProductVariant[]);
     setMedia((mediaRows ?? []) as StoreMedia[]);
     setIsLoading(false);
@@ -135,6 +137,7 @@ export default function StoreProductEditor({ productContentId }: { productConten
     () => media.filter((item) => item.media_type === "document"),
     [media]
   );
+  const videoMedia = useMemo(() => media.filter((item) => item.media_type === "video"), [media]);
 
   const colorOptions = useMemo(() => {
     const byCode = new Map<string, string>();
@@ -183,10 +186,16 @@ export default function StoreProductEditor({ productContentId }: { productConten
       return;
     }
 
-    if (content.is_published && (!hasCopy || !primaryImage)) {
+    const hasPrimaryAltText = Boolean(primaryImage?.alt_text?.trim());
+    if (content.is_published && (!hasCopy || !primaryImage || !hasPrimaryAltText || variants.length === 0)) {
       setErrorMessage(
-        "A published product must have marketing copy and a primary image. Add the missing content or switch it back to Draft."
+        "A published product must have marketing copy, an active variant, and a primary image with alt text. Add the missing content or switch it back to Draft."
       );
+      return;
+    }
+
+    if (content.is_published && initialSlug !== null && slug !== initialSlug) {
+      setErrorMessage("Published Store product slug cannot change; unpublish it before changing the public slug.");
       return;
     }
 
@@ -226,6 +235,7 @@ export default function StoreProductEditor({ productContentId }: { productConten
             }
           : current
       );
+      setInitialSlug(slug);
       setSuccessMessage("Store product content saved.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to save Store product content.");
@@ -328,6 +338,28 @@ export default function StoreProductEditor({ productContentId }: { productConten
       setSuccessMessage("Primary image updated.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to update the primary image.");
+    } finally {
+      setMediaActionId(null);
+    }
+  }
+
+  async function handleUpdateMedia(item: StoreMedia, updates: Pick<StoreMedia, "alt_text" | "title" | "sort_order">) {
+    setMediaActionId(item.id);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      const userId = await getCurrentUserId();
+      const { error } = await supabase.from("store_product_media").update({
+        alt_text: updates.alt_text?.trim() || null,
+        title: updates.title?.trim() || null,
+        sort_order: Number.isFinite(updates.sort_order) ? updates.sort_order : 0,
+        updated_by: userId,
+      }).eq("id", item.id);
+      if (error) throw error;
+      await loadData();
+      setSuccessMessage("Store media details updated.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to update Store media details.");
     } finally {
       setMediaActionId(null);
     }
@@ -596,7 +628,9 @@ export default function StoreProductEditor({ productContentId }: { productConten
                     )}
                   </div>
                   <div className="p-3">
-                    <p className="truncate text-sm font-medium text-gray-800 dark:text-white/90">{item.title || "Product image"}</p>
+                    <input aria-label={`Alt text for ${item.title || item.id}`} defaultValue={item.alt_text ?? ""} className={fieldClass} placeholder="Alt text" onBlur={(event) => { if (event.target.value !== (item.alt_text ?? "")) void handleUpdateMedia(item, { alt_text: event.target.value, title: item.title, sort_order: item.sort_order }); }} />
+                    <input aria-label={`Sort order for ${item.title || item.id}`} type="number" defaultValue={item.sort_order} className={`${fieldClass} mt-2`} onBlur={(event) => { const value = Number(event.target.value); if (value !== item.sort_order) void handleUpdateMedia(item, { alt_text: item.alt_text, title: item.title, sort_order: value }); }} />
+                    <p className="mt-2 truncate text-sm font-medium text-gray-800 dark:text-white/90">{item.title || "Product image"}</p>
                     <div className="mt-3 flex gap-2">
                       {!item.is_primary && (
                         <button
@@ -656,6 +690,20 @@ export default function StoreProductEditor({ productContentId }: { productConten
                       >
                         Delete
                       </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {videoMedia.length > 0 && (
+              <div className="mt-6 border-t border-gray-200 pt-5 dark:border-gray-800">
+                <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">Video</h4>
+                <div className="mt-3 space-y-2">
+                  {videoMedia.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-brand-600 hover:underline">{item.title || "Product video"}</a>
+                      <button type="button" disabled={mediaActionId === item.id} onClick={() => void handleDeleteMedia(item)} className="rounded-lg border border-error-200 px-3 py-2 text-xs font-medium text-error-600">Delete</button>
                     </div>
                   ))}
                 </div>
@@ -739,12 +787,16 @@ export default function StoreProductEditor({ productContentId }: { productConten
               <li className={content.short_description?.trim() || content.description?.trim() ? "text-success-600" : "text-warning-600"}>
                 {content.short_description?.trim() || content.description?.trim() ? "✓" : "○"} Marketing copy
               </li>
-              <li className={primaryImage ? "text-success-600" : "text-warning-600"}>
-                {primaryImage ? "✓" : "○"} Primary product image
+              <li className={primaryImage?.alt_text?.trim() ? "text-success-600" : "text-warning-600"}>
+                {primaryImage?.alt_text?.trim() ? "✓" : "○"} Primary image with alt text
+              </li>
+              <li className={variants.length > 0 ? "text-success-600" : "text-warning-600"}>
+                {variants.length > 0 ? "✓" : "○"} Active product variant
               </li>
               <li className={content.slug && SLUG_PATTERN.test(content.slug) ? "text-success-600" : "text-warning-600"}>
                 {content.slug && SLUG_PATTERN.test(content.slug) ? "✓" : "○"} Valid public slug
               </li>
+              <li className="text-gray-500 dark:text-gray-400">Published slugs are immutable; unpublish before changing.</li>
             </ul>
           </section>
         </aside>

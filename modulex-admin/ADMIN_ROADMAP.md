@@ -382,11 +382,13 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A3.2 Store product publishing
 
-- [ ] Review `/store/products` publish/unpublish workflow.
-- [ ] Verify publish guards require sufficient product content/media.
-- [ ] Review Store slug uniqueness and change behavior.
-- [ ] Review media management: primary image, color-specific media, documents, video, alt text, sort order.
-- [ ] Review Store color management and swatches.
+- [x] Review `/store/products` publish/unpublish workflow.
+- [x] Verify publish guards require sufficient product content/media.
+- [x] Review Store slug uniqueness and change behavior.
+- [x] Review media management: primary image, color-specific media, documents, video, alt text, sort order.
+- [x] Review Store color management and swatches.
+
+Implementation contract is complete on `feat/a3-2-store-product-publishing`; production migration, deployment, and authenticated acceptance remain before Phase A3.2 closeout.
 
 ## A3.3 Pricing
 

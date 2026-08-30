@@ -30,6 +30,7 @@ type ProductVariant = {
 type PrimaryMedia = {
   product_content_id: string;
   url: string;
+  alt_text: string | null;
 };
 
 type PublicationFilter = "all" | "published" | "draft";
@@ -69,6 +70,7 @@ export default function StoreProductsTable() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ id: string; publish: boolean } | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -119,7 +121,7 @@ export default function StoreProductsTable() {
     if (contentIds.length > 0) {
       const { data, error } = await supabase
         .from("store_product_media")
-        .select("product_content_id,url")
+        .select("product_content_id,url,alt_text")
         .in("product_content_id", contentIds)
         .eq("media_type", "image")
         .eq("is_primary", true);
@@ -145,7 +147,7 @@ export default function StoreProductsTable() {
 
   const rows = useMemo<ProductRow[]>(() => {
     const variantsByCode = new Map<string, ProductVariant[]>();
-    const mediaByContent = new Map<string, string>();
+    const mediaByContent = new Map<string, PrimaryMedia>();
 
     for (const variant of variants) {
       if (!variant.base_product_code) continue;
@@ -155,13 +157,15 @@ export default function StoreProductsTable() {
     }
 
     for (const media of primaryMedia) {
-      mediaByContent.set(media.product_content_id, media.url);
+      mediaByContent.set(media.product_content_id, media);
     }
 
     return content.map((item) => {
       const itemVariants = variantsByCode.get(item.base_product_code) ?? [];
       const firstVariant = itemVariants[0];
-      const primaryImageUrl = mediaByContent.get(item.id) ?? null;
+      const primaryMediaItem = mediaByContent.get(item.id);
+      const primaryImageUrl = primaryMediaItem?.url ?? null;
+      const hasPrimaryAltText = Boolean(primaryMediaItem?.alt_text?.trim());
       const hasCopy = Boolean(item.short_description?.trim() || item.description?.trim());
 
       return {
@@ -171,7 +175,7 @@ export default function StoreProductsTable() {
         category: firstVariant?.category_name?.[0]?.name ?? null,
         brand: firstVariant?.brand_name?.[0]?.name ?? null,
         hasCopy,
-        isReady: hasCopy && Boolean(primaryImageUrl),
+        isReady: hasCopy && itemVariants.length > 0 && Boolean(primaryImageUrl) && hasPrimaryAltText,
       };
     });
   }, [content, variants, primaryMedia]);
@@ -216,19 +220,20 @@ export default function StoreProductsTable() {
     );
   }, [rows]);
 
-  async function togglePublished(row: ProductRow) {
+  function togglePublished(row: ProductRow) {
     const nextPublished = !row.is_published;
 
     if (nextPublished && !row.isReady) {
       setErrorMessage(
-        `${row.display_name} cannot be published until it has marketing copy and a primary image.`
+        `${row.display_name} cannot be published until it has marketing copy, an active variant, and a primary image with alt text.`
       );
       return;
     }
 
-    if (!window.confirm(`${nextPublished ? "Publish" : "Unpublish"} ${row.display_name}?`)) {
-      return;
-    }
+    setConfirmAction({ id: row.id, publish: nextPublished });
+  }
+
+  async function confirmTogglePublished(row: ProductRow, nextPublished: boolean) {
 
     setActionId(row.id);
     setErrorMessage(null);
@@ -250,13 +255,18 @@ export default function StoreProductsTable() {
       .eq("id", row.id);
 
     if (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(
+        error.message.includes("slug")
+          ? `${error.message} Unpublish the product before changing its public slug.`
+          : error.message
+      );
       setActionId(null);
       return;
     }
 
     await loadData();
     setActionId(null);
+    setConfirmAction(null);
   }
 
   return (
@@ -421,7 +431,10 @@ export default function StoreProductsTable() {
                           {row.isReady ? "Ready" : "Incomplete"}
                         </span>
                         {!row.hasCopy && <p className="mt-1 text-xs text-gray-400">Missing copy</p>}
-                        {!row.primaryImageUrl && <p className="mt-1 text-xs text-gray-400">Missing primary image</p>}
+                        {!row.variants.length && <p className="mt-1 text-xs text-gray-400">Missing active variant</p>}
+                        {row.primaryImageUrl && !primaryMedia.find((media) => media.product_content_id === row.id)?.alt_text?.trim() && (
+                          <p className="mt-1 text-xs text-gray-400">Missing primary image alt text</p>
+                        )}
                       </td>
                       <td className="px-5 py-4">
                         <span
@@ -450,9 +463,22 @@ export default function StoreProductsTable() {
                             {isActionLoading
                               ? "Saving..."
                               : row.is_published
-                                ? "Unpublish"
-                                : "Publish"}
+                              ? "Unpublish"
+                              : "Publish"}
                           </button>
+                          {confirmAction?.id === row.id && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+                              <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl dark:bg-gray-900">
+                                <p className="text-sm text-gray-700 dark:text-gray-200">
+                                  {confirmAction.publish ? "Publish" : "Unpublish"} {row.display_name}?
+                                </p>
+                                <div className="mt-4 flex justify-end gap-2">
+                                  <button type="button" onClick={() => setConfirmAction(null)} className="rounded-lg border border-gray-200 px-3 py-2 text-xs">Cancel</button>
+                                  <button type="button" onClick={() => void confirmTogglePublished(row, confirmAction.publish)} className="rounded-lg bg-brand-500 px-3 py-2 text-xs text-white">Confirm</button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
