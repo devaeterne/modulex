@@ -44,3 +44,15 @@ These instructions apply repo-wide unless a more specific `AGENTS.md` overrides 
 - Do not override shared component appearance with arbitrary Tailwind. If a required state is missing, extend the reviewed shared variant API.
 - New reusable visual patterns belong in the shared UI layer first.
 - UI-changing PRs must run the Admin UI regression contract.
+
+## Admin validation and mutation consistency
+
+- Before changing an Admin form, input, or mutation, read `modulex-admin/docs/ADMIN_VALIDATION_GUIDE.md` and verify the authoritative DB/RPC contract first.
+- Frontend validation is an early UX guard only; DB constraints, RPC validation, lifecycle triggers, grants, and RLS remain authoritative.
+- Normalize empty strings, whitespace, identifiers, enums, booleans, numbers, dates, and optional fields explicitly. Never cast a non-UUID identifier to UUID.
+- Prevent duplicate submits. Use the existing idempotency boundary for sensitive stock, order, and pricing mutations, and do not bypass an existing RPC with direct table writes.
+- Optimistic UI requires explicit rollback/error reconciliation; failed mutations must not leave success state or stale local data.
+- Preserve append-safe audit/history semantics. Physical delete is not the default for historical, referenced, or audited business entities.
+- Protected actions must be authorized across UI, route/server boundary, RPC/function, grants, RLS, and DB lifecycle guards; hiding a button or checking `authenticated` alone is not authorization.
+- Data-heavy screens must expose loading, empty, populated, error/retry, and permission-denied states and must honor server-side pagination/filter/search contracts.
+- Shared schema/RPC changes require Admin, Store, Customer Portal, and Dealer Portal regression checks where those consumers can be affected.

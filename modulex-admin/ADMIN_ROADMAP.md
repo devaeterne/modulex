@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `fd74962ee6eacd78de952520c26562e7b33d7f31`
+Main baseline: `1970122294504e15b4b3d368a91f0cfe450d01d8`
 Current phase: **Phase A3 — Products, Catalog & Pricing Control**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
 Current Admin next action: **Complete A3.3 Pricing production migration and authenticated acceptance; do not mark A3.3 CLOSED until those gates pass.**
@@ -408,6 +408,18 @@ A3.2 implementation, migration, production deployment, authenticated route smoke
 
 A3.3 Pricing remains the primary functional Admin next action; UI-2A → UI-2E is a parallel cross-cutting quality track and does not replace the pricing roadmap.
 
+## Cross-cutting validation and data contract hardening track (VAL-1 → VAL-6)
+
+- [x] VAL-1 — Validation & Data Contract Foundation.
+  - `docs/ADMIN_VALIDATION_GUIDE.md`, root mutation/authorization guardrails, a reusable validation/data-contract smoke contract, and the domain audit method are established. Legacy form remediation is intentionally deferred. The foundation contract and Admin final gate pass; no schema or production data changes were required.
+- [ ] VAL-2 — Products & Pricing.
+- [ ] VAL-3 — Customers / Orders / Invoices.
+- [ ] VAL-4 — Inventory / Warehouses / Stock Operations.
+- [ ] VAL-5 — Store CMS / Users / Settings / remaining Admin forms.
+- [ ] VAL-6 — Full validation regression & production acceptance.
+
+The VAL track is cross-cutting and additive: it does not overwrite the UI-2 track or functional Admin roadmap. Domain packages remediate validation debt only after a mismatch inventory and the database-contract-first audit described in `docs/ADMIN_VALIDATION_GUIDE.md`.
+
 ### Phase A3 Exit Gate
 
 - [ ] Product and Store publish state is deterministic.
@@ -700,7 +712,7 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin roadmap work is **A3.3 — Pricing**. Implementation contracts are complete; production migration and authenticated acceptance remain.
+Primary Admin roadmap work is **A3.3 — Pricing**. Implementation contracts are complete; production migration and authenticated acceptance remain. VAL-1 is the active cross-cutting foundation track and does not replace this functional next action.
 
 1. Apply and accept the reviewed A3.3 pricing hardening migration, then close A3.3 after production gates pass.
 2. Preserve the A3.1 canonical taxonomy/family/color/lifecycle/export contract and the A3.2 Store publication/public-RPC boundaries.
