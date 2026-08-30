@@ -17,15 +17,18 @@ const sqlPath = "sql/a1-core-operations-hardening.sql";
 const confirmationPatchPath = "sql/a1-order-confirmation-validation.sql";
 const legacyCompatibilityPath = "sql/a1-order-legacy-progression-compatibility.sql";
 const fulfillmentCompatibilityPath = "sql/a1-fulfillment-order-status-compatibility.sql";
+const productLifecyclePath = "sql/a1-order-product-lifecycle-compatibility.sql";
 assert.equal(exists(sqlPath), true, "A1 core operations hardening SQL contract must exist");
 assert.equal(exists(confirmationPatchPath), true, "A1 order confirmation validation patch must exist");
 assert.equal(exists(legacyCompatibilityPath), true, "A1 legacy order progression compatibility patch must exist");
 assert.equal(exists(fulfillmentCompatibilityPath), true, "A1 fulfillment/order compatibility patch must exist");
+assert.equal(exists(productLifecyclePath), true, "A1 order product lifecycle compatibility patch must exist");
 
 const sql = read(sqlPath);
 const confirmationPatch = read(confirmationPatchPath);
 const legacyCompatibility = read(legacyCompatibilityPath);
 const fulfillmentCompatibility = read(fulfillmentCompatibilityPath);
+const productLifecycle = read(productLifecyclePath);
 const shipmentDetail = read("src/components/customers/CustomerShipmentDetailRBAC.tsx");
 const installationDetail = read("src/components/customers/CustomerInstallationDetail.tsx");
 const permissions = read("src/lib/auth/permissions.ts");
@@ -36,7 +39,7 @@ const portalExperienceContract = read("../modulex-store/scripts/portal-experienc
 assert.match(sql, /customer_order_status_transition_allowed/i, "order transition helper must exist");
 assert.match(sql, /Invalid customer order status transition/i, "invalid order transitions must fail closed");
 assert.match(sql, /quantity[^;]{0,220}(?:>|greater than)\s*zero/i, "order quantity must be validated in the database boundary");
-assert.match(sql, /status\s*(?:<>|!=)\s*'archived'|status\s+in\s*\([^)]*'active'/i, "order products/variants must be lifecycle-valid");
+assert.match(sql, /status\s*(?:<>|!=)\s*'archived'|status\s+in\s*\([^)]*'active'/i, "draft order products/variants must remain lifecycle-valid");
 assert.match(sql, /order_tax_rules/i, "configured order tax rules must be authoritative");
 assert.match(sql, /shipping address[^;]{0,220}required/i, "delivery fulfillment must require a shipping address");
 assert.match(sql, /price_source/i, "pricing source classification must remain server-controlled");
@@ -45,6 +48,8 @@ assert.match(confirmationPatch, /p_status\s*=\s*'confirmed'[\s\S]{0,260}validate
 assert.match(confirmationPatch, /v_order\.status\s*<>\s*'draft'/i, "draft orders may remain incomplete while non-Draft commercial mutations enforce readiness");
 assert.match(legacyCompatibility, /update of\s+price_group_id,\s*payment_method_id,\s*shipping_address_id,\s*tax_rate,\s*fulfillment_type\b/i, "legacy compatibility guard must continue validating commercial field changes");
 assert.doesNotMatch(legacyCompatibility, /update of[^\n]+\bstatus\b/i, "legacy confirmed orders must not be revalidated only because their status advances");
+assert.match(productLifecycle, /p\.status\s*<>\s*'active'/i, "order confirmation must reject inactive or archived products");
+assert.match(productLifecycle, /active products/i, "product lifecycle rejection must explain the active-product requirement");
 
 // Shipments: strict warehouse flow, no backwards jumps or order-state regression.
 assert.match(sql, /customer_shipment_status_transition_allowed/i, "shipment transition helper must exist");
@@ -79,8 +84,8 @@ assert.match(installationDetail, /in_progress[\s\S]{0,260}completed/i, "in-progr
 // Invoice/payment boundary: active internal roles, no new portal invoice/payment surface.
 assert.match(permissions, /"invoices\.manage"/, "Admin permission model must retain invoice mutation permission");
 assert.match(permissions, /finance:[\s\S]*"invoices\.manage"/, "Finance must retain invoice management permission");
-assert.doesNotMatch(sql + confirmationPatch + legacyCompatibility + fulfillmentCompatibility, /get_store_portal_(?:invoice|payment)/i, "A1 must not add portal invoice/payment RPCs");
-assert.doesNotMatch(sql + confirmationPatch + legacyCompatibility + fulfillmentCompatibility, /create\s+table[\s\S]{0,80}(?:payment_transactions|customer_payments|payment_ledger)/i, "standalone payment ledger remains deferred");
+assert.doesNotMatch(sql + confirmationPatch + legacyCompatibility + fulfillmentCompatibility + productLifecycle, /get_store_portal_(?:invoice|payment)/i, "A1 must not add portal invoice/payment RPCs");
+assert.doesNotMatch(sql + confirmationPatch + legacyCompatibility + fulfillmentCompatibility + productLifecycle, /create\s+table[\s\S]{0,80}(?:payment_transactions|customer_payments|payment_ledger)/i, "standalone payment ledger remains deferred");
 
 // Existing Store contracts are the cross-roadmap proof that portal data is intentionally narrower.
 assert.match(storePortalContract, /unit_price\|subtotal\|tax_amount\|total_amount\|grand_total\|payment_commission_amount\|internal_notes/i, "Store order contract must guard financial/internal fields");
