@@ -13,7 +13,7 @@ const read = (file) => {
 };
 const exists = (file) => fs.existsSync(path.join(root, file));
 
-const migrationPath = "supabase/migrations/20260830100000_a1_core_operations_hardening.sql";
+const migrationPath = "../modulex-store/supabase/migrations/20260830100000_a1_core_operations_hardening.sql";
 assert.equal(exists(migrationPath), true, "A1 core operations hardening migration must exist");
 
 const migration = read(migrationPath);
