@@ -1,0 +1,56 @@
+name: Admin Products Pricing UI
+
+on:
+  push:
+    paths:
+      - "modulex-admin/src/app/(admin)/brands/**"
+      - "modulex-admin/src/app/(admin)/categories/**"
+      - "modulex-admin/src/app/(admin)/pricing/**"
+      - "modulex-admin/src/components/brands/**"
+      - "modulex-admin/src/components/categories/**"
+      - "modulex-admin/src/components/products/TaxonomyManager.tsx"
+      - "modulex-admin/src/components/pricing/**"
+      - "modulex-admin/scripts/products-pricing-ui-contract.mjs"
+      - ".github/workflows/admin-products-pricing-ui.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/app/(admin)/brands/**"
+      - "modulex-admin/src/app/(admin)/categories/**"
+      - "modulex-admin/src/app/(admin)/pricing/**"
+      - "modulex-admin/src/components/brands/**"
+      - "modulex-admin/src/components/categories/**"
+      - "modulex-admin/src/components/products/TaxonomyManager.tsx"
+      - "modulex-admin/src/components/pricing/**"
+      - "modulex-admin/scripts/products-pricing-ui-contract.mjs"
+      - ".github/workflows/admin-products-pricing-ui.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  products-pricing-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: Products + Pricing UI contract
+        run: node scripts/products-pricing-ui-contract.mjs
+      - name: Production surface regression
+        run: npm run smoke:production-surface
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build
