@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `74013f90561e023b0453aea57cd010456de2c597`
+Main baseline: `34d7174f069a107a319c07270133a5125ef6a680`
 Current phase: **Phase A2 — Inventory, Warehouses & Physical Operations**
-Current cross-roadmap package: **Granite GC-5 Gallery and GC-6 Cabinet Journey are production-accepted. GC-7 Reviews / Social Proof is in progress: Admin now has a `store.manage`-gated Reviews & Social Proof editor with explicit draft/publish/unpublish/delete controls and mandatory parent attribution fields; production schema/data and Store/Admin CI are verified, while PR #167 is merged on `main`; live homepage acceptance was not re-verified during the A1 closeout. Admin primary roadmap work has advanced to Phase A2 after verified A1 closeout.**
-Current Admin next action: **Review warehouses CRUD and role restrictions, then verify the zones/locations hierarchy and active-stock integrity.**
+Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A2 work is isolated from Store scope; post-merge Store production acceptance remains Store-owned.**
+Current Admin next action: **Review/merge PR #173, explicitly apply the A2.2 Supabase migration, run production DB/advisor acceptance and deploy Admin; then close A2.2 and move to A2.3 Stock Operations & Scanning.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -128,7 +128,7 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Document role expectations for `super_admin`, `admin`, `sales`, `finance`, `hr`, `warehouse`, and `shipping`.
   - Role expectations, route families, mutation rules, aliases, and enforcement layers are documented in `docs/ADMIN_RBAC_MATRIX.md`.
   - TDD evidence: run `33249649439` failed on the pre-fix parity gaps; targeted GREEN run `33249708946` passed 12/12 RBAC checks.
-  - Full verification run `33249988130` passed RBAC parity, production-surface, secondary CMS, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
+  - Full verification run `33249988130` passed RBAC parity, production-surface, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
 
 ## A0.3 Runtime/config cleanup
 
@@ -212,7 +212,7 @@ These rules are mandatory for all future Modulex Admin work:
 
 - [x] Review global and customer-scoped order list consistency. (A1.2A)
   - Both `/customers/orders` and `/customers/[id]/orders` use the shared `CustomerOrdersList` contract with server-side search/status filtering, exact filtered count, page windows, URL state, and route-scope summary aggregation.
-  - PR #130 repaired the earlier stacked-PR base error and merged A1.2A to `main` as `f9d9571c70e911ee41c588e2ff8bd17a9a351a05`; Vercel Admin production deployment `dpl_699J47YQXfSx3fW9bvkEAAC9c8eo` is `READY` from that exact SHA.
+  - PR #130 repaired the earlier stacked-PR base error and merged A1.2A to `main` as `f9d9571c70e911ee41c588e2ff8bd17a9a351a05`; Vercel Admin production deployment `dpl_699J47YQfSx3fW9bvkEAAC9c8eo` is `READY` from that exact SHA.
   - Production migration `20260829193058_customer_order_list_summary` installed `customer_order_directory` with `security_invoker=true` and authenticated-only SELECT plus `get_customer_order_list_summary(uuid)` as SECURITY INVOKER / STABLE with an empty `search_path` and authenticated-only EXECUTE.
   - Read-only authenticated Admin acceptance verified 5/5 direct-vs-directory RLS-visible rows, working order/customer-code/customer-name searches, 1/1 scoped rows, and exact global/scoped summary parity. A profiles-less authenticated caller saw 0 directory rows and a zero summary, confirming underlying RLS remains authoritative.
   - No production data writes were made during acceptance. Post-DDL Supabase advisors reported no A1.2A-specific security or performance finding; existing Store SECURITY DEFINER/auth warnings and broader FK/index/policy performance backlog remain outside this package.
@@ -288,17 +288,29 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A2.1 Warehouse/location model
 
-- [ ] Review warehouses CRUD and role restrictions.
-- [ ] Review locations/zones hierarchy and data integrity.
-- [ ] Prevent deletion/deactivation that would orphan active stock without an explicit migration path.
+- [x] Review warehouses CRUD and role restrictions.
+  - Production retains Admin-only location creation while the warehouse role keeps the narrow QR-update path; `private.guard_location_master_role()` prevents warehouse-role changes to location master fields. Current production contains the expected A2 location policies and guard trigger set.
+- [x] Review locations/zones hierarchy and data integrity.
+  - Production contains the A2 hierarchy/parent-state triggers for zones, locations, and inventory, and `smoke:a2-warehouse-integrity` is GREEN in Actions run `33312699819`.
+- [x] Prevent deletion/deactivation that would orphan active stock without an explicit migration path.
+  - Production contains warehouse/zone/location deactivation guards, and the inventory/warehouse/location plus movement provenance foreign keys resolve with `ON DELETE RESTRICT`.
 
 ## A2.2 Inventory and movements
 
-- [ ] Review inventory list filters/search/pagination.
-- [ ] Define stock-on-hand, reserved, available, damaged/hold semantics if not already explicit.
-- [ ] Review stock movement types and required references/reasons.
-- [ ] Require idempotent or guarded writes for repeated scan/operation requests where relevant.
-- [ ] Verify movement history is append-safe and auditable.
+- [~] Review inventory list filters/search/pagination.
+  - PR #173 moves inventory discovery to `search_stock_page` with server-side query, warehouse/zone/location/status filters, deterministic SKU/location/inventory ordering, exact window total, and 25-row pagination. Desktop inventory labels physical quantity as **On Hand**.
+- [~] Define stock-on-hand, reserved, available, damaged/hold semantics if not already explicit.
+  - A2.2 defines `inventory.quantity` as physical On Hand, `reserved_quantity` as allocated stock still physically present, and `available = on_hand - reserved`. Low-stock classification is based on available quantity versus `products.min_stock_level`.
+  - Operational holds use reserved quantity with explicit audit context. A2.2 does not introduce a separate damaged bucket; damaged stock must leave usable inventory through an explicit audited stock mutation rather than remaining silently available.
+- [~] Review stock movement types and required references/reasons.
+  - New A2.2 writes require a non-empty reason. `reference_no` remains optional because not every warehouse operation has an external document, but is stored when supplied; movement actor/time/reason/reference remain part of the ledger.
+  - Automatic reversal is deliberately limited to `in`, `out`, `transfer`, `reservation`, and `release`; ambiguous legacy `adjustment`, `return`, and `damage` movements are not guessed.
+- [~] Require idempotent or guarded writes for repeated scan/operation requests where relevant.
+  - PR #173 adds idempotent stock-in/out/transfer/reserve/release RPC contracts with client UUID keys, server-generated canonical JSONB fingerprints, advisory transaction locks, same-payload replay, and changed-payload conflict behavior. Desktop and guided-scan flows both pass the idempotency key.
+- [~] Verify movement history is append-safe and auditable.
+  - PR #173 adds an append-only UPDATE/DELETE trigger, removes application UPDATE/DELETE movement policies/grants, and records reversal links through compensating movement rows. Existing historical rows remain valid through nullable metadata.
+  - TDD RED was captured before implementation (`A2.2 migration must exist`). GREEN Actions run `33312699819` passes A2.2, A2.1, production-surface, RBAC, full lint, and the Next.js production build; parallel Admin A1 and Store regression workflows are also GREEN.
+  - **Release boundary:** `modulex-admin/sql/a2-inventory-movements.sql` is committed but has not been applied to production Supabase in PR preparation. A2.2 remains `[~]` until merge/release, production DB acceptance, advisor review, and Admin deployment verification are complete.
 
 ## A2.3 Stock operations and scanning
 
@@ -316,7 +328,8 @@ These rules are mandatory for all future Modulex Admin work:
 ### Phase A2 Exit Gate
 
 - [ ] Stock-changing actions are validated and auditable.
-- [ ] Warehouse/location integrity is enforced.
+- [x] Warehouse/location integrity is enforced.
+  - A2.1 guard triggers and restrictive FK behavior are present in production and covered by the permanent A2.1 contract.
 - [ ] Scan/label workflows pass device/mobile regression checks.
 - [ ] Inventory reports reconcile against source records.
 
@@ -512,7 +525,8 @@ Current routes include employees, departments, positions, attendance, leave, lif
 - [x] Auth recovery contract exists.
 - [x] Polling regression contract exists.
 - [x] Production-surface/demo-route contract exists and is part of the Admin smoke chain.
-- [ ] Add targeted regression contracts whenever roadmap work changes critical domain behavior.
+- [x] Add targeted regression contracts whenever roadmap work changes critical domain behavior.
+  - A2.1 warehouse/location integrity and A2.2 inventory/movement contracts are now permanent Admin workflow gates; A2.2 remains release-pending until production migration acceptance.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -592,7 +606,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] Store product CMS surfaces exist.
 - [x] Store color management exists.
 - [x] Store homepage/content settings exist.
-- [x] Store marketing settings exist.
+- [x] Store marketing settings exists.
 - [x] Store lead list/detail surfaces exist.
 - [x] Dealer onboarding and portal activation Admin flows have contract coverage.
 - [x] Customer document dealer-visibility controls exist.
@@ -614,6 +628,7 @@ Keep this section current so future planning does not rediscover completed work.
 
 - [x] PR #85 reduced Admin Supabase polling churn: notification polling cadence, hidden-tab suspension, profile load behavior, and cross-tab email queue coordination.
 - [x] PR #106 gated warehouse/zone/location list-page mutations with `warehouse.manage` while preserving read-only structure access; full Admin verification passed before merge.
+- [x] A2.1 warehouse/location integrity is present in production: hierarchy/deactivation guards and restrictive warehouse/location/movement provenance foreign keys were re-verified on 2026-08-30.
 
 ---
 
@@ -627,17 +642,19 @@ Record material decisions here when they affect future phases.
 - [x] Phase 2.1 first secondary CMS scope is **About + Gallery/Projects**; Blog remains disabled until a real editorial workflow is required. Ordinary Navbar/Footer links become configurable in Package D while route/security behavior remains code-owned.
 - [x] Granite/Oakwell migration uses a **structured hybrid CMS**. Production business content that operators should change without deployment is DB/Storage-backed and Admin-managed; Store receives narrow public projections. Granite Center is migration evidence only, not a runtime backend.
 - [x] New Granite migration domains are introduced incrementally by the package that first needs them after current-schema review; no speculative parallel CMS is created.
+- [x] A2.2 keeps the existing hybrid inventory architecture: mutable `inventory` snapshot for operational reads plus append-safe `inventory_movements` ledger. It does not adopt full event sourcing or create separate damaged/hold quantity buckets.
 
 ---
 
 # Next Action
 
-Primary Admin roadmap work is **Phase A1 — Customer, Order & Fulfillment Operations**. **A1.1A — Customer Directory Scalability** is verified and ready for review/merge.
+Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. **A2.2 — Inventory & Movements** is implemented and CI-GREEN in PR #173, but remains release-pending because its production Supabase migration has not been applied.
 
-1. Review, merge, and deploy the A1.1A PR; confirm the resulting Admin Vercel production deployment is `READY` from the merged `main` SHA.
-2. Then start **A1.1B — Customer Master Mutation Contract**: validated customer status/type/master mutations plus mutation+audit atomicity.
-3. Follow with **A1.1C — Customer Detail & Address Integrity**: remove legacy action-hiding CSS, clarify detail action hierarchy, and make default-address changes atomic.
+1. Review and merge PR #173 after confirming its final branch remains current with `main` and all required checks are GREEN.
+2. Apply `modulex-admin/sql/a2-inventory-movements.sql` to production Supabase as an explicit release step, then verify the new view/RPC/ledger contracts and run Security + Performance Advisors.
+3. Deploy Admin from the merged `main`, verify inventory pagination/filtering plus desktop/guided stock-operation smoke on the deployed surface, and then mark A2.2 `[x]`.
+4. Continue with **A2.3 — Stock Operations & Scanning**: workflow/error handling, duplicate scan behavior, QR label generation/printing, and mobile warehouse usability.
 
-**Cross-roadmap coordination:** Store Phase 2.1A and 2.1B are complete, Phase 2.1C About is production-accepted, and Gallery/Projects remains intentionally fail-closed until approved real Gallery/Project content is published/live-accepted. Granite GC-1, GC-2, GC-3, and GC-4 are production-accepted. GC-4 production acceptance is recorded in `modulex-store/docs/granite-center/GC4_PRODUCTION_ACCEPTANCE.md`; Admin `/store/leads/form-options`, Project Consultation lead visibility, and the native lead security/attribution boundary passed production acceptance. **GC-5 — Projects / Gallery is next.** Gallery/Projects remains `[~]` and GC-5 owns curated project/media association and final Gallery acceptance. Package D configurable navigation/footer remains an A4.1 obligation under the same dynamic-content rule. Admin primary work remains Phase A1 with its current next action unchanged.
+**Cross-roadmap coordination:** PR #172 (GC-8B accessibility/performance hardening) is merged to `main`. A2.2 intentionally changes only Admin/shared Supabase inventory contracts and does not modify Store runtime behavior; Store production acceptance remains tracked by the Store roadmap.
 
-**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A1 or other concurrently merged Admin work is preserved rather than overwritten.
+**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A2 or other concurrently merged Admin work is preserved rather than overwritten.
