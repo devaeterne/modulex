@@ -43,7 +43,12 @@ assert.match(gallery, /activeCategory/, "Gallery should expose a category filter
 assert.match(gallery, /aria-pressed=/, "Gallery category filters should expose pressed state accessibly");
 assert.match(
   gallery,
-  /entry\.project\.category\s*===\s*activeCategory/,
+  /const\s+effectiveActiveCategory\s*=\s*activeCategory[\s\S]*categories\.includes\(activeCategory\)/,
+  "Gallery should derive a safe effective category from the selected CMS category",
+);
+assert.match(
+  gallery,
+  /entry\.project\.category\s*===\s*effectiveActiveCategory/,
   "Gallery category filtering should use each project's CMS category",
 );
 assert.match(gallery, />\s*All\s*</, "Gallery should offer an All filter");
