@@ -23,8 +23,8 @@ type ProductVariant = {
   sku: string;
   color_code: string | null;
   color_name: string | null;
-  category: string | null;
-  brand: string | null;
+  category_name: { name: string }[] | null;
+  brand_name: { name: string }[] | null;
 };
 
 type PrimaryMedia = {
@@ -102,7 +102,7 @@ export default function StoreProductsTable() {
     if (baseCodes.length > 0) {
       const { data, error } = await supabase
         .from("products")
-        .select("id,base_product_code,sku,color_code,color_name,category,brand")
+        .select("id,base_product_code,sku,color_code,color_name,brand_name:product_brands(name),category_name:product_categories(name)")
         .in("base_product_code", baseCodes)
         .eq("status", "active")
         .order("sku", { ascending: true });
@@ -168,8 +168,8 @@ export default function StoreProductsTable() {
         ...item,
         variants: itemVariants,
         primaryImageUrl,
-        category: firstVariant?.category ?? null,
-        brand: firstVariant?.brand ?? null,
+        category: firstVariant?.category_name?.[0]?.name ?? null,
+        brand: firstVariant?.brand_name?.[0]?.name ?? null,
         hasCopy,
         isReady: hasCopy && Boolean(primaryImageUrl),
       };

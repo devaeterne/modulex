@@ -24,8 +24,8 @@ type ProductVariant = {
   sku: string;
   color_code: string | null;
   color_name: string | null;
-  category: string | null;
-  brand: string | null;
+  category_name: { name: string }[] | null;
+  brand_name: { name: string }[] | null;
 };
 
 type StoreMedia = {
@@ -95,7 +95,7 @@ export default function StoreProductEditor({ productContentId }: { productConten
       await Promise.all([
         supabase
           .from("products")
-          .select("id,sku,color_code,color_name,category,brand")
+          .select("id,sku,color_code,color_name,brand_name:product_brands(name),category_name:product_categories(name)")
           .eq("base_product_code", nextContent.base_product_code)
           .eq("status", "active")
           .order("sku", { ascending: true }),
@@ -390,8 +390,8 @@ export default function StoreProductEditor({ productContentId }: { productConten
     );
   }
 
-  const category = variants.find((item) => item.category)?.category ?? null;
-  const brand = variants.find((item) => item.brand)?.brand ?? null;
+  const category = variants.find((item) => item.category_name?.length)?.category_name?.[0]?.name ?? null;
+  const brand = variants.find((item) => item.brand_name?.length)?.brand_name?.[0]?.name ?? null;
 
   return (
     <div className="space-y-6">
