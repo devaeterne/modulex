@@ -344,7 +344,7 @@ These rules are mandatory for all future Modulex Admin work:
   - The A2.4 SQL package keeps security-invoker views, adds narrow paginated/filterable reporting RPCs with exact counts and deterministic ordering, and adds movement created-at/from/to warehouse indexes.
 - [x] Review inventory and movement reports for correctness and export needs.
   - Inventory/location/movement and low-stock CSV paths page through bounded filtered RPC calls to the exact count rather than inheriting the former 1,000-row client ceiling. Permanent repository verification is `smoke:a2-low-stock-reporting` plus `.github/workflows/admin-a2-low-stock-reporting.yml`.
-  - Repository acceptance: `docs/acceptance/a2-4-low-stock-reporting.md`. Production migration `20260830155834` is applied; source/RPC reconciliation and Advisor review passed. A2.4 remains NOT CLOSED only because production deployment `c5c9af0` predates the A2.4 merge, so authenticated browser/CSV verification of the accepted merge SHA is still outstanding.
+  - Production acceptance: `docs/acceptance/a2-4-low-stock-reporting.md` is PASS/CLOSED. Migration `20260830155834`, source/RPC reconciliation, Advisor review, authenticated browser route smoke, deterministic filtering/pagination, and complete CSV exports passed on deployment SHA `2d08d28`.
 
 ### Phase A2 Exit Gate
 
@@ -354,7 +354,8 @@ These rules are mandatory for all future Modulex Admin work:
   - A2.1 guard triggers and restrictive FK behavior are present in production and covered by the permanent A2.1 contract.
 - [x] Scan/label workflows pass device/mobile regression checks.
   - A2.3 permanently guards camera same-value cooldown/serialization, guided confirmation and error handling, manual/hardware scanner fallback, QR label print modes/sizes, responsive warehouse UI contracts, and A2.2 idempotent write boundaries.
-- [ ] Inventory reports reconcile against source records.
+- [x] Inventory reports reconcile against source records.
+  - A2.4 production migration, RPC/source reconciliation, authenticated route smoke, and full filtered CSV exports passed on deployment SHA `2d08d28`.
 
 ---
 
@@ -674,11 +675,10 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. A2.1–A2.3 are production-accepted. A2.4 migration, reconciliation, authenticated API/RLS smoke, and Advisor review are complete; deployed UI acceptance remains open because production is still at the A2.3 SHA `c5c9af0`.
+Primary Admin roadmap work is **Phase A3 — Products, Catalog & Pricing Control**. A2.1–A2.4 are production-accepted and the Phase A2 exit gate is closed.
 
-1. Merge the accepted A2.4 repository package and deploy Admin from that merge SHA.
-2. Authenticated-browser verify `/low-stock`, `/reports/inventory`, `/reports/movements`, pagination/filter behavior, and full filtered CSV exports against production.
-3. Record the deployed SHA and smoke evidence, then mark the Phase A2 inventory-report reconciliation exit gate complete.
+1. Begin A3.1 Product master data review.
+2. Preserve the A2.4 production reporting/RPC boundary while planning catalog and pricing work.
 
 **Cross-roadmap coordination:** A2.4 is Admin/shared-Supabase inventory reporting work only; it introduces no Store runtime change and did not mutate production inventory/movement source data. Store production acceptance remains tracked by the Store roadmap.
 
