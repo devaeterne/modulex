@@ -6,6 +6,7 @@ import { callPublicRpc, getPublicStorageObjectUrl } from "@/lib/supabase/public-
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PAGE_REVALIDATE_SECONDS = 60;
 const GALLERY_REVALIDATE_SECONDS = 60;
+const CABINET_CONTENT_REVALIDATE_SECONDS = 60;
 
 export type StorePublicPage = {
   slug: string;
@@ -50,6 +51,22 @@ export type StorePublicProjectMedia = {
   sortOrder: number;
 };
 
+export type StorePublicProcessStep = {
+  id: string;
+  title: string;
+  body: string;
+  sortOrder: number;
+  updatedAt: string;
+};
+
+export type StorePublicFaqEntry = {
+  id: string;
+  question: string;
+  answer: string;
+  sortOrder: number;
+  updatedAt: string;
+};
+
 type PageRpcRow = {
   slug: string; eyebrow: string | null; title: string; intro: string | null; body: string | null;
   hero_image_url: string | null; hero_image_alt: string | null; cta_label: string | null; cta_href: string | null;
@@ -72,6 +89,22 @@ type ProjectMediaRpcRow = {
   media_url: string | null;
   alt_text: string;
   sort_order: number;
+};
+
+type ProcessStepRpcRow = {
+  id: string;
+  title: string;
+  body: string;
+  sort_order: number;
+  updated_at: string;
+};
+
+type FaqEntryRpcRow = {
+  id: string;
+  question: string;
+  answer: string;
+  sort_order: number;
+  updated_at: string;
 };
 
 function normalizeSlug(slug: string) {
@@ -189,7 +222,38 @@ export const getStorePublicProjectMedia = cache(async (slug: string): Promise<St
   return rows.map(mapProjectMedia).filter((media): media is StorePublicProjectMedia => media !== null);
 });
 
+export const getStorePublicProcessSteps = cache(async (): Promise<StorePublicProcessStep[]> => {
+  const rows = await callPublicRpc<ProcessStepRpcRow[]>(
+    "get_store_public_process_steps",
+    {},
+    { revalidate: CABINET_CONTENT_REVALIDATE_SECONDS },
+  );
+  return rows
+    .map((row) => ({ id: row.id, title: row.title.trim(), body: row.body.trim(), sortOrder: row.sort_order, updatedAt: row.updated_at }))
+    .filter((row) => row.title && row.body);
+});
+
+export const getStorePublicFaqEntries = cache(async (): Promise<StorePublicFaqEntry[]> => {
+  const rows = await callPublicRpc<FaqEntryRpcRow[]>(
+    "get_store_public_faq_entries",
+    {},
+    { revalidate: CABINET_CONTENT_REVALIDATE_SECONDS },
+  );
+  return rows
+    .map((row) => ({ id: row.id, question: row.question.trim(), answer: row.answer.trim(), sortOrder: row.sort_order, updatedAt: row.updated_at }))
+    .filter((row) => row.question && row.answer);
+});
+
 export const getStoreGalleryReadiness = cache(async () => {
   const [page, projects] = await Promise.all([getStoreGalleryPage(), getStorePublicProjects()]);
   return { page, projects, isReady: Boolean(page && projects.length > 0) };
+});
+
+export const getStoreCabinetJourneyReadiness = cache(async () => {
+  const [page, steps, faqs] = await Promise.all([
+    getStorePublicPage("cabinet-process"),
+    getStorePublicProcessSteps(),
+    getStorePublicFaqEntries(),
+  ]);
+  return { page, steps, faqs, isReady: Boolean(page && steps.length > 0) };
 });
