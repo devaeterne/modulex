@@ -14,10 +14,14 @@ expect(context.includes("usePathname"), "Sidebar context must observe route chan
 expect(context.includes("window.innerWidth < 1024"), "Sidebar mobile breakpoint must match the lg header breakpoint");
 expect(context.includes("setIsMobileOpen(false)") && context.includes("[pathname]"), "Mobile sidebar must close after route changes");
 expect(context.includes("closeMobileSidebar"), "Sidebar context must expose an idempotent mobile close action");
+expect(context.includes('target.closest("aside a[href]")'), "Mobile sidebar navigation links must close the drawer immediately on click");
+expect(context.includes('document.addEventListener("click", handleSidebarNavigationClick)'), "Mobile sidebar click-close behavior must be registered and cleaned up");
+expect(context.includes("if (!isMobile) return"), "Sidebar link clicks must not alter desktop expansion state");
 
 expect(header.includes('import styles from "./AppHeader.module.css"'), "Header must scope mobile notification layout styles");
 expect(header.includes("usePathname") && header.includes("setApplicationMenuOpen(false)"), "Mobile application menu must close after navigation");
 expect(header.includes("styles.mobileNotification"), "Notification dropdown must use the viewport-safe wrapper");
+expect(header.includes("window.innerWidth >= 1024") && header.includes("toggleSidebar()") && header.includes("toggleMobileSidebar()"), "Header toggle must keep desktop and mobile sidebar behavior separate");
 
 expect(css.includes("position: fixed"), "Mobile notification panel must be viewport-positioned");
 expect(css.includes("100dvh"), "Mobile notification panel must respect dynamic viewport height");
