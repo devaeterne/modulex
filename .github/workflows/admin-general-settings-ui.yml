@@ -1,9 +1,9 @@
 name: Admin General Settings UI
 on:
   push:
-    paths: ["modulex-admin/src/app/(admin)/settings/general/**", "modulex-admin/src/components/settings/**", "modulex-admin/scripts/general-settings-ui-contract.mjs", ".github/workflows/admin-general-settings-ui.yml"]
+    paths: ["modulex-admin/src/app/(admin)/settings/general/**", "modulex-admin/src/components/settings/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/scripts/general-settings-ui-contract.mjs", ".github/workflows/admin-general-settings-ui.yml"]
   pull_request:
-    paths: ["modulex-admin/src/app/(admin)/settings/general/**", "modulex-admin/src/components/settings/**", "modulex-admin/scripts/general-settings-ui-contract.mjs", ".github/workflows/admin-general-settings-ui.yml"]
+    paths: ["modulex-admin/src/app/(admin)/settings/general/**", "modulex-admin/src/components/settings/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/scripts/general-settings-ui-contract.mjs", ".github/workflows/admin-general-settings-ui.yml"]
 permissions: { contents: read }
 jobs:
   settings-verification:
