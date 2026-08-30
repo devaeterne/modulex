@@ -41,11 +41,11 @@ Follow-up PR: #154 — `fix(admin): preserve low stock threshold retry`
 
 ## Category audit packages
 
-The remaining sidebar audit was grouped into category PRs to keep review/merge manageable while preserving per-route coverage. Implementation/CI status below reflects repository state; merge/deploy is recorded separately and is not inferred.
+The remaining sidebar audit was grouped into category PRs to keep review/merge manageable while preserving per-route coverage. All packages below have now been merged and deployment has been confirmed.
 
 ### Products + Pricing — 05–09
 PR: #155 — `fix(admin): audit Products and Pricing UI`
-Status: **merged; deployment confirmation not recorded here**.
+Status: **merged and deployed**.
 
 - [x] 05 — Brands (`/brands`)
 - [x] 06 — Categories (`/categories`)
@@ -53,10 +53,11 @@ Status: **merged; deployment confirmation not recorded here**.
 - [x] 08 — Product Prices (`/pricing/products`)
 - [x] 09 — Price Groups (`/pricing/groups`)
 - [x] Category contract, production-surface, RBAC, lint, and production build passed.
+- [x] Merge and deploy.
 
 ### Customers — 10–14
 PR: #156 — `test(admin): audit Customers UI surfaces`
-Status: **merged; deployment confirmation not recorded here**.
+Status: **merged and deployed**.
 
 - [x] 10 — Customers Dashboard (`/customers/dashboard`)
 - [x] 11 — Customer List (`/customers`)
@@ -64,10 +65,11 @@ Status: **merged; deployment confirmation not recorded here**.
 - [x] 13 — Shipments (`/customers/shipments`)
 - [x] 14 — Installations (`/customers/installations`)
 - [x] Category contract, production-surface, RBAC, lint, and production build passed.
+- [x] Merge and deploy.
 
 ### Inventory + Warehouse + QR — 15–23
-PR: #157 — `test(admin): audit Inventory Warehouse and QR UI`
-Status: **implementation complete / CI green / merge pending**.
+PR: #157 — `fix(admin): audit Inventory Warehouse and QR UI`
+Status: **merged and deployed**.
 
 - [x] 15 — Stock Overview (`/inventory`)
 - [x] 16 — Stock Movements (`/stock-movements`)
@@ -80,12 +82,14 @@ Status: **implementation complete / CI green / merge pending**.
 - [x] 23 — Shelf Inventory (`/shelf-inventory`)
 - [x] Dead Shelf Inventory navigation replaced with a real read-only shelf/location stock view backed by existing inventory search and linked to the guided scan flow.
 - [x] Inventory search/error/locale/table accessibility and mobile behavior hardened.
+- [x] Stock Movements and Stock Operations accessibility/error/locale behavior hardened after per-surface regression review.
+- [x] Category contract validates each route surface and exact sidebar permission boundary.
 - [x] Category contract, production-surface, RBAC, lint, and production build passed.
-- [ ] Merge and deploy.
+- [x] Merge and deploy.
 
 ### Personnel — 24–37
-PR: #158 — `test(admin): audit Personnel UI surfaces`
-Status: **implementation complete / CI green / merge pending**.
+PR: #158 — `fix(admin): audit Personnel UI surfaces`
+Status: **merged and deployed**.
 
 - [x] 24 — Personnel Overview (`/personnel`)
 - [x] 25 — Employees (`/personnel/employees`)
@@ -102,12 +106,13 @@ Status: **implementation complete / CI green / merge pending**.
 - [x] 36 — Departments (`/personnel/departments`)
 - [x] 37 — Positions (`/personnel/positions`)
 - [x] Personnel overview backend errors are controlled/logged; status, navigation, focus, and screen-reader semantics hardened.
+- [x] Personnel routes are regression-bound to their exact `personnel.view` / `personnel.manage` sidebar permissions.
 - [x] Category contract, production-surface, RBAC, lint, and production build passed.
-- [ ] Merge and deploy.
+- [x] Merge and deploy.
 
 ### Finance + Reports — 38–46
 PR: #159 — `test(admin): audit Finance and Reports UI`
-Status: **merged; deployment confirmation not recorded here**.
+Status: **merged and deployed**.
 
 - [x] 38 — Invoices (`/customers/invoices`)
 - [x] 39 — Payroll (`/finance/payroll`)
@@ -119,10 +124,11 @@ Status: **merged; deployment confirmation not recorded here**.
 - [x] 45 — Inventory Reports (`/reports/inventory`)
 - [x] 46 — Movement Reports (`/reports/movements`)
 - [x] Category contract, production-surface, RBAC, lint, and production build passed.
+- [x] Merge and deploy.
 
 ### Users + Store — 47–57
-PR: #160 — `test(admin): audit Users and Store UI`
-Status: **implementation complete / CI green / merge pending**.
+PR: #160 — `fix(admin): audit Users and Store UI`
+Status: **merged and deployed**.
 
 - [x] 47 — User Management (`/users`)
 - [x] 48 — Roles & Access (`/roles`)
@@ -136,12 +142,13 @@ Status: **implementation complete / CI green / merge pending**.
 - [x] 56 — Color Options (`/store/colors`)
 - [x] 57 — Leads & Dealer Apps (`/store/leads`)
 - [x] Roles & Access permission matrix has table caption/header scope and screen-reader permission-state labels.
+- [x] Users/Store routes are regression-bound to their exact sidebar permissions.
 - [x] Category contract, production-surface, RBAC, lint, and production build passed.
-- [ ] Merge and deploy.
+- [x] Merge and deploy.
 
 ### General Settings — 58–64
-PR: #161 — `test(admin): audit General Settings UI`
-Status: **implementation complete / CI green / merge pending**.
+PR: #161 — `fix(admin): audit General Settings UI`
+Status: **merged and deployed**.
 
 - [x] 58 — Settings Overview (`/settings/general`)
 - [x] 59 — Company (`/settings/general/company`)
@@ -151,18 +158,27 @@ Status: **implementation complete / CI green / merge pending**.
 - [x] 63 — Notifications (`/settings/general/notifications`)
 - [x] 64 — Email Delivery Log (`/settings/general/email-notifications`)
 - [x] Settings overview navigation has explicit landmark/labels and keyboard focus treatment.
+- [x] General Settings routes are regression-bound to the exact `settings.view` sidebar permission.
 - [x] Category contract, production-surface, RBAC, lint, and production build passed.
-- [ ] Merge and deploy.
+- [x] Merge and deploy.
 
 ## Shared mobile shell follow-up
 
-PR: #162 — `fix(admin): harden mobile shell navigation and notifications` — **merged**.
-Follow-up PR: #164 — `fix(admin): close mobile sidebar on link tap` — **merge pending**.
+PR: #162 — `fix(admin): harden mobile shell navigation and notifications` — **merged and deployed**.
+Follow-up PR: #164 — `fix(admin): close mobile sidebar on link tap` — **merged and deployed**.
 
 - [x] Mobile breakpoint aligned to the header `lg` boundary at 1024px.
 - [x] Notification dropdown uses viewport-safe, safe-area-aware mobile positioning instead of a fixed negative right offset.
 - [x] Notification height is constrained by the dynamic viewport while desktop trigger alignment remains intact.
 - [x] Mobile application menu closes after navigation.
 - [x] Mobile sidebar closes on pathname changes as a fallback.
-- [x] #164 adds immediate close-on-tap for sidebar navigation links without changing desktop collapse/expand behavior.
-- [ ] Merge/deploy #164.
+- [x] Sidebar navigation links close the mobile drawer immediately on tap.
+- [x] Desktop sidebar collapse/expand behavior remains independent from the mobile drawer.
+- [x] Merge/deploy #164.
+
+## Audit closeout
+
+- [x] Admin UI audit 01–64 completed.
+- [x] Category audit PRs #155–#161 merged and deployed.
+- [x] Shared mobile shell PRs #162 and #164 merged and deployed.
+- [x] Final regression/build evidence recorded before merge for each package.
