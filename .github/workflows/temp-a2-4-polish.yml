@@ -1,0 +1,59 @@
+name: Temporary A2.4 Final Polish
+
+on:
+  push:
+    branches:
+      - feat/a2-4-low-stock-reporting
+    paths:
+      - .github/workflows/temp-a2-4-polish.yml
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/a2-4-low-stock-reporting
+      - name: Apply bounded final fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          inventory = Path('modulex-admin/src/components/reports/InventoryReport.tsx')
+          text = inventory.read_text()
+          old = '{summaryCards.map(([label, value]) => <Metric key={String(label)} label={String(label)} value={formatNumber(value as number | string)} />)}'
+          new = '{summaryCards.map(([label, value]) => <Metric key={String(label)} label={String(label)} value={typeof value === "string" ? value : formatNumber(value)} />)}'
+          if text.count(old) != 1:
+              raise SystemExit(f'Inventory metric render match count: {text.count(old)}')
+          inventory.write_text(text.replace(old, new, 1))
+
+          low_stock = Path('modulex-admin/src/components/inventory/LowStockManager.tsx')
+          text = low_stock.read_text()
+          old_open = '''          <div className="flex items-center gap-2">\n            <button\n              type="button"\n              disabled={offset === 0 || isLoading}'''
+          new_open = '''          <nav className="flex items-center gap-2" aria-label="Low stock pagination">\n            <button\n              type="button"\n              disabled={offset === 0 || isLoading}'''
+          if text.count(old_open) != 1:
+              raise SystemExit(f'Low-stock pagination open match count: {text.count(old_open)}')
+          text = text.replace(old_open, new_open, 1)
+          old_page = '<span>Page {currentPage} of {totalPages}</span>'
+          new_page = '<span aria-live="polite">Page {currentPage} of {totalPages}</span>'
+          if text.count(old_page) != 1:
+              raise SystemExit(f'Low-stock page text match count: {text.count(old_page)}')
+          text = text.replace(old_page, new_page, 1)
+          old_close = '''            >Next</button>\n          </div>\n        </div>\n      </div>\n    </div>\n  );\n}'''
+          new_close = '''            >Next</button>\n          </nav>\n        </div>\n      </div>\n    </div>\n  );\n}'''
+          if text.count(old_close) != 1:
+              raise SystemExit(f'Low-stock pagination close match count: {text.count(old_close)}')
+          low_stock.write_text(text.replace(old_close, new_close, 1))
+          PY
+      - name: Remove temporary workflow and commit
+        run: |
+          rm .github/workflows/temp-a2-4-polish.yml
+          git config user.name "devaeterne"
+          git config user.email "info@safaksariyildiz.com"
+          git add modulex-admin/src/components/reports/InventoryReport.tsx modulex-admin/src/components/inventory/LowStockManager.tsx .github/workflows/temp-a2-4-polish.yml
+          git diff --cached --check
+          git commit -m "fix(admin): polish A2.4 report pagination metrics"
+          git push origin HEAD:feat/a2-4-low-stock-reporting
