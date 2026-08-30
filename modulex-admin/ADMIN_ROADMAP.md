@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `ef4e6339aaaca7db8374108bcd94f41b008cb533`
-Current phase: **Phase A2 — Inventory, Warehouses & Physical Operations**
-Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A2 work is isolated from Store scope; post-merge Store production acceptance remains Store-owned.**
-Current Admin next action: **A2.4 Low-stock & Reporting is merged to `main`; verify the production Admin deployment and authenticated report/CSV flows, then close the Phase A2 exit gate.**
+Main baseline: `fd74962ee6eacd78de952520c26562e7b33d7f31`
+Current phase: **Phase A3 — Products, Catalog & Pricing Control**
+Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
+Current Admin next action: **A3.1 Product Master Data is production-accepted; begin A3.2 Store product publishing review while preserving the canonical product taxonomy, lifecycle, and export contracts.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -365,10 +365,20 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A3.1 Product master data
 
-- [ ] Review product create/edit flows and SKU/base-product/color relationships.
-- [ ] Verify category/brand management and referential integrity.
-- [ ] Define activation/deactivation rules for variants already referenced by orders/inventory.
-- [ ] Review bulk operations/import/export requirements.
+- [x] Review product create/edit flows and SKU/base-product/color relationships.
+  - Product create/edit now treats one row as one sellable/stockable variant, exposes required `base_product_code` + `color_code` fields, keeps `color_name` descriptive, and preserves canonical SKU/barcode normalization and deterministic list behavior.
+- [x] Verify category/brand management and referential integrity.
+  - `brand_id` / `category_id` are canonical foreign keys with restrictive deletes, active-taxonomy guards, family consistency checks, case-insensitive taxonomy uniqueness, and synchronized legacy compatibility mirrors. Production brand mirror backfill closed the pre-existing 460 NULL legacy-brand values without changing canonical IDs.
+- [x] Define activation/deactivation rules for variants already referenced by orders/inventory.
+  - `set_product_status` is the authenticated SECURITY INVOKER lifecycle boundary; products with on-hand/reserved stock cannot be deactivated or archived, archived is terminal, physical DELETE is unavailable to application roles, and A1 active-product downstream rules remain authoritative.
+- [x] Review bulk operations/import/export requirements.
+  - Full filtered canonical product-master CSV export is implemented through bounded `get_products_page` pagination. Destructive bulk lifecycle mutations remain out of scope; bulk import is explicitly deferred until a validation-first dry-run importer can return row-level errors before writes.
+  - PR #177 merged A3.1 as `a6679deed15d0869ec62928b2da182c8305b0883`. Production Admin deployment `dpl_BjCGMYhQ6auRp3KPP7euEAa58bEr` is `READY` on current `main` SHA `fd74962ee6eacd78de952520c26562e7b33d7f31`, which is a direct descendant of the A3.1 merge.
+  - Production migrations `20260830184807_a3_1_product_master_data` and `20260830184940_a3_1_product_brand_mirror_backfill` are applied. Reconciliation is clean: 462 products, 0 missing canonical fields, 0 taxonomy mirror mismatches, and 0 duplicate SKU/barcode/family-color groups; product RPC total reconciles 462/462.
+  - Authenticated Admin DB smoke passed under the real application role/RLS boundary; anon RPC execution and product DELETE remain denied. Fresh Supabase Security/Performance Advisor review found no A3.1-specific new finding.
+  - Fresh CI evidence includes A3.1 + product-list + products/pricing contracts, A1/A2 regressions, RBAC 14/14, typecheck, lint with 0 errors, production build, and 8/8 PR-triggered workflows before merge.
+  - Production `/products` returns HTTP 200 with the deployed A3.1 product bundle; no `/products` or `/products/new` Vercel runtime errors were found in the post-deploy acceptance window.
+  - **A3.1 production acceptance: complete.** Detailed evidence: `docs/acceptance/a3-1-product-master-data.md`.
 
 ## A3.2 Store product publishing
 
@@ -551,6 +561,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
 - [x] Production-surface/demo-route contract exists and is part of the Admin smoke chain.
 - [x] Add targeted regression contracts whenever roadmap work changes critical domain behavior.
   - A2.1 warehouse/location integrity, A2.2 inventory/movement, and A2.3 stock-operations/scanning contracts are permanent Admin workflow gates. A2.3 protects scanner duplicate handling, guided confirmation/error recovery, QR label printing, mobile fallback behavior, and continued use of the A2.2 idempotent write boundary.
+  - A3.1 product-master contract permanently protects canonical taxonomy/family/color semantics, lifecycle guards, server-side product list/export behavior, and A1/A2 regression boundaries.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -655,6 +666,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] A2.1 warehouse/location integrity is present in production: hierarchy/deactivation guards and restrictive warehouse/location/movement provenance foreign keys were re-verified on 2026-08-30.
 - [x] A2.2 inventory/movement production acceptance is complete: server-side inventory discovery, explicit On Hand/Reserved/Available semantics, idempotent mutation RPCs, append-only/reversal audit contracts, production migrations, advisor review, Admin deployment verification, and final application-role TRUNCATE revocation are covered by PR #173 plus closeout PR #174.
 - [x] A2.3 stock operations/scanning acceptance is complete: existing stock writes remain on A2.2 idempotent RPCs; camera repeated-frame suppression and serialized processing, guided confirmation/error handling, QR label printing, hardware/manual fallback, responsive warehouse behavior, and clean production QR/barcode integrity are covered by the permanent A2.3 gate.
+- [x] A3.1 product master production acceptance is complete: canonical family/color/taxonomy enforcement, protected lifecycle mutation, full filtered export, production migrations, mirror reconciliation, advisor review, authenticated DB smoke, and deployed `/products` verification are recorded in `docs/acceptance/a3-1-product-master-data.md`.
 
 ---
 
@@ -670,16 +682,17 @@ Record material decisions here when they affect future phases.
 - [x] New Granite migration domains are introduced incrementally by the package that first needs them after current-schema review; no speculative parallel CMS is created.
 - [x] A2.2 keeps the existing hybrid inventory architecture: mutable `inventory` snapshot for operational reads plus append-safe `inventory_movements` ledger. It does not adopt full event sourcing or create separate damaged/hold quantity buckets.
 - [x] A2.3 does not add a scan-specific write ledger or new mutation API. Camera/manual scans resolve workflow inputs; confirmed stock changes continue through the A2.2 idempotent RPC + movement-ledger boundary.
+- [x] A3.1 keeps `brand_id` / `category_id` canonical while legacy text taxonomy columns remain synchronized compatibility mirrors; physical product deletion is not part of the Admin product-master lifecycle.
 
 ---
 
 # Next Action
 
-Primary Admin roadmap work is **Phase A3 — Products, Catalog & Pricing Control**. A2.1–A2.4 are production-accepted and the Phase A2 exit gate is closed.
+Primary Admin roadmap work is **A3.2 — Store product publishing**. A3.1 Product Master Data is production-accepted and closed.
 
-1. Begin A3.1 Product master data review.
-2. Preserve the A2.4 production reporting/RPC boundary while planning catalog and pricing work.
+1. Begin A3.2 `/store/products` publish/unpublish, publish-guard, slug, media, and color-management review.
+2. Preserve the A3.1 canonical taxonomy/family/color/lifecycle/export contract and the Store canonical taxonomy public-RPC boundary while changing publication behavior.
 
-**Cross-roadmap coordination:** A2.4 is Admin/shared-Supabase inventory reporting work only; it introduces no Store runtime change and did not mutate production inventory/movement source data. Store production acceptance remains tracked by the Store roadmap.
+**Cross-roadmap coordination:** A3.1 changes shared product-master semantics, but Store remains on the existing approved canonical `brand_id` / `category_id` read projection. The A3.1 Admin closeout does not widen Store public data or portal pricing visibility.
 
-**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A2 or other concurrently merged Admin work is preserved rather than overwritten.
+**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A3 or other concurrently merged Admin work is preserved rather than overwritten.
