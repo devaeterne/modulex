@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `9e92f1eb3b89b996d17005538012b6587c24f99f`
+Main baseline: `c5c9af0601a18eda9840ff8c00e401ce0a27c82a`
 Current phase: **Phase A2 — Inventory, Warehouses & Physical Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A2 work is isolated from Store scope; post-merge Store production acceptance remains Store-owned.**
-Current Admin next action: **A2.3 Stock Operations & Scanning is production-accepted and CI-GREEN; proceed to A2.4 Low-stock & Reporting after merge/deploy verification.**
+Current Admin next action: **A2.4 Low-stock & Reporting is release-candidate complete and CI-GREEN; merge first, then apply the A2.4 production migration, reconcile/advisor-check, verify Admin deploy, and only then close the Phase A2 exit gate.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -338,9 +338,14 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A2.4 Low-stock and reporting
 
-- [ ] Define low-stock threshold source of truth.
-- [ ] Verify low-stock views use efficient queries/indexes.
-- [ ] Review inventory and movement reports for correctness and export needs.
+- [x] Define low-stock threshold source of truth.
+  - `products.min_stock_level` is authoritative; `0` means threshold unset. Available remains A2.2 On Hand − Reserved. Out of Stock is threshold-independent, while Low Stock requires a positive configured threshold and positive Available at/below that threshold.
+- [x] Verify low-stock views use efficient queries/indexes.
+  - `v_product_stock_summary` / `v_low_stock_products` remain `security_invoker`; A2.4 adds authenticated SECURITY INVOKER search/summary RPCs with deterministic server-side filtering/pagination and a 500-row page cap for exports.
+  - Production preflight confirmed existing product/inventory/location/movement indexes cover the report join/filter keys used by A2.4. No speculative index is added before a production plan/advisor demonstrates a need.
+- [x] Review inventory and movement reports for correctness and export needs.
+  - Low Stock, Inventory Product, Inventory Location and Movement reports no longer rely on a browser-side latest-1,000-row boundary; filtered aggregates come from PostgreSQL and CSV export exhausts the same filtered RPC in pages.
+  - Read-only production preflight reconciles inventory to 462 On Hand / 3 Reserved / 459 Available and movement source/history to 4 events / 4.00 units. Final production reconciliation remains post-merge because the threshold-semantic migration must ship with the updated Admin client.
 
 ### Phase A2 Exit Gate
 
@@ -351,6 +356,7 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Scan/label workflows pass device/mobile regression checks.
   - A2.3 permanently guards camera same-value cooldown/serialization, guided confirmation and error handling, manual/hardware scanner fallback, QR label print modes/sizes, responsive warehouse UI contracts, and A2.2 idempotent write boundaries.
 - [ ] Inventory reports reconcile against source records.
+  - A2.4 read-only preflight reconciliation is PASS. Final exit-gate acceptance remains pending until `a2-low-stock-reporting.sql` is applied in production and the deployed Admin RPC surfaces are reconciled against the post-migration source records.
 
 ---
 
@@ -545,7 +551,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
 - [x] Polling regression contract exists.
 - [x] Production-surface/demo-route contract exists and is part of the Admin smoke chain.
 - [x] Add targeted regression contracts whenever roadmap work changes critical domain behavior.
-  - A2.1 warehouse/location integrity, A2.2 inventory/movement, and A2.3 stock-operations/scanning contracts are permanent Admin workflow gates. A2.3 protects scanner duplicate handling, guided confirmation/error recovery, QR label printing, mobile fallback behavior, and continued use of the A2.2 idempotent write boundary.
+  - A2.1 warehouse/location integrity, A2.2 inventory/movement, A2.3 stock-operations/scanning, and A2.4 low-stock/reporting contracts are permanent Admin workflow gates. A2.4 protects threshold semantics, server-side report paging/aggregates, complete filtered CSV export, and the A2.2 Available quantity model.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -665,19 +671,20 @@ Record material decisions here when they affect future phases.
 - [x] New Granite migration domains are introduced incrementally by the package that first needs them after current-schema review; no speculative parallel CMS is created.
 - [x] A2.2 keeps the existing hybrid inventory architecture: mutable `inventory` snapshot for operational reads plus append-safe `inventory_movements` ledger. It does not adopt full event sourcing or create separate damaged/hold quantity buckets.
 - [x] A2.3 does not add a scan-specific write ledger or new mutation API. Camera/manual scans resolve workflow inputs; confirmed stock changes continue through the A2.2 idempotent RPC + movement-ledger boundary.
+- [x] A2.4 defines `products.min_stock_level = 0` as threshold-unset. Out of Stock remains an alert independent of threshold configuration; Low Stock is only a configured-threshold state. Reporting RPCs are SECURITY INVOKER and do not introduce a second inventory source of truth.
 
 ---
 
 # Next Action
 
-Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. **A2.3 — Stock Operations & Scanning is production-accepted and closed.**
+Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. **A2.4 — Low-stock & Reporting is release-candidate complete; final production acceptance is pending.**
 
-1. Merge/deploy the A2.3 acceptance package after final branch checks remain GREEN; verify Admin production is on the merge SHA and has no new runtime errors.
-2. Start **A2.4 — Low-stock & Reporting** from the resulting current `main`.
-3. Define the low-stock threshold source of truth against A2.2 Available semantics and product minimum-stock configuration.
-4. Verify low-stock/report queries and indexes, then reconcile inventory and movement reports against source records and decide export requirements.
-5. Close the Phase A2 exit gate only after A2.4 reporting reconciliation is complete.
+1. Merge the A2.4 package only while final CI remains GREEN.
+2. Apply `modulex-admin/sql/a2-low-stock-reporting.sql` to production Supabase immediately before/with the updated Admin release.
+3. Reconcile production Low Stock / Inventory / Movement RPC results against source records, then run Security + Performance Advisors and record any intentional pre-existing findings.
+4. Verify the Admin production deployment is on the merge SHA and `/low-stock`, `/reports/inventory`, `/reports/movements` use the new production RPCs without runtime errors.
+5. Update A2.4 acceptance to production PASS, check the final Phase A2 reconciliation exit gate, then advance Admin roadmap work to **Phase A3 — Products, Catalog & Pricing Control**.
 
-**Cross-roadmap coordination:** A2.3 is Admin-only acceptance/hardening and introduces no Store runtime, shared schema, or production stock mutation change; Store production acceptance remains tracked by the Store roadmap.
+**Cross-roadmap coordination:** A2.4 is Admin/shared-Supabase inventory reporting work only; it introduces no Store runtime change and does not mutate production inventory/movement data during preflight. Store production acceptance remains tracked by the Store roadmap.
 
 **Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A2 or other concurrently merged Admin work is preserved rather than overwritten.
