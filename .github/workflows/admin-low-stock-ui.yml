@@ -1,0 +1,51 @@
+name: Admin Low Stock UI
+
+on:
+  push:
+    paths:
+      - "modulex-admin/src/app/(admin)/low-stock/page.tsx"
+      - "modulex-admin/src/components/inventory/LowStockManager.tsx"
+      - "modulex-admin/scripts/low-stock-ui-contract.mjs"
+      - "modulex-admin/AdminUICheck.md"
+      - ".github/workflows/admin-low-stock-ui.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/app/(admin)/low-stock/page.tsx"
+      - "modulex-admin/src/components/inventory/LowStockManager.tsx"
+      - "modulex-admin/scripts/low-stock-ui-contract.mjs"
+      - "modulex-admin/AdminUICheck.md"
+      - ".github/workflows/admin-low-stock-ui.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  low-stock-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Low Stock UI contract
+        run: node scripts/low-stock-ui-contract.mjs
+      - name: Production surface regression
+        run: npm run smoke:production-surface
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build
