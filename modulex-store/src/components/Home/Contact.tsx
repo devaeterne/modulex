@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import StoreIcon from "@/components/StoreIcon";
 
 const EMAILJS_SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID;
@@ -114,9 +115,7 @@ export default function Contact() {
 
           <div className="contact-details">
             <div className="contact-item">
-              <div className="contact-icon">
-                <i className="bi bi-geo-alt"></i>
-              </div>
+              <div className="contact-icon"><StoreIcon name="geo-alt" /></div>
               <div className="contact-text">
                 <h4>Visit Our Studio</h4>
                 <p>
@@ -126,9 +125,7 @@ export default function Contact() {
               </div>
             </div>
             <div className="contact-item">
-              <div className="contact-icon">
-                <i className="bi bi-telephone"></i>
-              </div>
+              <div className="contact-icon"><StoreIcon name="telephone" /></div>
               <div className="contact-text">
                 <h4>Call Us</h4>
                 <p>
@@ -138,9 +135,7 @@ export default function Contact() {
               </div>
             </div>
             <div className="contact-item">
-              <div className="contact-icon">
-                <i className="bi bi-envelope"></i>
-              </div>
+              <div className="contact-icon"><StoreIcon name="envelope" /></div>
               <div className="contact-text">
                 <h4>Email Us</h4>
                 <p>
@@ -150,9 +145,7 @@ export default function Contact() {
               </div>
             </div>
             <div className="contact-item">
-              <div className="contact-icon">
-                <i className="bi bi-clock"></i>
-              </div>
+              <div className="contact-icon"><StoreIcon name="clock" /></div>
               <div className="contact-text">
                 <h4>Office Hours</h4>
                 <p>
@@ -165,21 +158,11 @@ export default function Contact() {
           <div className="contact-social">
             <h4>Follow Us</h4>
             <div className="social-links-contact">
-              <a href="#" aria-label="Facebook">
-                <i className="bi bi-facebook"></i>
-              </a>
-              <a href="#" aria-label="Instagram">
-                <i className="bi bi-instagram"></i>
-              </a>
-              <a href="#" aria-label="Twitter">
-                <i className="bi bi-twitter-x"></i>
-              </a>
-              <a href="#" aria-label="Pinterest">
-                <i className="bi bi-pinterest"></i>
-              </a>
-              <a href="#" aria-label="LinkedIn">
-                <i className="bi bi-linkedin"></i>
-              </a>
+              <a href="#" aria-label="Facebook"><StoreIcon name="facebook" /></a>
+              <a href="#" aria-label="Instagram"><StoreIcon name="instagram" /></a>
+              <a href="#" aria-label="Twitter"><StoreIcon name="twitter-x" /></a>
+              <a href="#" aria-label="Pinterest"><StoreIcon name="pinterest" /></a>
+              <a href="#" aria-label="LinkedIn"><StoreIcon name="linkedin" /></a>
             </div>
           </div>
         </div>
@@ -214,63 +197,26 @@ export default function Contact() {
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="firstName">First Name *</label>
-                <input
-                  type="text"
-                  id="firstName"
-                  name="firstName"
-                  required
-                  placeholder="John"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                />
+                <input type="text" id="firstName" name="firstName" required placeholder="John" value={formData.firstName} onChange={handleChange} />
               </div>
               <div className="form-group">
                 <label htmlFor="lastName">Last Name *</label>
-                <input
-                  type="text"
-                  id="lastName"
-                  name="lastName"
-                  required
-                  placeholder="Doe"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                />
+                <input type="text" id="lastName" name="lastName" required placeholder="Doe" value={formData.lastName} onChange={handleChange} />
               </div>
             </div>
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="email">Email *</label>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  required
-                  placeholder="john@example.com"
-                  value={formData.email}
-                  onChange={handleChange}
-                />
+                <input type="email" id="email" name="email" required placeholder="john@example.com" value={formData.email} onChange={handleChange} />
               </div>
               <div className="form-group">
                 <label htmlFor="phone">Phone Number</label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  placeholder="+1 (555) 000-0000"
-                  value={formData.phone}
-                  onChange={handleChange}
-                />
+                <input type="tel" id="phone" name="phone" placeholder="+1 (555) 000-0000" value={formData.phone} onChange={handleChange} />
               </div>
             </div>
             <div className="form-group">
               <label htmlFor="projectType">Project Type *</label>
-              <select
-                id="projectType"
-                name="projectType"
-                required
-                value={formData.projectType}
-                onChange={handleChange}
-              >
+              <select id="projectType" name="projectType" required value={formData.projectType} onChange={handleChange}>
                 <option value="">Select a project type</option>
                 <option value="residential">Residential Design</option>
                 <option value="commercial">Commercial Space</option>
@@ -281,12 +227,7 @@ export default function Contact() {
             </div>
             <div className="form-group">
               <label htmlFor="budget">Budget Range</label>
-              <select
-                id="budget"
-                name="budget"
-                value={formData.budget}
-                onChange={handleChange}
-              >
+              <select id="budget" name="budget" value={formData.budget} onChange={handleChange}>
                 <option value="">Select your budget</option>
                 <option value="5-10k">$5,000 - $10,000</option>
                 <option value="10-25k">$10,000 - $25,000</option>
@@ -297,24 +238,11 @@ export default function Contact() {
             </div>
             <div className="form-group">
               <label htmlFor="message">Tell us about your project *</label>
-              <textarea
-                id="message"
-                name="message"
-                rows={5}
-                required
-                placeholder="Describe your vision, timeline, and any specific requirements..."
-                value={formData.message}
-                onChange={handleChange}
-              ></textarea>
+              <textarea id="message" name="message" rows={5} required placeholder="Describe your vision, timeline, and any specific requirements..." value={formData.message} onChange={handleChange}></textarea>
             </div>
             <div className="form-group checkbox-group">
               <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="newsletter"
-                  checked={formData.newsletter}
-                  onChange={handleChange}
-                />
+                <input type="checkbox" name="newsletter" checked={formData.newsletter} onChange={handleChange} />
                 <span>Send me design tips and project inspiration</span>
               </label>
             </div>
@@ -322,9 +250,7 @@ export default function Contact() {
               type="submit"
               className="btn-submit"
               disabled={isSubmitting}
-              style={{
-                background: status.type === "success" ? "#4CAF50" : undefined,
-              }}
+              style={{ background: status.type === "success" ? "#4CAF50" : undefined }}
             >
               <span>
                 {isSubmitting
@@ -334,9 +260,7 @@ export default function Contact() {
                     : "Send Message"}
               </span>
               {!isSubmitting && status.type !== "success" && (
-                <span className="submit-icon">
-                  <i className="bi bi-chevron-right"></i>
-                </span>
+                <span className="submit-icon"><StoreIcon name="chevron-right" /></span>
               )}
             </button>
           </form>
