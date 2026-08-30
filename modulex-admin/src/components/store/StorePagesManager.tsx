@@ -13,6 +13,7 @@ import {
 function defaultPageTitle(slug: ControlledPageSlug) {
   if (slug === "about") return "About Oakwell Cabinetry";
   if (slug === "showroom") return "Oakwell Cabinetry Showroom Information";
+  if (slug === "cabinet-process") return "Cabinet Planning Process";
   return "Projects";
 }
 
@@ -85,7 +86,7 @@ export default function StorePagesManager() {
   );
 
   function handleSaved(saved: StorePage) {
-    setPages((current) => current.map((page) => (page.slug === saved.slug ? saved : page)));
+    setPages((current) => current.map((page) => (page.slug === saved.slug ? saved : page));
   }
 
   if (loading) {
@@ -105,7 +106,7 @@ export default function StorePagesManager() {
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
         <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Secondary Store Pages</h1>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-          Manage the controlled About, Gallery, and Showroom page records. Saving a draft never publishes content; publishing is an explicit action.
+          Manage the controlled About, Gallery, Showroom, and Cabinet Planning page records. Saving a draft never publishes content; publishing is an explicit action.
         </p>
         {error ? <p className="mt-3 text-sm text-error-600">{error}</p> : null}
       </section>
