@@ -1,4 +1,4 @@
-type StoreIconName =
+export type StoreIconName =
   | "arrow-up"
   | "bounding-box"
   | "building"
@@ -44,43 +44,18 @@ export default function StoreIcon({ name, className, size = "1em" }: StoreIconPr
   const brand = brandLabels[name];
   if (brand) {
     return (
-      <svg
-        aria-hidden="true"
-        className={className}
-        focusable="false"
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        role="img"
-      >
+      <svg aria-hidden="true" className={className} focusable="false" width={size} height={size} viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
-        <text
-          x="12"
-          y="14.7"
-          fill="currentColor"
-          fontFamily="system-ui, sans-serif"
-          fontSize={brand.length > 1 ? "7" : "10"}
-          fontWeight="800"
-          textAnchor="middle"
-        >
+        <text x="12" y="14.7" fill="currentColor" fontFamily="system-ui, sans-serif" fontSize={brand.length > 1 ? "7" : "10"} fontWeight="800" textAnchor="middle">
           {brand}
         </text>
       </svg>
     );
   }
 
-  const common = {
-    ariaHidden: true,
-    className,
-    focusable: false,
-    width: size,
-    height: size,
-    viewBox: "0 0 24 24",
-  } as const;
-
   switch (name) {
     case "grid":
-      return <svg aria-hidden={common.ariaHidden} className={className} focusable="false" width={size} height={size} viewBox={common.viewBox} fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg>;
+      return <svg aria-hidden="true" className={className} focusable="false" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg>;
     case "chevron-left":
       return <svg aria-hidden="true" className={className} focusable="false" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>;
     case "chevron-right":
