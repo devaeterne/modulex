@@ -86,7 +86,7 @@ export default function StorePagesManager() {
   );
 
   function handleSaved(saved: StorePage) {
-    setPages((current) => current.map((page) => (page.slug === saved.slug ? saved : page));
+    setPages((current) => current.map((page) => (page.slug === saved.slug ? saved : page)));
   }
 
   if (loading) {
