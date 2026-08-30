@@ -1,0 +1,50 @@
+name: Admin Mobile Shell UI
+
+on:
+  push:
+    paths:
+      - "modulex-admin/src/context/SidebarContext.tsx"
+      - "modulex-admin/src/layout/AppHeader.tsx"
+      - "modulex-admin/src/layout/AppHeader.module.css"
+      - "modulex-admin/src/components/header/NotificationDropdown.tsx"
+      - "modulex-admin/scripts/mobile-shell-ui-contract.mjs"
+      - ".github/workflows/admin-mobile-shell-ui.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/context/SidebarContext.tsx"
+      - "modulex-admin/src/layout/AppHeader.tsx"
+      - "modulex-admin/src/layout/AppHeader.module.css"
+      - "modulex-admin/src/components/header/NotificationDropdown.tsx"
+      - "modulex-admin/scripts/mobile-shell-ui-contract.mjs"
+      - ".github/workflows/admin-mobile-shell-ui.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-shell-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: Mobile shell UI contract
+        run: node scripts/mobile-shell-ui-contract.mjs
+      - name: Production surface regression
+        run: npm run smoke:production-surface
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build

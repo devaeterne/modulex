@@ -1,0 +1,38 @@
+.mobileNotification :global(.dropdown-toggle) + div {
+  position: fixed;
+  top: calc(8.5rem + env(safe-area-inset-top, 0px));
+  right: 0.75rem;
+  left: 0.75rem;
+  width: auto !important;
+  max-width: none;
+  max-height: calc(100dvh - 9.25rem);
+  margin-top: 0 !important;
+}
+
+.mobileNotification :global(.custom-scrollbar) {
+  max-height: min(430px, calc(100dvh - 19rem));
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .mobileNotification :global(.dropdown-toggle) + div {
+    right: 1.25rem;
+    left: auto;
+    width: min(400px, calc(100vw - 2.5rem)) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobileNotification :global(.dropdown-toggle) + div {
+    position: absolute;
+    top: auto;
+    right: 0;
+    left: auto;
+    width: 400px !important;
+    max-height: none;
+    margin-top: 17px !important;
+  }
+
+  .mobileNotification :global(.custom-scrollbar) {
+    max-height: 430px;
+  }
+}
