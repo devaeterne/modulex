@@ -5,7 +5,6 @@ on:
     paths:
       - "modulex-admin/src/components/products/**"
       - "modulex-admin/src/icons/index.tsx"
-      - "modulex-admin/src/types/svg.d.ts"
       - "modulex-admin/sql/a3-product-master-data.sql"
       - "modulex-admin/scripts/a3-product-master-contract.mjs"
       - "modulex-admin/docs/acceptance/a3-1-product-master-data.md"
@@ -19,7 +18,6 @@ on:
     paths:
       - "modulex-admin/src/components/products/**"
       - "modulex-admin/src/icons/index.tsx"
-      - "modulex-admin/src/types/svg.d.ts"
       - "modulex-admin/sql/a3-product-master-data.sql"
       - "modulex-admin/scripts/a3-product-master-contract.mjs"
       - "modulex-admin/docs/acceptance/a3-1-product-master-data.md"
