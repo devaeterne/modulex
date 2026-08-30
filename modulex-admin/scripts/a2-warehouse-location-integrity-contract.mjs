@@ -25,11 +25,35 @@ const zonesTable = read("src/components/zones/ZonesTable.tsx");
 const locationForm = read("src/components/locations/LocationForm.tsx");
 const locationsTable = read("src/components/locations/LocationsTable.tsx");
 
-// Role parity: location master writes must match warehouse.manage (Admin/Super Admin only).
+// Role parity: creating locations is master-data work, while the warehouse role
+// keeps only the narrow UPDATE capability required by existing QR RPCs.
 assert.match(sql, /drop policy if exists locations_insert_admin_or_warehouse on public\.locations/i, "legacy warehouse-role location INSERT policy must be removed");
-assert.match(sql, /drop policy if exists locations_update_admin_or_warehouse on public\.locations/i, "legacy warehouse-role location UPDATE policy must be removed");
 assert.match(sql, /create policy locations_insert_admin_only[\s\S]{0,320}with check\s*\(\s*\(\s*select public\.is_admin\(\)\s*\)\s*\)/i, "location INSERT must be Admin-only");
-assert.match(sql, /create policy locations_update_admin_only[\s\S]{0,420}using\s*\(\s*\(\s*select public\.is_admin\(\)\s*\)\s*\)[\s\S]{0,160}with check\s*\(\s*\(\s*select public\.is_admin\(\)\s*\)\s*\)/i, "location UPDATE must be Admin-only");
+assert.match(sql, /create policy locations_update_admin_or_warehouse[\s\S]{0,520}warehouse/i, "location UPDATE must preserve warehouse-role access for approved QR operations");
+assert.match(sql, /guard_location_master_role/i, "warehouse-role location updates must pass a master-field guard");
+
+const masterRoleGuard =
+  sql.match(/create or replace function private\.guard_location_master_role\(\)[\s\S]*?\$\$;/i)?.[0] ?? "";
+assert.match(masterRoleGuard, /public\.is_admin\(\)/i, "Admin users must bypass the warehouse-only field restriction");
+assert.match(masterRoleGuard, /public\.has_role\([\s\S]{0,180}warehouse/i, "warehouse role must be identified explicitly");
+for (const field of [
+  "warehouse_id",
+  "zone_id",
+  "name",
+  "code",
+  "location_type",
+  "aisle",
+  "rack",
+  "shelf",
+  "bin",
+  "max_capacity",
+  "current_capacity",
+  "is_active",
+]) {
+  assert.match(masterRoleGuard, new RegExp(`new\\.${field}\\s+is distinct from\\s+old\\.${field}`, "i"), `warehouse role must not mutate location master field ${field}`);
+}
+assert.doesNotMatch(masterRoleGuard, /new\.qr_code\s+is distinct from\s+old\.qr_code/i, "warehouse QR operations must remain permitted");
+assert.match(masterRoleGuard, /QR operational fields/i, "blocked warehouse master updates must explain the allowed boundary");
 
 // Hierarchy integrity must be database-authoritative.
 assert.match(sql, /guard_location_hierarchy/i, "location hierarchy guard must exist");
