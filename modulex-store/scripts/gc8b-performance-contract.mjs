@@ -7,18 +7,18 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const srcRoot = path.join(root, "src");
 
-async function walk(directory) {
+async function walk(directory, matcher) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
     const absolute = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await walk(absolute));
-    else if (/\.(?:tsx?|jsx?)$/.test(entry.name)) files.push(absolute);
+    if (entry.isDirectory()) files.push(...await walk(absolute, matcher));
+    else if (matcher.test(entry.name)) files.push(absolute);
   }
   return files;
 }
 
-const sourceFiles = await walk(srcRoot);
+const sourceFiles = await walk(srcRoot, /\.(?:tsx?|jsx?)$/);
 const iconUsages = [];
 for (const absolute of sourceFiles) {
   const source = await readFile(absolute, "utf8");
@@ -34,6 +34,22 @@ assert.equal(
   `Store source must not depend on the 128 KiB Bootstrap icon font:\n${iconUsages.join("\n")}`,
 );
 
+const cssFiles = await walk(srcRoot, /\.css$/);
+const legacyFontUsages = [];
+for (const absolute of cssFiles) {
+  const source = await readFile(absolute, "utf8");
+  const relative = path.relative(root, absolute).replaceAll(path.sep, "/");
+  for (const match of source.matchAll(/font-family:\s*['"](?:Outfit|Playfair Display)['"]/gi)) {
+    legacyFontUsages.push(`${relative}: ${match[0]}`);
+  }
+}
+
+assert.equal(
+  legacyFontUsages.length,
+  0,
+  `All Store CSS consumers must use Next font variables instead of unavailable literal families:\n${legacyFontUsages.join("\n")}`,
+);
+
 const [style, layout] = await Promise.all([
   readFile(path.join(srcRoot, "css/style.css"), "utf8"),
   readFile(path.join(srcRoot, "app/layout.tsx"), "utf8"),
@@ -41,7 +57,6 @@ const [style, layout] = await Promise.all([
 
 assert.doesNotMatch(style, /fonts\.googleapis\.com/i, "Primary stylesheet must not reference Google Fonts CSS");
 assert.doesNotMatch(style, /display=swap['"]?\);?/i, "Primary stylesheet must not retain a partial Google Fonts import fragment");
-assert.doesNotMatch(style, /font-family:\s*['"](?:Outfit|Playfair Display)['"]/i, "Legacy external font-family declarations must be replaced by Next font variables");
 assert.match(style, /font-family:\s*var\(--font-outfit\)/, "Body typography must use the optimized Outfit variable");
 assert.match(style, /font-family:\s*var\(--font-playfair\)/, "Display typography must use the optimized Playfair variable");
 assert.match(layout, /from\s+["']next\/font\/google["']/, "Root layout must use next/font for self-hosted Google font delivery");
