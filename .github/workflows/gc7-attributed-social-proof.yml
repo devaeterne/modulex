@@ -1,0 +1,74 @@
+name: GC-7 Attributed Social Proof
+
+on:
+  push:
+    branches:
+      - feat/gc7-attributed-social-proof
+  pull_request:
+    paths:
+      - "modulex-store/**"
+      - "modulex-admin/**"
+      - ".github/workflows/gc7-attributed-social-proof.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  store-gc7-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-store
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-store/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: GC-7 contract
+        run: npm run smoke:gc7-social-proof
+      - name: Cabinet journey regression
+        run: npm run smoke:gc6-cabinet-journey
+      - name: Gallery regression
+        run: npm run smoke:gc5-gallery-projects
+      - name: Company regression
+        run: npm run smoke:gc3-company-public
+      - name: Scoped lint
+        run: npx eslint src/app/page.tsx src/lib/store/content/queries.ts scripts/gc7-social-proof-contract.mjs
+      - name: Production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+          NEXT_PUBLIC_SITE_URL: https://oakwellcabinetry.com
+        run: npm run build
+
+  admin-gc7-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Scoped lint
+        run: npx eslint 'src/app/(admin)/store/reviews/page.tsx' src/components/store/StoreReviewsManager.tsx src/layout/AppSidebar.tsx src/lib/auth/permissions.ts src/lib/store/reviews.ts
+      - name: Production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build
