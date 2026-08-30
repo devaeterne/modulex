@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - feat/gc8a-store-chrome-seo
-      - docs/gc8a-production-closeout
     paths:
       - "modulex-store/**"
       - "modulex-admin/src/components/store/**"
@@ -21,11 +20,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   store-gc8a-verification:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -70,7 +68,6 @@ jobs:
         run: npm run build
 
   admin-gc8a-verification:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -97,114 +94,3 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
         run: npm run build
-
-  sync-production-closeout:
-    if: github.actor != 'github-actions[bot]' && (github.ref == 'refs/heads/docs/gc8a-production-closeout' || github.head_ref == 'docs/gc8a-production-closeout')
-    needs:
-      - store-gc8a-verification
-      - admin-gc8a-verification
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout closeout branch
-        uses: actions/checkout@v4
-        with:
-          ref: docs/gc8a-production-closeout
-      - name: Record GC-8A production acceptance
-        shell: python
-        run: |
-          from pathlib import Path
-
-          store = Path("modulex-store/STORE_ROADMAP.md")
-          text = store.read_text()
-          replacements = {
-              "Main baseline: `cc670f511225c6e57b48c1bae321ef986f7da93c`": "Main baseline: `d41f7c19ce81016b6a1a05166d0a4089104bfe52`",
-              "Current Granite migration status: **GC-5, GC-6 and GC-7 are production-accepted. GC-7 live homepage acceptance is recorded after PR #167 / commit `74013f90561e023b0453aea57cd010456de2c597`. GC-8A — managed public navigation/footer + technical SEO — is implementation/data/CI complete on its conflict-safe latest-main branch; PR merge/deploy and live acceptance remain the final closeout gate before `[x]`.**": "Current Granite migration status: **GC-5, GC-6, GC-7 and GC-8A are production-accepted. GC-8A live acceptance is recorded after PR #169 / merge commit `d41f7c19ce81016b6a1a05166d0a4089104bfe52`; managed public chrome, portal coexistence and technical SEO are verified live. GC-8B — accessibility + performance acceptance — is the active next package.**",
-              "- [~] GC-8 — Navigation/footer, SEO, accessibility & performance QA. GC-8A implementation/data/CI complete; live acceptance pending, GC-8B remains next.": "- [~] GC-8 — Navigation/footer, SEO, accessibility & performance QA. GC-8A is production-accepted; GC-8B accessibility/performance acceptance remains the final GC-8 package.",
-              "# Next Action\n\n1. Merge/deploy **GC-8A — managed Store chrome + technical SEO** only after final branch CI is green and the PR remains `behind_by = 0`.\n2. Post-merge, verify live public nav/footer order, portal coexistence, Oakwell-facing Organization JSON-LD with Granite & Cabinet Center as distinct parent, managed-title de-duplication, canonical/robots/sitemap behavior, and no Granite runtime backend/media dependency; then mark GC-8A `[x]` in the closeout.\n3. Proceed to **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning**.": "# Next Action\n\n1. Execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from latest `main`.\n2. Keep GC-8 `[~]` until accessibility, performance, indexing and final live acceptance all pass; then close the overall GC-8 exit gate.\n3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend."
-          }
-          for old, new in replacements.items():
-              if old not in text:
-                  raise SystemExit(f"STORE_ROADMAP marker missing: {old[:120]}")
-              text = text.replace(old, new, 1)
-          store.write_text(text)
-
-          migration = Path("modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md")
-          m = migration.read_text()
-          migration_replacements = {
-              "Status: `[~]` implementation/data/CI complete; PR merge/deploy + live acceptance pending.": "Status: `[x]` production-accepted on 2026-08-30 after PR #169 merge/deploy and live verification.",
-              "- `[~]` post-merge live acceptance: nav/footer, portal coexistence, JSON-LD, titles, canonical/robots/sitemap and deployment commit match.": "- `[x]` post-merge live acceptance: production deployment matches merge commit `d41f7c19ce81016b6a1a05166d0a4089104bfe52`; nav/footer ordering, `/account` + `/dealer` coexistence, Oakwell Organization/Brand JSON-LD with Granite parent attribution, managed-title de-duplication, canonical/robots/sitemap behavior and Granite runtime-backend/media independence are verified live.",
-              "**GC-8A exit gate:** code/data/CI are complete; mark `[x]` only after merge/deploy and live production acceptance.": "**GC-8A exit gate:** `[x]` code/data/CI, merge/deploy and live production acceptance are complete. Acceptance record: `docs/granite-center/GC8A_PRODUCTION_ACCEPTANCE.md`.",
-              "# 10. Next Action\n\n1. Complete GC-8A PR merge/deploy and live acceptance; do not mark GC-8A `[x]` before the production deployment/commit and public/portal/SEO checks pass.\n2. Then execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from the latest `main`.\n3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend.": "# 10. Next Action\n\n1. Execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from latest `main`.\n2. Close overall GC-8 only after accessibility, performance, indexing and final production verification pass.\n3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend."
-          }
-          for old, new in migration_replacements.items():
-              if old not in m:
-                  raise SystemExit(f"Migration roadmap marker missing: {old[:120]}")
-              m = m.replace(old, new, 1)
-          migration.write_text(m)
-
-          acceptance = Path("modulex-store/docs/granite-center/GC8A_PRODUCTION_ACCEPTANCE.md")
-          if acceptance.exists():
-              raise SystemExit("GC8A production acceptance already exists")
-          acceptance.write_text("""# GC-8A Production Acceptance — Managed Store Chrome + Technical SEO
-
-Date: 2026-08-30
-Status: **PRODUCTION ACCEPTED**
-
-## Delivered scope
-
-GC-8A makes ordinary public navigation/footer labels, order and approved destinations data-owned through Admin → Supabase → the narrow published Store projection while keeping route allowlists and fixed Account/Contact behavior code-owned. It also normalizes managed technical SEO, structured data and indexing behavior without making Granite Center a runtime content or media backend.
-
-## Repository / deployment evidence
-
-- Implementation PR: **#169 — `feat(store): deliver GC-8A managed chrome and technical SEO`**.
-- PR #169 merged to `main` as `d41f7c19ce81016b6a1a05166d0a4089104bfe52` on 2026-08-30.
-- Final PR branch CI was green before merge; Store and Admin GC-8A verification jobs passed.
-- Vercel Store project `oakwell` production deployment `dpl_4H8Dat4Ru72Ntozz48kJsgKJK2MQ` is `READY` from the same merge commit. A second production deployment for the same merge commit is also `READY`.
-- Production host used for live acceptance: `https://oakwell-phi.vercel.app`.
-
-## Live public chrome acceptance
-
-Production `/` returns HTTP 200 and renders the approved managed chrome projection in order:
-
-- Primary: Home, About, Products, Showroom, Gallery, Dealers.
-- Footer Products: Product Catalog, Product Support.
-- Footer Company: About Us, Showroom, Contact.
-
-The public Account icon and Contact Us CTA remain code-owned. The server-rendered Store state exposes the exact 11 published `store_chrome_items` rows expected by the GC-8A contract.
-
-Production `/account` and `/dealer` both return HTTP 200 through their login surfaces, retain the public Navbar, keep their portal auth shell, and do not render a duplicate public footer. Their metadata remains `noindex, nofollow`.
-
-## Technical SEO acceptance
-
-Live verification confirmed:
-
-- `/` title is `Oakwell Cabinetry | Cabinet Products & Dealer Support` with no duplicate managed suffix;
-- `/about` title is `About Oakwell Cabinetry | Granite & Cabinet Center Brand` with no duplicate suffix and a canonical `/about` URL;
-- `/showroom` title is `Oakwell Cabinetry Showroom Information | Virginia`, canonicalizes to `/showroom`, and correctly emits `noindex, follow` while no real showroom location is published;
-- Organization JSON-LD identifies `OAKWELL CABINETRY` as the public Organization/Brand and `GRANITE & CABINET CENTER` as `parentOrganization`;
-- `/robots.txt` allows the public site, disallows `/api/`, `/account/` and `/dealer/`, and points to the production sitemap;
-- `/sitemap.xml` returns HTTP 200 and contains only ready/indexable public routes, including Home, About, Products, Contact, Dealer Apply, Gallery, Cabinet Process and the published product route; Showroom is intentionally absent while it is `noindex`;
-- live public media resolves from Oakwell local assets or managed Supabase storage. Granite Center URLs remain attribution/provenance evidence only and are not used as the Store runtime content/media backend.
-
-## Scope boundaries retained
-
-- No arbitrary public navigation href input; destinations remain code allowlisted.
-- No browser elevated/service key.
-- No portal shell/sidebar replacement.
-- No conversion of Granite Center into the public Organization identity.
-- No Granite WordPress/runtime media dependency.
-- No invented showroom/location data to force indexability.
-- GC-8B accessibility/performance tuning remains separate and is not claimed by this closeout.
-
-## Closeout
-
-GC-8A is production-accepted and may be marked `[x]`. Overall GC-8 remains `[~]` until **GC-8B — Accessibility + performance acceptance** completes its accessibility, keyboard/mobile, Lighthouse/Core Web Vitals, LCP/CLS, indexing and final live-verification gates.
-""")
-      - name: Commit closeout docs
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add modulex-store/STORE_ROADMAP.md modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md modulex-store/docs/granite-center/GC8A_PRODUCTION_ACCEPTANCE.md
-          git diff --cached --quiet && exit 0
-          git commit -m "docs(store): close GC-8A production acceptance"
-          git push origin HEAD:docs/gc8a-production-closeout
