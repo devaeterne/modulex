@@ -1,0 +1,107 @@
+name: GC-7 Wire Social Proof
+
+on:
+  push:
+    branches:
+      - feat/gc7-attributed-social-proof
+    paths:
+      - ".github/workflows/gc7-wire-social-proof.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/gc7-attributed-social-proof
+      - name: Wire Admin and Store surfaces
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          sidebar = Path("modulex-admin/src/layout/AppSidebar.tsx")
+          text = sidebar.read_text()
+          anchor = '      { name: "Cabinet Content", path: "/store/cabinet-content", permission: "store.manage", exact: true },\n'
+          addition = anchor + '      { name: "Reviews", path: "/store/reviews", permission: "store.manage", exact: true },\n'
+          if 'path: "/store/reviews"' not in text:
+              if anchor not in text: raise SystemExit("sidebar anchor missing")
+              text = text.replace(anchor, addition, 1)
+              sidebar.write_text(text)
+
+          permissions = Path("modulex-admin/src/lib/auth/permissions.ts")
+          text = permissions.read_text()
+          anchor = '      path === "/store/cabinet-content" ||\n      path.startsWith("/store/cabinet-content/") ||\n'
+          addition = anchor + '      path === "/store/reviews" ||\n      path.startsWith("/store/reviews/") ||\n'
+          if 'path === "/store/reviews"' not in text:
+              if anchor not in text: raise SystemExit("permissions anchor missing")
+              text = text.replace(anchor, addition, 1)
+              permissions.write_text(text)
+
+          queries = Path("modulex-store/src/lib/store/content/queries.ts")
+          text = queries.read_text()
+          if "SOCIAL_PROOF_REVALIDATE_SECONDS" not in text:
+              text = text.replace(
+                  "const CABINET_CONTENT_REVALIDATE_SECONDS = 60;\n",
+                  "const CABINET_CONTENT_REVALIDATE_SECONDS = 60;\nconst SOCIAL_PROOF_REVALIDATE_SECONDS = 60;\n",
+                  1,
+              )
+              type_anchor = '''export type StorePublicFaqEntry = {\n  id: string;\n  question: string;\n  answer: string;\n  sortOrder: number;\n  updatedAt: string;\n};\n'''
+              type_addition = type_anchor + '''\nexport type StorePublicTestimonial = {\n  id: string;\n  reviewerName: string;\n  reviewerLocation: string | null;\n  excerpt: string;\n  sortOrder: number;\n  attributionClassification: "parent_attributed" | "oakwell_owned";\n  sourceEntity: string | null;\n  sourcePageUrl: string | null;\n  attributionText: string | null;\n  updatedAt: string;\n};\n'''
+              if type_anchor not in text: raise SystemExit("testimonial type anchor missing")
+              text = text.replace(type_anchor, type_addition, 1)
+              rpc_anchor = '''type FaqEntryRpcRow = {\n  id: string;\n  question: string;\n  answer: string;\n  sort_order: number;\n  updated_at: string;\n};\n'''
+              rpc_addition = rpc_anchor + '''\ntype TestimonialRpcRow = {\n  id: string;\n  reviewer_name: string;\n  reviewer_location: string | null;\n  excerpt: string;\n  sort_order: number;\n  attribution_classification: string;\n  source_entity: string | null;\n  source_page_url: string | null;\n  attribution_text: string | null;\n  updated_at: string;\n};\n'''
+              if rpc_anchor not in text: raise SystemExit("testimonial RPC type anchor missing")
+              text = text.replace(rpc_anchor, rpc_addition, 1)
+              function_anchor = '''export const getStoreGalleryReadiness = cache(async () => {\n'''
+              function_addition = '''export const getStorePublicTestimonials = cache(async (): Promise<StorePublicTestimonial[]> => {\n  const rows = await callPublicRpc<TestimonialRpcRow[]>(\n    "get_store_public_testimonials",\n    {},\n    { revalidate: SOCIAL_PROOF_REVALIDATE_SECONDS },\n  );\n\n  return rows.flatMap((row) => {\n    const reviewerName = row.reviewer_name?.trim();\n    const excerpt = row.excerpt?.trim();\n    if (!reviewerName || !excerpt) return [];\n    if (row.attribution_classification !== "parent_attributed" && row.attribution_classification !== "oakwell_owned") return [];\n\n    const sourceEntity = row.source_entity?.trim() || null;\n    const sourcePageUrl = row.source_page_url?.trim() || null;\n    const attributionText = row.attribution_text?.trim() || null;\n    if (row.attribution_classification === "parent_attributed") {\n      if (!sourceEntity || !sourcePageUrl?.startsWith("https://") || !attributionText) return [];\n    }\n\n    return [{\n      id: row.id,\n      reviewerName,\n      reviewerLocation: row.reviewer_location?.trim() || null,\n      excerpt,\n      sortOrder: row.sort_order,\n      attributionClassification: row.attribution_classification,\n      sourceEntity,\n      sourcePageUrl,\n      attributionText,\n      updatedAt: row.updated_at,\n    }];\n  });\n});\n\n''' + function_anchor
+              if function_anchor not in text: raise SystemExit("testimonial function anchor missing")
+              text = text.replace(function_anchor, function_addition, 1)
+              queries.write_text(text)
+
+          home = Path("modulex-store/src/app/page.tsx")
+          text = home.read_text()
+          if "getStorePublicTestimonials" not in text:
+              import_anchor = 'import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";\n'
+              import_addition = import_anchor + 'import { getStorePublicTestimonials } from "@/lib/store/content/queries";\n'
+              if import_anchor not in text: raise SystemExit("home import anchor missing")
+              text = text.replace(import_anchor, import_addition, 1)
+              promise_anchor = '''  const [companyResult, featuresResult, productResult] = await Promise.allSettled([\n    getStorePublicCompanyProfile(),\n    settings.showFeatures ? getStoreHomeFeatures() : Promise.resolve([]),\n    settings.showFeaturedProducts ? getStoreCatalogProducts({ limit: 12 }) : Promise.resolve([]),\n  ]);\n'''
+              promise_replacement = '''  const [companyResult, featuresResult, productResult, testimonialResult] = await Promise.allSettled([\n    getStorePublicCompanyProfile(),\n    settings.showFeatures ? getStoreHomeFeatures() : Promise.resolve([]),\n    settings.showFeaturedProducts ? getStoreCatalogProducts({ limit: 12 }) : Promise.resolve([]),\n    getStorePublicTestimonials(),\n  ]);\n'''
+              if promise_anchor not in text: raise SystemExit("home Promise.allSettled anchor missing")
+              text = text.replace(promise_anchor, promise_replacement, 1)
+              products_anchor = '''  const featuredProducts = productResult.status === "fulfilled"\n    ? productResult.value.filter((product) => product.isFeatured).slice(0, 6)\n    : [];\n'''
+              products_addition = products_anchor + '''  const testimonials = testimonialResult.status === "fulfilled" ? testimonialResult.value : [];\n'''
+              if products_anchor not in text: raise SystemExit("home products anchor missing")
+              text = text.replace(products_anchor, products_addition, 1)
+              render_anchor = '''      {settings.showVirtualTour ? <VirtualTour /> : null}\n'''
+              render_block = '''      {testimonials.length > 0 ? (\n        <section className="testimonials" aria-labelledby="parent-reviews-heading">\n          <div className="container">\n            <div className="section-header text-center">\n              <span className="section-tag">Attributed social proof</span>\n              <h2 id="parent-reviews-heading">Granite & Cabinet Center customer reviews</h2>\n              <p>These source-linked excerpts describe Granite & Cabinet Center customer experiences and are not Oakwell-specific reviews.</p>\n            </div>\n            <div className="testimonials-grid mt-5">\n              {testimonials.map((testimonial) => (\n                <article className="testimonial-card" key={testimonial.id}>\n                  <p className="testimonial-text">“{testimonial.excerpt}”</p>\n                  <div className="client-info">\n                    <div>\n                      <h4>{testimonial.reviewerName}</h4>\n                      {testimonial.reviewerLocation ? <p>{testimonial.reviewerLocation}</p> : null}\n                      {testimonial.attributionClassification === "parent_attributed" && testimonial.sourcePageUrl && testimonial.attributionText ? (\n                        <a href={testimonial.sourcePageUrl} target="_blank" rel="noopener noreferrer" className="service-link">\n                          {testimonial.attributionText}\n                        </a>\n                      ) : null}\n                    </div>\n                  </div>\n                </article>\n              ))}\n            </div>\n          </div>\n        </section>\n      ) : null}\n\n''' + render_anchor
+              if render_anchor not in text: raise SystemExit("home testimonial render anchor missing")
+              text = text.replace(render_anchor, render_block, 1)
+              home.write_text(text)
+
+          package = Path("modulex-store/package.json")
+          text = package.read_text()
+          if '"smoke:gc7-social-proof"' not in text:
+              text = text.replace(
+                  "npm run smoke:gc6-cabinet-journey && npm run smoke:gallery-freshness",
+                  "npm run smoke:gc6-cabinet-journey && npm run smoke:gc7-social-proof && npm run smoke:gallery-freshness",
+                  1,
+              )
+              anchor = '    "smoke:gc6-cabinet-journey": "node scripts/gc6-cabinet-journey-contract.mjs",\n'
+              addition = anchor + '    "smoke:gc7-social-proof": "node scripts/gc7-social-proof-contract.mjs",\n'
+              if anchor not in text: raise SystemExit("package GC6 script anchor missing")
+              text = text.replace(anchor, addition, 1)
+              package.write_text(text)
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin/src/layout/AppSidebar.tsx modulex-admin/src/lib/auth/permissions.ts modulex-store/src/lib/store/content/queries.ts modulex-store/src/app/page.tsx modulex-store/package.json
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: wire attributed social proof into Admin and Store"
+            git push origin HEAD:feat/gc7-attributed-social-proof
+          fi
