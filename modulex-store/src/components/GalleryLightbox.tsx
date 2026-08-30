@@ -1,5 +1,6 @@
 "use client";
 
+import StoreIcon from "@/components/StoreIcon";
 import { useLightboxStore } from "@/store/useLightboxStore";
 import { useEffect, useRef } from "react";
 
@@ -50,7 +51,7 @@ export default function GalleryLightbox() {
           onClick={closeLightbox}
           aria-label="Close media viewer"
         >
-          <i className="bi bi-x-lg" aria-hidden="true"></i>
+          <StoreIcon name="x" />
         </button>
 
         {type === "image" && src && (
