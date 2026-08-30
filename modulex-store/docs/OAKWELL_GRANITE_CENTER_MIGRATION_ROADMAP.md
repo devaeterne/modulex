@@ -1,6 +1,6 @@
 # Oakwell Cabinetry — Granite & Cabinet Center Content / Media Migration Roadmap
 
-Last reviewed: 2026-08-29
+Last reviewed: 2026-08-30
 Status: **APPROVED — execute sequentially via reviewed PRs**
 Primary source: https://granitecenterva.com/
 Target: `devaeterne/modulex` → `modulex-store` + controlled CMS in `modulex-admin`
@@ -510,21 +510,26 @@ Goal: replace parent form behavior with configurable first-party Oakwell lead ca
 
 Goal: seed real, curated, CMS-managed cabinet portfolio content.
 
-- `[ ]` import approved cabinet-relevant candidates as drafts;
-- `[ ]` attach controlled media assets;
+- `[x]` import approved cabinet-relevant candidates as drafts;
+- `[x]` attach controlled media assets;
 - `[ ]` add provenance, title/category/location/summary/alt text;
 - `[ ]` preserve parent attribution where required;
-- `[ ]` review and publish curated set;
-- `[ ]` verify Gallery readiness/nav/sitemap/live rendering.
+- `[x]` review and publish curated set;
+- `[x]` verify Gallery readiness/nav/sitemap/live rendering.
 
 **Exit gate:** all visible project content/media is approved, cabinet-relevant, CMS-backed and live accepted. This package may close the standing Store Phase 2.1 Gallery blocker.
+
+
+**GC-5 production closeout — 2026-08-30:** 20 source project groups and 83 project images are imported into controlled Oakwell CMS/Storage. 13 curated projects are published (4 Residential + 9 Commercial). The remaining 7 Residential groups / 45 linked assets are intentionally retained as draft/mixed with explicit review notes because they are primarily countertop, fireplace, outdoor, shower or material-focused rather than cabinet-project focused.
 
 ## GC-6 — Cabinet content / customer journey
 
 Goal: publish real Oakwell cabinet knowledge without parent marketing noise.
 
-- `[ ]` adapt process as typed CMS content;
-- `[ ]` create Oakwell cabinetry FAQ in managed data;
+- `[~]` adapt process as typed CMS content;
+- `[~]` create Oakwell cabinetry FAQ in managed data;
+**GC-6 implementation status — 2026-08-30:** typed process and FAQ domains are migrated to production; 4 source-adapted cabinet-planning steps and 6 original Oakwell cabinetry FAQs are published in controlled data. Draft gating was verified at 0/0 public rows before publication; after publication the narrow RPCs return 4/6 while anon direct table selects remain denied and source provenance remains private. Store/Admin CI is green. Final GC-6 completion remains pending PR merge/deploy and live `/cabinet-process` acceptance.
+
 - `[ ]` add approved consultation CTA content;
 - `[ ]` decide Home Office/accessory scope separately;
 - `[ ]` omit unsupported guarantees/discounts/SLAs.

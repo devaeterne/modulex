@@ -1,8 +1,9 @@
 # Modulex Store Roadmap
 
-Last reviewed: 2026-08-29
-Main baseline: `406bd374a4b4a7738a1a785709f3b277d21e4410`
+Last reviewed: 2026-08-30
+Main baseline: `e0ccbcc239a52ac734ede69ed80fcf205bc2a93d`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
+Current Granite migration status: **GC-5 Gallery/media migration is production-accepted: 20 projects imported, 13 curated projects published, and 7 non-cabinet-focused Residential source groups intentionally retained as non-publishable drafts. GC-6 Cabinet Journey is in progress: typed process/FAQ CMS, Admin management, production data publication, public RPC gating, lint and production builds are verified; live Store acceptance remains pending PR merge/deploy.**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
 
@@ -172,7 +173,7 @@ The broader Granite migration now has an approved dynamic-content architecture a
   - Package C implementation reads the published `about` projection through the approved RPC query layer, keeps company-profile identity/contact canonical, generates CMS metadata, and retains the factual fallback when CMS data is missing or unavailable.
   - Branch verification passed in GitHub Actions run `33244098018`. Production acceptance completed after PR #99 merge/deploy: an approved factual `about` row is published in production, the anonymous public RPC returns it, and live `/about` renders the CMS title/intro/CTA with 200/indexable metadata after Vercel revalidation.
 
-- [~] Convert Gallery/Projects page to CMS-backed data.
+- [x] Convert Gallery/Projects page to CMS-backed data.
   - Design for both public routes: `docs/superpowers/specs/2026-08-29-phase-2-1-c-store-public-pages-design.md`.
   - Package C implementation adds published-only project/media rendering, fail-closed `notFound()`, CMS metadata, accessible image/video interaction, and shared readiness gating for route navigation and sitemap exposure.
   - No public project-detail route or `/gallery/detail` was reintroduced. Completion remains pending production acceptance with a published Gallery page and at least one approved published project.
@@ -181,6 +182,15 @@ The broader Granite migration now has an approved dynamic-content architecture a
 - [x] Decide Blog strategy.
   - Decision: **Option B — no Blog CMS in Phase 2.1.** Keep `/blog` disabled/not-found until editorial workflow is actually required.
   - Do not keep or rebuild a fake blog merely for template completeness.
+
+### Granite GC-6 — Cabinet Journey / FAQ extension
+
+- [~] Publish a CMS-backed cabinet planning/customer-journey surface.
+  - Typed `store_process_steps` and `store_faq_entries` domains, Admin `Cabinet Content` management, published-only public RPCs, CMS page SEO/CTA, conditional sitemap readiness and FAQ structured data are implemented on the GC-6 branch.
+  - Production migration is applied; 4 adapted process steps and 6 original Oakwell cabinetry FAQs are published in controlled data. Anonymous direct table reads remain denied and provenance is omitted from public projections.
+  - Source promotions, fixed SLAs, installation promises, guarantees and other unconfirmed Granite claims were deliberately not migrated.
+  - Branch verification: GC-6 contract, company/gallery/showroom regressions, changed-file lint and Store/Admin production builds pass.
+  - Completion remains `[~]` until the PR is merged/deployed and `/cabinet-process` receives live acceptance.
 
 ## 2.1.2 Shared Store chrome
 
