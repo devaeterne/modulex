@@ -1,0 +1,60 @@
+name: Admin A2.4 Low Stock Reporting
+
+on:
+  push:
+    branches:
+      - feat/a2-4-low-stock-reporting
+    paths:
+      - "modulex-admin/src/components/inventory/LowStockManager.tsx"
+      - "modulex-admin/src/components/reports/**"
+      - "modulex-admin/src/lib/reports/**"
+      - "modulex-admin/sql/a2-low-stock-reporting.sql"
+      - "modulex-admin/scripts/a2-low-stock-reporting-contract.mjs"
+      - "modulex-admin/docs/acceptance/a2-4-low-stock-reporting.md"
+      - "modulex-admin/ADMIN_ROADMAP.md"
+      - ".github/workflows/admin-a2-low-stock-reporting.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/components/inventory/LowStockManager.tsx"
+      - "modulex-admin/src/components/reports/**"
+      - "modulex-admin/src/lib/reports/**"
+      - "modulex-admin/sql/a2-low-stock-reporting.sql"
+      - "modulex-admin/scripts/a2-low-stock-reporting-contract.mjs"
+      - "modulex-admin/docs/acceptance/a2-4-low-stock-reporting.md"
+      - "modulex-admin/ADMIN_ROADMAP.md"
+      - ".github/workflows/admin-a2-low-stock-reporting.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  reporting-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: A2.4 low-stock and reporting contract
+        run: node scripts/a2-low-stock-reporting-contract.mjs
+      - name: A2.3 stock operations regression
+        run: node scripts/a2-stock-operations-scanning-contract.mjs
+      - name: A2.2 inventory and movement regression
+        run: npm run smoke:a2-inventory-movements
+      - name: A2.1 warehouse and location regression
+        run: npm run smoke:a2-warehouse-integrity
+      - name: Production surface regression
+        run: npm run smoke:production-surface
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - run: npm run lint
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
