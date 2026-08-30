@@ -77,7 +77,7 @@ jobs:
           const report = JSON.parse(fs.readFileSync("lighthouse-home.json", "utf8"));
           const score = (key) => Math.round((report.categories[key]?.score ?? 0) * 100);
           const metric = (key) => report.audits[key]?.numericValue ?? null;
-          const summary = [
+          const lines = [
             "## GC-8B production Lighthouse mobile baseline",
             `- Performance: ${score("performance")}`,
             `- Accessibility: ${score("accessibility")}`,
@@ -85,7 +85,44 @@ jobs:
             `- LCP: ${metric("largest-contentful-paint")?.toFixed(0) ?? "n/a"} ms`,
             `- CLS: ${metric("cumulative-layout-shift")?.toFixed(3) ?? "n/a"}`,
             `- TBT: ${metric("total-blocking-time")?.toFixed(0) ?? "n/a"} ms`,
-          ].join("\n");
+            "",
+            "### Diagnostics",
+          ];
+          const diagnosticIds = [
+            "first-contentful-paint",
+            "speed-index",
+            "server-response-time",
+            "mainthread-work-breakdown",
+            "bootup-time",
+            "unused-javascript",
+            "unused-css-rules",
+            "render-blocking-resources",
+            "largest-contentful-paint-element",
+            "lcp-discovery-insight",
+            "lcp-phases-insight",
+            "render-blocking-insight",
+            "third-parties-insight",
+            "image-delivery-insight",
+            "network-requests",
+          ];
+          for (const id of diagnosticIds) {
+            const audit = report.audits[id];
+            if (!audit) continue;
+            const value = audit.displayValue || (typeof audit.numericValue === "number" ? audit.numericValue.toFixed(0) : "");
+            lines.push(`- ${id}: score=${audit.score ?? "n/a"}${value ? `; ${value}` : ""}`);
+          }
+          const requests = report.audits["network-requests"]?.details?.items || [];
+          const heavy = requests
+            .filter((item) => typeof item.transferSize === "number")
+            .sort((a, b) => b.transferSize - a.transferSize)
+            .slice(0, 8);
+          if (heavy.length) {
+            lines.push("", "### Largest transfers");
+            for (const item of heavy) {
+              lines.push(`- ${Math.round(item.transferSize / 1024)} KiB — ${item.url}`);
+            }
+          }
+          const summary = lines.join("\n");
           console.log(summary);
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
           NODE
