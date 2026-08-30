@@ -14,13 +14,10 @@ const read = (file) => {
 const exists = (file) => fs.existsSync(path.join(root, file));
 
 const sqlPath = "sql/a2-warehouse-location-integrity.sql";
-const errorFormatterPath = "src/lib/inventory/warehouse-structure-errors.ts";
 
 assert.equal(exists(sqlPath), true, "A2.1 warehouse/location integrity SQL contract must exist");
-assert.equal(exists(errorFormatterPath), true, "A2.1 shared warehouse structure error formatter must exist");
 
 const sql = read(sqlPath);
-const errorFormatter = read(errorFormatterPath);
 const warehouseForm = read("src/components/warehouses/WarehouseForm.tsx");
 const warehousesTable = read("src/components/warehouses/WarehousesTable.tsx");
 const zoneForm = read("src/components/zones/ZoneForm.tsx");
@@ -49,6 +46,23 @@ assert.match(sql, /guard_location_deactivation/i, "location deactivation guard m
 assert.match(sql, /quantity\s*>\s*0|reserved_quantity\s*>\s*0/i, "deactivation guards must inspect active stock/reservations");
 assert.match(sql, /active zones|active locations/i, "parent deactivation must account for active child structure");
 
+// Guard failures themselves are operator-facing because every existing structure
+// mutation surface already renders the Supabase error.message directly.
+assert.match(sql, /Move stock first/i, "stock-blocked lifecycle errors must tell operators what to do next");
+assert.match(sql, /same warehouse/i, "hierarchy mismatch errors must explain the same-warehouse rule");
+assert.match(sql, /Deactivate (?:active )?(?:zones|locations) first/i, "parent lifecycle errors must explain child deactivation order");
+
+for (const [name, source] of [
+  ["WarehouseForm", warehouseForm],
+  ["WarehousesTable", warehousesTable],
+  ["ZoneForm", zoneForm],
+  ["ZonesTable", zonesTable],
+  ["LocationForm", locationForm],
+  ["LocationsTable", locationsTable],
+]) {
+  assert.match(source, /setErrorMessage\(error\.message\)/, `${name} must continue surfacing database guard messages`);
+}
+
 // Delete semantics: stock and operational history must not be silently erased/nullified.
 for (const constraint of [
   "inventory_warehouse_id_fkey",
@@ -62,22 +76,6 @@ for (const constraint of [
   "inventory_movements_to_location_id_fkey",
 ]) {
   assert.match(sql, new RegExp(`${constraint}[\\s\\S]{0,260}on delete restrict`, "i"), `${constraint} must use ON DELETE RESTRICT`);
-}
-
-// Admin mutation surfaces must use one operator-facing error contract.
-assert.match(errorFormatter, /export function formatWarehouseStructureError/i, "shared warehouse structure formatter must be exported");
-assert.match(errorFormatter, /active stock|move stock/i, "formatter must explain stock-blocked lifecycle changes");
-assert.match(errorFormatter, /same warehouse/i, "formatter must explain hierarchy mismatch");
-
-for (const [name, source] of [
-  ["WarehouseForm", warehouseForm],
-  ["WarehousesTable", warehousesTable],
-  ["ZoneForm", zoneForm],
-  ["ZonesTable", zonesTable],
-  ["LocationForm", locationForm],
-  ["LocationsTable", locationsTable],
-]) {
-  assert.match(source, /formatWarehouseStructureError/, `${name} must use the shared warehouse structure error formatter`);
 }
 
 console.log("A2.1 warehouse/location integrity contract PASS");
