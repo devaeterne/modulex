@@ -10,7 +10,7 @@
   min-height: 100vh;
   color: var(--portal-text);
   background: var(--portal-bg);
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-outfit), sans-serif;
 }
 
 body.dark .portal-shell,
@@ -42,7 +42,7 @@ body.dark .portal-auth-shell {
   border-radius: 50%;
   color: #fff;
   background: var(--dark-brown);
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-playfair), serif;
   font-size: 1.1rem;
 }
 body.dark .portal-brand__mark { background: var(--orange-primary); color: #1a1714; }
@@ -50,7 +50,7 @@ body.dark .portal-brand__mark { background: var(--orange-primary); color: #1a171
 .portal-display-title {
   margin: 0;
   color: var(--portal-text);
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-playfair), serif;
   font-size: clamp(2rem, 4vw, 3.25rem);
   font-weight: 600;
   line-height: 1.08;
@@ -225,11 +225,11 @@ body.dark .portal-status--danger { color: #ffaca3; }
 .portal-definition-grid dd { margin: 0; color: var(--portal-text); font-weight: 600; }
 .portal-order-detail__items { overflow: hidden; }
 .portal-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.25rem 0.75rem; }
-.portal-section-heading h2 { margin: 0; color: var(--portal-text); font-family: 'Playfair Display', serif; font-size: 1.4rem; }
+.portal-section-heading h2 { margin: 0; color: var(--portal-text); font-family: var(--font-playfair), serif; font-size: 1.4rem; }
 
 .portal-empty-state { padding: 3rem 1.5rem; text-align: center; border: 1px dashed var(--portal-border); border-radius: 18px; }
 .portal-empty-state__icon { display: block; margin-bottom: 0.75rem; color: var(--portal-accent); font-size: 2rem; }
-.portal-empty-state h2 { margin-bottom: 0.4rem; font-family: 'Playfair Display', serif; }
+.portal-empty-state h2 { margin-bottom: 0.4rem; font-family: var(--font-playfair), serif; }
 
 .portal-timeline { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
 .portal-timeline__step { position: relative; display: grid; grid-template-columns: 24px 1fr; gap: 0.8rem; min-height: 64px; }
