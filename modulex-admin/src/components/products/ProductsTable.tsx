@@ -23,10 +23,13 @@ type Product = {
   sku: string;
   barcode: string | null;
   product_name: string;
-  brand_id: string | null;
-  category_id: string | null;
-  brand: string | null;
-  category: string | null;
+  base_product_code: string;
+  color_code: string;
+  color_name: string | null;
+  brand_id: string;
+  category_id: string;
+  brand: string;
+  category: string;
   unit: string;
   min_stock_level: number;
   product_status: ProductStatus;
@@ -50,11 +53,16 @@ type ProductsPagePayload = {
   };
 };
 
+type RpcError = {
+  code?: string;
+  message?: string;
+};
+
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
+const EXPORT_PAGE_SIZE = 100;
 
 const focusClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900";
-
 const controlClass =
   "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 shadow-theme-xs outline-none transition focus-visible:border-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500/20 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300";
 
@@ -79,20 +87,39 @@ function formatStatus(status: ProductStatus) {
 }
 
 function formatNumber(value: number) {
-  return new Intl.NumberFormat(undefined, {
-    maximumFractionDigits: 2,
-  }).format(value);
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
 }
 
 function reportProductError(context: string, error: unknown) {
   console.error(`[Product List] ${context}`, error);
 }
 
+function lifecycleErrorMessage(error: RpcError) {
+  const message = error.message ?? "";
+  if (message.includes("on-hand or reserved stock remains")) {
+    return "This product still has on-hand or reserved stock. Clear stock before deactivating or archiving it.";
+  }
+  if (message.includes("Archived product status is terminal")) {
+    return "Archived products cannot be reactivated.";
+  }
+  if (message.includes("Active products require an active brand and category")) {
+    return "This product cannot be activated until its brand and category are active.";
+  }
+  if (error.code === "42501") {
+    return "You do not have permission to manage products.";
+  }
+  return "We couldn’t update the product status. Please try again.";
+}
+
+function csvCell(value: string | number | null | undefined) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
 function getPageNumbers(currentPage: number, totalPages: number) {
   if (totalPages <= 5) {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
-
   const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
   return Array.from({ length: 5 }, (_, index) => start + index);
 }
@@ -120,39 +147,43 @@ export default function ProductsTable() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [archiveTarget, setArchiveTarget] = useState<Product | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const canManage = hasPermission(profile?.roles, "products.manage");
-  const activeFilterCount = [query, statusFilter, brandFilter, categoryFilter].filter(
-    Boolean
-  ).length;
+  const activeFilterCount = [query, statusFilter, brandFilter, categoryFilter].filter(Boolean).length;
   const columnCount = canManage ? 8 : 7;
+
+  const getRpcArgs = useCallback(
+    (page: number, requestedPageSize: number) => ({
+      p_query: query,
+      p_page: page,
+      p_page_size: requestedPageSize,
+      p_status: statusFilter || null,
+      p_brand_id: brandFilter || null,
+      p_category_id: categoryFilter || null,
+      p_sort_by: sortBy,
+      p_sort_direction: sortDirection,
+    }),
+    [query, statusFilter, brandFilter, categoryFilter, sortBy, sortDirection]
+  );
 
   const loadProducts = useCallback(
     async (options?: { background?: boolean }) => {
       const requestId = ++requestIdRef.current;
       const background = options?.background === true;
-
       if (!background) setIsLoading(true);
       setErrorMessage(null);
 
-      const { data, error } = await supabase.rpc("get_products_page", {
-        p_query: query,
-        p_page: currentPage,
-        p_page_size: pageSize,
-        p_status: statusFilter || null,
-        p_brand_id: brandFilter || null,
-        p_category_id: categoryFilter || null,
-        p_sort_by: sortBy,
-        p_sort_direction: sortDirection,
-      });
+      const { data, error } = await supabase.rpc(
+        "get_products_page",
+        getRpcArgs(currentPage, pageSize)
+      );
 
-      if (requestId !== requestIdRef.current) {
-        return;
-      }
+      if (requestId !== requestIdRef.current) return;
 
       if (error) {
         reportProductError("product page load failed", error);
@@ -168,7 +199,6 @@ export default function ProductsTable() {
 
       const payload = data as ProductsPagePayload | null;
       const nextTotalPages = Math.max(1, Number(payload?.total_pages ?? 1));
-
       if (currentPage > nextTotalPages) {
         setCurrentPage(nextTotalPages);
         if (!background) setIsLoading(false);
@@ -182,16 +212,7 @@ export default function ProductsTable() {
       setTotalPages(nextTotalPages);
       if (!background) setIsLoading(false);
     },
-    [
-      query,
-      currentPage,
-      pageSize,
-      statusFilter,
-      brandFilter,
-      categoryFilter,
-      sortBy,
-      sortDirection,
-    ]
+    [currentPage, pageSize, getRpcArgs]
   );
 
   useEffect(() => {
@@ -258,6 +279,29 @@ export default function ProductsTable() {
     resetToFirstPage();
   }
 
+  async function setProductStatus(product: Product, nextStatus: ProductStatus) {
+    setActionLoadingId(product.product_id);
+    setErrorMessage(null);
+
+    try {
+      const { error } = await supabase.rpc("set_product_status", {
+        p_product_id: product.product_id,
+        p_status: nextStatus,
+      });
+
+      if (error) {
+        reportProductError("product lifecycle update failed", error);
+        setErrorMessage(lifecycleErrorMessage(error));
+        return false;
+      }
+
+      await loadProducts({ background: true });
+      return true;
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   async function handleToggleStatus(product: Product) {
     if (!canManage) {
       setErrorMessage("You do not have permission to manage products.");
@@ -270,26 +314,7 @@ export default function ProductsTable() {
 
     const nextStatus: ProductStatus =
       product.product_status === "active" ? "inactive" : "active";
-
-    setActionLoadingId(product.product_id);
-    setErrorMessage(null);
-
-    try {
-      const { error } = await supabase
-        .from("products")
-        .update({ status: nextStatus })
-        .eq("id", product.product_id);
-
-      if (error) {
-        reportProductError("product status update failed", error);
-        setErrorMessage("We couldn’t update the product status. Please try again.");
-        return;
-      }
-
-      await loadProducts({ background: true });
-    } finally {
-      setActionLoadingId(null);
-    }
+    await setProductStatus(product, nextStatus);
   }
 
   async function confirmArchiveProduct() {
@@ -301,26 +326,8 @@ export default function ProductsTable() {
       return;
     }
 
-    setActionLoadingId(product.product_id);
-    setErrorMessage(null);
-
-    try {
-      const { error } = await supabase
-        .from("products")
-        .update({ status: "archived" })
-        .eq("id", product.product_id);
-
-      if (error) {
-        reportProductError("product archive failed", error);
-        setErrorMessage("We couldn’t archive the product. Please try again.");
-        return;
-      }
-
-      setArchiveTarget(null);
-      await loadProducts({ background: true });
-    } finally {
-      setActionLoadingId(null);
-    }
+    const changed = await setProductStatus(product, "archived");
+    if (changed) setArchiveTarget(null);
   }
 
   function handleDuplicateProduct(product: Product) {
@@ -331,6 +338,85 @@ export default function ProductsTable() {
     router.push(`/products/new?duplicateFrom=${product.product_id}`);
   }
 
+  async function exportProductsCsv() {
+    if (isExporting) return;
+    setIsExporting(true);
+    setErrorMessage(null);
+
+    try {
+      let exportPage = 1;
+      let expectedTotal = Number.POSITIVE_INFINITY;
+      const exported: Product[] = [];
+
+      while (exported.length < expectedTotal) {
+        const { data, error } = await supabase.rpc(
+          "get_products_page",
+          getRpcArgs(exportPage, EXPORT_PAGE_SIZE)
+        );
+        if (error) throw error;
+
+        const payload = data as ProductsPagePayload | null;
+        const rows = payload?.items ?? [];
+        expectedTotal = Number(payload?.total_count ?? 0);
+        exported.push(...rows);
+
+        if (rows.length === 0 && exported.length < expectedTotal) {
+          throw new Error("Product export stopped before reaching the exact total count.");
+        }
+        if (exportPage > 10000) {
+          throw new Error("Product export exceeded the bounded page limit.");
+        }
+        exportPage += 1;
+      }
+
+      const headers = [
+        "SKU",
+        "Barcode",
+        "Product Name",
+        "Base Product Code",
+        "Color Code",
+        "Color Name",
+        "Brand",
+        "Category",
+        "Unit",
+        "Minimum Stock",
+        "Status",
+      ];
+      const lines = exported.map((product) =>
+        [
+          product.sku,
+          product.barcode,
+          product.product_name,
+          product.base_product_code,
+          product.color_code,
+          product.color_name,
+          product.brand,
+          product.category,
+          product.unit,
+          product.min_stock_level,
+          product.product_status,
+        ]
+          .map(csvCell)
+          .join(",")
+      );
+      const csv = [headers.map(csvCell).join(","), ...lines].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `product-master-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      reportProductError("product CSV export failed", error);
+      setErrorMessage("The complete product CSV could not be exported. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   const startRow = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRow = Math.min(currentPage * pageSize, totalCount);
   const pageNumbers = getPageNumbers(currentPage, totalPages);
@@ -339,30 +425,26 @@ export default function ProductsTable() {
     <>
       <div
         className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
-        aria-busy={isLoading || Boolean(actionLoadingId)}
+        aria-busy={isLoading || isExporting || Boolean(actionLoadingId)}
       >
         <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-              Product List
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Product List</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Search, filter and sort the product catalog. Management actions are shown only to authorized roles.
+              Search, filter and sort canonical product variants. Export always includes the full filtered result set.
             </p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
               <div>
-                <label htmlFor="product-search" className="sr-only">
-                  Search products
-                </label>
+                <label htmlFor="product-search" className="sr-only">Search products</label>
                 <input
                   id="product-search"
                   value={queryInput}
                   onChange={(event) => setQueryInput(event.target.value)}
                   type="search"
-                  placeholder="Search SKU, barcode, name, brand..."
+                  placeholder="Search SKU, family, color, barcode, name..."
                   className={`h-10 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 sm:w-[320px] ${focusClass}`}
                 />
               </div>
@@ -373,6 +455,15 @@ export default function ProductsTable() {
                 Search
               </button>
             </form>
+
+            <button
+              type="button"
+              onClick={() => void exportProductsCsv()}
+              disabled={isExporting}
+              className={`inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04] ${focusClass}`}
+            >
+              {isExporting ? "Exporting..." : "Export CSV"}
+            </button>
 
             {canManage ? (
               <Link
@@ -388,12 +479,7 @@ export default function ProductsTable() {
         <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <div className="space-y-1.5">
-              <label
-                htmlFor="product-status-filter"
-                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
-              >
-                Status
-              </label>
+              <label htmlFor="product-status-filter" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
               <select
                 id="product-status-filter"
                 value={statusFilter}
@@ -411,12 +497,7 @@ export default function ProductsTable() {
             </div>
 
             <div className="space-y-1.5">
-              <label
-                htmlFor="product-brand-filter"
-                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
-              >
-                Brand
-              </label>
+              <label htmlFor="product-brand-filter" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Brand</label>
               <select
                 id="product-brand-filter"
                 value={brandFilter}
@@ -427,21 +508,12 @@ export default function ProductsTable() {
                 className={controlClass}
               >
                 <option value="">All Brands</option>
-                {brands.map((brand) => (
-                  <option key={brand.id} value={brand.id}>
-                    {brand.name}
-                  </option>
-                ))}
+                {brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <label
-                htmlFor="product-category-filter"
-                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
-              >
-                Category
-              </label>
+              <label htmlFor="product-category-filter" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Category</label>
               <select
                 id="product-category-filter"
                 value={categoryFilter}
@@ -452,21 +524,12 @@ export default function ProductsTable() {
                 className={controlClass}
               >
                 <option value="">All Categories</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <label
-                htmlFor="product-sort-by"
-                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
-              >
-                Sort by
-              </label>
+              <label htmlFor="product-sort-by" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Sort by</label>
               <select
                 id="product-sort-by"
                 value={sortBy}
@@ -487,12 +550,7 @@ export default function ProductsTable() {
             </div>
 
             <div className="space-y-1.5">
-              <label
-                htmlFor="product-sort-direction"
-                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
-              >
-                Direction
-              </label>
+              <label htmlFor="product-sort-direction" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Direction</label>
               <select
                 id="product-sort-direction"
                 value={sortDirection}
@@ -508,12 +566,7 @@ export default function ProductsTable() {
             </div>
 
             <div className="space-y-1.5">
-              <label
-                htmlFor="product-page-size"
-                className="block text-xs font-medium text-gray-500 dark:text-gray-400"
-              >
-                Rows per page
-              </label>
+              <label htmlFor="product-page-size" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Rows per page</label>
               <div className="flex items-center gap-2">
                 <select
                   id="product-page-size"
@@ -524,13 +577,8 @@ export default function ProductsTable() {
                   }}
                   className={`${controlClass} min-w-[110px] flex-1`}
                 >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size} / page
-                    </option>
-                  ))}
+                  {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size} / page</option>)}
                 </select>
-
                 {activeFilterCount > 0 ? (
                   <button
                     type="button"
@@ -546,19 +594,13 @@ export default function ProductsTable() {
         </div>
 
         {accessError ? (
-          <div
-            role="status"
-            className="mx-5 mt-5 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400"
-          >
+          <div role="status" className="mx-5 mt-5 rounded-lg border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
             {accessError}
           </div>
         ) : null}
 
         {errorMessage ? (
-          <div
-            role="alert"
-            className="m-5 flex flex-col gap-3 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400 sm:flex-row sm:items-center sm:justify-between"
-          >
+          <div role="alert" className="m-5 flex flex-col gap-3 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400 sm:flex-row sm:items-center sm:justify-between">
             <span>{errorMessage}</span>
             <button
               type="button"
@@ -574,134 +616,50 @@ export default function ProductsTable() {
           <table className="min-w-[1080px] divide-y divide-gray-100 dark:divide-gray-800">
             <thead className="bg-gray-50 dark:bg-white/[0.02]">
               <tr>
-                {[
-                  "SKU",
-                  "Product",
-                  "Barcode",
-                  "Brand",
-                  "Category",
-                  "Min Stock",
-                  "Status",
-                ].map((label) => (
-                  <th
-                    key={label}
-                    scope="col"
-                    className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400"
-                  >
-                    {label}
-                  </th>
+                {["SKU", "Product", "Barcode", "Brand", "Category", "Min Stock", "Status"].map((label) => (
+                  <th key={label} scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>
                 ))}
-                {canManage ? (
-                  <th
-                    scope="col"
-                    className="px-5 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400"
-                  >
-                    Actions
-                  </th>
-                ) : null}
+                {canManage ? <th scope="col" className="px-5 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Actions</th> : null}
               </tr>
             </thead>
 
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading ? (
-                <tr>
-                  <td
-                    colSpan={columnCount}
-                    className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
-                  >
-                    Loading products...
-                  </td>
-                </tr>
+                <tr><td colSpan={columnCount} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading products...</td></tr>
               ) : products.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={columnCount}
-                    className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400"
-                  >
-                    No products found for the selected filters.
-                  </td>
-                </tr>
+                <tr><td colSpan={columnCount} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No products found for the selected filters.</td></tr>
               ) : (
                 products.map((product) => {
                   const isActionLoading = actionLoadingId === product.product_id;
                   const isArchived = product.product_status === "archived";
-
                   return (
-                    <tr
-                      key={product.product_id}
-                      className="transition hover:bg-gray-50 dark:hover:bg-white/[0.03]"
-                    >
-                      <td className="px-5 py-4 text-sm font-medium text-gray-800 dark:text-white/90">
-                        {product.sku}
-                      </td>
+                    <tr key={product.product_id} className="transition hover:bg-gray-50 dark:hover:bg-white/[0.03]">
+                      <td className="px-5 py-4 text-sm font-medium text-gray-800 dark:text-white/90">{product.sku}</td>
                       <td className="px-5 py-4">
-                        <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                          {product.product_name}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Unit: {product.unit}
-                        </p>
+                        <p className="text-sm font-medium text-gray-800 dark:text-white/90">{product.product_name}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Family: {product.base_product_code} · Color: {product.color_name || product.color_code} ({product.color_code}) · Unit: {product.unit}</p>
                       </td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
-                        {product.barcode || "—"}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
-                        {product.brand || "—"}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
-                        {product.category || "—"}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
-                        {formatNumber(Number(product.min_stock_level))}
-                      </td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.barcode || "—"}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.brand || "—"}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.category || "—"}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{formatNumber(Number(product.min_stock_level))}</td>
                       <td className="px-5 py-4">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(product.product_status)}`}
-                        >
-                          {formatStatus(product.product_status)}
-                        </span>
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(product.product_status)}`}>{formatStatus(product.product_status)}</span>
                       </td>
                       {canManage ? (
                         <td className="px-5 py-4">
                           <div className="flex min-w-[330px] items-center justify-end gap-2">
-                            <Link
-                              href={`/products/${product.product_id}/edit`}
-                              className={`rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
-                            >
-                              Edit
-                            </Link>
+                            <Link href={`/products/${product.product_id}/edit`} className={`rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}>Edit</Link>
                             <button
                               type="button"
                               onClick={() => void handleToggleStatus(product)}
                               disabled={isActionLoading || isArchived}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${focusClass} ${
-                                product.product_status === "active"
-                                  ? "bg-warning-50 text-warning-700 hover:bg-warning-100 dark:bg-warning-500/10 dark:text-warning-400"
-                                  : "bg-success-50 text-success-700 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400"
-                              }`}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${focusClass} ${product.product_status === "active" ? "bg-warning-50 text-warning-700 hover:bg-warning-100 dark:bg-warning-500/10 dark:text-warning-400" : "bg-success-50 text-success-700 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400"}`}
                             >
-                              {isActionLoading
-                                ? "Saving..."
-                                : product.product_status === "active"
-                                  ? "Deactivate"
-                                  : "Activate"}
+                              {isActionLoading ? "Saving..." : product.product_status === "active" ? "Deactivate" : "Activate"}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDuplicateProduct(product)}
-                              disabled={isActionLoading}
-                              className={`rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
-                            >
-                              Duplicate
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setArchiveTarget(product)}
-                              disabled={isActionLoading || isArchived}
-                              className={`rounded-lg bg-error-50 px-3 py-1.5 text-xs font-medium text-error-600 transition hover:bg-error-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-error-500/10 dark:text-error-400 ${focusClass}`}
-                            >
-                              Archive
-                            </button>
+                            <button type="button" onClick={() => handleDuplicateProduct(product)} disabled={isActionLoading} className={`rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}>Duplicate</button>
+                            <button type="button" onClick={() => setArchiveTarget(product)} disabled={isActionLoading || isArchived} className={`rounded-lg bg-error-50 px-3 py-1.5 text-xs font-medium text-error-600 transition hover:bg-error-100 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-error-500/10 dark:text-error-400 ${focusClass}`}>Archive</button>
                           </div>
                         </td>
                       ) : null}
@@ -714,32 +672,12 @@ export default function ProductsTable() {
         </div>
 
         <div className="flex flex-col gap-4 border-t border-gray-200 px-5 py-4 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
-          <p
-            aria-live="polite"
-            className="text-sm text-gray-500 dark:text-gray-400"
-          >
-            Showing{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              {startRow}–{endRow}
-            </span>{" "}
-            of{" "}
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              {totalCount}
-            </span>{" "}
-            products
+          <p aria-live="polite" className="text-sm text-gray-500 dark:text-gray-400">
+            Showing <span className="font-medium text-gray-700 dark:text-gray-300">{startRow}–{endRow}</span> of <span className="font-medium text-gray-700 dark:text-gray-300">{totalCount}</span> products
           </p>
 
           <nav aria-label="Product list pagination" className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              aria-label="Previous page"
-              disabled={currentPage <= 1 || isLoading}
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              className={`h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04] ${focusClass}`}
-            >
-              Previous
-            </button>
-
+            <button type="button" aria-label="Previous page" disabled={currentPage <= 1 || isLoading} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} className={`h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04] ${focusClass}`}>Previous</button>
             {pageNumbers.map((page) => (
               <button
                 type="button"
@@ -748,29 +686,13 @@ export default function ProductsTable() {
                 aria-current={currentPage === page ? "page" : undefined}
                 disabled={isLoading}
                 onClick={() => setCurrentPage(page)}
-                className={`h-9 min-w-9 rounded-lg px-3 text-xs font-medium transition ${focusClass} ${
-                  currentPage === page
-                    ? "bg-brand-500 text-white"
-                    : "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                }`}
+                className={`h-9 min-w-9 rounded-lg px-3 text-xs font-medium transition ${focusClass} ${currentPage === page ? "bg-brand-500 text-white" : "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]"}`}
               >
                 {page}
               </button>
             ))}
-
-            <button
-              type="button"
-              aria-label="Next page"
-              disabled={currentPage >= totalPages || isLoading}
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              className={`h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04] ${focusClass}`}
-            >
-              Next
-            </button>
-
-            <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">
-              Page {currentPage} of {totalPages}
-            </span>
+            <button type="button" aria-label="Next page" disabled={currentPage >= totalPages || isLoading} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} className={`h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04] ${focusClass}`}>Next</button>
+            <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">Page {currentPage} of {totalPages}</span>
           </nav>
         </div>
       </div>
@@ -792,36 +714,13 @@ export default function ProductsTable() {
             aria-describedby="archive-product-description"
             className="relative z-10 w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-900"
           >
-            <h4
-              id="archive-product-title"
-              className="text-lg font-semibold text-gray-900 dark:text-white"
-            >
-              Archive product?
-            </h4>
-            <p
-              id="archive-product-description"
-              className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300"
-            >
-              {archiveTarget.sku} will be moved to archived status and will no longer be available for normal product workflows.
+            <h4 id="archive-product-title" className="text-lg font-semibold text-gray-900 dark:text-white">Archive product?</h4>
+            <p id="archive-product-description" className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
+              {archiveTarget.sku} will be archived. On-hand and reserved stock must be zero; archived status is terminal.
             </p>
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                autoFocus
-                disabled={actionLoadingId === archiveTarget.product_id}
-                onClick={() => setArchiveTarget(null)}
-                className={`inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.04] ${focusClass}`}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={actionLoadingId === archiveTarget.product_id}
-                onClick={() => void confirmArchiveProduct()}
-                className={`inline-flex h-10 items-center justify-center rounded-lg bg-error-600 px-4 text-sm font-semibold text-white transition hover:bg-error-700 disabled:cursor-not-allowed disabled:opacity-50 ${focusClass}`}
-              >
-                {actionLoadingId === archiveTarget.product_id ? "Archiving..." : "Archive product"}
-              </button>
+              <button type="button" autoFocus disabled={actionLoadingId === archiveTarget.product_id} onClick={() => setArchiveTarget(null)} className={`inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/[0.04] ${focusClass}`}>Cancel</button>
+              <button type="button" disabled={actionLoadingId === archiveTarget.product_id} onClick={() => void confirmArchiveProduct()} className={`inline-flex h-10 items-center justify-center rounded-lg bg-error-600 px-4 text-sm font-semibold text-white transition hover:bg-error-700 disabled:cursor-not-allowed disabled:opacity-50 ${focusClass}`}>{actionLoadingId === archiveTarget.product_id ? "Archiving..." : "Archive product"}</button>
             </div>
           </div>
         </div>

@@ -1,0 +1,62 @@
+name: Admin A3.1 Product Master
+
+on:
+  push:
+    paths:
+      - "modulex-admin/src/components/products/**"
+      - "modulex-admin/src/icons/index.tsx"
+      - "modulex-admin/sql/a3-product-master-data.sql"
+      - "modulex-admin/scripts/a3-product-master-contract.mjs"
+      - "modulex-admin/docs/acceptance/a3-1-product-master-data.md"
+      - "modulex-admin/docs/superpowers/specs/2026-08-30-a3-1-product-master-data-design.md"
+      - "modulex-admin/docs/superpowers/plans/2026-08-30-a3-1-product-master-data.md"
+      - "modulex-admin/ADMIN_ROADMAP.md"
+      - "modulex-admin/package.json"
+      - "modulex-store/supabase/migrations/20260830120000_a3_1_canonical_product_taxonomy.sql"
+      - ".github/workflows/admin-a3-product-master.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/components/products/**"
+      - "modulex-admin/src/icons/index.tsx"
+      - "modulex-admin/sql/a3-product-master-data.sql"
+      - "modulex-admin/scripts/a3-product-master-contract.mjs"
+      - "modulex-admin/docs/acceptance/a3-1-product-master-data.md"
+      - "modulex-admin/docs/superpowers/specs/2026-08-30-a3-1-product-master-data-design.md"
+      - "modulex-admin/docs/superpowers/plans/2026-08-30-a3-1-product-master-data.md"
+      - "modulex-admin/ADMIN_ROADMAP.md"
+      - "modulex-admin/package.json"
+      - "modulex-store/supabase/migrations/20260830120000_a3_1_canonical_product_taxonomy.sql"
+      - ".github/workflows/admin-a3-product-master.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  product-master-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - run: npm run smoke:a3-product-master
+      - run: node scripts/product-list-ui-contract.mjs
+      - run: node scripts/products-pricing-ui-contract.mjs
+      - run: npm run smoke:a1-core-operations
+      - run: npm run smoke:a2-warehouse-integrity
+      - run: npm run smoke:a2-inventory-movements
+      - run: node scripts/a2-stock-operations-scanning-contract.mjs
+      - run: npm run smoke:a2-low-stock-reporting
+      - run: npm run smoke:rbac
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
