@@ -78,7 +78,7 @@ PR: #151 — `fix(admin): harden Product List UI`
 - [x] Replace hardcoded number locale with runtime locale formatting.
 - [x] Add explicit labels/ARIA/focus-visible states for search, filter, pagination, threshold inputs, and actions.
 - [x] Add Low Stock UI regression contract and dedicated workflow.
-- [ ] Verify Low Stock contract, production-surface/RBAC regressions, lint, and production build in CI.
+- [x] Verify Low Stock contract, production-surface/RBAC regressions, lint, and production build in CI.
 - [ ] Merge and deploy.
 
 ## Queue — sidebar order
