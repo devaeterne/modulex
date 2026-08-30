@@ -1,61 +1,25 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
+import Select from "@/components/form/Select";
 import { supabase } from "@/lib/supabase/client";
 
+type Option = { value: string; label: string };
+type Row = { id: string; name: string; sku?: string; stone_type_id?: string; material_price_band_id?: string; price_per_sqft?: string };
+
 export default function CountertopConfigurator() {
-  const [stoneProductId, setStoneProductId] = useState("");
-  const [priceGroupId, setPriceGroupId] = useState("");
-  const [orderItemId, setOrderItemId] = useState("");
-  const [sqft, setSqft] = useState("");
-  const [edgeProfileId, setEdgeProfileId] = useState("");
-  const [edgeLinearFt, setEdgeLinearFt] = useState("0");
-  const [sinkProductId, setSinkProductId] = useState("");
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  async function calculate() {
-    setError(null); setResult(null);
-    if (!stoneProductId || !priceGroupId || !sqft) { setError("Stone, price group and square footage are required."); return; }
-    const { data, error: rpcError } = await supabase.rpc("calculate_countertop_price", {
-      p_stone_product_id: stoneProductId, p_price_group_id: priceGroupId, p_sqft: sqft,
-      p_edge_profile_id: edgeProfileId || null, p_edge_linear_ft: edgeLinearFt || "0",
-      p_sink_product_id: sinkProductId || null, p_services: [], p_manual_material_price: null,
-    });
-    if (rpcError) { setError("Unable to calculate countertop pricing."); return; }
-    setResult(data as Record<string, unknown>);
-  }
-
-  async function attach() {
-    if (!orderItemId || !result) { setError("Calculate a price and provide a draft order item first."); return; }
-    setSaving(true); setError(null);
-    const { error: rpcError } = await supabase.rpc("attach_countertop_configuration", {
-      p_order_item_id: orderItemId, p_stone_product_id: stoneProductId, p_price_group_id: priceGroupId,
-      p_sqft: sqft, p_edge_profile_id: edgeProfileId || null, p_edge_linear_ft: edgeLinearFt || "0",
-      p_sink_product_id: sinkProductId || null, p_services: [], p_configuration: {}, p_manual_material_price: null,
-    });
-    setSaving(false);
-    if (rpcError) { setError("Unable to attach countertop configuration to the draft order."); return; }
-    setResult({ ...result, attached: true });
-  }
-
-  return <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-    <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Countertop configuration</h2>
-    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Server-side pricing preview and draft-order snapshot attachment.</p>
-    <div className="mt-5 grid gap-4 md:grid-cols-2">
-      <label className="text-sm font-medium">Stone product ID<Input value={stoneProductId} onChange={(e) => setStoneProductId(e.target.value)} /></label>
-      <label className="text-sm font-medium">Price group ID<Input value={priceGroupId} onChange={(e) => setPriceGroupId(e.target.value)} /></label>
-      <label className="text-sm font-medium">Square feet<Input type="number" step="0.0001" value={sqft} onChange={(e) => setSqft(e.target.value)} /></label>
-      <label className="text-sm font-medium">Edge profile ID (optional)<Input value={edgeProfileId} onChange={(e) => setEdgeProfileId(e.target.value)} /></label>
-      <label className="text-sm font-medium">Edge linear feet<Input type="number" step="0.0001" value={edgeLinearFt} onChange={(e) => setEdgeLinearFt(e.target.value)} /></label>
-      <label className="text-sm font-medium">Sink product ID (optional)<Input value={sinkProductId} onChange={(e) => setSinkProductId(e.target.value)} /></label>
-      <label className="text-sm font-medium">Draft order item ID (optional)<Input value={orderItemId} onChange={(e) => setOrderItemId(e.target.value)} /></label>
-    </div>
-    <div className="mt-5 flex gap-3"><Button onClick={calculate}>Calculate price</Button><Button variant="outline" onClick={attach} disabled={saving || !result || !orderItemId}>{saving ? "Attaching..." : "Attach snapshot"}</Button></div>
-    {error && <p className="mt-4 text-sm text-error-600">{error}</p>}
-    {result && <pre className="mt-5 overflow-auto rounded-lg bg-gray-50 p-4 text-sm dark:bg-white/[0.03]">{JSON.stringify(result, null, 2)}</pre>}
-  </section>;
+  const [types, setTypes] = useState<Option[]>([]); const [bands, setBands] = useState<Option[]>([]); const [edges, setEdges] = useState<Option[]>([]); const [sinks, setSinks] = useState<Option[]>([]); const [priceGroups, setPriceGroups] = useState<Option[]>([]); const [stones, setStones] = useState<Row[]>([]); const [services, setServices] = useState<Array<Row & { pricing_method: string; unit_price: string; quantity: string }>>([]);
+  const [stoneTypeId, setStoneTypeId] = useState(""); const [stoneProductId, setStoneProductId] = useState(""); const [bandId, setBandId] = useState(""); const [priceGroupId, setPriceGroupId] = useState(""); const [edgeId, setEdgeId] = useState(""); const [sinkId, setSinkId] = useState(""); const [orderItemId, setOrderItemId] = useState(""); const [sqft, setSqft] = useState(""); const [edgeLinearFt, setEdgeLinearFt] = useState("0"); const [slabQuantity, setSlabQuantity] = useState("1"); const [manualPrice, setManualPrice] = useState(""); const [overrideReason, setOverrideReason] = useState("");
+  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null); const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  useEffect(() => { let mounted = true; (async () => { const [t,b,e,s,p,pg] = await Promise.all([supabase.from("countertop_stone_types").select("id,name").eq("is_active",true).order("name"),supabase.from("countertop_material_price_bands").select("id,code").eq("is_active",true).order("sort_order"),supabase.from("countertop_edge_profiles").select("id,name").eq("is_active",true).order("name"),supabase.from("products").select("id,name,sku").eq("status","active").contains("metadata", { product_kind: "sink" }).order("name"),supabase.from("countertop_stone_product_profiles").select("product_id,stone_type_id,material_price_band_id,products(id,name,sku),countertop_material_price_bands(price_per_sqft)").eq("is_active",true),supabase.from("price_groups").select("id,name").eq("is_active",true).order("name")]); const svc = await supabase.from("countertop_services").select("id,name,pricing_method,unit_price").eq("is_active",true).order("name"); if (!mounted) return; if ([t,b,e,s,p,pg,svc].some((x) => x.error)) setError("Countertop reference data could not be loaded."); setTypes((t.data ?? []).map((x) => ({ value: x.id, label: x.name }))); setBands((b.data ?? []).map((x) => ({ value: x.id, label: x.code }))); setEdges((e.data ?? []).map((x) => ({ value: x.id, label: x.name }))); setSinks((s.data ?? []).map((x) => ({ value: x.id, label: `${x.name} (${x.sku})` }))); setPriceGroups((pg.data ?? []).map((x) => ({ value: x.id, label: x.name }))); setPriceGroupId(pg.data?.[0]?.id ?? ""); setStones((p.data ?? []).map((x: any) => ({ id: x.product_id, name: x.products?.name ?? "", sku: x.products?.sku, stone_type_id: x.stone_type_id, material_price_band_id: x.material_price_band_id, price_per_sqft: x.countertop_material_price_bands?.price_per_sqft }))); setServices((svc.data ?? []).map((x) => ({ ...x, quantity: "1" }))); setLoading(false); })(); return () => { mounted = false; }; }, []);
+  const filteredStones = useMemo(() => stones.filter((x) => !stoneTypeId || x.stone_type_id === stoneTypeId), [stones, stoneTypeId]);
+  const selectedStone = stones.find((x) => x.id === stoneProductId); useEffect(() => { if (selectedStone?.material_price_band_id) setBandId(selectedStone.material_price_band_id); }, [selectedStone?.material_price_band_id]);
+  const toggleService = (id: string) => setServices((rows) => rows.map((x) => x.id === id ? { ...x, selected: !(x as any).selected } as any : x));
+  async function calculate() { setError(null); setResult(null); if (!stoneProductId || !priceGroupId || !sqft) return setError("Stone, price group and square footage are required."); const selected = services.filter((x: any) => x.selected).map((x) => ({ service_id: x.id, quantity: x.quantity })); const { data, error: e } = await supabase.rpc("calculate_countertop_price", { p_stone_product_id: stoneProductId, p_price_group_id: priceGroupId, p_sqft: sqft, p_edge_profile_id: edgeId || null, p_edge_linear_ft: edgeLinearFt || "0", p_sink_product_id: sinkId || null, p_services: selected, p_manual_material_price: manualPrice || null }); if (e) return setError("Unable to calculate countertop pricing."); setResult(data as Record<string, unknown>); }
+  async function attach() { if (!result || !orderItemId) return setError("Calculate a price and provide a draft order item."); setSaving(true); setError(null); const selected = services.filter((x: any) => x.selected).map((x) => ({ service_id: x.id, quantity: x.quantity })); const { error: e } = await supabase.rpc("attach_countertop_configuration", { p_order_item_id: orderItemId, p_stone_product_id: stoneProductId, p_price_group_id: priceGroupId, p_sqft: sqft, p_edge_profile_id: edgeId || null, p_edge_linear_ft: edgeLinearFt || "0", p_sink_product_id: sinkId || null, p_services: selected, p_configuration: {}, p_manual_material_price: manualPrice || null, p_slab_quantity: slabQuantity, p_override_reason: overrideReason || null }); setSaving(false); if (e) return setError("Unable to attach countertop configuration."); setResult({ ...result, attached: true }); }
+  if (loading) return <section className="p-5">Loading countertop references…</section>;
+  return <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Countertop configurator</h2><p className="mt-1 text-sm text-gray-500">Select managed references; server pricing is authoritative.</p>{error && <p className="mt-4 text-sm text-error-600">{error}</p>}<div className="mt-5 grid gap-4 md:grid-cols-2"><label>Stone type<Select options={types} defaultValue={stoneTypeId} onChange={(v) => { setStoneTypeId(v); setStoneProductId(""); }} /></label><label>Stone<Select options={filteredStones.map((x) => ({ value: x.id, label: `${x.name} (${x.sku})` }))} onChange={setStoneProductId} /></label><label>Material price band<Select options={bands} defaultValue={bandId} onChange={setBandId} /></label><label>Square feet<Input type="number" step="0.0001" value={sqft} onChange={(e) => setSqft(e.target.value)} /></label><label>Slabs to reserve<Input type="number" step="1" min="1" value={slabQuantity} onChange={(e) => setSlabQuantity(e.target.value)} /></label><label>Edge<Select options={edges} defaultValue={edgeId} onChange={setEdgeId} /></label><label>Edge linear feet<Input type="number" step="0.0001" value={edgeLinearFt} onChange={(e) => setEdgeLinearFt(e.target.value)} /></label><label>Sink (optional)<Select options={sinks} defaultValue={sinkId} onChange={setSinkId} /></label><label>Commercial price group<Select options={priceGroups} defaultValue={priceGroupId} onChange={setPriceGroupId} /></label><label>Manual $/sqft (optional)<Input value={manualPrice} onChange={(e) => setManualPrice(e.target.value)} /></label><label>Override reason<Input value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} /></label><label>Draft order item ID<Input value={orderItemId} onChange={(e) => setOrderItemId(e.target.value)} /></label></div><div className="mt-5 space-y-2"><p className="text-sm font-medium">Additional services</p>{services.length === 0 && <p className="text-sm text-gray-500">No active services.</p>}{services.map((x: any) => <label key={x.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={Boolean(x.selected)} onChange={() => toggleService(x.id)} />{x.name} ({x.pricing_method})<Input className="max-w-24" value={x.quantity} onChange={(e) => setServices((rows) => rows.map((r) => r.id === x.id ? { ...r, quantity: e.target.value } : r))} /></label>)}</div><div className="mt-5 flex gap-3"><Button onClick={calculate}>Calculate price</Button><Button variant="outline" onClick={attach} disabled={saving || !result}>{saving ? "Attaching…" : "Attach draft snapshot"}</Button></div>{result && <pre className="mt-5 overflow-auto rounded-lg bg-gray-50 p-4 text-sm dark:bg-white/[0.03]">{JSON.stringify(result, null, 2)}</pre>}</section>;
 }

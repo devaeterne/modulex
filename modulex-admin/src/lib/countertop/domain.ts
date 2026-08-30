@@ -25,6 +25,12 @@ function multiply(a: string, b: string) {
   return formatScaled(result);
 }
 
+function serviceAmount(service: CountertopCharge, sqft: string, linearFt: string) {
+  const measure = service.pricing_method === "sq_ft" ? sqft : service.pricing_method === "linear_ft" ? linearFt : service.pricing_method === "flat" ? "1" : service.quantity;
+  const quantity = service.pricing_method === "flat" ? "1" : service.pricing_method === "each" ? service.quantity : measure;
+  return multiply(service.unit_price, quantity);
+}
+
 export function calculateCountertopPrice(input: CountertopPricingInput): CountertopPricing {
   const values = [input.materialUnitPrice, input.sqft, input.edgeUnitPrice ?? "0", input.edgeLinearFt ?? "0", input.sinkPrice ?? "0"];
   for (const value of values) { const parsed = parseDbDecimal(value, money); if (parsed.error || parsed.value === null) throw new Error(parsed.error ?? "Invalid countertop amount."); }
@@ -36,7 +42,7 @@ export function calculateCountertopPrice(input: CountertopPricingInput): Counter
   const services = (input.services ?? []).reduce((sum, service) => {
     const price = parseDbDecimal(service.unit_price, money); const quantity = parseDbDecimal(service.quantity, money);
     if (price.error || quantity.error || price.value === null || quantity.value === null) throw new Error("Invalid service amount.");
-    return formatScaled(scaled(sum) + scaled(multiply(service.unit_price, service.quantity)));
+    return formatScaled(scaled(sum) + scaled(serviceAmount(service, input.sqft, input.edgeLinearFt ?? "0")));
   }, "0.0000");
   const subtotal = formatScaled(scaled(material) + scaled(edge) + scaled(sink) + scaled(services));
   return { material_subtotal: material, edge_subtotal: edge, sink_subtotal: sink, services_subtotal: services, subtotal };
