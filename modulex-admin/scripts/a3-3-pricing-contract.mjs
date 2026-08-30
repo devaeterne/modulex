@@ -30,6 +30,10 @@ assert.match(migration, /lower\(tg_op\)::public\.audit_action/, "Audit action mu
 assert.match(migration, /identity cannot be removed/i, "Base group identity must be immutable");
 assert.match(migration, /cannot be deleted/i, "Base group deletion must be blocked");
 assert.match(migration, /trg_product_margin_settings_audit/, "Product-specific margin changes must be audited");
+assert.match(migration, /tg_table_name in \('product_prices', 'product_costs', 'price_groups'\)[\s\S]*?\)::uuid/i, "UUID pricing tables must use explicit UUID mapping");
+assert.match(migration, /tg_table_name = 'product_margin_settings'[\s\S]*?product_id[\s\S]*?\)::uuid/i, "Margin settings must use product_id as audit identity");
+assert.match(migration, /tg_table_name = 'product_margin_settings'[\s\S]*?end if;[\s\S]*?insert into public\.audit_logs[\s\S]*?v_record_id/i, "Pricing settings must retain nullable audit record_id");
+assert.doesNotMatch(migration, /pricing_settings[\s\S]{0,180}::uuid/i, "pricing_settings smallint id must never be cast to UUID");
 const lifecycle = migration.match(/create or replace function public\.guard_price_group_lifecycle\([\s\S]*?\$\$;/i)?.[0] ?? "";
 assert.match(lifecycle, /if tg_op = 'DELETE'[\s\S]*?old\.is_base_price[\s\S]*?raise exception/i, "Base-group delete must fail closed");
 assert.match(lifecycle, /if tg_op = 'DELETE'[\s\S]*?return old;/i, "Non-base group delete must return OLD");

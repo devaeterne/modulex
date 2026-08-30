@@ -4,11 +4,16 @@ create or replace function public.audit_pricing_change()
 returns trigger language plpgsql security definer
 set search_path = pg_catalog, public
 as $$
+declare
+  v_record_id uuid;
 begin
+  if tg_table_name in ('product_prices', 'product_costs', 'price_groups') then
+    v_record_id := case when tg_op = 'DELETE' then (to_jsonb(old)->>'id')::uuid else (to_jsonb(new)->>'id')::uuid end;
+  elsif tg_table_name = 'product_margin_settings' then
+    v_record_id := case when tg_op = 'DELETE' then (to_jsonb(old)->>'product_id')::uuid else (to_jsonb(new)->>'product_id')::uuid end;
+  end if;
   insert into public.audit_logs (table_name, record_id, action, old_data, new_data, changed_by)
-  values (tg_table_name,
-    coalesce((to_jsonb(new)->>'id')::uuid, (to_jsonb(old)->>'id')::uuid,
-      (to_jsonb(new)->>'product_id')::uuid, (to_jsonb(old)->>'product_id')::uuid),
+  values (tg_table_name, v_record_id,
     lower(tg_op)::public.audit_action,
     case when tg_op = 'INSERT' then null else to_jsonb(old) end,
     case when tg_op = 'DELETE' then null else to_jsonb(new) end, auth.uid());
