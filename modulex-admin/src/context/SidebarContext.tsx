@@ -58,6 +58,20 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsMobileOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    const handleSidebarNavigationClick = (event: MouseEvent) => {
+      if (!isMobile) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("aside a[href]")) {
+        setIsMobileOpen(false);
+      }
+    };
+
+    document.addEventListener("click", handleSidebarNavigationClick);
+    return () => document.removeEventListener("click", handleSidebarNavigationClick);
+  }, [isMobile]);
+
   const toggleSidebar = () => {
     setIsExpanded((prev) => !prev);
   };
