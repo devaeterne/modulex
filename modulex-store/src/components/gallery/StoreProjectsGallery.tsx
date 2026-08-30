@@ -55,19 +55,19 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
     return Array.from(new Set(values));
   }, [entries]);
 
+  const effectiveActiveCategory = activeCategory === "All" || categories.includes(activeCategory)
+    ? activeCategory
+    : "All";
+
   const visibleEntries = useMemo(
-    () => activeCategory === "All" ? entries : entries.filter((entry) => entry.project.category === activeCategory),
-    [activeCategory, entries],
+    () => effectiveActiveCategory === "All"
+      ? entries
+      : entries.filter((entry) => entry.project.category === effectiveActiveCategory),
+    [effectiveActiveCategory, entries],
   );
 
   const selected = useMemo(() => entries.find((entry) => entry.project.slug === selectedSlug) ?? null, [entries, selectedSlug]);
   const selectedMedia = selected ? getDisplayMedia(selected) : [];
-
-  useEffect(() => {
-    if (activeCategory !== "All" && !categories.includes(activeCategory)) {
-      setActiveCategory("All");
-    }
-  }, [activeCategory, categories]);
 
   useEffect(() => {
     if (!selected) return;
@@ -116,8 +116,8 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
         <div className="gallery-filter project-gallery-filter" role="group" aria-label="Filter projects by category">
           <button
             type="button"
-            className={`nav-link ${activeCategory === "All" ? "active" : ""}`}
-            aria-pressed={activeCategory === "All"}
+            className={`nav-link ${effectiveActiveCategory === "All" ? "active" : ""}`}
+            aria-pressed={effectiveActiveCategory === "All"}
             onClick={() => setActiveCategory("All")}
           >
             All
@@ -125,8 +125,8 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
           {categories.map((category) => (
             <button
               type="button"
-              className={`nav-link ${activeCategory === category ? "active" : ""}`}
-              aria-pressed={activeCategory === category}
+              className={`nav-link ${effectiveActiveCategory === category ? "active" : ""}`}
+              aria-pressed={effectiveActiveCategory === category}
               onClick={() => setActiveCategory(category)}
               key={category}
             >
