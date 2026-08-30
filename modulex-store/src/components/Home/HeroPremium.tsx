@@ -18,32 +18,123 @@ export default function HeroPremium() {
         loop={true}
         speed={1500}
         parallax={true}
-        creativeEffect={{ prev: { shadow: true, translate: [0, 0, -400] }, next: { translate: ["100%", 0, 0] } }}
-        autoplay={{ delay: 6000, disableOnInteraction: false }}
-        pagination={{ clickable: true, el: ".hero-pagination" }}
-        navigation={{ nextEl: ".hero-swiper-next", prevEl: ".hero-swiper-prev" }}
+        creativeEffect={{
+          prev: {
+            shadow: true,
+            translate: [0, 0, -400],
+          },
+          next: {
+            translate: ["100%", 0, 0],
+          },
+        }}
+        autoplay={{
+          delay: 6000,
+          disableOnInteraction: false,
+        }}
+        pagination={{
+          clickable: true,
+          el: ".hero-pagination",
+        }}
+        navigation={{
+          nextEl: ".hero-swiper-next",
+          prevEl: ".hero-swiper-prev",
+        }}
         className="premium-swiper"
       >
+        {/* Slide 1 */}
         <SwiperSlide>
-          <div className="hero-slide" style={{ backgroundImage: "url('/assets/images/img(8).jpg')" }} data-swiper-parallax-scale="1.1">
+          <div
+            className="hero-slide"
+            style={{ backgroundImage: "url('/assets/images/img(8).jpg')" }}
+            data-swiper-parallax-scale="1.1"
+          >
             <div className="hero-overlay"></div>
-            <div className="container"><div className="hero-content"><h1 data-swiper-parallax="-300">Curated<br /><span className="highlight">Luxury Living</span></h1><p data-swiper-parallax="-200">Experience the pinnacle of sophisticated interior architecture.</p><div className="hero-cta" data-swiper-parallax="-100"><Link href="#contact" className="btn-primary">Start Your Project</Link><Link href="#portfolio" className="btn-secondary">View Portfolio</Link></div></div></div>
+            <div className="container">
+              <div className="hero-content">
+                <h1 data-swiper-parallax="-300">
+                  Curated<br />
+                  <span className="highlight">Luxury Living</span>
+                </h1>
+                <p data-swiper-parallax="-200">
+                  Experience the pinnacle of sophisticated interior
+                  architecture.
+                </p>
+                <div className="hero-cta" data-swiper-parallax="-100">
+                  <Link href="#contact" className="btn-primary">
+                    Start Your Project
+                  </Link>
+                  <Link href="#portfolio" className="btn-secondary">
+                    View Portfolio
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </SwiperSlide>
+
+        {/* Slide 2 */}
         <SwiperSlide>
-          <div className="hero-slide" style={{ backgroundImage: "url('/assets/images/img(2).jpg')" }} data-swiper-parallax-scale="1.1">
+          <div
+            className="hero-slide"
+            style={{ backgroundImage: "url('/assets/images/img(2).jpg')" }}
+            data-swiper-parallax-scale="1.1"
+          >
             <div className="hero-overlay"></div>
-            <div className="container"><div className="hero-content"><h1 data-swiper-parallax="-300">Bespoke<br /><span className="highlight">Sanctuaries</span></h1><p data-swiper-parallax="-200">Personalized spaces designed for serenity and style.</p><div className="hero-cta" data-swiper-parallax="-100"><Link href="#services" className="btn-primary">Our Services</Link></div></div></div>
+            <div className="container">
+              <div className="hero-content">
+                <h1 data-swiper-parallax="-300">
+                  Bespoke<br />
+                  <span className="highlight">Sanctuaries</span>
+                </h1>
+                <p data-swiper-parallax="-200">
+                  Personalized spaces designed for serenity and style.
+                </p>
+                <div className="hero-cta" data-swiper-parallax="-100">
+                  <Link href="#services" className="btn-primary">
+                    Our Services
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </SwiperSlide>
+
+        {/* Slide 3 */}
         <SwiperSlide>
-          <div className="hero-slide" style={{ backgroundImage: "url('/assets/images/img(11).jpg')" }} data-swiper-parallax-scale="1.1">
+          <div
+            className="hero-slide"
+            style={{ backgroundImage: "url('/assets/images/img(11).jpg')" }}
+            data-swiper-parallax-scale="1.1"
+          >
             <div className="hero-overlay"></div>
-            <div className="container"><div className="hero-content"><h1 data-swiper-parallax="-300">Timeless<br /><span className="highlight">Elegance</span></h1><p data-swiper-parallax="-200">Crafting environments that inspire for generations.</p><div className="hero-cta" data-swiper-parallax="-100"><Link href="#virtual-tour" className="btn-primary">Explore Tour</Link></div></div></div>
+            <div className="container">
+              <div className="hero-content">
+                <h1 data-swiper-parallax="-300">
+                  Timeless<br />
+                  <span className="highlight">Elegance</span>
+                </h1>
+                <p data-swiper-parallax="-200">
+                  Crafting environments that inspire for generations.
+                </p>
+                <div className="hero-cta" data-swiper-parallax="-100">
+                  <Link href="#virtual-tour" className="btn-primary">
+                    Explore Tour
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </SwiperSlide>
-        <div className="hero-swiper-prev"><StoreIcon name="chevron-left" /></div>
-        <div className="hero-swiper-next"><StoreIcon name="chevron-right" /></div>
+
+        {/* Navigation */}
+        <div className="hero-swiper-prev">
+          <StoreIcon name="chevron-left" />
+        </div>
+        <div className="hero-swiper-next">
+          <StoreIcon name="chevron-right" />
+        </div>
+
+        {/* Pagination */}
         <div className="hero-pagination swiper-pagination"></div>
       </Swiper>
     </section>
