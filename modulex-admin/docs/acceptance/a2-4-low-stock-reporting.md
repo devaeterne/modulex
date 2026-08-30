@@ -61,6 +61,12 @@ Existing production indexes already cover the core report join/filter keys used 
 
 All new report functions are `SECURITY INVOKER`. Function execution is revoked from `PUBLIC`/`anon` and explicitly granted to `authenticated`; underlying RLS remains authoritative. Existing report views remain `security_invoker = true`.
 
+## Advisor preflight baseline
+
+Security and Performance Advisors were run against the current production schema before A2.4 DDL is applied. The reported items are pre-existing Store/support/auth/HR/index backlog; no A2.4 function or view exists in production yet, so no finding can currently be attributed to A2.4.
+
+The post-migration Advisor rerun remains mandatory. A2.4 is not production-accepted if its new SECURITY INVOKER RPCs introduce a new Security or Performance Advisor finding.
+
 ## Release boundary
 
 The schema change is intentionally not applied before the Admin application is ready for release because `is_low_stock` semantics change from the legacy threshold-zero behavior.
