@@ -27,10 +27,11 @@ assert(sql.includes("unit = 'slab'") || sql.includes("SLAB"), "SLAB inventory co
 assert(sql.includes("inventory") && sql.includes("reserved_quantity"), "existing quantity reservation semantics must remain the inventory boundary");
 assert(sql.includes("countertop_configurations") && sql.includes("pricing_snapshot"), "immutable countertop snapshot table must exist");
 assert(sql.includes("countertop_material_price_bands") && sql.includes("countertop_stone_product_profiles"), "stone material bands and product profiles must be relational");
+for (const key of ["manual_override", "edge_profile_id", "commercial_price_group_id", "service_id", "applicable_measure", "totals"]) assert(sql.includes(key), `snapshot field ${key} missing`);
 for (const [code, price] of [["B1",34],["R1",45],["R22",150]]) assert(sql.includes(`'${code}',${price}`), `${code} material band seed missing`);
 assert(sql.includes("slab_quantity") && sql.includes("countertop_reservation_quantity"), "commercial quantity and slab reservation quantity must be distinct");
 assert(!sql.includes("reserve_countertop_slab_delta") && !sql.includes("countertop_slab_reservation"), "countertop must not create a second reservation engine");
-assert(migration.includes("coalesce((select cc.slab_quantity") && migration.includes("reserve_customer_order_item_stock"), "canonical reservation target must include slab quantity");
+assert(migration.includes("coalesce(v_item.countertop_reservation_quantity, v_item.quantity)") && migration.includes("reserve_customer_order_item_stock"), "canonical reservation target must include slab quantity");
 assert(sql.includes("product_kind","sink") || sql.includes("product_kind"), "sink domain identity must be validated");
 assert(migration.includes("countertop_material_price_bands") && migration.includes("attach_countertop_configuration"), "canonical timestamped migration must contain the domain");
 assert(sql.includes("calculate_countertop_price") && /set search_path\s*=\s*pg_catalog\s*,\s*public/.test(sql), "server-side pricing RPC must be pinned and present");

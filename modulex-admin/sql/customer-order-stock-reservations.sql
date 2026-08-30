@@ -171,6 +171,7 @@ declare
   v_inv record;
 begin
   select oi.id, oi.order_id, oi.product_id, oi.quantity,
+         oi.countertop_reservation_quantity,
          oi.sku_snapshot, oi.product_name_snapshot,
          o.order_number, o.status as order_status
   into v_item
@@ -192,7 +193,7 @@ begin
   where r.order_item_id = p_order_item_id;
 
   -- Countertop jobs reserve physical slabs independently from commercial job quantity.
-  v_target := greatest(coalesce((select cc.slab_quantity from public.countertop_configurations cc where cc.order_item_id = p_order_item_id), v_item.quantity) - v_consumed, 0);
+  v_target := greatest(coalesce(v_item.countertop_reservation_quantity, v_item.quantity) - v_consumed, 0);
 
   if v_active > v_target then
     v_excess := v_active - v_target;
