@@ -512,8 +512,8 @@ Goal: seed real, curated, CMS-managed cabinet portfolio content.
 
 - `[x]` import approved cabinet-relevant candidates as drafts;
 - `[x]` attach controlled media assets;
-- `[ ]` add provenance, title/category/location/summary/alt text;
-- `[ ]` preserve parent attribution where required;
+- `[x]` add provenance, title/category/location/summary/alt text;
+- `[x]` preserve parent attribution where required;
 - `[x]` review and publish curated set;
 - `[x]` verify Gallery readiness/nav/sitemap/live rendering.
 
@@ -528,11 +528,11 @@ Goal: publish real Oakwell cabinet knowledge without parent marketing noise.
 
 - `[~]` adapt process as typed CMS content;
 - `[~]` create Oakwell cabinetry FAQ in managed data;
-**GC-6 implementation status — 2026-08-30:** typed process and FAQ domains are migrated to production; 4 source-adapted cabinet-planning steps and 6 original Oakwell cabinetry FAQs are published in controlled data. Draft gating was verified at 0/0 public rows before publication; after publication the narrow RPCs return 4/6 while anon direct table selects remain denied and source provenance remains private. Store/Admin CI is green. Final GC-6 completion remains pending PR merge/deploy and live `/cabinet-process` acceptance.
+**GC-6 implementation status — 2026-08-30:** typed process and FAQ domains are migrated to production; 4 source-adapted cabinet-planning steps and 6 original Oakwell cabinetry FAQs are published in controlled data. Draft gating was verified at 0/0 public rows before publication; after publication the narrow RPCs return 4/6 while anon direct table selects remain denied and source provenance remains private. The CMS CTA is `Start a Project Consultation` → `/contact`; Home Office/accessories remain hold; source discounts, SLAs, guarantees and installation promises were omitted. Store/Admin CI is green. Final GC-6 completion remains pending PR merge/deploy and live `/cabinet-process` acceptance.
 
-- `[ ]` add approved consultation CTA content;
-- `[ ]` decide Home Office/accessory scope separately;
-- `[ ]` omit unsupported guarantees/discounts/SLAs.
+- `[x]` add approved consultation CTA content;
+- `[x]` decide Home Office/accessory scope separately — remains hold / outside initial Oakwell scope;
+- `[x]` omit unsupported guarantees/discounts/SLAs.
 
 **Exit gate:** normal content editing is Admin-managed and copy accurately describes Oakwell.
 
