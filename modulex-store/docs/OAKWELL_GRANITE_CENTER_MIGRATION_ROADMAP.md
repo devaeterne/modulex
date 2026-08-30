@@ -13,6 +13,8 @@ GC-2 production acceptance: `modulex-store/docs/granite-center/GC2_PRODUCTION_AC
 GC-3 implementation plan: `docs/superpowers/plans/2026-08-29-gc3-company-identity-contact-about-showroom.md`
 GC-3 production acceptance: `modulex-store/docs/granite-center/GC3_PRODUCTION_ACCEPTANCE.md`
 GC-4 production acceptance: `modulex-store/docs/granite-center/GC4_PRODUCTION_ACCEPTANCE.md`
+GC-8A design: `modulex-store/docs/superpowers/specs/2026-08-30-gc8a-store-chrome-seo-design.md`
+GC-8A implementation plan: `modulex-store/docs/superpowers/plans/2026-08-30-gc8a-store-chrome-seo.md`
 GC-1 manifest: `modulex-store/docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md` + `gc1-source-manifest.json`
 
 > Purpose: identify which verified Granite & Cabinet Center business data, media, social proof, forms, showroom information, and cabinet-related content should be adapted into Oakwell Cabinetry without cloning the parent website or importing stale/irrelevant WordPress content.
@@ -540,30 +542,46 @@ Goal: publish real Oakwell cabinet knowledge without parent marketing noise.
 
 Goal: add trust signals with correct source identity.
 
-- `[~]` implement/manage review/testimonial domain;
+- `[x]` implement/manage review/testimonial domain;
 - `[x]` import only approved source-linked excerpts/data;
 - `[x]` enforce parent attribution;
 - `[x]` avoid third-party broken widgets;
-- `[~]` verify a parent review cannot render as Oakwell-specific by mistake.
+- `[x]` verify a parent review cannot render as Oakwell-specific by mistake.
 
+**GC-7 production closeout — 2026-08-30:** PR #167 / commit `74013f90561e023b0453aea57cd010456de2c597` is production-accepted. Live homepage verification confirmed two Granite & Cabinet Center excerpts with source identity/HTTPS citation/visible parent attribution and no inferred rating; anon direct testimonial-table read remains denied.
 
-**GC-7 implementation status — 2026-08-30:** `store_testimonials` is migrated to production with Admin-only CRUD/RLS and a narrow published-only RPC. Draft-gate verification returned 2 draft / 0 public; after controlled publication the RPC returns 2 parent-attributed records, both with Granite & Cabinet Center source identity, HTTPS source URL and visible attribution while anon direct table select remains denied. The homepage code explicitly labels these as `Granite & Cabinet Center customer reviews` and `not Oakwell-specific reviews`; no rating or third-party widget is inferred. Store/Admin CI is green. Final GC-7 completion remains pending PR merge/deploy and live homepage acceptance.
-
-**Exit gate:** every visible review has valid identity/source/attribution and can be managed from Admin.
+**Exit gate:** `[x]` every visible review has valid identity/source/attribution and can be managed from Admin.
 
 ## GC-8 — Navigation, footer, SEO, accessibility & performance QA
 
-- `[ ]` complete configurable navigation/footer under the dynamic-content rule;
-- `[ ]` audit metadata/canonical/Organization/LocalBusiness structured data;
-- `[ ]` hard-code audit for business literals and Granite hotlinks;
+### GC-8A — Managed Store chrome + technical SEO
+
+Status: `[~]` implementation/data/CI complete; PR merge/deploy + live acceptance pending.
+
+- `[x]` add typed `store_chrome_items` with code-owned placement/destination allowlists, Admin-only direct access and narrow published-only public RPC;
+- `[x]` preserve current public chrome as exactly 11 approved rows: 6 primary + 2 Footer Products + 3 Footer Company;
+- `[x]` prove draft-first rollout: 11 draft / 0 public before controlled publication, anon direct table read denied, anon RPC execution allowed;
+- `[x]` publish and verify the exact 11-row ordered projection;
+- `[x]` make Navbar/Footer consume published data while keeping Account/Contact code-owned and preserving `/account` + `/dealer` portal shell behavior;
+- `[x]` add Store-only Admin editing inside existing `/store/content` with the same eight destination keys and no arbitrary href input;
+- `[x]` fix managed SEO-title duplication using absolute managed titles;
+- `[x]` model Oakwell as the public Organization/Brand and Granite & Cabinet Center as `parentOrganization` when the legal parent differs;
+- `[x]` audit canonical/robots/sitemap readiness and reject Granite runtime backend/media hotlinks;
+- `[x]` Store/Admin contracts, RBAC, scoped lint and production builds verified; final conflict-safe branch is based on latest `main` with no A1 business files or `ADMIN_ROADMAP.md` changes;
+- `[~]` post-merge live acceptance: nav/footer, portal coexistence, JSON-LD, titles, canonical/robots/sitemap and deployment commit match.
+
+**GC-8A exit gate:** code/data/CI are complete; mark `[x]` only after merge/deploy and live production acceptance.
+
+### GC-8B — Accessibility + performance acceptance
+
 - `[ ]` alt-text/accessibility audit;
 - `[ ]` keyboard/mobile/lightbox/form QA;
 - `[ ]` Lighthouse/Core Web Vitals baseline vs post-migration;
 - `[ ]` LCP/CLS media verification;
-- `[ ]` sitemap/indexing verification;
-- `[ ]` lint/build/smoke/live checks.
+- `[ ]` final sitemap/indexing verification;
+- `[ ]` final lint/build/smoke/live checks after tuning.
 
-**Exit gate:** migration is production-verified; mutable business content is managed through Admin/Supabase and Store contains behavior/layout rather than production content constants.
+**GC-8 exit gate:** migration is production-verified; mutable business content is managed through Admin/Supabase and Store contains behavior/layout rather than production content constants.
 
 ---
 
@@ -602,10 +620,6 @@ Goal: add trust signals with correct source identity.
 
 # 10. Next Action
 
-GC-0 truth/data ownership is locked; GC-1, GC-2, and GC-3 are production-accepted.
-
-1. Start **GC-5 — Projects / Gallery migration** from the latest `main`.
-2. Use the existing `store_projects` + `store_project_media` foundation and GC-2 media/provenance domain; do not publish parent projects until cabinet relevance, attribution, and media review are approved.
-3. Keep Phase 2.1 Gallery/Projects `[~]` until GC-5 supplies at least one approved published project/media set and live Gallery acceptance passes.
-4. GC-4 is closed. Do not seed project-type or consultation-intent values unless the business approves them; the Store intentionally hides empty configurable selects.
-5. Preserve customer-upload deferral, dealer document isolation, and all GC-4 lead security/attribution boundaries.
+1. Complete GC-8A PR merge/deploy and live acceptance; do not mark GC-8A `[x]` before the production deployment/commit and public/portal/SEO checks pass.
+2. Then execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from the latest `main`.
+3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend.
