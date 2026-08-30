@@ -22,10 +22,14 @@ for (const token of [
   "product_prices_current_unique_idx",
   "set search_path = pg_catalog, public",
   "is_base_price",
+  "product_margin_settings",
 ]) {
   assert.match(migration.toLowerCase(), new RegExp(token.replaceAll(" ", "\\s+")), `A3.3 migration must cover ${token}`);
 }
 assert.match(migration, /lower\(tg_op\)::public\.audit_action/, "Audit action must map trigger operation to audit enum");
+assert.match(migration, /identity cannot be removed/i, "Base group identity must be immutable");
+assert.match(migration, /cannot be deleted/i, "Base group deletion must be blocked");
+assert.match(migration, /trg_product_margin_settings_audit/, "Product-specific margin changes must be audited");
 assert.match(productPrices, /hasPermission\(profile\?\.roles,\s*["']pricing\.manage["']\)/, "Product pricing writes must use effective pricing.manage permission");
 assert.match(groups, /hasPermission\(profile\?\.roles,\s*["']pricing\.manage["']\)/, "Price-group writes must use effective pricing.manage permission");
 assert.match(costMargin, /hasPermission\(profile\?\.roles,\s*["']pricing\.(?:manage|cost\.view)["']\)/, "Cost/margin access must use effective pricing permission");

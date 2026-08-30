@@ -392,11 +392,11 @@ A3.2 implementation, migration, production deployment, authenticated route smoke
 
 ## A3.3 Pricing
 
-- [x] Review pricing dashboard, product pricing, groups, and cost-margin pages.
-- [x] Define price-group lifecycle and effective-date behavior.
-- [x] Verify Dealer Portal only sees assigned active groups with approved ordering visibility.
-- [x] Ensure missing dealer-tier price never silently falls back to public/list price unless business rules explicitly change.
-- [x] Add validation/audit coverage for price changes.
+- [~] Review pricing dashboard, product pricing, groups, and cost-margin pages.
+- [~] Define price-group lifecycle and effective-date behavior.
+- [~] Verify Dealer Portal only sees assigned active groups with approved ordering visibility.
+- [~] Ensure missing dealer-tier price never silently falls back to public/list price unless business rules explicitly change.
+- [~] Add validation/audit coverage for price changes.
 
 ## Cross-cutting Admin UI hardening track (UI-2A → UI-2E)
 
