@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `34d7174f069a107a319c07270133a5125ef6a680`
+Main baseline: `f0281e1e00ce3045c59cc7b0209ecfadf1855e9b`
 Current phase: **Phase A2 — Inventory, Warehouses & Physical Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A2 work is isolated from Store scope; post-merge Store production acceptance remains Store-owned.**
-Current Admin next action: **Review/merge PR #173, explicitly apply the A2.2 Supabase migration, run production DB/advisor acceptance and deploy Admin; then close A2.2 and move to A2.3 Stock Operations & Scanning.**
+Current Admin next action: **A2.2 is production-accepted; proceed to A2.3 Stock Operations & Scanning, starting with `/stock-operations` workflow/error handling, duplicate-scan protection, QR label flow, and mobile warehouse usability.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -297,20 +297,27 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A2.2 Inventory and movements
 
-- [~] Review inventory list filters/search/pagination.
-  - PR #173 moves inventory discovery to `search_stock_page` with server-side query, warehouse/zone/location/status filters, deterministic SKU/location/inventory ordering, exact window total, and 25-row pagination. Desktop inventory labels physical quantity as **On Hand**.
-- [~] Define stock-on-hand, reserved, available, damaged/hold semantics if not already explicit.
+- [x] Review inventory list filters/search/pagination.
+  - PR #173 moved inventory discovery to `search_stock_page` with server-side query, warehouse/zone/location/status filters, deterministic SKU/location/inventory ordering, exact window total, and 25-row pagination. Desktop inventory labels physical quantity as **On Hand**.
+  - Production acceptance confirmed the paginated RPC is installed and returns a 25-row window with the exact 463-row production total.
+- [x] Define stock-on-hand, reserved, available, damaged/hold semantics if not already explicit.
   - A2.2 defines `inventory.quantity` as physical On Hand, `reserved_quantity` as allocated stock still physically present, and `available = on_hand - reserved`. Low-stock classification is based on available quantity versus `products.min_stock_level`.
   - Operational holds use reserved quantity with explicit audit context. A2.2 does not introduce a separate damaged bucket; damaged stock must leave usable inventory through an explicit audited stock mutation rather than remaining silently available.
-- [~] Review stock movement types and required references/reasons.
+- [x] Review stock movement types and required references/reasons.
   - New A2.2 writes require a non-empty reason. `reference_no` remains optional because not every warehouse operation has an external document, but is stored when supplied; movement actor/time/reason/reference remain part of the ledger.
   - Automatic reversal is deliberately limited to `in`, `out`, `transfer`, `reservation`, and `release`; ambiguous legacy `adjustment`, `return`, and `damage` movements are not guessed.
-- [~] Require idempotent or guarded writes for repeated scan/operation requests where relevant.
+  - Production ledger acceptance confirms 4 existing movement rows and 0 null/blank reasons.
+- [x] Require idempotent or guarded writes for repeated scan/operation requests where relevant.
   - PR #173 adds idempotent stock-in/out/transfer/reserve/release RPC contracts with client UUID keys, server-generated canonical JSONB fingerprints, advisory transaction locks, same-payload replay, and changed-payload conflict behavior. Desktop and guided-scan flows both pass the idempotency key.
-- [~] Verify movement history is append-safe and auditable.
+  - Rollback-only production acceptance proved same-key/same-payload replay returns the existing movement, changed-payload reuse fails with SQLSTATE `22023`, and reversal restores stock without leaving acceptance-test data behind.
+- [x] Verify movement history is append-safe and auditable.
   - PR #173 adds an append-only UPDATE/DELETE trigger, removes application UPDATE/DELETE movement policies/grants, and records reversal links through compensating movement rows. Existing historical rows remain valid through nullable metadata.
-  - TDD RED was captured before implementation (`A2.2 migration must exist`). GREEN Actions run `33312699819` passes A2.2, A2.1, production-surface, RBAC, full lint, and the Next.js production build; parallel Admin A1 and Store regression workflows are also GREEN.
-  - **Release boundary:** `modulex-admin/sql/a2-inventory-movements.sql` is committed but has not been applied to production Supabase in PR preparation. A2.2 remains `[~]` until merge/release, production DB acceptance, advisor review, and Admin deployment verification are complete.
+  - The production bundle is applied in order: `a2-inventory-movements.sql`, `a2-inventory-movements-reversal-lock-fix.sql`, then the final `a2-inventory-movements-truncate-privilege-fix.sql` recorded by closeout PR #174.
+  - Final least-privilege acceptance confirms `anon` and `authenticated` have no `TRUNCATE` privilege on `inventory_movements`; authenticated UPDATE and DELETE remain denied. This closes the RLS-bypassable table-level privilege gap without changing movement data.
+  - TDD closeout RED: Actions run `33315567541` failed specifically because the TRUNCATE corrective migration was absent. GREEN run `33315626138` passes A2.1, A2.2, production-surface, RBAC, full lint, and the Next.js production build.
+  - PR #173 is merged on `main` as `f0281e1e00ce3045c59cc7b0209ecfadf1855e9b`; its Admin Vercel production deployment is `READY` and serves the deployed Inventory surface. PR #174 is the repository closeout package for the final privilege regression/migration record.
+  - Fresh post-DDL Supabase Security and Performance Advisor scans report no A2.2-specific new finding; unrelated existing Store/support/HR/index backlog remains outside A2.2.
+  - **A2.2 production acceptance: complete.** Normal inventory discovery, quantity semantics, retry-safe writes, append-only movement audit, controlled reversal, production DB acceptance, advisor review, Admin deploy verification, and final TRUNCATE privilege hardening are all closed.
 
 ## A2.3 Stock operations and scanning
 
@@ -327,7 +334,8 @@ These rules are mandatory for all future Modulex Admin work:
 
 ### Phase A2 Exit Gate
 
-- [ ] Stock-changing actions are validated and auditable.
+- [x] Stock-changing actions are validated and auditable.
+  - A2.2 idempotent mutation RPCs, required-reason contract, append-only ledger, compensating reversals, and least-privilege table grants are production-verified and permanently regression-tested.
 - [x] Warehouse/location integrity is enforced.
   - A2.1 guard triggers and restrictive FK behavior are present in production and covered by the permanent A2.1 contract.
 - [ ] Scan/label workflows pass device/mobile regression checks.
@@ -526,7 +534,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
 - [x] Polling regression contract exists.
 - [x] Production-surface/demo-route contract exists and is part of the Admin smoke chain.
 - [x] Add targeted regression contracts whenever roadmap work changes critical domain behavior.
-  - A2.1 warehouse/location integrity and A2.2 inventory/movement contracts are now permanent Admin workflow gates; A2.2 remains release-pending until production migration acceptance.
+  - A2.1 warehouse/location integrity and A2.2 inventory/movement contracts are permanent Admin workflow gates; A2.2 production acceptance includes idempotency/reversal, append-only UPDATE/DELETE protection, and explicit denial of application-role TRUNCATE privilege.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -629,6 +637,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] PR #85 reduced Admin Supabase polling churn: notification polling cadence, hidden-tab suspension, profile load behavior, and cross-tab email queue coordination.
 - [x] PR #106 gated warehouse/zone/location list-page mutations with `warehouse.manage` while preserving read-only structure access; full Admin verification passed before merge.
 - [x] A2.1 warehouse/location integrity is present in production: hierarchy/deactivation guards and restrictive warehouse/location/movement provenance foreign keys were re-verified on 2026-08-30.
+- [x] A2.2 inventory/movement production acceptance is complete: server-side inventory discovery, explicit On Hand/Reserved/Available semantics, idempotent mutation RPCs, append-only/reversal audit contracts, production migrations, advisor review, Admin deployment verification, and final application-role TRUNCATE revocation are covered by PR #173 plus closeout PR #174.
 
 ---
 
@@ -648,12 +657,13 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. **A2.2 — Inventory & Movements** is implemented and CI-GREEN in PR #173, but remains release-pending because its production Supabase migration has not been applied.
+Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. **A2.2 — Inventory & Movements is production-accepted and closed.**
 
-1. Review and merge PR #173 after confirming its final branch remains current with `main` and all required checks are GREEN.
-2. Apply `modulex-admin/sql/a2-inventory-movements.sql` to production Supabase as an explicit release step, then verify the new view/RPC/ledger contracts and run Security + Performance Advisors.
-3. Deploy Admin from the merged `main`, verify inventory pagination/filtering plus desktop/guided stock-operation smoke on the deployed surface, and then mark A2.2 `[x]`.
-4. Continue with **A2.3 — Stock Operations & Scanning**: workflow/error handling, duplicate scan behavior, QR label generation/printing, and mobile warehouse usability.
+1. Start **A2.3 — Stock Operations & Scanning** from current `main`.
+2. Review `/stock-operations` end to end: operation selection, validation, failure/retry UX, and reason/reference behavior against the now-authoritative A2.2 idempotent RPC contracts.
+3. Review QR/barcode scanning for malformed payloads, repeated scans, duplicate submissions, permission failures, and clear recovery behavior.
+4. Verify QR label generation/printing plus mobile/tablet warehouse usability, then close A2.3 only after device-oriented regression coverage is GREEN.
+5. Continue with **A2.4 — Low-stock & Reporting** after A2.3 acceptance.
 
 **Cross-roadmap coordination:** PR #172 (GC-8B accessibility/performance hardening) is merged to `main`. A2.2 intentionally changes only Admin/shared Supabase inventory contracts and does not modify Store runtime behavior; Store production acceptance remains tracked by the Store roadmap.
 
