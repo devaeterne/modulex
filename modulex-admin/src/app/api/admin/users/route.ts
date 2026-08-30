@@ -328,7 +328,7 @@ export async function POST(request: Request) {
         data: {
           full_name: fullName,
         },
-        redirectTo: `${siteUrl}/reset-password`,
+        redirectTo: `${siteUrl}/reset-password?mode=invite`,
       }
     );
 
@@ -435,7 +435,7 @@ export async function PATCH(request: Request) {
 
     const siteUrl = getSiteUrl(request);
     const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-      redirectTo: `${siteUrl}/reset-password`,
+      redirectTo: `${siteUrl}/reset-password?mode=recovery`,
     });
 
     if (error) {
