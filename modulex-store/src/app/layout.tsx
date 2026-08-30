@@ -16,6 +16,11 @@ import JsonLd from "@/components/seo/JsonLd";
 import StoreChrome from "@/components/StoreChrome";
 import { siteConfig } from "@/config/site";
 import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
+import {
+  SAFE_STORE_CHROME_FALLBACK,
+  resolveStoreChromeItems,
+} from "@/lib/store/chrome/destinations";
+import { getStorePublicChromeItems } from "@/lib/store/chrome/queries";
 import { getStoreGalleryReadiness } from "@/lib/store/content/queries";
 import { getStoreMarketingSettings } from "@/lib/store/marketing/queries";
 import { getStoreSiteSettings } from "@/lib/store/site/queries";
@@ -62,23 +67,28 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [companyResult, marketingResult, siteSettingsResult, galleryResult] = await Promise.allSettled([
+  const [companyResult, marketingResult, siteSettingsResult, galleryResult, chromeResult] = await Promise.allSettled([
     getStorePublicCompanyProfile(),
     getStoreMarketingSettings(),
     getStoreSiteSettings(),
     getStoreGalleryReadiness(),
+    getStorePublicChromeItems(),
   ]);
 
   const company = companyResult.status === "fulfilled" ? companyResult.value : null;
   const marketing = marketingResult.status === "fulfilled" ? marketingResult.value : null;
   const siteSettings = siteSettingsResult.status === "fulfilled" ? siteSettingsResult.value : null;
   const galleryReady = galleryResult.status === "fulfilled" ? galleryResult.value.isReady : false;
+  const chromeItems = resolveStoreChromeItems(
+    chromeResult.status === "fulfilled" ? chromeResult.value : SAFE_STORE_CHROME_FALLBACK,
+  );
 
   if (
     companyResult.status === "rejected" ||
     marketingResult.status === "rejected" ||
     siteSettingsResult.status === "rejected" ||
-    galleryResult.status === "rejected"
+    galleryResult.status === "rejected" ||
+    chromeResult.status === "rejected"
   ) {
     console.error("Unable to load one or more public Store shell settings");
   }
@@ -94,6 +104,7 @@ export default async function RootLayout({
           companyName={company?.companyName || siteConfig.name}
           logoUrl={company?.logoUrl}
           galleryReady={galleryReady}
+          chromeItems={chromeItems}
         >
           {children}
         </StoreChrome>

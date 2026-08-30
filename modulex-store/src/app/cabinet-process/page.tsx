@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/seo/JsonLd";
 import { getStoreCabinetJourneyReadiness, type StorePublicPage } from "@/lib/store/content/queries";
+import { resolveManagedSeoTitle } from "@/lib/seo/metadata";
 
 export const revalidate = 60;
 
@@ -22,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
     const page = readiness.page;
     const image = page.ogImageUrl || page.heroImageUrl;
     return {
-      title: page.seoTitle || page.title,
+      title: resolveManagedSeoTitle(page.seoTitle, page.title),
       description: page.seoDescription || page.intro || FALLBACK_DESCRIPTION,
       alternates: { canonical: "/cabinet-process" },
       openGraph: image ? { images: [image] } : undefined,

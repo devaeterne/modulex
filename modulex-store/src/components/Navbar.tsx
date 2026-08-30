@@ -4,15 +4,18 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { pushAnalyticsEvent } from "@/lib/analytics/events";
+import type { ResolvedStoreChromeItem } from "@/lib/store/chrome/destinations";
 
 export default function Navbar({
   companyName = "Oakwell Cabinetry",
   logoUrl,
   galleryReady = false,
+  navigationItems,
 }: {
   companyName?: string;
   logoUrl?: string | null;
   galleryReady?: boolean;
+  navigationItems: ResolvedStoreChromeItem[];
 }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -77,6 +80,9 @@ export default function Navbar({
 
   const lightLogo = logoUrl || "/assets/images/logo.png";
   const darkLogo = logoUrl || "/assets/images/logo-white.png";
+  const visibleNavigationItems = navigationItems.filter(
+    (item) => item.destinationKey !== "gallery" || galleryReady,
+  );
 
   return (
     <nav ref={navRef} className={`navbar navbar-expand-lg custom-navbar ${isMobileOpen ? "menu-open" : ""}`}>
@@ -87,14 +93,16 @@ export default function Navbar({
         </Link>
 
         <ul className={`navbar-nav custom-nav ${isMobileOpen ? "active" : ""}`} id="mobileNav">
-          <li className="nav-item home-dd"><Link className="nav-link" href="/" onClick={handleLinkClick}>Home</Link></li>
-          <li className="nav-item about-dd"><Link className="nav-link" href="/about" onClick={handleLinkClick}>About</Link></li>
-          <li className="nav-item"><Link className="nav-link" href="/products" onClick={handleLinkClick}>Products</Link></li>
-          <li className="nav-item"><Link className="nav-link" href="/showroom" onClick={handleLinkClick}>Showroom</Link></li>
-          {galleryReady ? (
-            <li className="nav-item"><Link className="nav-link" href="/gallery" onClick={handleLinkClick}>Gallery</Link></li>
-          ) : null}
-          <li className="nav-item"><Link className="nav-link" href="/dealers/apply" onClick={handleLinkClick}>Dealers</Link></li>
+          {visibleNavigationItems.map((item) => (
+            <li
+              className={`nav-item ${item.destinationKey === "home" ? "home-dd" : item.destinationKey === "about" ? "about-dd" : ""}`.trim()}
+              key={item.id}
+            >
+              <Link className="nav-link" href={item.href} onClick={handleLinkClick}>
+                {item.label}
+              </Link>
+            </li>
+          ))}
         </ul>
 
         <div className="d-flex align-items-center gap-2">

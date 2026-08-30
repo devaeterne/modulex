@@ -1,0 +1,71 @@
+name: GC-8A Store Chrome SEO
+
+on:
+  push:
+    branches:
+      - feat/gc8a-store-chrome-seo
+    paths:
+      - "modulex-store/**"
+      - "modulex-admin/src/components/store/**"
+      - "modulex-admin/src/lib/store/**"
+      - "modulex-admin/src/app/(admin)/store/content/**"
+      - ".github/workflows/gc8a-store-chrome-seo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  store-gc8a-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-store
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-store/package-lock.json
+      - run: npm ci
+      - name: Portal navbar regression
+        run: npm run smoke:portal-public-navbar
+      - name: GC-7 regression
+        run: npm run smoke:gc7-social-proof
+      - name: GC-6 regression
+        run: npm run smoke:gc6-cabinet-journey
+      - name: GC-5 regression
+        run: npm run smoke:gc5-gallery-projects
+      - name: Company regression
+        run: npm run smoke:gc3-company-public
+      - name: GC-8A contract
+        run: npm run smoke:gc8a-store-chrome-seo
+
+  admin-gc8a-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Store chrome scoped lint
+        run: >-
+          npx eslint
+          src/components/store/StoreChromeSettings.tsx
+          src/components/store/StoreContentSettings.tsx
+          src/lib/store/chrome.ts
+          'src/app/(admin)/store/content/page.tsx'
+      - name: Admin production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build

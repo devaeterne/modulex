@@ -8,6 +8,7 @@ import {
   type StorePublicCompanyProfile,
 } from "@/lib/store/company/queries";
 import { getStorePublicPage, type StorePublicPage } from "@/lib/store/content/queries";
+import { resolveManagedSeoTitle } from "@/lib/seo/metadata";
 import {
   createBreadcrumbJsonLd,
   createLocalBusinessJsonLd,
@@ -79,7 +80,8 @@ export async function generateMetadata(): Promise<Metadata> {
       };
     }
 
-    const title = page.seoTitle || page.title;
+    const title = resolveManagedSeoTitle(page.seoTitle, page.title);
+    const openGraphTitle = page.seoTitle?.trim() || page.title;
     const description = page.seoDescription || page.intro || FALLBACK_DESCRIPTION;
     const image = page.ogImageUrl || page.heroImageUrl;
 
@@ -89,7 +91,7 @@ export async function generateMetadata(): Promise<Metadata> {
       alternates: { canonical: "/showroom" },
       robots: { index: hasPublishedShowroom, follow: true },
       openGraph: {
-        title,
+        title: openGraphTitle,
         description,
         url: "/showroom",
         ...(image ? { images: [image] } : {}),

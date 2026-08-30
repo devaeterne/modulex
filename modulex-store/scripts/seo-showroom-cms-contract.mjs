@@ -33,14 +33,16 @@ assert.match(
   /robots:[\s\S]*index:\s*hasPublishedShowroom/s,
   "Showroom must noindex when no active showroom location is published",
 );
-assert.match(showroomPage, /page\.seoTitle/, "Showroom metadata must use the CMS SEO title");
+assert.match(showroomPage, /resolveManagedSeoTitle\(page\.seoTitle,\s*page\.title\)/, "Showroom managed SEO title must be absolute");
 assert.match(showroomPage, /page\.seoDescription/, "Showroom metadata must use the CMS SEO description");
 assert.match(showroomPage, /page\.ogImageUrl/, "Showroom metadata must use the CMS OG image");
 assert.match(showroomPage, /page\.eyebrow/, "Showroom visible copy must use the CMS eyebrow");
 assert.match(showroomPage, /page\.intro/, "Showroom visible copy must use the CMS intro");
 assert.match(showroomPage, /page\.body/, "Showroom visible copy must use the CMS body");
 
-assert.match(structuredData, /legalName/, "Organization JSON-LD must expose the legal company identity");
+assert.match(structuredData, /name:\s*brandName/, "Organization JSON-LD must keep Oakwell as the public organization name");
+assert.match(structuredData, /parentOrganization/, "Organization JSON-LD must support the parent-company relationship");
+assert.match(structuredData, /parentName/, "Organization JSON-LD must derive the distinct parent identity from canonical company data");
 assert.match(structuredData, /"@type":\s*"Brand"/, "Organization JSON-LD must identify Oakwell as a brand");
 assert.match(structuredData, /createLocalBusinessJsonLd/, "SEO helpers must support showroom LocalBusiness JSON-LD");
 assert.match(structuredData, /openingHoursSpecification/, "LocalBusiness JSON-LD must expose published opening hours");
