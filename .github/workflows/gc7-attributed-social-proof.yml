@@ -1,0 +1,30 @@
+name: GC-7 Attributed Social Proof
+
+on:
+  push:
+    branches:
+      - feat/gc7-attributed-social-proof
+  pull_request:
+    paths:
+      - "modulex-store/**"
+      - "modulex-admin/**"
+      - ".github/workflows/gc7-attributed-social-proof.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  gc7-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-store
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: GC-7 contract
+        run: node scripts/gc7-social-proof-contract.mjs
