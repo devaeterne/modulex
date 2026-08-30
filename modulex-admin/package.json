@@ -29,6 +29,7 @@
     "smoke:a3-product-master": "node scripts/a3-product-master-contract.mjs",
     "smoke:a3-2-store-product-publishing": "node scripts/a3-2-store-product-publishing-contract.mjs",
     "smoke:a3-3-pricing": "node scripts/a3-3-pricing-contract.mjs",
+    "smoke:countertop-domain": "node scripts/countertop-domain-contract.mjs",
     "smoke:secondary-cms-admin": "node scripts/secondary-cms-admin-contract.mjs",
     "smoke:requests-admin": "node scripts/requests-admin-contract.mjs",
     "smoke:api": "node scripts/api-smoke.mjs",

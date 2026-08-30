@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-08-30
+Last reviewed: 2026-08-31
 Main baseline: `82cc94508c7845d0dd50cd8e4ae9ff0e855db965`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
-Current Admin next action: **Start VAL-2 — Products & Pricing validation/data-contract hardening from current `main`; preserve the closed A3.1/A3.2/A3.3 product, publication, pricing, Dealer boundary, and audit contracts.**
+Current Admin next action: **Complete Countertop / Stone / Sink MVP verification and production acceptance; preserve the closed A3.1/A3.2/A3.3 and VAL-2 validation contracts.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -409,6 +409,14 @@ A3.3 implementation, production migration `20260830213328_a3_3_pricing_hardening
 - [ ] UI-2E final Admin UI regression and production acceptance.
 
 A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality track and does not replace the functional roadmap.
+
+## Countertop / Stone / Sink domain
+
+- [~] Deliver the approved additive countertop thin slice.
+  - MVP keeps `products` canonical, uses validated metadata for stone/sink attributes, tracks slabs by quantity with `unit = 'slab'`, and reuses existing inventory movements/reservations/idempotency.
+  - The end-to-end slice must cover stone → price group/manual price → square-foot/linear-foot/edge/sink/services pricing → immutable order snapshot → existing order item → quantity-based slab reservation.
+  - Individual slab identity, remnants, advanced fabrication optimization, Prima/Ruvati imports, and faucet-specific rules remain future extensions.
+  - Production migration/data mutation and `[x]` closeout require schema/data preflight, rollback-only verification, advisor review, full regressions, and authenticated acceptance.
 
 ## Cross-cutting validation and data contract hardening track (VAL-1 → VAL-6)
 
