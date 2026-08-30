@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { downloadCsv } from "@/lib/reports/csv";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { downloadCsv } from "@/lib/reports/csv";
 
 type ReportTab = "products" | "locations";
-type ProductStatusFilter = "all" | "low" | "out" | "reserved" | "ok" | "unset";
+type ProductStatusFilter = "all" | "low" | "out" | "reserved" | "ok";
 
 type ProductStockRow = {
   product_id: string;
@@ -25,16 +25,7 @@ type ProductStockRow = {
   is_low_stock: boolean;
   stock_status: string;
   last_inventory_update: string | null;
-  threshold_configured: boolean;
-  is_out_of_stock: boolean;
-  is_stock_alert: boolean;
-  total_count: number | string;
-  summary_on_hand: number | string;
-  summary_reserved: number | string;
-  summary_available: number | string;
-  summary_low_stock: number | string;
-  summary_out_of_stock: number | string;
-  summary_thresholds_set: number | string;
+  total_count?: number | string;
 };
 
 type LocationStockRow = {
@@ -56,44 +47,14 @@ type LocationStockRow = {
   current_capacity: number | string;
   capacity_usage_percent: number | string | null;
   is_active: boolean;
-  total_count: number | string;
-  summary_occupied: number | string;
-  summary_product_slots: number | string;
-  summary_on_hand: number | string;
-  summary_reserved: number | string;
-  summary_available: number | string;
+  total_count?: number | string;
 };
-
-type WarehouseOption = { id: string; code: string; name: string };
-type FacetRow = {
-  categories: string[] | null;
-  brands: string[] | null;
-  warehouses: WarehouseOption[] | null;
-  movement_types: string[] | null;
-};
-
-type ReportFilters = {
-  query: string;
-  status: ProductStatusFilter;
-  category: string;
-  brand: string;
-  warehouseId: string;
-};
+type FilterOption = { filter_kind: "brand" | "category" | "warehouse"; filter_key: string; filter_label: string };
 
 const PAGE_SIZE = 50;
-const EXPORT_PAGE_SIZE = 500;
-const EMPTY_FILTERS: ReportFilters = {
-  query: "",
-  status: "all",
-  category: "",
-  brand: "",
-  warehouseId: "",
-};
+
 const controlClass =
-  "h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-theme-xs outline-none focus-visible:border-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500/20 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90";
-const focusClass =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900";
-const numberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+  "h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90";
 
 function n(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
@@ -101,342 +62,251 @@ function n(value: number | string | null | undefined) {
 }
 
 function formatNumber(value: number | string | null | undefined) {
-  return numberFormatter.format(n(value));
+  return n(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+function productState(row: ProductStockRow) {
+  const available = n(row.total_available_quantity);
+  if (available <= 0) return { key: "out", label: "OUT OF STOCK", className: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400" };
+  if (row.is_low_stock) return { key: "low", label: "LOW STOCK", className: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400" };
+  if (n(row.total_reserved_quantity) > 0) return { key: "reserved", label: "RESERVED", className: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400" };
+  return { key: "ok", label: "OK", className: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" };
 }
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
-function productState(row: ProductStockRow) {
-  const label = row.stock_status.replaceAll("_", " ");
-  if (row.stock_status === "OUT_OF_STOCK") return { label, className: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400" };
-  if (row.stock_status === "LOW_STOCK") return { label, className: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400" };
-  if (row.stock_status === "PARTIALLY_RESERVED") return { label, className: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400" };
-  return { label: "OK", className: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" };
-}
-
-function reportError(context: string, error: unknown) {
-  console.error(`[Inventory Report] ${context}`, error);
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 export default function InventoryReport() {
   const [tab, setTab] = useState<ReportTab>("products");
-  const [filters, setFilters] = useState<ReportFilters>(EMPTY_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<ReportFilters>(EMPTY_FILTERS);
-  const [productRows, setProductRows] = useState<ProductStockRow[]>([]);
-  const [locationRows, setLocationRows] = useState<LocationStockRow[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [brands, setBrands] = useState<string[]>([]);
-  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
-  const [offset, setOffset] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
+  const [products, setProducts] = useState<ProductStockRow[]>([]);
+  const [locations, setLocations] = useState<LocationStockRow[]>([]);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState("all");
+  const [warehouseFilter, setWarehouseFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [productSummary, setProductSummary] = useState({
-    summary_on_hand: 0,
-    summary_reserved: 0,
-    summary_available: 0,
-    summary_low_stock: 0,
-    summary_out_of_stock: 0,
-    summary_thresholds_set: 0,
-  });
-  const [locationSummary, setLocationSummary] = useState({
-    summary_occupied: 0,
-    summary_product_slots: 0,
-    summary_on_hand: 0,
-    summary_reserved: 0,
-    summary_available: 0,
-  });
+  const [productOffset, setProductOffset] = useState(0);
+  const [locationOffset, setLocationOffset] = useState(0);
+  const [productTotal, setProductTotal] = useState(0);
+  const [locationTotal, setLocationTotal] = useState(0);
+  const [filterOptions, setFilterOptions] = useState<FilterOption[]>([]);
+  const requestIdRef = useRef(0);
 
-  const loadFacets = useCallback(async () => {
-    const { data, error } = await supabase.rpc("get_inventory_report_facets");
-    if (error) {
-      reportError("facets load failed", error);
-      return;
-    }
-    const facet = ((data as FacetRow[]) ?? [])[0];
-    setCategories(facet?.categories ?? []);
-    setBrands(facet?.brands ?? []);
-    setWarehouses(Array.isArray(facet?.warehouses) ? facet.warehouses : []);
-  }, []);
-
-  const loadProductPage = useCallback(async (nextFilters: ReportFilters, nextOffset: number) => {
+  async function loadReport(nextProductOffset = 0, nextLocationOffset = 0) {
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setErrorMessage(null);
-    const { data, error } = await supabase.rpc("search_inventory_product_report_page", {
-      p_query: nextFilters.query || null,
-      p_status: nextFilters.status,
-      p_category: nextFilters.category || null,
-      p_brand: nextFilters.brand || null,
-      p_offset: nextOffset,
-      p_limit: PAGE_SIZE,
-    });
-    if (error) {
-      reportError("product report load failed", error);
-      setProductRows([]);
-      setTotalCount(0);
-      setErrorMessage("Inventory product report is temporarily unavailable. Please try again.");
-      setIsLoading(false);
-      return;
-    }
-    const rows = (data as ProductStockRow[]) ?? [];
-    const first = rows[0];
-    setProductRows(rows);
-    setTotalCount(n(first?.total_count));
-    setProductSummary({
-      summary_on_hand: n(first?.summary_on_hand),
-      summary_reserved: n(first?.summary_reserved),
-      summary_available: n(first?.summary_available),
-      summary_low_stock: n(first?.summary_low_stock),
-      summary_out_of_stock: n(first?.summary_out_of_stock),
-      summary_thresholds_set: n(first?.summary_thresholds_set),
-    });
-    setOffset(nextOffset);
-    setIsLoading(false);
-  }, []);
+    const [productResult, locationResult] = await Promise.all([
+      supabase.rpc("search_inventory_product_report_page", {
+        p_query: query.trim(), p_status: statusFilter, p_category: categoryFilter,
+        p_brand: brandFilter, p_offset: nextProductOffset, p_limit: PAGE_SIZE,
+        p_export_all: false,
+      }),
+      supabase.rpc("search_inventory_location_report_page", {
+        p_query: query.trim(), p_warehouse_id: warehouseFilter === "all" ? null : warehouseFilter,
+        p_offset: nextLocationOffset, p_limit: PAGE_SIZE, p_export_all: false,
+      }),
+    ]);
 
-  const loadLocationPage = useCallback(async (nextFilters: ReportFilters, nextOffset: number) => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    const { data, error } = await supabase.rpc("search_inventory_location_report_page", {
-      p_query: nextFilters.query || null,
-      p_warehouse_id: nextFilters.warehouseId || null,
-      p_offset: nextOffset,
-      p_limit: PAGE_SIZE,
-    });
+    const error = productResult.error || locationResult.error;
+    if (requestId !== requestIdRef.current) return;
     if (error) {
-      reportError("location report load failed", error);
-      setLocationRows([]);
-      setTotalCount(0);
-      setErrorMessage("Inventory location report is temporarily unavailable. Please try again.");
-      setIsLoading(false);
-      return;
+      setErrorMessage(error.message);
+      setProducts([]);
+      setLocations([]);
+      setProductTotal(0);
+      setLocationTotal(0);
+      setProductOffset(0);
+      setLocationOffset(0);
+    } else {
+      setProducts((productResult.data ?? []) as ProductStockRow[]);
+      setLocations((locationResult.data ?? []) as LocationStockRow[]);
+      const nextProducts = (productResult.data ?? []) as ProductStockRow[];
+      const nextLocations = (locationResult.data ?? []) as LocationStockRow[];
+      setProductTotal(n(nextProducts[0]?.total_count));
+      setLocationTotal(n(nextLocations[0]?.total_count));
+      setProductOffset(nextProductOffset);
+      setLocationOffset(nextLocationOffset);
     }
-    const rows = (data as LocationStockRow[]) ?? [];
-    const first = rows[0];
-    setLocationRows(rows);
-    setTotalCount(n(first?.total_count));
-    setLocationSummary({
-      summary_occupied: n(first?.summary_occupied),
-      summary_product_slots: n(first?.summary_product_slots),
-      summary_on_hand: n(first?.summary_on_hand),
-      summary_reserved: n(first?.summary_reserved),
-      summary_available: n(first?.summary_available),
-    });
-    setOffset(nextOffset);
     setIsLoading(false);
-  }, []);
-
-  const loadActivePage = useCallback((activeTab: ReportTab, nextFilters: ReportFilters, nextOffset: number) => {
-    if (activeTab === "products") return loadProductPage(nextFilters, nextOffset);
-    return loadLocationPage(nextFilters, nextOffset);
-  }, [loadLocationPage, loadProductPage]);
+  }
 
   useEffect(() => {
-    void loadFacets();
-    void loadProductPage(EMPTY_FILTERS, 0);
-  }, [loadFacets, loadProductPage]);
+    const timer = window.setTimeout(() => { void loadReport(0, 0); }, 250);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, statusFilter, categoryFilter, brandFilter, warehouseFilter]);
 
-  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-  const visibleRows = tab === "products" ? productRows.length : locationRows.length;
-  const firstVisible = totalCount === 0 ? 0 : offset + 1;
-  const lastVisible = Math.min(offset + visibleRows, totalCount);
-
-  const summaryCards = useMemo(() => {
-    if (tab === "products") {
-      return [
-        ["Products", totalCount],
-        ["On Hand", productSummary.summary_on_hand],
-        ["Reserved", productSummary.summary_reserved],
-        ["Available", productSummary.summary_available],
-        ["Low / Out", `${formatNumber(productSummary.summary_low_stock)} / ${formatNumber(productSummary.summary_out_of_stock)}`],
-      ];
+  useEffect(() => {
+    async function loadFilterOptions() {
+      const { data, error } = await supabase.rpc("get_inventory_report_filter_options");
+      if (error) { setErrorMessage("Report filters are temporarily unavailable."); return; }
+      setFilterOptions((data ?? []) as FilterOption[]);
     }
-    return [
-      ["Locations", totalCount],
-      ["Occupied", locationSummary.summary_occupied],
-      ["Product Slots", locationSummary.summary_product_slots],
-      ["On Hand", locationSummary.summary_on_hand],
-      ["Available", locationSummary.summary_available],
-    ];
-  }, [locationSummary, productSummary, tab, totalCount]);
+    void loadFilterOptions();
+  }, []);
 
-  function applyFilters() {
-    const nextFilters = { ...filters, query: filters.query.trim() };
-    setAppliedFilters(nextFilters);
-    void loadActivePage(tab, nextFilters, 0);
-  }
+  const categories = useMemo(() => filterOptions.filter((option) => option.filter_kind === "category"), [filterOptions]);
+  const brands = useMemo(() => filterOptions.filter((option) => option.filter_kind === "brand"), [filterOptions]);
+  const warehouses = useMemo(() => filterOptions.filter((option) => option.filter_kind === "warehouse"), [filterOptions]);
 
-  function switchTab(nextTab: ReportTab) {
-    setTab(nextTab);
-    setOffset(0);
-    void loadActivePage(nextTab, appliedFilters, 0);
-  }
+  const filteredProducts = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return products.filter((row) => {
+      const state = productState(row);
+      if (statusFilter !== "all" && state.key !== statusFilter) return false;
+      if (categoryFilter !== "all" && row.category !== categoryFilter) return false;
+      if (brandFilter !== "all" && row.brand !== brandFilter) return false;
+      if (!normalized) return true;
+      return [row.sku, row.barcode, row.product_name, row.brand, row.category]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalized));
+    });
+  }, [products, query, statusFilter, categoryFilter, brandFilter]);
+
+  const filteredLocations = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return locations.filter((row) => {
+      if (warehouseFilter !== "all" && row.warehouse_id !== warehouseFilter) return false;
+      if (!normalized) return true;
+      return [row.location_code, row.location_name, row.warehouse_code, row.warehouse_name, row.zone_code, row.zone_name]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalized));
+    });
+  }, [locations, query, warehouseFilter]);
+
+  const productSummary = useMemo(() => ({
+    products: filteredProducts.length,
+    onHand: filteredProducts.reduce((sum, row) => sum + n(row.total_quantity), 0),
+    reserved: filteredProducts.reduce((sum, row) => sum + n(row.total_reserved_quantity), 0),
+    available: filteredProducts.reduce((sum, row) => sum + n(row.total_available_quantity), 0),
+    lowStock: filteredProducts.filter((row) => row.is_low_stock).length,
+  }), [filteredProducts]);
+
+  const locationSummary = useMemo(() => ({
+    locations: filteredLocations.length,
+    occupied: filteredLocations.filter((row) => n(row.product_count) > 0).length,
+    products: filteredLocations.reduce((sum, row) => sum + n(row.product_count), 0),
+    onHand: filteredLocations.reduce((sum, row) => sum + n(row.total_quantity), 0),
+    available: filteredLocations.reduce((sum, row) => sum + n(row.total_available_quantity), 0),
+  }), [filteredLocations]);
 
   async function exportCurrent() {
-    setIsExporting(true);
-    setErrorMessage(null);
-    try {
-      const date = new Date().toISOString().slice(0, 10);
-      if (tab === "products") {
-        const allRows: ProductStockRow[] = [];
-        let exportOffset = 0;
-        let exportTotal = Number.POSITIVE_INFINITY;
-        while (exportOffset < exportTotal) {
-          const { data, error } = await supabase.rpc("search_inventory_product_report_page", {
-            p_query: appliedFilters.query || null,
-            p_status: appliedFilters.status,
-            p_category: appliedFilters.category || null,
-            p_brand: appliedFilters.brand || null,
-            p_offset: exportOffset,
-            p_limit: EXPORT_PAGE_SIZE,
-          });
-          if (error) throw error;
-          const page = (data as ProductStockRow[]) ?? [];
-          exportTotal = n(page[0]?.total_count);
-          allRows.push(...page);
-          if (page.length === 0) break;
-          exportOffset += page.length;
-        }
-        downloadCsv(
-          `inventory-product-summary-${date}.csv`,
-          ["SKU", "Product", "Brand", "Category", "Warehouses", "Locations", "On Hand", "Reserved", "Available", "Minimum", "Threshold", "Status", "Last Update"],
-          allRows.map((row) => [row.sku, row.product_name, row.brand ?? "", row.category ?? "", row.warehouse_count, row.location_count, row.total_quantity, row.total_reserved_quantity, row.total_available_quantity, row.min_stock_level, row.threshold_configured ? "Configured" : "Unset", productState(row).label, row.last_inventory_update ?? ""])
-        );
-      } else {
-        const allRows: LocationStockRow[] = [];
-        let exportOffset = 0;
-        let exportTotal = Number.POSITIVE_INFINITY;
-        while (exportOffset < exportTotal) {
-          const { data, error } = await supabase.rpc("search_inventory_location_report_page", {
-            p_query: appliedFilters.query || null,
-            p_warehouse_id: appliedFilters.warehouseId || null,
-            p_offset: exportOffset,
-            p_limit: EXPORT_PAGE_SIZE,
-          });
-          if (error) throw error;
-          const page = (data as LocationStockRow[]) ?? [];
-          exportTotal = n(page[0]?.total_count);
-          allRows.push(...page);
-          if (page.length === 0) break;
-          exportOffset += page.length;
-        }
-        downloadCsv(
-          `inventory-location-summary-${date}.csv`,
-          ["Warehouse", "Zone", "Location", "Type", "Products", "On Hand", "Reserved", "Available", "Max Capacity", "Current Capacity", "Capacity Usage %"],
-          allRows.map((row) => [row.warehouse_code, row.zone_code ?? "", row.location_code, row.location_type, row.product_count, row.total_quantity, row.total_reserved_quantity, row.total_available_quantity, row.max_capacity ?? "", row.current_capacity, row.capacity_usage_percent ?? ""])
-        );
-      }
-    } catch (error) {
-      reportError("export failed", error);
-      setErrorMessage("The filtered inventory report could not be exported. Please try again.");
-    } finally {
-      setIsExporting(false);
+    const date = new Date().toISOString().slice(0, 10);
+    if (tab === "products") {
+      const exportRows: ProductStockRow[] = [];
+      let offset = 0;
+      do {
+        const { data, error } = await supabase.rpc("search_inventory_product_report_page", {
+          p_query: query.trim(), p_status: statusFilter, p_category: categoryFilter,
+          p_brand: brandFilter, p_offset: offset, p_limit: 100, p_export_all: false,
+        });
+        if (error) { setErrorMessage("Inventory export is temporarily unavailable."); return; }
+        const page = (data ?? []) as ProductStockRow[];
+        exportRows.push(...page); offset += page.length;
+        if (page.length === 0 || offset >= n(page[0]?.total_count)) break;
+      } while (true);
+      downloadCsv(`inventory-product-summary-${date}.csv`, ["SKU", "Product", "Brand", "Category", "Warehouses", "Locations", "On Hand", "Reserved", "Available", "Minimum", "Status", "Last Update"], exportRows.map((row) => [row.sku, row.product_name, row.brand ?? "", row.category ?? "", row.warehouse_count, row.location_count, row.total_quantity, row.total_reserved_quantity, row.total_available_quantity, row.min_stock_level, productState(row).label, row.last_inventory_update ?? ""]));
+    } else {
+      const exportRows: LocationStockRow[] = [];
+      let offset = 0;
+      do {
+        const { data, error } = await supabase.rpc("search_inventory_location_report_page", {
+          p_query: query.trim(), p_warehouse_id: warehouseFilter === "all" ? null : warehouseFilter,
+          p_offset: offset, p_limit: 100, p_export_all: false,
+        });
+        if (error) { setErrorMessage("Inventory export is temporarily unavailable."); return; }
+        const page = (data ?? []) as LocationStockRow[];
+        exportRows.push(...page); offset += page.length;
+        if (page.length === 0 || offset >= n(page[0]?.total_count)) break;
+      } while (true);
+      downloadCsv(`inventory-location-summary-${date}.csv`, ["Warehouse", "Zone", "Location", "Type", "Products", "On Hand", "Reserved", "Available", "Max Capacity", "Current Capacity", "Capacity Usage %"], exportRows.map((row) => [row.warehouse_code, row.zone_code ?? "", row.location_code, row.location_type, row.product_count, row.total_quantity, row.total_reserved_quantity, row.total_available_quantity, row.max_capacity ?? "", row.current_capacity, row.capacity_usage_percent ?? ""]));
     }
   }
 
+  const summaryCards = tab === "products"
+    ? [
+        ["Products", productTotal],
+        ["Page On Hand", formatNumber(productSummary.onHand)],
+        ["Page Reserved", formatNumber(productSummary.reserved)],
+        ["Page Available", formatNumber(productSummary.available)],
+        ["Page Low Stock", productSummary.lowStock],
+      ]
+    : [
+        ["Locations", locationTotal],
+        ["Page Occupied", locationSummary.occupied],
+        ["Page Product Slots", formatNumber(locationSummary.products)],
+        ["Page On Hand", formatNumber(locationSummary.onHand)],
+        ["Page Available", formatNumber(locationSummary.available)],
+      ];
+
   return (
-    <div className="space-y-5" aria-busy={isLoading}>
+    <div className="space-y-5">
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => switchTab("products")} className={`h-10 rounded-lg px-4 text-sm font-medium ${tab === "products" ? "bg-brand-500 text-white" : "border border-gray-200 bg-white text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"} ${focusClass}`}>Product Summary</button>
-        <button type="button" onClick={() => switchTab("locations")} className={`h-10 rounded-lg px-4 text-sm font-medium ${tab === "locations" ? "bg-brand-500 text-white" : "border border-gray-200 bg-white text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"} ${focusClass}`}>Location Utilization</button>
+        <button type="button" onClick={() => setTab("products")} className={`h-10 rounded-lg px-4 text-sm font-medium ${tab === "products" ? "bg-brand-500 text-white" : "border border-gray-200 bg-white text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"}`}>Product Summary</button>
+        <button type="button" onClick={() => setTab("locations")} className={`h-10 rounded-lg px-4 text-sm font-medium ${tab === "locations" ? "bg-brand-500 text-white" : "border border-gray-200 bg-white text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"}`}>Location Utilization</button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {summaryCards.map(([label, value]) => <Metric key={String(label)} label={String(label)} value={typeof value === "string" ? value : formatNumber(value)} />)}
+        {summaryCards.map(([label, value]) => <Metric key={String(label)} label={String(label)} value={String(value)} />)}
       </div>
 
-      {errorMessage ? <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div> : null}
+      {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
 
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{tab === "products" ? "Inventory by Product" : "Inventory by Location"}</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Server-side filters, pagination, aggregates, and complete paged CSV export.</p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{tab === "products" ? "Aggregated stock, reservations, availability, thresholds, and stock status." : "Warehouse and shelf utilization with stock and capacity totals."}</p>
           </div>
-          <form onSubmit={(event) => { event.preventDefault(); applyFilters(); }} className="flex flex-wrap gap-2">
-            <input value={filters.query} onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))} placeholder={tab === "products" ? "Search product..." : "Search location..."} className={`${controlClass} w-[240px]`} />
-            {tab === "products" ? (
-              <>
-                <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as ProductStatusFilter }))} className={controlClass} aria-label="Product stock status">
-                  <option value="all">All Statuses</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="reserved">Reserved</option><option value="ok">OK</option><option value="unset">Threshold Unset</option>
-                </select>
-                <select value={filters.category} onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value }))} className={controlClass} aria-label="Product category">
-                  <option value="">All Categories</option>{categories.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-                <select value={filters.brand} onChange={(event) => setFilters((current) => ({ ...current, brand: event.target.value }))} className={controlClass} aria-label="Product brand">
-                  <option value="">All Brands</option>{brands.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-              </>
-            ) : (
-              <select value={filters.warehouseId} onChange={(event) => setFilters((current) => ({ ...current, warehouseId: event.target.value }))} className={controlClass} aria-label="Warehouse">
-                <option value="">All Warehouses</option>{warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.code} · {warehouse.name}</option>)}
-              </select>
-            )}
-            <button type="submit" className={`h-10 rounded-lg bg-gray-900 px-4 text-sm font-medium text-white dark:bg-white dark:text-gray-900 ${focusClass}`}>Apply</button>
-            <button type="button" onClick={() => void loadActivePage(tab, appliedFilters, offset)} className={`h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 dark:border-gray-800 dark:text-gray-300 ${focusClass}`}>Refresh</button>
-            <button type="button" onClick={() => void exportCurrent()} disabled={totalCount === 0 || isExporting} className={`h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 ${focusClass}`}>{isExporting ? "Exporting..." : "Export CSV"}</button>
-          </form>
+          <div className="flex flex-wrap gap-2">
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "products" ? "Search product..." : "Search location..."} className={`${controlClass} w-[240px]`} />
+            {tab === "products" ? <>
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as ProductStatusFilter)} className={controlClass}><option value="all">All Statuses</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="reserved">Reserved</option><option value="ok">OK</option></select>
+              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={controlClass}><option value="all">All Categories</option>{categories.map((option) => <option key={option.filter_key} value={option.filter_key}>{option.filter_label}</option>)}</select>
+              <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)} className={controlClass}><option value="all">All Brands</option>{brands.map((option) => <option key={option.filter_key} value={option.filter_key}>{option.filter_label}</option>)}</select>
+            </> : <select value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} className={controlClass}><option value="all">All Warehouses</option>{warehouses.map((option) => <option key={option.filter_key} value={option.filter_key}>{option.filter_label}</option>)}</select>}
+            <button type="button" onClick={() => void loadReport(0, 0)} className="h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]">Refresh</button>
+            <button type="button" onClick={() => void exportCurrent()} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">Export CSV</button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
-          {tab === "products" ? <ProductTable rows={productRows} isLoading={isLoading} /> : <LocationTable rows={locationRows} isLoading={isLoading} />}
+          {tab === "products" ? (
+            <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
+              <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Product","Brand / Category","Warehouses","Locations","On Hand","Reserved","Available","Minimum","Status","Last Update"].map((label) => <th key={label} className={`${["Warehouses","Locations","On Hand","Reserved","Available","Minimum"].includes(label) ? "text-right" : "text-left"} px-5 py-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400`}>{label}</th>)}</tr></thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {isLoading ? <tr><td colSpan={10} className="px-5 py-10 text-center text-sm text-gray-500">Loading inventory report...</td></tr> : filteredProducts.length === 0 ? <tr><td colSpan={10} className="px-5 py-10 text-center text-sm text-gray-500">No products match the current filters.</td></tr> : filteredProducts.map((row) => { const state = productState(row); return <tr key={row.product_id}><td className="px-5 py-4"><p className="text-sm font-semibold text-gray-800 dark:text-white/90">{row.sku}</p><p className="text-xs text-gray-500">{row.product_name}</p></td><td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300"><p>{row.brand || "—"}</p><p className="text-xs text-gray-400">{row.category || "—"}</p></td><td className="px-5 py-4 text-right text-sm text-gray-700 dark:text-gray-300">{formatNumber(row.warehouse_count)}</td><td className="px-5 py-4 text-right text-sm text-gray-700 dark:text-gray-300">{formatNumber(row.location_count)}</td><td className="px-5 py-4 text-right text-sm font-medium text-gray-800 dark:text-white/90">{formatNumber(row.total_quantity)}</td><td className="px-5 py-4 text-right text-sm text-gray-600 dark:text-gray-300">{formatNumber(row.total_reserved_quantity)}</td><td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{formatNumber(row.total_available_quantity)}</td><td className="px-5 py-4 text-right text-sm text-gray-600 dark:text-gray-300">{formatNumber(row.min_stock_level)}</td><td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${state.className}`}>{state.label}</span></td><td className="px-5 py-4 text-sm text-gray-500">{formatDate(row.last_inventory_update)}</td></tr>; })}
+              </tbody>
+            </table>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
+              <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Warehouse","Zone","Location","Type","Products","On Hand","Reserved","Available","Capacity"].map((label) => <th key={label} className={`${["Products","On Hand","Reserved","Available","Capacity"].includes(label) ? "text-right" : "text-left"} px-5 py-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400`}>{label}</th>)}</tr></thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {isLoading ? <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">Loading location report...</td></tr> : filteredLocations.length === 0 ? <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">No locations match the current filters.</td></tr> : filteredLocations.map((row) => <tr key={row.location_id}><td className="px-5 py-4"><p className="text-sm font-semibold text-gray-800 dark:text-white/90">{row.warehouse_code}</p><p className="text-xs text-gray-500">{row.warehouse_name}</p></td><td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{row.zone_code || "—"}</td><td className="px-5 py-4"><p className="text-sm font-medium text-gray-800 dark:text-white/90">{row.location_code}</p><p className="text-xs text-gray-500">{row.location_name}</p></td><td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{String(row.location_type).replaceAll("_", " ")}</td><td className="px-5 py-4 text-right text-sm text-gray-700 dark:text-gray-300">{formatNumber(row.product_count)}</td><td className="px-5 py-4 text-right text-sm font-medium text-gray-800 dark:text-white/90">{formatNumber(row.total_quantity)}</td><td className="px-5 py-4 text-right text-sm text-gray-600 dark:text-gray-300">{formatNumber(row.total_reserved_quantity)}</td><td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{formatNumber(row.total_available_quantity)}</td><td className="px-5 py-4 text-right text-sm text-gray-600 dark:text-gray-300">{row.capacity_usage_percent == null ? "—" : `${formatNumber(row.capacity_usage_percent)}%`}</td></tr>)}
+              </tbody>
+            </table>
+          )}
         </div>
-
-        <div className="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
-          <p>Showing {firstVisible}–{lastVisible} of {totalCount}</p>
-          <div className="flex items-center gap-2">
-            <button type="button" disabled={offset === 0 || isLoading} onClick={() => void loadActivePage(tab, appliedFilters, Math.max(0, offset - PAGE_SIZE))} className={`h-9 rounded-lg border border-gray-200 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 ${focusClass}`}>Previous</button>
-            <span>Page {currentPage} of {totalPages}</span>
-            <button type="button" disabled={offset + PAGE_SIZE >= totalCount || isLoading} onClick={() => void loadActivePage(tab, appliedFilters, offset + PAGE_SIZE)} className={`h-9 rounded-lg border border-gray-200 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 ${focusClass}`}>Next</button>
-          </div>
-        </div>
+        <ReportPagination
+          offset={tab === "products" ? productOffset : locationOffset}
+          total={tab === "products" ? productTotal : locationTotal}
+          loading={isLoading}
+          onPage={(nextOffset) => void loadReport(tab === "products" ? nextOffset : productOffset, tab === "locations" ? nextOffset : locationOffset)}
+        />
       </div>
     </div>
   );
 }
 
-function ProductTable({ rows, isLoading }: { rows: ProductStockRow[]; isLoading: boolean }) {
-  return (
-    <table className="min-w-[1180px] divide-y divide-gray-100 dark:divide-gray-800">
-      <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Product", "Brand / Category", "Warehouses", "Locations", "On Hand", "Reserved", "Available", "Minimum", "Threshold", "Status", "Last Update"].map((label) => <th key={label} scope="col" className={`${["Warehouses", "Locations", "On Hand", "Reserved", "Available", "Minimum"].includes(label) ? "text-right" : "text-left"} px-5 py-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400`}>{label}</th>)}</tr></thead>
-      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-        {isLoading ? <tr><td colSpan={11} className="px-5 py-10 text-center text-sm text-gray-500">Loading inventory report...</td></tr> : rows.length === 0 ? <tr><td colSpan={11} className="px-5 py-10 text-center text-sm text-gray-500">No products match the current filters.</td></tr> : rows.map((row) => { const state = productState(row); return (
-          <tr key={row.product_id}>
-            <td className="px-5 py-4"><p className="text-sm font-semibold text-gray-800 dark:text-white/90">{row.sku}</p><p className="text-xs text-gray-500">{row.product_name}</p></td>
-            <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300"><p>{row.brand || "—"}</p><p className="text-xs text-gray-400">{row.category || "—"}</p></td>
-            <td className="px-5 py-4 text-right text-sm">{formatNumber(row.warehouse_count)}</td><td className="px-5 py-4 text-right text-sm">{formatNumber(row.location_count)}</td>
-            <td className="px-5 py-4 text-right text-sm font-medium">{formatNumber(row.total_quantity)}</td><td className="px-5 py-4 text-right text-sm">{formatNumber(row.total_reserved_quantity)}</td><td className="px-5 py-4 text-right text-sm font-semibold">{formatNumber(row.total_available_quantity)}</td><td className="px-5 py-4 text-right text-sm">{formatNumber(row.min_stock_level)}</td>
-            <td className="px-5 py-4 text-sm text-gray-500">{row.threshold_configured ? "Configured" : "Unset"}</td>
-            <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${state.className}`}>{state.label}</span></td>
-            <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500">{formatDate(row.last_inventory_update)}</td>
-          </tr>
-        ); })}
-      </tbody>
-    </table>
-  );
-}
-
-function LocationTable({ rows, isLoading }: { rows: LocationStockRow[]; isLoading: boolean }) {
-  return (
-    <table className="min-w-[1100px] divide-y divide-gray-100 dark:divide-gray-800">
-      <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Warehouse", "Zone", "Location", "Type", "Products", "On Hand", "Reserved", "Available", "Capacity", "Usage"].map((label) => <th key={label} scope="col" className={`${["Products", "On Hand", "Reserved", "Available", "Capacity", "Usage"].includes(label) ? "text-right" : "text-left"} px-5 py-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400`}>{label}</th>)}</tr></thead>
-      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-        {isLoading ? <tr><td colSpan={10} className="px-5 py-10 text-center text-sm text-gray-500">Loading location report...</td></tr> : rows.length === 0 ? <tr><td colSpan={10} className="px-5 py-10 text-center text-sm text-gray-500">No locations match the current filters.</td></tr> : rows.map((row) => (
-          <tr key={row.location_id}>
-            <td className="px-5 py-4"><p className="text-sm font-semibold">{row.warehouse_code}</p><p className="text-xs text-gray-500">{row.warehouse_name}</p></td>
-            <td className="px-5 py-4 text-sm">{row.zone_code || "—"}</td><td className="px-5 py-4"><p className="text-sm font-semibold">{row.location_code}</p><p className="text-xs text-gray-500">{row.location_name}</p></td><td className="px-5 py-4 text-sm">{row.location_type}</td>
-            <td className="px-5 py-4 text-right text-sm">{formatNumber(row.product_count)}</td><td className="px-5 py-4 text-right text-sm font-medium">{formatNumber(row.total_quantity)}</td><td className="px-5 py-4 text-right text-sm">{formatNumber(row.total_reserved_quantity)}</td><td className="px-5 py-4 text-right text-sm font-semibold">{formatNumber(row.total_available_quantity)}</td>
-            <td className="px-5 py-4 text-right text-sm">{row.max_capacity == null ? "—" : `${formatNumber(row.current_capacity)} / ${formatNumber(row.max_capacity)}`}</td><td className="px-5 py-4 text-right text-sm">{row.capacity_usage_percent == null ? "—" : `${formatNumber(row.capacity_usage_percent)}%`}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+function ReportPagination({ offset, total, loading, onPage }: { offset: number; total: number; loading: boolean; onPage: (offset: number) => void }) {
+  const first = total === 0 ? 0 : offset + 1;
+  const last = Math.min(offset + PAGE_SIZE, total);
+  return <div className="flex items-center justify-between border-t border-gray-200 px-5 py-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400"><span>Showing {first}–{last} of {total}</span><div className="flex gap-2"><button type="button" disabled={loading || offset === 0} onClick={() => onPage(Math.max(0, offset - PAGE_SIZE))} className="rounded-lg border px-3 py-2 disabled:opacity-50">Previous</button><button type="button" disabled={loading || offset + PAGE_SIZE >= total} onClick={() => onPage(offset + PAGE_SIZE)} className="rounded-lg border px-3 py-2 disabled:opacity-50">Next</button></div></div>;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
