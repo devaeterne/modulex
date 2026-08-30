@@ -4,6 +4,7 @@ import Hero, { type HomeHeroContent } from "@/components/Home/Hero";
 import VirtualTour from "@/components/Home/VirtualTour";
 import ProductCard from "@/components/products/ProductCard";
 import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
+import { getStorePublicTestimonials } from "@/lib/store/content/queries";
 import { getStoreCatalogProducts } from "@/lib/store/products/queries";
 import { getStoreHomeFeatures, getStoreSiteSettings, type StoreSiteSettings } from "@/lib/store/site/queries";
 
@@ -80,10 +81,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function Home() {
   const settings = await loadSiteSettings();
-  const [companyResult, featuresResult, productResult] = await Promise.allSettled([
+  const [companyResult, featuresResult, productResult, testimonialResult] = await Promise.allSettled([
     getStorePublicCompanyProfile(),
     settings.showFeatures ? getStoreHomeFeatures() : Promise.resolve([]),
     settings.showFeaturedProducts ? getStoreCatalogProducts({ limit: 12 }) : Promise.resolve([]),
+    getStorePublicTestimonials(),
   ]);
 
   const company = companyResult.status === "fulfilled" ? companyResult.value : null;
@@ -91,6 +93,7 @@ export default async function Home() {
   const featuredProducts = productResult.status === "fulfilled"
     ? productResult.value.filter((product) => product.isFeatured).slice(0, 6)
     : [];
+  const testimonials = testimonialResult.status === "fulfilled" ? testimonialResult.value : [];
 
   const heroContent: HomeHeroContent = {
     eyebrow: settings.homepageEyebrow || company?.companyName || "Oakwell Cabinetry",
@@ -153,6 +156,36 @@ export default async function Home() {
             </div>
             <div className="mt-5 text-center">
               <Link href="/products" className="btn-primary">View All Products</Link>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {testimonials.length > 0 ? (
+        <section className="testimonials" aria-labelledby="parent-reviews-heading">
+          <div className="container">
+            <div className="section-header text-center">
+              <span className="section-tag">Attributed social proof</span>
+              <h2 id="parent-reviews-heading">Granite & Cabinet Center customer reviews</h2>
+              <p>These source-linked excerpts describe Granite & Cabinet Center customer experiences and are not Oakwell-specific reviews.</p>
+            </div>
+            <div className="testimonials-grid mt-5">
+              {testimonials.map((testimonial) => (
+                <article className="testimonial-card" key={testimonial.id}>
+                  <p className="testimonial-text">“{testimonial.excerpt}”</p>
+                  <div className="client-info">
+                    <div>
+                      <h4>{testimonial.reviewerName}</h4>
+                      {testimonial.reviewerLocation ? <p>{testimonial.reviewerLocation}</p> : null}
+                      {testimonial.attributionClassification === "parent_attributed" && testimonial.sourcePageUrl && testimonial.attributionText ? (
+                        <a href={testimonial.sourcePageUrl} target="_blank" rel="noopener noreferrer" className="service-link">
+                          {testimonial.attributionText}
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           </div>
         </section>

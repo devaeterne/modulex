@@ -158,6 +158,7 @@ const managementItems: NavItem[] = [
       { name: "Company", path: "/store/company", permission: "store.manage", exact: true },
       { name: "Pages", path: "/store/pages", permission: "store.manage", exact: true },
       { name: "Cabinet Content", path: "/store/cabinet-content", permission: "store.manage", exact: true },
+      { name: "Reviews", path: "/store/reviews", permission: "store.manage", exact: true },
       { name: "Projects", path: "/store/projects", permission: "store.manage", exact: true },
       { name: "Media Library", path: "/store/media", permission: "store.manage", exact: true },
       { name: "Marketing & Analytics", path: "/store/marketing", permission: "store.manage", exact: true },

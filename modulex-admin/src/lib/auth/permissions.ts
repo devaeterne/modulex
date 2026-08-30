@@ -228,6 +228,8 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
       path.startsWith("/store/pages/") ||
       path === "/store/cabinet-content" ||
       path.startsWith("/store/cabinet-content/") ||
+      path === "/store/reviews" ||
+      path.startsWith("/store/reviews/") ||
       path === "/store/projects" ||
       path.startsWith("/store/projects/") ||
       path === "/store/media" ||

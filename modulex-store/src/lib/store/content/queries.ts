@@ -7,6 +7,7 @@ const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const PAGE_REVALIDATE_SECONDS = 60;
 const GALLERY_REVALIDATE_SECONDS = 60;
 const CABINET_CONTENT_REVALIDATE_SECONDS = 60;
+const SOCIAL_PROOF_REVALIDATE_SECONDS = 60;
 
 export type StorePublicPage = {
   slug: string;
@@ -67,6 +68,19 @@ export type StorePublicFaqEntry = {
   updatedAt: string;
 };
 
+export type StorePublicTestimonial = {
+  id: string;
+  reviewerName: string;
+  reviewerLocation: string | null;
+  excerpt: string;
+  sortOrder: number;
+  attributionClassification: "parent_attributed" | "oakwell_owned";
+  sourceEntity: string | null;
+  sourcePageUrl: string | null;
+  attributionText: string | null;
+  updatedAt: string;
+};
+
 type PageRpcRow = {
   slug: string; eyebrow: string | null; title: string; intro: string | null; body: string | null;
   hero_image_url: string | null; hero_image_alt: string | null; cta_label: string | null; cta_href: string | null;
@@ -104,6 +118,19 @@ type FaqEntryRpcRow = {
   question: string;
   answer: string;
   sort_order: number;
+  updated_at: string;
+};
+
+type TestimonialRpcRow = {
+  id: string;
+  reviewer_name: string;
+  reviewer_location: string | null;
+  excerpt: string;
+  sort_order: number;
+  attribution_classification: string;
+  source_entity: string | null;
+  source_page_url: string | null;
+  attribution_text: string | null;
   updated_at: string;
 };
 
@@ -242,6 +269,41 @@ export const getStorePublicFaqEntries = cache(async (): Promise<StorePublicFaqEn
   return rows
     .map((row) => ({ id: row.id, question: row.question.trim(), answer: row.answer.trim(), sortOrder: row.sort_order, updatedAt: row.updated_at }))
     .filter((row) => row.question && row.answer);
+});
+
+export const getStorePublicTestimonials = cache(async (): Promise<StorePublicTestimonial[]> => {
+  const rows = await callPublicRpc<TestimonialRpcRow[]>(
+    "get_store_public_testimonials",
+    {},
+    { revalidate: SOCIAL_PROOF_REVALIDATE_SECONDS },
+  );
+
+  return rows.flatMap((row) => {
+    const reviewerName = row.reviewer_name?.trim();
+    const excerpt = row.excerpt?.trim();
+    if (!reviewerName || !excerpt) return [];
+    if (row.attribution_classification !== "parent_attributed" && row.attribution_classification !== "oakwell_owned") return [];
+
+    const sourceEntity = row.source_entity?.trim() || null;
+    const sourcePageUrl = row.source_page_url?.trim() || null;
+    const attributionText = row.attribution_text?.trim() || null;
+    if (row.attribution_classification === "parent_attributed") {
+      if (!sourceEntity || !sourcePageUrl?.startsWith("https://") || !attributionText) return [];
+    }
+
+    return [{
+      id: row.id,
+      reviewerName,
+      reviewerLocation: row.reviewer_location?.trim() || null,
+      excerpt,
+      sortOrder: row.sort_order,
+      attributionClassification: row.attribution_classification,
+      sourceEntity,
+      sourcePageUrl,
+      attributionText,
+      updatedAt: row.updated_at,
+    }];
+  });
 });
 
 export const getStoreGalleryReadiness = cache(async () => {
