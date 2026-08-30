@@ -5,6 +5,7 @@ import { Autoplay, Navigation, Pagination } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
+import StoreIcon from "@/components/StoreIcon";
 
 export default function Testimonials() {
   return (
@@ -50,11 +51,11 @@ export default function Testimonials() {
             <SwiperSlide>
               <div className="testimonial-card">
                 <div className="stars">
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
                 </div>
                 <p className="testimonial-text">
                   &quot;Oakwell transformed our apartment beyond our wildest
@@ -74,11 +75,11 @@ export default function Testimonials() {
             <SwiperSlide>
               <div className="testimonial-card featured">
                 <div className="stars">
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
                 </div>
                 <p className="testimonial-text">
                   &quot;Working with Oakwell was an incredible experience. They
@@ -98,11 +99,11 @@ export default function Testimonials() {
             <SwiperSlide>
               <div className="testimonial-card">
                 <div className="stars">
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
                 </div>
                 <p className="testimonial-text">
                   &quot;From the first consultation to the final reveal, the team
@@ -125,11 +126,11 @@ export default function Testimonials() {
             <SwiperSlide>
               <div className="testimonial-card">
                 <div className="stars">
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
-                  <i className="bi bi-star-fill"></i>
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
+                  <StoreIcon name="star" />
                 </div>
                 <p className="testimonial-text">
                   &quot;The renovation of our restaurant was completed on time and
@@ -148,10 +149,10 @@ export default function Testimonials() {
             </SwiperSlide>
           </Swiper>
           <div className="swiper-prev">
-            <i className="bi bi-chevron-left"></i>
+            <StoreIcon name="chevron-left" />
           </div>
           <div className="swiper-next">
-            <i className="bi bi-chevron-right"></i>
+            <StoreIcon name="chevron-right" />
           </div>
         </div>
       </div>

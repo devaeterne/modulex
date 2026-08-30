@@ -7,6 +7,7 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "swiper/css/effect-fade";
 import Link from "next/link";
+import StoreIcon from "@/components/StoreIcon";
 
 export default function HeroSlider() {
   return (
@@ -116,10 +117,10 @@ export default function HeroSlider() {
 
         {/* Navigation */}
         <div className="hero-swiper-prev">
-          <i className="bi bi-chevron-left"></i>
+          <StoreIcon name="chevron-left" />
         </div>
         <div className="hero-swiper-next">
-          <i className="bi bi-chevron-right"></i>
+          <StoreIcon name="chevron-right" />
         </div>
 
         {/* Pagination */}

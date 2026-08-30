@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
+import StoreIcon, { type StoreIconName } from "@/components/StoreIcon";
 import type { StorePublicCompanyProfile } from "@/lib/store/company/queries";
 import type { ResolvedStoreChromeItem } from "@/lib/store/chrome/destinations";
 import type { StoreSiteSettings } from "@/lib/store/site/queries";
@@ -38,14 +39,15 @@ export default function Footer({
   const localityLine = hasUsableLocality
     ? [company?.city, company?.stateRegion, company?.postalCode].filter(Boolean).join(", ")
     : "";
-  const socials = [
-    ["Facebook", settings?.facebookUrl, "bi-facebook"],
-    ["Instagram", settings?.instagramUrl, "bi-instagram"],
-    ["LinkedIn", settings?.linkedinUrl, "bi-linkedin"],
-    ["Pinterest", settings?.pinterestUrl, "bi-pinterest"],
-    ["TikTok", settings?.tiktokUrl, "bi-tiktok"],
-    ["YouTube", settings?.youtubeUrl, "bi-youtube"],
-  ].filter((item): item is [string, string, string] => Boolean(item[1]));
+  const socialCandidates: Array<[string, string | null | undefined, StoreIconName]> = [
+    ["Facebook", settings?.facebookUrl, "facebook"],
+    ["Instagram", settings?.instagramUrl, "instagram"],
+    ["LinkedIn", settings?.linkedinUrl, "linkedin"],
+    ["Pinterest", settings?.pinterestUrl, "pinterest"],
+    ["TikTok", settings?.tiktokUrl, "tiktok"],
+    ["YouTube", settings?.youtubeUrl, "youtube"],
+  ];
+  const socials = socialCandidates.filter((item): item is [string, string, StoreIconName] => Boolean(item[1]));
 
   return (
     <footer>
@@ -64,7 +66,7 @@ export default function Footer({
             <div className="social-links">
               {socials.map(([label, href, icon]) => (
                 <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label}>
-                  <i className={`bi ${icon}`} aria-hidden="true"></i>
+                  <StoreIcon name={icon} />
                 </a>
               ))}
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import StoreIcon from "@/components/StoreIcon";
 
 const THEME_EVENT = "oakwell-theme-change";
 type Theme = "light" | "dark";
@@ -52,8 +53,8 @@ export default function ThemeToggle() {
     >
       <span className="toggle-track" aria-hidden="true">
         <span className="toggle-thumb" />
-        <span className="toggle-icon toggle-icon--sun"><i className="bi bi-sun-fill" /></span>
-        <span className="toggle-icon toggle-icon--moon"><i className="bi bi-moon-fill" /></span>
+        <span className="toggle-icon toggle-icon--sun"><StoreIcon name="sun" /></span>
+        <span className="toggle-icon toggle-icon--moon"><StoreIcon name="moon" /></span>
       </span>
     </button>
   );

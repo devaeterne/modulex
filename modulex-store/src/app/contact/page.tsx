@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import TrackedLink from "@/components/analytics/TrackedLink";
 import LeadForm from "@/components/leads/LeadForm";
+import StoreIcon from "@/components/StoreIcon";
 import {
   getStorePublicCompanyLocations,
   getStorePublicCompanyProfile,
@@ -45,13 +46,13 @@ function locationAddressLines(location: StorePublicCompanyLocation) {
 function StructuredContactCard({ channel }: { channel: StorePublicCompanyContactChannel }) {
   const href = safeContactHref(channel.href);
   const content = href ? <a href={href}>{channel.value}</a> : channel.value;
-  return <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><i className="bi bi-chat-square-text"></i></div><h3>{channel.label}</h3><p>{content}</p></div></div>;
+  return <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><StoreIcon name="chat" /></div><h3>{channel.label}</h3><p>{content}</p></div></div>;
 }
 
 function LocationCard({ location }: { location: StorePublicCompanyLocation }) {
   const addressLines = locationAddressLines(location);
   const mapHref = /^https?:\/\//i.test(location.mapUrl?.trim() ?? "") ? location.mapUrl!.trim() : null;
-  return <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><i className="bi bi-geo-alt"></i></div><h3>{location.name}</h3>{addressLines.length > 0 ? <address>{addressLines.map((line) => <span className="d-block" key={line}>{line}</span>)}</address> : null}{location.email ? <p className="mb-1"><a href={`mailto:${location.email}`}>{location.email}</a></p> : null}{location.phone ? <p className="mb-1"><a href={phoneHref(location.phone)}>{location.phone}</a></p> : null}{mapHref ? <p className="mb-0"><a href={mapHref} target="_blank" rel="noopener noreferrer">View map</a></p> : null}</div></div>;
+  return <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><StoreIcon name="geo-alt" /></div><h3>{location.name}</h3>{addressLines.length > 0 ? <address>{addressLines.map((line) => <span className="d-block" key={line}>{line}</span>)}</address> : null}{location.email ? <p className="mb-1"><a href={`mailto:${location.email}`}>{location.email}</a></p> : null}{location.phone ? <p className="mb-1"><a href={phoneHref(location.phone)}>{location.phone}</a></p> : null}{mapHref ? <p className="mb-0"><a href={mapHref} target="_blank" rel="noopener noreferrer">View map</a></p> : null}</div></div>;
 }
 
 export default async function Contact() {
@@ -97,9 +98,9 @@ export default async function Contact() {
           <div className="section-header text-center"><span className="section-tag">{companyName}</span><h2 id="contact-heading">Get in Touch</h2><p>Contact our team for product information, project consultation, cabinet specifications, dealer support, and general inquiries.</p></div>
 
           <div className="row g-4 justify-content-center">
-            {company?.email ? <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><i className="bi bi-envelope"></i></div><h3>Email</h3><p><TrackedLink href={`mailto:${company.email}`} event="email_click" payload={{ context: "contact_page" }}>{company.email}</TrackedLink></p></div></div> : null}
-            {company?.phone ? <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><i className="bi bi-telephone"></i></div><h3>Phone</h3><p><TrackedLink href={phoneHref(company.phone)} event="phone_click" payload={{ context: "contact_page" }}>{company.phone}</TrackedLink></p></div></div> : null}
-            {addressLines.length > 0 ? <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><i className="bi bi-geo-alt"></i></div><h3>Company Address</h3><p>{addressLines.map((line, index) => <span key={`${line}-${index}`}>{line}{index < addressLines.length - 1 ? <br /> : null}</span>)}</p></div></div> : null}
+            {company?.email ? <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><StoreIcon name="envelope" /></div><h3>Email</h3><p><TrackedLink href={`mailto:${company.email}`} event="email_click" payload={{ context: "contact_page" }}>{company.email}</TrackedLink></p></div></div> : null}
+            {company?.phone ? <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><StoreIcon name="telephone" /></div><h3>Phone</h3><p><TrackedLink href={phoneHref(company.phone)} event="phone_click" payload={{ context: "contact_page" }}>{company.phone}</TrackedLink></p></div></div> : null}
+            {addressLines.length > 0 ? <div className="col-lg-4 col-md-6"><div className="service-card h-100"><div className="service-icon" aria-hidden="true"><StoreIcon name="geo-alt" /></div><h3>Company Address</h3><p>{addressLines.map((line, index) => <span key={`${line}-${index}`}>{line}{index < addressLines.length - 1 ? <br /> : null}</span>)}</p></div></div> : null}
             {structure.contactChannels.map((channel) => <StructuredContactCard key={channel.id} channel={channel} />)}
           </div>
 

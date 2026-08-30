@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
+import { Outfit, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import "./portal.css";
 import "./portal-forms.css";
 import "./portal-fulfillment.css";
 import "./portal-dealer.css";
 import "@/css/bootstrap.min.css";
-import "@/css/bootstrap-icons.css";
 import "@/css/style.css";
 import "@/css/media-queries.css";
 import "@/css/dark-mode.css";
@@ -28,6 +28,18 @@ import {
   createOrganizationJsonLd,
   createWebSiteJsonLd,
 } from "@/lib/seo/structured-data";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
@@ -94,7 +106,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang={siteConfig.language}>
+    <html lang={siteConfig.language} className={`${outfit.variable} ${playfair.variable}`}>
       <body>
         <AnalyticsProvider settings={marketing} />
         <JsonLd data={[createOrganizationJsonLd(company), createWebSiteJsonLd()]} />

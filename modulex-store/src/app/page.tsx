@@ -3,6 +3,7 @@ import Link from "next/link";
 import Hero, { type HomeHeroContent } from "@/components/Home/Hero";
 import VirtualTour from "@/components/Home/VirtualTour";
 import ProductCard from "@/components/products/ProductCard";
+import StoreIcon from "@/components/StoreIcon";
 import { getStorePublicCompanyProfile } from "@/lib/store/company/queries";
 import { getStorePublicTestimonials } from "@/lib/store/content/queries";
 import { getStoreCatalogProducts } from "@/lib/store/products/queries";
@@ -124,12 +125,12 @@ export default async function Home() {
             <div className="services-grid">
               {features.map((feature) => (
                 <article className="service-card" key={feature.id}>
-                  <div className="service-icon" aria-hidden="true"><i className="bi bi-grid"></i></div>
+                  <div className="service-icon" aria-hidden="true"><StoreIcon name="grid" /></div>
                   <h3>{feature.title}</h3>
                   <p>{feature.description}</p>
                   {feature.linkLabel && feature.linkHref ? (
                     <Link href={feature.linkHref} className="service-link">
-                      {feature.linkLabel} <i className="bi bi-chevron-right" aria-hidden="true"></i>
+                      {feature.linkLabel} <StoreIcon name="chevron-right" />
                     </Link>
                   ) : null}
                 </article>
