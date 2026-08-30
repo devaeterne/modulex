@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "modulex-admin/src/components/products/**"
+      - "modulex-admin/src/types/svg.d.ts"
       - "modulex-admin/sql/a3-product-master-data.sql"
       - "modulex-admin/scripts/a3-product-master-contract.mjs"
       - "modulex-admin/docs/acceptance/a3-1-product-master-data.md"
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - "modulex-admin/src/components/products/**"
+      - "modulex-admin/src/types/svg.d.ts"
       - "modulex-admin/sql/a3-product-master-data.sql"
       - "modulex-admin/scripts/a3-product-master-contract.mjs"
       - "modulex-admin/docs/acceptance/a3-1-product-master-data.md"
