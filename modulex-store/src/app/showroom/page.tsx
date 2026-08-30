@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import JsonLd from "@/components/seo/JsonLd";
+import StoreIcon from "@/components/StoreIcon";
 import {
   getStorePublicCompanyLocations,
   getStorePublicCompanyProfile,
@@ -201,7 +202,7 @@ export default async function ShowroomPage() {
                 return (
                   <div className="col-lg-6" key={location.id}>
                     <article className="service-card h-100">
-                      <div className="service-icon" aria-hidden="true"><i className="bi bi-building"></i></div>
+                      <div className="service-icon" aria-hidden="true"><StoreIcon name="building" /></div>
                       <h3>{location.name}</h3>
                       {lines.length > 0 ? (
                         <address>{lines.map((line) => <span className="d-block" key={line}>{line}</span>)}</address>

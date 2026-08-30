@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import StoreIcon from "@/components/StoreIcon";
 import type { StorePublicProject, StorePublicProjectMedia } from "@/lib/store/content/queries";
 
 export type StoreProjectGalleryEntry = { project: StorePublicProject; media: StorePublicProjectMedia[] };
@@ -44,6 +45,9 @@ function ProjectAttribution({ project }: { project: StorePublicProject }) {
 export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryProps) {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const categories = useMemo(() => {
     const values = entries
@@ -52,31 +56,60 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
     return Array.from(new Set(values));
   }, [entries]);
 
+  const effectiveActiveCategory = activeCategory === "All" || categories.includes(activeCategory)
+    ? activeCategory
+    : "All";
+
   const visibleEntries = useMemo(
-    () => activeCategory === "All" ? entries : entries.filter((entry) => entry.project.category === activeCategory),
-    [activeCategory, entries],
+    () => effectiveActiveCategory === "All"
+      ? entries
+      : entries.filter((entry) => entry.project.category === effectiveActiveCategory),
+    [effectiveActiveCategory, entries],
   );
 
   const selected = useMemo(() => entries.find((entry) => entry.project.slug === selectedSlug) ?? null, [entries, selectedSlug]);
   const selectedMedia = selected ? getDisplayMedia(selected) : [];
 
   useEffect(() => {
-    if (activeCategory !== "All" && !categories.includes(activeCategory)) {
-      setActiveCategory("All");
-    }
-  }, [activeCategory, categories]);
-
-  useEffect(() => {
     if (!selected) return;
+
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setSelectedSlug(null); };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectedSlug(null);
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), video[controls], [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
+    window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      openerRef.current?.focus();
     };
   }, [selected]);
+
+  const closeProjectGallery = () => setSelectedSlug(null);
 
   return (
     <>
@@ -84,8 +117,8 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
         <div className="gallery-filter project-gallery-filter" role="group" aria-label="Filter projects by category">
           <button
             type="button"
-            className={`nav-link ${activeCategory === "All" ? "active" : ""}`}
-            aria-pressed={activeCategory === "All"}
+            className={`nav-link ${effectiveActiveCategory === "All" ? "active" : ""}`}
+            aria-pressed={effectiveActiveCategory === "All"}
             onClick={() => setActiveCategory("All")}
           >
             All
@@ -93,8 +126,8 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
           {categories.map((category) => (
             <button
               type="button"
-              className={`nav-link ${activeCategory === category ? "active" : ""}`}
-              aria-pressed={activeCategory === category}
+              className={`nav-link ${effectiveActiveCategory === category ? "active" : ""}`}
+              aria-pressed={effectiveActiveCategory === category}
               onClick={() => setActiveCategory(category)}
               key={category}
             >
@@ -111,7 +144,10 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
               <button
                 type="button"
                 className="project-gallery-card-button"
-                onClick={() => setSelectedSlug(entry.project.slug)}
+                onClick={(event) => {
+                  openerRef.current = event.currentTarget;
+                  setSelectedSlug(entry.project.slug);
+                }}
                 aria-label={`View ${entry.project.title} project media`}
               >
                 <div className="project-gallery-card-media">
@@ -132,11 +168,23 @@ export default function StoreProjectsGallery({ entries }: StoreProjectsGalleryPr
       </div>
 
       {selected ? (
-        <div role="dialog" aria-modal="true" aria-label={`${selected.project.title} project gallery`} className="gallery-lightbox active project-gallery-lightbox">
-          <div className="lightbox-overlay" onMouseDown={() => setSelectedSlug(null)}></div>
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${selected.project.title} project gallery`}
+          className="gallery-lightbox active project-gallery-lightbox"
+        >
+          <div className="lightbox-overlay" onMouseDown={closeProjectGallery} aria-hidden="true"></div>
           <div className="project-gallery-dialog">
-            <button type="button" className="lightbox-close" onClick={() => setSelectedSlug(null)} aria-label="Close project gallery">
-              <i className="bi bi-x-lg" aria-hidden="true"></i>
+            <button
+              ref={closeButtonRef}
+              type="button"
+              className="lightbox-close"
+              onClick={closeProjectGallery}
+              aria-label="Close project gallery"
+            >
+              <StoreIcon name="x" />
             </button>
             <div className="project-gallery-dialog-content">
               <div className="project-gallery-dialog-header">

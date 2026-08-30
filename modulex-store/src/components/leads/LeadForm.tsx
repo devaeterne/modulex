@@ -1,5 +1,6 @@
 "use client";
 
+import StoreIcon from "@/components/StoreIcon";
 import { FormEvent, useMemo, useRef, useState } from "react";
 import type { StoreLeadFormOption, StoreLeadRequestKind, StoreLeadType } from "@/lib/store/leads/types";
 import { captureSessionAttribution, getSessionAttribution } from "@/lib/analytics/attribution";
@@ -172,7 +173,7 @@ export default function LeadForm({ type, formOptions = [] }: LeadFormProps) {
       <div className="form-group checkbox-group"><label className="checkbox-label"><input type="checkbox" name="marketing_consent" /><span>I would also like to receive occasional Oakwell product and dealer updates.</span></label></div>
       {error ? <div className="alert alert-danger" role="alert">{error}</div> : null}
       {referenceCode ? <div className="alert alert-success" role="status" aria-live="polite">Thank you. Your request was submitted successfully. Reference: <strong>{referenceCode}</strong></div> : null}
-      <button type="submit" className="btn-submit" disabled={submitting}><span>{submitting ? "Submitting..." : dealer ? "Submit Dealer Application" : projectConsultation ? "Request Consultation" : "Send Inquiry"}</span><span className="submit-icon" aria-hidden="true"><i className="bi bi-chevron-right"></i></span></button>
+      <button type="submit" className="btn-submit" disabled={submitting}><span>{submitting ? "Submitting..." : dealer ? "Submit Dealer Application" : projectConsultation ? "Request Consultation" : "Send Inquiry"}</span><span className="submit-icon" aria-hidden="true"><StoreIcon name="chevron-right" /></span></button>
     </form>
   );
 }

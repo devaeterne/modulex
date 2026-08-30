@@ -1,28 +1,57 @@
 "use client";
 
+import StoreIcon from "@/components/StoreIcon";
 import { useLightboxStore } from "@/store/useLightboxStore";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export default function GalleryLightbox() {
   const { isOpen, type, src, closeLightbox } = useLightboxStore();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
+    if (!isOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeLightbox();
     };
-  }, [isOpen]);
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      openerRef.current?.focus();
+      openerRef.current = null;
+    };
+  }, [isOpen, closeLightbox]);
+
+  if (!isOpen) return null;
 
   return (
-    <div className={`gallery-lightbox ${isOpen ? "active" : ""}`} id="galleryLightbox">
-      <div className="lightbox-overlay" onClick={closeLightbox}></div>
+    <div
+      className="gallery-lightbox active"
+      id="galleryLightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Media viewer"
+    >
+      <div className="lightbox-overlay" onClick={closeLightbox} aria-hidden="true"></div>
       <div className="lightbox-content">
-        <button className="lightbox-close" id="lightboxClose" onClick={closeLightbox}>
-          <i className="bi bi-x-lg"></i>
+        <button
+          ref={closeButtonRef}
+          type="button"
+          className="lightbox-close"
+          id="lightboxClose"
+          onClick={closeLightbox}
+          aria-label="Close media viewer"
+        >
+          <StoreIcon name="x" />
         </button>
 
         {type === "image" && src && (
@@ -32,6 +61,7 @@ export default function GalleryLightbox() {
           <iframe
             id="lightboxPano"
             src={src}
+            title="Interactive panorama"
             allowFullScreen
             style={{ display: "block" }}
           ></iframe>

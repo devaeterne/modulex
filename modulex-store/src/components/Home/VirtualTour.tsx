@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import StoreIcon from "@/components/StoreIcon";
 import { useLightboxStore } from "@/store/useLightboxStore";
 
 export default function VirtualTour() {
@@ -66,19 +67,19 @@ export default function VirtualTour() {
                 <div className="tour-features">
                   <div className="tour-feature">
                     <span className="feature-icon">
-                      <i className="bi bi-house-door"></i>
+                      <StoreIcon name="house" />
                     </span>
                     <span>Interactive 360° Views</span>
                   </div>
                   <div className="tour-feature">
                     <span className="feature-icon">
-                      <i className="bi bi-bounding-box"></i>
+                      <StoreIcon name="bounding-box" />
                     </span>
                     <span>Detailed Room Layouts</span>
                   </div>
                   <div className="tour-feature">
                     <span className="feature-icon">
-                      <i className="bi bi-palette"></i>
+                      <StoreIcon name="palette" />
                     </span>
                     <span>Design Inspiration</span>
                   </div>

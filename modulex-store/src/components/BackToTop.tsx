@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import StoreIcon from "@/components/StoreIcon";
 
 export default function BackToTop() {
   const [isVisible, setIsVisible] = useState(false);
@@ -46,7 +47,7 @@ export default function BackToTop() {
       aria-label="Back to top"
       style={{ border: 0 }}
     >
-      <i className="bi bi-arrow-up" aria-hidden="true"></i>
+      <StoreIcon name="arrow-up" />
     </button>
   );
 }

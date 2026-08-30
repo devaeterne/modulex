@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import StoreIcon from "@/components/StoreIcon";
 
 const EMAILJS_SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID;
 const EMAILJS_TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID;
@@ -115,7 +116,7 @@ export default function Contact() {
           <div className="contact-details">
             <div className="contact-item">
               <div className="contact-icon">
-                <i className="bi bi-geo-alt"></i>
+                <StoreIcon name="geo-alt" />
               </div>
               <div className="contact-text">
                 <h4>Visit Our Studio</h4>
@@ -127,7 +128,7 @@ export default function Contact() {
             </div>
             <div className="contact-item">
               <div className="contact-icon">
-                <i className="bi bi-telephone"></i>
+                <StoreIcon name="telephone" />
               </div>
               <div className="contact-text">
                 <h4>Call Us</h4>
@@ -139,7 +140,7 @@ export default function Contact() {
             </div>
             <div className="contact-item">
               <div className="contact-icon">
-                <i className="bi bi-envelope"></i>
+                <StoreIcon name="envelope" />
               </div>
               <div className="contact-text">
                 <h4>Email Us</h4>
@@ -151,7 +152,7 @@ export default function Contact() {
             </div>
             <div className="contact-item">
               <div className="contact-icon">
-                <i className="bi bi-clock"></i>
+                <StoreIcon name="clock" />
               </div>
               <div className="contact-text">
                 <h4>Office Hours</h4>
@@ -166,19 +167,19 @@ export default function Contact() {
             <h4>Follow Us</h4>
             <div className="social-links-contact">
               <a href="#" aria-label="Facebook">
-                <i className="bi bi-facebook"></i>
+                <StoreIcon name="facebook" />
               </a>
               <a href="#" aria-label="Instagram">
-                <i className="bi bi-instagram"></i>
+                <StoreIcon name="instagram" />
               </a>
               <a href="#" aria-label="Twitter">
-                <i className="bi bi-twitter-x"></i>
+                <StoreIcon name="twitter-x" />
               </a>
               <a href="#" aria-label="Pinterest">
-                <i className="bi bi-pinterest"></i>
+                <StoreIcon name="pinterest" />
               </a>
               <a href="#" aria-label="LinkedIn">
-                <i className="bi bi-linkedin"></i>
+                <StoreIcon name="linkedin" />
               </a>
             </div>
           </div>
@@ -335,7 +336,7 @@ export default function Contact() {
               </span>
               {!isSubmitting && status.type !== "success" && (
                 <span className="submit-icon">
-                  <i className="bi bi-chevron-right"></i>
+                  <StoreIcon name="chevron-right" />
                 </span>
               )}
             </button>

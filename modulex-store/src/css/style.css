@@ -237,7 +237,7 @@
 /* =====================================================
    FONTS
    ===================================================== */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;800;900&family=Outfit:wght@300;400;500;600;700&display=swap');
+
 
 
 /* =====================================================
@@ -266,7 +266,7 @@
 }
 
 body {
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-outfit), sans-serif;
     background: var(--cream);
     color: var(--dark);
     overflow-x: hidden;
@@ -757,7 +757,7 @@ img.logo-dark {
 
 /* Hero Text */
 .hero-text h1 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: clamp(2.5rem, 5vw, 5rem);
     font-weight: 900;
     line-height: 1.1;
@@ -859,7 +859,7 @@ img.logo-dark {
 
 .floating-badge h1,
 .floating-badge h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 2.5rem;
     color: var(--orange-primary);
     font-weight: 800;
@@ -1269,7 +1269,7 @@ img.logo-dark {
     line-height: 1.3;
     border: none;
     border-radius: 50px;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-outfit), sans-serif;
     font-size: var(--btn-font-size);
     padding: 14px 24px;
     font-weight: 700;
@@ -1340,7 +1340,7 @@ img.logo-dark {
 }
 
 .stat-number {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 3.5rem;
     font-weight: 800;
     color: white;
@@ -1374,7 +1374,7 @@ img.logo-dark {
 }
 
 .section-header h2 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: clamp(2rem, 4vw, 3rem);
     font-weight: 800;
     color: var(--dark-brown);
@@ -1433,7 +1433,7 @@ img.logo-dark {
 }
 
 .service-card h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.8rem;
     font-weight: 700;
     margin-bottom: 1rem;
@@ -1519,7 +1519,7 @@ img.logo-dark {
 }
 
 .portfolio-overlay h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.8rem;
     color: white;
     margin-bottom: 0.5rem;
@@ -1683,7 +1683,7 @@ img.logo-dark {
 }
 
 .banner-text h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 2rem;
     color: white;
     font-weight: 800;
@@ -1768,7 +1768,7 @@ img.logo-dark {
 }
 
 .tour-info h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 2.1rem;
     font-weight: 800;
     color: var(--dark-brown);
@@ -2133,7 +2133,7 @@ span.feature-icon i {
     position: absolute;
     top: -20px;
     left: 30px;
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 8rem;
     color: var(--orange-primary);
     opacity: 0.15;
@@ -2192,7 +2192,7 @@ span.feature-icon i {
 
 .client-info h3,
 .client-info h4 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.2rem;
     font-weight: 700;
     color: var(--dark-brown);
@@ -2243,7 +2243,7 @@ span.feature-icon i {
 }
 
 .faq-question h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.4rem;
     font-weight: 700;
     color: var(--dark-brown);
@@ -2318,7 +2318,7 @@ span.feature-icon i {
 }
 
 .cta-content h2 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: clamp(2rem, 4vw, 3rem);
     font-weight: 800;
     margin-bottom: 1.5rem;
@@ -2385,7 +2385,7 @@ span.feature-icon i {
 }
 
 .contact-intro h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 2.5rem;
     font-weight: 800;
     color: var(--dark-brown);
@@ -2426,7 +2426,7 @@ span.feature-icon i {
 }
 
 .contact-text h4 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.3rem;
     font-weight: 700;
     color: var(--dark-brown);
@@ -2443,7 +2443,7 @@ span.feature-icon i {
 }
 
 .contact-social h4 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.3rem;
     font-weight: 700;
     color: var(--dark-brown);
@@ -2516,7 +2516,7 @@ span.feature-icon i {
     padding: .5rem .7rem;
     border: 2px solid rgba(0, 0, 0, 0.1);
     border-radius: 6px;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-outfit), sans-serif;
     font-size: 1rem;
     transition: all 0.3s ease;
     background: var(--cream);
@@ -2591,7 +2591,7 @@ footer {
 }
 
 .footer-brand h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 2rem;
     font-weight: 800;
     color: var(--orange-primary);
@@ -2630,7 +2630,7 @@ footer {
 }
 
 .footer-links h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.3rem;
     margin-bottom: 1.5rem;
     color: white;
@@ -2941,7 +2941,7 @@ html.has-scroll-dragging {
 }
 
 .header-content h1 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: clamp(2.5rem, 6vw, 5rem);
     font-weight: 900;
     line-height: 1.1;
@@ -3054,7 +3054,7 @@ html.has-scroll-dragging {
 }
 
 .experience-badge h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 56px;
     font-weight: 900;
     margin: 0;
@@ -3076,7 +3076,7 @@ html.has-scroll-dragging {
 }
 
 .about-content h2 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: clamp(2rem, 4vw, 3rem);
     font-weight: 800;
     color: var(--dark-brown);
@@ -3111,7 +3111,7 @@ html.has-scroll-dragging {
 }
 
 .signature h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.3rem;
     font-weight: 700;
     color: var(--dark-brown);
@@ -3156,7 +3156,7 @@ html.has-scroll-dragging {
 }
 
 .step-number {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 4rem;
     font-weight: 900;
     color: var(--orange-primary);
@@ -3207,7 +3207,7 @@ html.has-scroll-dragging {
 }
 
 .step-content h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.6rem;
     font-weight: 700;
     color: var(--dark-brown);
@@ -3303,7 +3303,7 @@ html.has-scroll-dragging {
 }
 
 .member-info h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--dark-brown);
@@ -3333,7 +3333,7 @@ html.has-scroll-dragging {
 }
 
 .why-content h2 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: clamp(2rem, 4vw, 3rem);
     font-weight: 800;
     color: var(--dark-brown);
@@ -3360,7 +3360,7 @@ html.has-scroll-dragging {
 }
 
 .why-text h4 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.3rem;
     font-weight: 700;
     color: var(--dark-brown);
@@ -3443,7 +3443,7 @@ html.has-scroll-dragging {
 }
 
 .award-item h3 {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-playfair), serif;
     font-size: 1.2rem;
     font-weight: 700;
     color: var(--dark-brown);
