@@ -4,15 +4,13 @@ on:
     paths: ["modulex-admin/src/app/(admin)/inventory/**", "modulex-admin/src/app/(admin)/stock-movements/**", "modulex-admin/src/app/(admin)/stock-operations/**", "modulex-admin/src/app/(admin)/warehouses/**", "modulex-admin/src/app/(admin)/zones/**", "modulex-admin/src/app/(admin)/locations/**", "modulex-admin/src/app/(admin)/qr-labels/**", "modulex-admin/src/app/(admin)/scan/**", "modulex-admin/src/app/(admin)/shelf-inventory/**", "modulex-admin/src/components/inventory/**", "modulex-admin/src/components/stock-movements/**", "modulex-admin/src/components/stock-operations/**", "modulex-admin/src/components/warehouses/**", "modulex-admin/src/components/zones/**", "modulex-admin/src/components/locations/**", "modulex-admin/src/components/qr-labels/**", "modulex-admin/src/components/qr/**", "modulex-admin/src/components/scan/**", "modulex-admin/src/lib/inventory/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/inventory-warehouse-qr-ui-contract.mjs", "modulex-admin/scripts/a2-warehouse-location-integrity-contract.mjs", "modulex-admin/sql/a2-warehouse-location-integrity.sql", "modulex-admin/package.json", ".github/workflows/admin-inventory-warehouse-qr-ui.yml"]
   pull_request:
     paths: ["modulex-admin/src/app/(admin)/inventory/**", "modulex-admin/src/app/(admin)/stock-movements/**", "modulex-admin/src/app/(admin)/stock-operations/**", "modulex-admin/src/app/(admin)/warehouses/**", "modulex-admin/src/app/(admin)/zones/**", "modulex-admin/src/app/(admin)/locations/**", "modulex-admin/src/app/(admin)/qr-labels/**", "modulex-admin/src/app/(admin)/scan/**", "modulex-admin/src/app/(admin)/shelf-inventory/**", "modulex-admin/src/components/inventory/**", "modulex-admin/src/components/stock-movements/**", "modulex-admin/src/components/stock-operations/**", "modulex-admin/src/components/warehouses/**", "modulex-admin/src/components/zones/**", "modulex-admin/src/components/locations/**", "modulex-admin/src/components/qr-labels/**", "modulex-admin/src/components/qr/**", "modulex-admin/src/components/scan/**", "modulex-admin/src/lib/inventory/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/inventory-warehouse-qr-ui-contract.mjs", "modulex-admin/scripts/a2-warehouse-location-integrity-contract.mjs", "modulex-admin/sql/a2-warehouse-location-integrity.sql", "modulex-admin/package.json", ".github/workflows/admin-inventory-warehouse-qr-ui.yml"]
-permissions: { contents: write }
+permissions: { contents: read }
 jobs:
   operations-verification:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: modulex-admin } }
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with: { node-version: 20, cache: npm, cache-dependency-path: modulex-admin/package-lock.json }
       - run: npm ci
@@ -24,85 +22,3 @@ jobs:
       - name: Build
         env: { NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key }
         run: npm run build
-      - name: Close A2.1 roadmap
-        if: github.event_name == 'pull_request' && github.actor != 'github-actions[bot]'
-        shell: python
-        run: |
-          from pathlib import Path
-
-          path = Path("ADMIN_ROADMAP.md")
-          text = path.read_text()
-          text = text.replace(
-              "Main baseline: `74013f90561e023b0453aea57cd010456de2c597`",
-              "Main baseline: `d41f7c19ce81016b6a1a05166d0a4089104bfe52`",
-              1,
-          )
-          text = text.replace(
-              "Current cross-roadmap package: **Granite GC-5 Gallery and GC-6 Cabinet Journey are production-accepted. GC-7 Reviews / Social Proof is in progress: Admin now has a `store.manage`-gated Reviews & Social Proof editor with explicit draft/publish/unpublish/delete controls and mandatory parent attribution fields; production schema/data and Store/Admin CI are verified, while PR #167 is merged on `main`; live homepage acceptance was not re-verified during the A1 closeout. Admin primary roadmap work has advanced to Phase A2 after verified A1 closeout.**",
-              "Current cross-roadmap package: **Granite GC-8A managed Store chrome / technical SEO is merged on current `main`. Admin primary roadmap work remains Phase A2; A2.1 warehouse/location integrity is production-accepted and A2.2 Inventory & Movements is next.**",
-              1,
-          )
-          text = text.replace(
-              "Current Admin next action: **Review warehouses CRUD and role restrictions, then verify the zones/locations hierarchy and active-stock integrity.**",
-              "Current Admin next action: **Start A2.2 — review inventory list search/filter/pagination, then lock stock semantics, movement references, idempotency, and append-safe audit behavior.**",
-              1,
-          )
-
-          old_a2 = """## A2.1 Warehouse/location model
-
-- [ ] Review warehouses CRUD and role restrictions.
-- [ ] Review locations/zones hierarchy and data integrity.
-- [ ] Prevent deletion/deactivation that would orphan active stock without an explicit migration path.
-"""
-          new_a2 = """## A2.1 Warehouse/location model
-
-- [x] Review warehouses CRUD and role restrictions.
-  - Existing warehouse/zone/location Admin surfaces remain the management UI. `warehouse.manage` continues to gate create/edit/status controls and direct mutation routes; warehouse/shipping users retain read-only structure visibility.
-  - Production migration `20260830103947_a2_warehouse_location_integrity` makes location INSERT Admin/Super Admin only. Location UPDATE stays RLS-visible to the warehouse role only for compatibility with existing SECURITY INVOKER QR RPCs; `private.guard_location_master_role()` blocks warehouse-role changes to warehouse/zone assignment, name/code/type, aisle/rack/shelf/bin, capacity, and active state while allowing QR operational fields.
-  - Existing warehouse/zone/location audit triggers remain authoritative; A2.1 adds no parallel audit path.
-- [x] Review locations/zones hierarchy and data integrity.
-  - Database guards enforce zone → warehouse and inventory → location → warehouse consistency, reject zone warehouse changes while locations are assigned, and reject location warehouse changes while inventory rows remain assigned.
-  - Active zones require an active warehouse; active locations require an active warehouse and, when zoned, an active zone. Post-acceptance production checks remain at 0 location/zone warehouse mismatches and 0 inventory/location warehouse mismatches.
-- [x] Prevent deletion/deactivation that would orphan active stock without an explicit migration path.
-  - Location, zone, and warehouse deactivation now fails closed when active stock/reservations or active child structure would be orphaned; operators must explicitly move stock and deactivate/migrate children first.
-  - Nine stock/structure/history foreign keys were hardened from cascade/set-null behavior to `ON DELETE RESTRICT`, preserving inventory and movement provenance rather than silently erasing/nulling it.
-  - Transaction-scoped production acceptance proved warehouse-role QR-only location UPDATE remains valid, warehouse-role master-data UPDATE is rejected with `42501`, stocked-location deactivation is rejected, and active-warehouse deactivation is rejected; the acceptance transaction rolled back and production counts remained 4 warehouses / 6 zones / 2 locations / 463 inventory rows with no new integrity mismatch.
-  - TDD RED runs `33306590705` and `33306811410` caught the missing integrity contract and the QR-role compatibility gap. Final targeted GREEN run `33306913730` passed inventory/warehouse/QR, A2.1, production-surface, RBAC, lint, and Next.js production build; run `33306913738` additionally passed Admin A1 and Store portal boundary regressions/builds on the same branch head.
-  - Post-DDL Supabase Security/Performance Advisor review reported no A2.1-specific new finding; existing Store/support/HR/security and unused-index backlog remains outside A2.1.
-"""
-          if old_a2 not in text:
-              raise SystemExit("A2.1 roadmap block not found")
-          text = text.replace(old_a2, new_a2, 1)
-
-          text = text.replace(
-              "- [ ] Warehouse/location integrity is enforced.",
-              "- [x] Warehouse/location integrity is enforced.\n  - A2.1 production migration `20260830103947_a2_warehouse_location_integrity`, rollback acceptance, permanent A2.1 contract, and history-safe `RESTRICT` foreign keys provide the verified warehouse/location integrity boundary.",
-              1,
-          )
-
-          marker = "# Next Action\n"
-          index = text.find(marker)
-          if index < 0:
-              raise SystemExit("Next Action marker not found")
-          text = text[:index] + """# Next Action
-
-Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. **A2.1 — Warehouse/location model is production-accepted on Supabase migration `20260830103947_a2_warehouse_location_integrity`; PR #170 carries the permanent SQL/contract/workflow source and is awaiting review/merge.**
-
-1. Review and merge PR #170, then confirm the resulting Admin production deployment from merged `main`.
-2. Start **A2.2 — Inventory and movements** with inventory list search/filter/pagination scalability.
-3. Then define stock-on-hand/reserved/available/damaged-or-hold semantics, movement references/reasons, duplicate/idempotency guards, and append-safe/auditable movement history.
-
-**Cross-roadmap coordination:** Granite GC-8A managed Store chrome / technical SEO is merged on current `main`. A2.2 should not widen Store/portal inventory visibility; existing portal fulfillment and dealer catalog projections remain separately guarded.
-
-**Parallel-work rule:** before any new Admin or Granite package touches Admin, re-read current `main` and this roadmap so concurrently merged work is preserved rather than overwritten.
-"""
-          path.write_text(text)
-      - name: Commit A2.1 roadmap closeout
-        if: github.event_name == 'pull_request' && github.actor != 'github-actions[bot]'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ADMIN_ROADMAP.md
-          git diff --cached --check
-          git commit -m "docs: close A2.1 roadmap"
-          git push origin HEAD:${{ github.head_ref }}
