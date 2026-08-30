@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `1970122294504e15b4b3d368a91f0cfe450d01d8`
-Current phase: **Phase A3 — Products, Catalog & Pricing Control**
+Main baseline: `82cc94508c7845d0dd50cd8e4ae9ff0e855db965`
+Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
-Current Admin next action: **Complete A3.3 Pricing production migration and authenticated acceptance; do not mark A3.3 CLOSED until those gates pass.**
+Current Admin next action: **Start VAL-2 — Products & Pricing validation/data-contract hardening from current `main`; preserve the closed A3.1/A3.2/A3.3 product, publication, pricing, Dealer boundary, and audit contracts.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -101,7 +101,7 @@ These rules are mandatory for all future Modulex Admin work:
 
 - [x] Add an Admin production-surface contract test.
   - `scripts/admin-production-surface-contract.mjs` blocks the known demo route files and `/api-test` navigation, protects the intentional `/profile` surface, and guards the production 404/login shell against known template/developer residue.
-  - Wired as `npm run smoke:production-surface` and into the main `npm run smoke` chain.
+  - Wired as `npm run smoke:production-surface` and into the main Admin smoke chain.
   - TDD evidence: Actions run `33248189596` failed on the first existing demo route before cleanup; run `33248248681` passed after route removal.
   - Full A0 verification run `33248339553` passed the production-surface contract, lint, deterministic Admin contracts, and production build.
   - PR #101 merged to `main` as `adfd9210740c77a4196a4938caa6a41a2f71556e` and Vercel Admin production deployment `dpl_VfZRggevcjmgp25axPY493c1NyC4` is `READY`.
@@ -146,7 +146,7 @@ These rules are mandatory for all future Modulex Admin work:
   - TDD evidence: Actions run `33255658800` failed on the legacy package identity before implementation; targeted GREEN run `33255818899` passed the runtime-config contract with the minimized lockfile identity delta.
   - Full deterministic verification: Actions run `33255912909` passed runtime-config, production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check. Credential-bound API/DB live smoke was not rerun because this package changes no schema, RLS, RPC, API, or production data behavior.
 - [x] Close post-merge Codex runtime/config findings before Phase A0 exit.
-  - PR #113 merged as `f6d7f9673dc874b5c254e47c750ff1bd4793c7c3`; Vercel deployment `dpl_5jbrwJDsdJv3FtXuMhfsstX7DY6k` is production `READY` from that exact merge SHA.
+  - PR #113 merged as `f6d7f9673dc874b5c254e47c750ff1bd4793c7c3`; Vercel deployment `dpl_5jbrwJDsdJv3FtXuMhfsstX7DY6k` is production `READY` from that exact SHA.
   - Post-merge Codex review found a P1 gap in source-wide privileged `NEXT_PUBLIC_*` detection and a P2 gap in Store activation-origin configuration/fallback handling.
   - Follow-up scope: strict source-wide browser-safe env allowlist, configuration-owned `STORE_SITE_URL` / `NEXT_PUBLIC_STORE_URL`, removal of the legacy `oakwell-phi.vercel.app` fallback, and fresh deterministic verification.
   - TDD RED: Actions run `33256670583` proved the previous runtime contract did not reject an injected `NEXT_PUBLIC_DATABASE_URL` source reference.
@@ -392,11 +392,13 @@ A3.2 implementation, migration, production deployment, authenticated route smoke
 
 ## A3.3 Pricing
 
-- [~] Review pricing dashboard, product pricing, groups, and cost-margin pages.
-- [~] Define price-group lifecycle and effective-date behavior.
-- [~] Verify Dealer Portal only sees assigned active groups with approved ordering visibility.
-- [~] Ensure missing dealer-tier price never silently falls back to public/list price unless business rules explicitly change.
-- [~] Add validation/audit coverage for price changes.
+- [x] Review pricing dashboard, product pricing, groups, and cost-margin pages.
+- [x] Define price-group lifecycle and effective-date behavior.
+- [x] Verify Dealer Portal only sees assigned active groups with approved ordering visibility.
+- [x] Ensure missing dealer-tier price never silently falls back to public/list price unless business rules explicitly change.
+- [x] Add validation/audit coverage for price changes.
+
+A3.3 implementation, production migration `20260830213328_a3_3_pricing_hardening`, rollback-only lifecycle/audit acceptance, authenticated pricing RPC acceptance, Dealer no-fallback boundary reconciliation, production pricing-route smoke, and post-migration advisor review are complete. Detailed evidence: `docs/acceptance/a3-3-pricing.md`.
 
 ## Cross-cutting Admin UI hardening track (UI-2A → UI-2E)
 
@@ -406,7 +408,7 @@ A3.2 implementation, migration, production deployment, authenticated route smoke
 - [ ] UI-2D route-level consistency cleanup after shared primitives are ready.
 - [ ] UI-2E final Admin UI regression and production acceptance.
 
-A3.3 Pricing remains the primary functional Admin next action; UI-2A → UI-2E is a parallel cross-cutting quality track and does not replace the pricing roadmap.
+A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality track and does not replace the functional roadmap.
 
 ## Cross-cutting validation and data contract hardening track (VAL-1 → VAL-6)
 
@@ -422,10 +424,10 @@ The VAL track is cross-cutting and additive: it does not overwrite the UI-2 trac
 
 ### Phase A3 Exit Gate
 
-- [ ] Product and Store publish state is deterministic.
-- [ ] Pricing changes are role-restricted and auditable.
-- [ ] Dealer pricing boundary tests pass.
-- [ ] Store catalog content can be managed without direct SQL.
+- [x] Product and Store publish state is deterministic.
+- [x] Pricing changes are role-restricted and auditable.
+- [x] Dealer pricing boundary tests pass.
+- [x] Store catalog content can be managed without direct SQL.
 
 ---
 
@@ -691,6 +693,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] A2.2 inventory/movement production acceptance is complete: server-side inventory discovery, explicit On Hand/Reserved/Available semantics, idempotent mutation RPCs, append-only/reversal audit contracts, production migrations, advisor review, Admin deployment verification, and final application-role TRUNCATE revocation are covered by PR #173 plus closeout PR #174.
 - [x] A2.3 stock operations/scanning acceptance is complete: existing stock writes remain on A2.2 idempotent RPCs; camera repeated-frame suppression and serialized processing, guided confirmation/error handling, QR label printing, hardware/manual fallback, responsive warehouse behavior, and clean production QR/barcode integrity are covered by the permanent A2.3 gate.
 - [x] A3.1 product master production acceptance is complete: canonical family/color/taxonomy enforcement, protected lifecycle mutation, full filtered export, production migrations, mirror reconciliation, advisor review, authenticated DB smoke, and deployed `/products` verification are recorded in `docs/acceptance/a3-1-product-master-data.md`.
+- [x] A3.3 pricing production acceptance is complete: the pricing hardening migration is applied, base-group/effective-period/audit contracts pass rollback-only production probes, authenticated price mutation acceptance passes, Dealer pricing remains assigned-group/no-fallback, production pricing routes return 200, and no A3.3-specific advisor finding was introduced.
 
 ---
 
@@ -712,11 +715,12 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin roadmap work is **A3.3 — Pricing**. Implementation contracts are complete; production migration and authenticated acceptance remain. VAL-1 is the active cross-cutting foundation track and does not replace this functional next action.
+Primary near-term Admin work is **VAL-2 — Products & Pricing**. Phase A3 functional delivery is CLOSED; Phase A4 is now the active functional phase, while VAL-2 is the next cross-cutting hardening package.
 
-1. Apply and accept the reviewed A3.3 pricing hardening migration, then close A3.3 after production gates pass.
-2. Preserve the A3.1 canonical taxonomy/family/color/lifecycle/export contract and the A3.2 Store publication/public-RPC boundaries.
+1. Audit Product and Pricing forms/mutations against the authoritative production DB column, enum, nullability, precision, FK, constraint, and RPC argument contracts.
+2. Inventory mismatches first; then remediate only verified DB-contract incompatibilities using shared validation/normalization helpers and targeted regression coverage.
+3. Preserve the closed A3.1 canonical taxonomy/family/color/lifecycle/export contract, A3.2 Store publication/public-RPC boundaries, and A3.3 price-group/effective-date/audit/Dealer no-fallback contracts.
 
-**Cross-roadmap coordination:** A3.1 changes shared product-master semantics, but Store remains on the existing approved canonical `brand_id` / `category_id` read projection. The A3.1 Admin closeout does not widen Store public data or portal pricing visibility.
+**Cross-roadmap coordination:** Store remains on the existing approved canonical product/public projections. VAL-2 must not widen Store public data or Dealer pricing visibility while hardening Admin input compatibility.
 
-**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A3 or other concurrently merged Admin work is preserved rather than overwritten.
+**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A4, VAL, UI, or other concurrently merged Admin work is preserved rather than overwritten.
