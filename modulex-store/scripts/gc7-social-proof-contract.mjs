@@ -17,6 +17,7 @@ function assert(condition, message) {
 }
 
 const migrationPath = "modulex-store/supabase/migrations/20260830093000_gc7_attributed_social_proof.sql";
+const hardeningMigrationPath = "modulex-store/supabase/migrations/20260830094500_gc7_public_rpc_hardening.sql";
 const homePath = "modulex-store/src/app/page.tsx";
 const queriesPath = "modulex-store/src/lib/store/content/queries.ts";
 const adminManagerPath = "modulex-admin/src/components/store/StoreReviewsManager.tsx";
@@ -26,6 +27,7 @@ const sidebarPath = "modulex-admin/src/layout/AppSidebar.tsx";
 const permissionsPath = "modulex-admin/src/lib/auth/permissions.ts";
 
 assert(exists(migrationPath), "GC-7 migration is missing");
+assert(exists(hardeningMigrationPath), "GC-7 public RPC hardening migration is missing");
 assert(exists(adminManagerPath), "Admin Store Reviews manager is missing");
 assert(exists(adminPagePath), "Admin Store Reviews route is missing");
 assert(exists(adminLibPath), "Admin reviews data module is missing");
@@ -37,6 +39,11 @@ assert(migration.includes("parent_attributed"), "parent attribution classificati
 assert(migration.includes("source_page_url"), "testimonial source URL missing");
 assert(migration.includes("attribution_text"), "visible testimonial attribution missing");
 assert(migration.includes("revoke all on table public.store_testimonials"), "direct testimonial grants are not revoked");
+
+const hardeningMigration = read(hardeningMigrationPath);
+assert(hardeningMigration.includes("security definer"), "public testimonial RPC no longer uses the narrow definer projection");
+assert(hardeningMigration.includes("set search_path = ''"), "public testimonial RPC search path is not hardened");
+assert(hardeningMigration.includes("revoke all on function public.get_store_public_testimonials() from public"), "public testimonial RPC default execute grant is not revoked");
 
 const queries = read(queriesPath);
 assert(queries.includes("getStorePublicTestimonials"), "Store testimonial query wrapper missing");
