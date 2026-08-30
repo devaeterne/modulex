@@ -13,42 +13,48 @@ const read = (file) => {
 };
 const exists = (file) => fs.existsSync(path.join(root, file));
 
-const migrationPath = "../modulex-store/supabase/migrations/20260830100000_a1_core_operations_hardening.sql";
-assert.equal(exists(migrationPath), true, "A1 core operations hardening migration must exist");
+const sqlPath = "sql/a1-core-operations-hardening.sql";
+assert.equal(exists(sqlPath), true, "A1 core operations hardening SQL contract must exist");
 
-const migration = read(migrationPath);
+const sql = read(sqlPath);
+const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
+const shipmentDetail = read("src/components/customers/CustomerShipmentDetailRBAC.tsx");
 const installationDetail = read("src/components/customers/CustomerInstallationDetail.tsx");
 const permissions = read("src/lib/auth/permissions.ts");
 const storePortalContract = read("../modulex-store/scripts/store-portal-contract.mjs");
 const portalExperienceContract = read("../modulex-store/scripts/portal-experience-contract.mjs");
 
-// Orders: server-authoritative validation and forward lifecycle policy.
-assert.match(migration, /customer_order_status_transition_allowed/i, "order transition helper must exist");
-assert.match(migration, /Invalid customer order status transition/i, "invalid order transitions must fail closed");
-assert.match(migration, /quantity[^;]{0,220}(?:>|greater than)\s*zero/i, "order quantity must be validated in the database boundary");
-assert.match(migration, /status\s*=\s*'active'/i, "new order products must be active");
-assert.match(migration, /order_tax_rules/i, "configured order tax rules must be authoritative");
-assert.match(migration, /shipping address[^;]{0,220}required/i, "delivery fulfillment must require a shipping address");
-assert.match(migration, /price_source/i, "pricing source classification must remain server-controlled");
+// Orders: server-authoritative validation and explicit lifecycle policy.
+assert.match(sql, /customer_order_status_transition_allowed/i, "order transition helper must exist");
+assert.match(sql, /Invalid customer order status transition/i, "invalid order transitions must fail closed");
+assert.match(sql, /quantity[^;]{0,220}(?:>|greater than)\s*zero/i, "order quantity must be validated in the database boundary");
+assert.match(sql, /status\s*(?:<>|!=)\s*'archived'|status\s+in\s*\([^)]*'active'/i, "order products/variants must be lifecycle-valid");
+assert.match(sql, /order_tax_rules/i, "configured order tax rules must be authoritative");
+assert.match(sql, /shipping address[^;]{0,220}required/i, "delivery fulfillment must require a shipping address");
+assert.match(sql, /price_source/i, "pricing source classification must remain server-controlled");
+assert.match(orderDetail, /ORDER_STATUS_TRANSITIONS|nextCustomerOrderStatuses/, "order UI must derive valid forward status options");
+assert.doesNotMatch(orderDetail, /STATUSES\.map\(/, "order UI must not offer every lifecycle status as a direct jump");
 
-// Shipments: no backwards jumps; shipped/delivered remain fulfillment actions.
-assert.match(migration, /customer_shipment_status_transition_allowed/i, "shipment transition helper must exist");
-assert.match(migration, /Invalid customer shipment status transition/i, "invalid shipment transitions must fail closed");
-assert.match(migration, /draft[^;]{0,220}picking/i, "shipment flow must include draft to picking");
-assert.match(migration, /picking[^;]{0,220}packed/i, "shipment flow must include picking to packed");
-assert.match(migration, /packed[^;]{0,220}shipped/i, "shipment flow must include packed to shipped");
-assert.match(migration, /shipped[^;]{0,220}delivered/i, "shipment flow must include shipped to delivered");
+// Shipments: strict warehouse flow, no backwards jumps.
+assert.match(sql, /customer_shipment_status_transition_allowed/i, "shipment transition helper must exist");
+assert.match(sql, /Invalid customer shipment status transition/i, "invalid shipment transitions must fail closed");
+assert.match(sql, /draft[^;]{0,220}picking/i, "shipment flow must include draft to picking");
+assert.match(sql, /picking[^;]{0,220}packed/i, "shipment flow must include picking to packed");
+assert.match(sql, /packed[^;]{0,220}shipped/i, "shipment flow must include packed to shipped");
+assert.match(sql, /shipped[^;]{0,220}delivered/i, "shipment flow must include shipped to delivered");
+assert.match(sql, /guard_customer_shipment_association/i, "shipment customer/order association must be guarded");
+assert.match(shipmentDetail, /canPack\s*=\s*shipment\.status\s*===\s*["']picking["']/, "shipment UI must only pack from Picking");
+assert.match(shipmentDetail, /canShip\s*=\s*shipment\.status\s*===\s*["']packed["']/, "shipment UI must only ship from Packed");
 
 // Installations: private mutation core + strict next-state matrix.
-assert.match(migration, /customer_installation_status_transition_allowed/i, "installation transition helper must exist");
-assert.match(migration, /Invalid customer installation status transition/i, "invalid installation transitions must fail closed");
-assert.match(migration, /private\.create_customer_installation_from_order/i, "installation create mutation must live behind a private function");
-assert.match(migration, /private\.update_customer_installation_schedule/i, "installation schedule mutation must live behind a private function");
-assert.match(migration, /private\.set_customer_installation_status/i, "installation status mutation must live behind a private function");
-assert.match(migration, /SECURITY DEFINER/i, "private installation mutation functions must use controlled definer execution");
-assert.match(migration, /revoke execute[\s\S]*set_customer_installation_status[\s\S]*from public/i, "installation RPC must revoke PUBLIC execute");
-assert.match(migration, /grant execute[\s\S]*set_customer_installation_status[\s\S]*to authenticated/i, "installation RPC must grant authenticated execute explicitly");
-
+assert.match(sql, /customer_installation_status_transition_allowed/i, "installation transition helper must exist");
+assert.match(sql, /Invalid customer installation status transition/i, "invalid installation transitions must fail closed");
+assert.match(sql, /private\.create_customer_installation_from_order/i, "installation create mutation must live behind a private function");
+assert.match(sql, /private\.update_customer_installation_schedule/i, "installation schedule mutation must live behind a private function");
+assert.match(sql, /private\.set_customer_installation_status/i, "installation status mutation must live behind a private function");
+assert.match(sql, /security definer/i, "private installation mutation functions must use controlled definer execution");
+assert.match(sql, /revoke execute[\s\S]*set_customer_installation_status[\s\S]*from public/i, "installation RPC must revoke PUBLIC execute");
+assert.match(sql, /grant execute[\s\S]*set_customer_installation_status[\s\S]*to authenticated/i, "installation RPC must grant authenticated execute explicitly");
 assert.doesNotMatch(installationDetail, /statuses\.map\(/, "installation UI must not offer every lifecycle status");
 assert.match(installationDetail, /nextInstallationStatuses|INSTALLATION_STATUS_TRANSITIONS/, "installation UI must derive valid next statuses");
 assert.match(installationDetail, /scheduled[\s\S]{0,260}confirmed[\s\S]{0,260}cancelled/i, "scheduled installation must expose only confirmed/cancelled next actions");
@@ -57,8 +63,8 @@ assert.match(installationDetail, /in_progress[\s\S]{0,260}completed/i, "in-progr
 // Invoice/payment boundary: active internal roles, no new portal invoice/payment surface.
 assert.match(permissions, /"invoices\.manage"/, "Admin permission model must retain invoice mutation permission");
 assert.match(permissions, /finance:[\s\S]*"invoices\.manage"/, "Finance must retain invoice management permission");
-assert.doesNotMatch(migration, /get_store_portal_(?:invoice|payment)/i, "A1 must not add portal invoice/payment RPCs");
-assert.doesNotMatch(migration, /create\s+table[\s\S]{0,80}(?:payment_transactions|customer_payments|payment_ledger)/i, "standalone payment ledger remains deferred");
+assert.doesNotMatch(sql, /get_store_portal_(?:invoice|payment)/i, "A1 must not add portal invoice/payment RPCs");
+assert.doesNotMatch(sql, /create\s+table[\s\S]{0,80}(?:payment_transactions|customer_payments|payment_ledger)/i, "standalone payment ledger remains deferred");
 
 // Existing Store contracts are the cross-roadmap proof that portal data is intentionally narrower.
 assert.match(storePortalContract, /unit_price\|subtotal\|tax_amount\|total_amount\|grand_total\|payment_commission_amount\|internal_notes/i, "Store order contract must guard financial/internal fields");
