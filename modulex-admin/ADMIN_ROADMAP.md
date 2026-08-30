@@ -4,7 +4,7 @@ Last reviewed: 2026-08-30
 Main baseline: `fd74962ee6eacd78de952520c26562e7b33d7f31`
 Current phase: **Phase A3 — Products, Catalog & Pricing Control**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
-Current Admin next action: **A3.1 Product Master Data is production-accepted; begin A3.2 Store product publishing review while preserving the canonical product taxonomy, lifecycle, and export contracts.**
+Current Admin next action: **Complete A3.3 Pricing production migration and authenticated acceptance; do not mark A3.3 CLOSED until those gates pass.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -392,11 +392,11 @@ A3.2 implementation, migration, production deployment, authenticated route smoke
 
 ## A3.3 Pricing
 
-- [ ] Review pricing dashboard, product pricing, groups, and cost-margin pages.
-- [ ] Define price-group lifecycle and effective-date behavior.
-- [ ] Verify Dealer Portal only sees assigned active groups with approved ordering visibility.
-- [ ] Ensure missing dealer-tier price never silently falls back to public/list price unless business rules explicitly change.
-- [ ] Add validation/audit coverage for price changes.
+- [~] Review pricing dashboard, product pricing, groups, and cost-margin pages.
+- [~] Define price-group lifecycle and effective-date behavior.
+- [~] Verify Dealer Portal only sees assigned active groups with approved ordering visibility.
+- [~] Ensure missing dealer-tier price never silently falls back to public/list price unless business rules explicitly change.
+- [~] Add validation/audit coverage for price changes.
 
 ## Cross-cutting Admin UI hardening track (UI-2A → UI-2E)
 
@@ -700,9 +700,9 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary Admin roadmap work is **A3.3 — Pricing**. A3.1 Product Master Data and A3.2 Store Product Publishing are production-accepted and closed.
+Primary Admin roadmap work is **A3.3 — Pricing**. Implementation contracts are complete; production migration and authenticated acceptance remain.
 
-1. Begin A3.3 pricing dashboard, product pricing, price-group lifecycle, and dealer pricing-boundary review.
+1. Apply and accept the reviewed A3.3 pricing hardening migration, then close A3.3 after production gates pass.
 2. Preserve the A3.1 canonical taxonomy/family/color/lifecycle/export contract and the A3.2 Store publication/public-RPC boundaries.
 
 **Cross-roadmap coordination:** A3.1 changes shared product-master semantics, but Store remains on the existing approved canonical `brand_id` / `category_id` read projection. The A3.1 Admin closeout does not widen Store public data or portal pricing visibility.
