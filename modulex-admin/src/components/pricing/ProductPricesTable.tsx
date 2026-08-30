@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { calculateDbDecimalBulk, canonicalizeDbDecimal, formatDbDecimal, parseDbDecimal } from "@/lib/validation";
 
 type ProductStatus = "active" | "inactive";
 
@@ -131,15 +132,7 @@ function makePriceKey(
 function formatAmountForInput(
   value: string | number
 ) {
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return "";
-  }
-
-  return number
-    .toFixed(2)
-    .replace(/\.?0+$/, "");
+  return formatDbDecimal(value, { precision: 18, scale: 4, min: 0, allowNull: true });
 }
 
 function normalizeComparablePrice(
@@ -153,41 +146,17 @@ function normalizeComparablePrice(
     return "";
   }
 
-  const number = Number(raw);
-
-  if (!Number.isFinite(number)) {
+  const parsed = parseDbDecimal(raw, { precision: 18, scale: 4, min: 0, allowNull: true });
+  if (parsed.error) {
     return `invalid:${raw}`;
   }
-
-  return number.toFixed(4);
-}
-
-function parsePrice(
-  value: string | undefined
-) {
-  const raw = (value ?? "")
-    .trim()
-    .replace(",", ".");
-
-  if (!raw) {
-    return null;
-  }
-
-  const number = Number(raw);
-
-  if (!Number.isFinite(number)) {
-    return null;
-  }
-
-  return number;
+  return canonicalizeDbDecimal(parsed.value, { precision: 18, scale: 4, min: 0, allowNull: true });
 }
 
 function formatCurrency(
   value: string
 ) {
-  const number = Number(
-    value.replace(",", ".")
-  );
+  const number = Number(value.replace(",", "."));
 
   if (!Number.isFinite(number)) {
     return "—";
@@ -1256,17 +1225,10 @@ export default function ProductPricesTable() {
       return;
     }
 
-    const parsedValue =
-      Number(
-        bulkValue
-          .trim()
-          .replace(",", ".")
-      );
+    const parsedValue = bulkValue.trim().replace(",", ".");
 
     if (
-      !Number.isFinite(
-        parsedValue
-      )
+      !parsedValue
     ) {
       setErrorMessage(
         "Enter a valid bulk adjustment value."
@@ -1317,116 +1279,21 @@ export default function ProductPricesTable() {
           bulkTargetGroupId
         );
 
-      let result:
-        | number
-        | null = null;
-
-      if (
-        bulkMode ===
-        "source_percent"
-      ) {
-        const sourceKey =
-          makePriceKey(
-            productId,
-            bulkSourceGroupId
-          );
-
-        const sourceValue =
-          parsePrice(
-            priceValues[
-            sourceKey
-            ]
-          );
-
-        if (
-          sourceValue ===
-          null
-        ) {
-          skipped += 1;
-          continue;
-        }
-
-        result =
-          sourceValue *
-          (1 +
-            parsedValue /
-            100);
-      }
-
-      if (
-        bulkMode ===
-        "current_percent"
-      ) {
-        const currentValue =
-          parsePrice(
-            priceValues[
-            targetKey
-            ]
-          );
-
-        if (
-          currentValue ===
-          null
-        ) {
-          skipped += 1;
-          continue;
-        }
-
-        result =
-          currentValue *
-          (1 +
-            parsedValue /
-            100);
-      }
-
-      if (
-        bulkMode ===
-        "current_amount"
-      ) {
-        const currentValue =
-          parsePrice(
-            priceValues[
-            targetKey
-            ]
-          );
-
-        if (
-          currentValue ===
-          null
-        ) {
-          skipped += 1;
-          continue;
-        }
-
-        result =
-          currentValue +
-          parsedValue;
-      }
-
-      if (
-        bulkMode ===
-        "set_amount"
-      ) {
-        result =
-          parsedValue;
-      }
-
-      if (
-        result === null ||
-        !Number.isFinite(
-          result
-        ) ||
-        result < 0
-      ) {
+      const source = bulkMode === "source_percent"
+        ? priceValues[makePriceKey(productId, bulkSourceGroupId)] ?? null
+        : priceValues[targetKey] ?? null;
+      const result = calculateDbDecimalBulk(
+        source,
+        parsedValue,
+        bulkMode,
+        { precision: 18, scale: 4, min: 0, allowNull: true }
+      );
+      if (result.error || result.value === null) {
         skipped += 1;
         continue;
       }
 
-      nextValues[
-        targetKey
-      ] = result.toFixed(
-        2
-      );
+      nextValues[targetKey] = result.value;
 
       applied += 1;
     }
@@ -1479,7 +1346,7 @@ export default function ProductPricesTable() {
       product_id: string;
       price_group_id: string;
       amount:
-      | number
+      | string
       | null;
     }[] = [];
 
@@ -1493,19 +1360,13 @@ export default function ProductPricesTable() {
           .replace(",", ".");
 
       let amount:
-        | number
+        | string
         | null = null;
 
       if (raw) {
-        const parsed =
-          Number(raw);
+        const parsed = parseDbDecimal(raw, { precision: 18, scale: 4, min: 0, allowNull: true });
 
-        if (
-          !Number.isFinite(
-            parsed
-          ) ||
-          parsed < 0
-        ) {
+        if (parsed.error || parsed.value === null) {
           const product =
             products.find(
               (item) =>
@@ -1531,9 +1392,7 @@ export default function ProductPricesTable() {
           return;
         }
 
-        amount = Number(
-          parsed.toFixed(4)
-        );
+        amount = parsed.value;
       }
 
       payload.push({

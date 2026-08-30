@@ -414,7 +414,8 @@ A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality
 
 - [x] VAL-1 — Validation & Data Contract Foundation.
   - `docs/ADMIN_VALIDATION_GUIDE.md`, root mutation/authorization guardrails, a reusable validation/data-contract smoke contract, and the domain audit method are established. Legacy form remediation is intentionally deferred. The foundation contract and Admin final gate pass; no schema or production data changes were required.
-- [ ] VAL-2 — Products & Pricing.
+- [~] VAL-2 — Products & Pricing.
+  - Targeted audit found decimal precision loss in Product/Pricing input hydration and bulk previews, incomplete numeric preflight for `numeric(12,2)` minimum stock, and a need to keep Cost & Margin read-only visibility separate from `pricing.manage` mutations. Shared decimal validation and the VAL-2 contract are implemented; production acceptance remains pending.
 - [ ] VAL-3 — Customers / Orders / Invoices.
 - [ ] VAL-4 — Inventory / Warehouses / Stock Operations.
 - [ ] VAL-5 — Store CMS / Users / Settings / remaining Admin forms.

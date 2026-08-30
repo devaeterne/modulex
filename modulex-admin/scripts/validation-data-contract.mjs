@@ -47,7 +47,7 @@ for (const track of [
 ]) {
   assert(roadmap.includes(track), `Roadmap validation track missing: ${track}`);
 }
-assert(/Primary Admin roadmap work is \*\*A3\.3 — Pricing\*\*[\s\S]*VAL-1 is the active cross-cutting foundation track/.test(roadmap), "A3.3 must remain the primary functional next action");
+assert(/Primary near-term Admin work is \*\*VAL-2 — Products & Pricing\*\*[\s\S]*Phase A3 functional delivery is CLOSED/.test(roadmap), "VAL-2 must remain the current validation next action after A3 closeout");
 
 for (const helper of [
   "normalizeOptional",

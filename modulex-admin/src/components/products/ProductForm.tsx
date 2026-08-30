@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
+import { parseDbDecimal } from "@/lib/validation";
 
 type ProductStatus = "active" | "inactive" | "archived";
 
@@ -337,10 +338,13 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     if (!values.color_code.trim()) return "Color code is required.";
     if (!values.unit.trim()) return "Unit is required.";
 
-    const minStock = Number(values.min_stock_level);
-    if (Number.isNaN(minStock) || minStock < 0) {
-      return "Minimum stock level must be a valid non-negative number.";
-    }
+    const minStock = parseDbDecimal(values.min_stock_level, {
+      precision: 12,
+      scale: 2,
+      min: 0,
+      allowNull: false,
+    });
+    if (minStock.error) return `Minimum stock level: ${minStock.error}`;
 
     return null;
   }
@@ -359,6 +363,17 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
 
     const selectedBrand = brandOptions.find((brand) => brand.id === values.brand_id);
     const selectedCategory = categoryOptions.find((category) => category.id === values.category_id);
+    const minStock = parseDbDecimal(values.min_stock_level, {
+      precision: 12,
+      scale: 2,
+      min: 0,
+      allowNull: false,
+    });
+    if (minStock.error || minStock.value === null) {
+      setErrorMessage(`Minimum stock level: ${minStock.error ?? "A value is required."}`);
+      setIsSubmitting(false);
+      return;
+    }
 
     const payload = {
       sku: values.sku.trim(),
@@ -374,7 +389,7 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       brand: selectedBrand?.name ?? null,
       category: selectedCategory?.name ?? null,
       unit: values.unit.trim(),
-      min_stock_level: Number(values.min_stock_level),
+      min_stock_level: minStock.value,
       status: values.status,
     };
 
