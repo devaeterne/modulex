@@ -20,12 +20,26 @@ export default function Navbar({
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const pathname = usePathname();
   const navRef = useRef<HTMLElement>(null);
+  const burgerButtonRef = useRef<HTMLButtonElement>(null);
   const lastYRef = useRef(0);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setIsMobileOpen(false), 0);
     return () => window.clearTimeout(timeout);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isMobileOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setIsMobileOpen(false);
+      window.requestAnimationFrame(() => burgerButtonRef.current?.focus());
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobileOpen]);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -98,7 +112,12 @@ export default function Navbar({
               className={`nav-item ${item.destinationKey === "home" ? "home-dd" : item.destinationKey === "about" ? "about-dd" : ""}`.trim()}
               key={item.id}
             >
-              <Link className="nav-link" href={item.href} onClick={handleLinkClick}>
+              <Link
+                className="nav-link"
+                href={item.href}
+                onClick={handleLinkClick}
+                aria-current={pathname === item.href ? "page" : undefined}
+              >
                 {item.label}
               </Link>
             </li>
@@ -122,6 +141,7 @@ export default function Navbar({
           <Link href="/contact" className="cta-nav" onClick={handleContactClick}>Contact Us</Link>
         </div>
         <button
+          ref={burgerButtonRef}
           type="button"
           className={`burger-menu ${isMobileOpen ? "open" : ""}`}
           id="burgerMenu"
