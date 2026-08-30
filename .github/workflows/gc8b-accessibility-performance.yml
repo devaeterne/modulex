@@ -41,11 +41,23 @@ jobs:
       - name: GC-8B scoped lint
         run: >-
           npx eslint
+          src/app/layout.tsx
+          src/app/page.tsx
+          src/app/contact/page.tsx
+          src/app/showroom/page.tsx
+          src/components/StoreIcon.tsx
+          src/components/BackToTop.tsx
+          src/components/Footer.tsx
           src/components/GalleryLightbox.tsx
+          src/components/ThemeToggle.tsx
           src/components/gallery/StoreProjectsGallery.tsx
-          src/components/Navbar.tsx
           src/components/leads/LeadForm.tsx
+          src/components/Home/Contact.tsx
           src/components/Home/Hero.tsx
+          src/components/Home/HeroPremium.tsx
+          src/components/Home/HeroSlider.tsx
+          src/components/Home/Testimonials.tsx
+          src/components/Home/VirtualTour.tsx
           src/lib/store/content/queries.ts
       - name: Store production build
         env:
@@ -53,6 +65,17 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
           NEXT_PUBLIC_SITE_URL: https://oakwellcabinetry.com
         run: npm run build
+      - name: Verify optimized build delivery
+        run: |
+          if grep -R -n "bootstrap-icons" .next/static .next/server 2>/dev/null; then
+            echo "Bootstrap Icons leaked into the production build"
+            exit 1
+          fi
+          if grep -R -n "fonts.googleapis.com" .next/static .next/server 2>/dev/null; then
+            echo "External Google Fonts CSS leaked into the production build"
+            exit 1
+          fi
+          echo "GC-8B optimized build delivery: PASS"
 
   production-lighthouse-baseline:
     runs-on: ubuntu-latest
