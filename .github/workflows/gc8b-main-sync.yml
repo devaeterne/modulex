@@ -1,0 +1,29 @@
+name: GC-8B Main Sync
+
+on:
+  push:
+    branches:
+      - feat/gc8b-accessibility-performance
+    paths:
+      - ".github/workflows/gc8b-main-sync.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/gc8b-accessibility-performance
+          fetch-depth: 0
+      - name: Merge current main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit origin/main
+          git rm .github/workflows/gc8b-main-sync.yml
+          git commit --amend --no-edit
+          git push origin HEAD:feat/gc8b-accessibility-performance
