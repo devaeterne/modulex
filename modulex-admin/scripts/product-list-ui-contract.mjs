@@ -101,8 +101,9 @@ expect(
 expect(
   tracker.includes("### [x] 01 — Dashboard + shared shell") &&
     tracker.includes("### [x] 02 — Request Center") &&
-    tracker.includes("### [ ] 03 — Product List"),
-  "AdminUICheck.md must preserve completed 01/02 history and current 03 tracking"
+    tracker.includes("### [x] 03 — Product List (`/products`)") &&
+    tracker.includes("PR: #151 — `fix(admin): harden Product List UI`"),
+  "AdminUICheck.md must preserve completed Product List audit history"
 );
 
 console.log("product list UI contract: ok");
