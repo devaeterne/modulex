@@ -6,10 +6,11 @@ import path from "node:path";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 
-const [dashboard, header, sidebar] = await Promise.all([
+const [dashboard, header, sidebar, adminLayout] = await Promise.all([
   readFile(path.join(root, "src/components/dashboard/ModulexDashboard.tsx"), "utf8"),
   readFile(path.join(root, "src/layout/AppHeader.tsx"), "utf8"),
   readFile(path.join(root, "src/layout/AppSidebar.tsx"), "utf8"),
+  readFile(path.join(root, "src/app/(admin)/layout.tsx"), "utf8"),
 ]);
 
 assert.match(
@@ -66,6 +67,22 @@ assert.match(
   sidebar,
   /lg:h-screen/,
   "Desktop sidebar must retain full viewport height",
+);
+
+assert.match(
+  adminLayout,
+  /min-w-0/,
+  "Admin content shell must allow wide descendants to shrink inside the available sidebar-adjusted viewport",
+);
+assert.doesNotMatch(
+  adminLayout,
+  /max-w-\(--breakpoint-2xl\)/,
+  "Admin shell must not globally cap every page to the 1536px breakpoint; page-level surfaces own their width constraints",
+);
+assert.match(
+  adminLayout,
+  /lg:ml-\[290px\][\s\S]{0,160}lg:ml-\[90px\]/,
+  "Admin content shell must preserve expanded and collapsed sidebar offsets",
 );
 
 assert.match(
