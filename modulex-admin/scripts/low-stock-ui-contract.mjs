@@ -83,6 +83,13 @@ expect(
   "Low Stock must not expose bulk selection until a supported batch mutation exists"
 );
 expect(
+  manager.includes('type RetryAction =') &&
+    manager.includes('setRetryAction({ type: "threshold", row })') &&
+    manager.includes("void saveThreshold(retryAction.row)") &&
+    manager.includes('retryAction.type === "load" ? "Retry" : "Retry update"'),
+  "Low Stock must preserve the failed threshold draft and retry the mutation instead of refreshing it"
+);
+expect(
   tracker.includes("### [x] 03 — Product List (`/products`)") &&
     tracker.includes("### [ ] 04 — Low Stock (`/low-stock`)") &&
     tracker.includes("PR: #151"),
