@@ -3,7 +3,7 @@
 Last reviewed: 2026-08-30
 Main baseline: `74013f90561e023b0453aea57cd010456de2c597`
 Current phase: **Phase A2 — Inventory, Warehouses & Physical Operations**
-Current cross-roadmap package: **Granite GC-5 Gallery and GC-6 Cabinet Journey are production-accepted. GC-7 Reviews / Social Proof is in progress: Admin now has a `store.manage`-gated Reviews & Social Proof editor with explicit draft/publish/unpublish/delete controls and mandatory parent attribution fields; production schema/data and Store/Admin CI are verified, while PR #167 is merged on `main`; live homepage acceptance was not re-verified during the A1 closeout. Admin primary Phase A1 work remains independently owned by its current roadmap next action.**
+Current cross-roadmap package: **Granite GC-5 Gallery and GC-6 Cabinet Journey are production-accepted. GC-7 Reviews / Social Proof is in progress: Admin now has a `store.manage`-gated Reviews & Social Proof editor with explicit draft/publish/unpublish/delete controls and mandatory parent attribution fields; production schema/data and Store/Admin CI are verified, while PR #167 is merged on `main`; live homepage acceptance was not re-verified during the A1 closeout. Admin primary roadmap work has advanced to Phase A2 after verified A1 closeout.**
 Current Admin next action: **Review warehouses CRUD and role restrictions, then verify the zones/locations hierarchy and active-stock integrity.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
