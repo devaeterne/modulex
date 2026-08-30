@@ -347,7 +347,7 @@ export default function InventoryReport() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {summaryCards.map(([label, value]) => <Metric key={String(label)} label={String(label)} value={formatNumber(value as number | string)} />)}
+        {summaryCards.map(([label, value]) => <Metric key={String(label)} label={String(label)} value={typeof value === "string" ? value : formatNumber(value)} />)}
       </div>
 
       {errorMessage ? <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div> : null}

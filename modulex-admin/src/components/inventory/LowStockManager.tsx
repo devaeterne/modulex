@@ -454,21 +454,21 @@ export default function LowStockManager() {
 
         <div className="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
           <p>Showing {firstVisible}–{lastVisible} of {totalCount}</p>
-          <div className="flex items-center gap-2">
+          <nav className="flex items-center gap-2" aria-label="Low stock pagination">
             <button
               type="button"
               disabled={offset === 0 || isLoading}
               onClick={() => void loadPage(appliedQuery, appliedView, Math.max(0, offset - PAGE_SIZE))}
               className={`h-9 rounded-lg border border-gray-200 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 ${focusClass}`}
             >Previous</button>
-            <span>Page {currentPage} of {totalPages}</span>
+            <span aria-live="polite">Page {currentPage} of {totalPages}</span>
             <button
               type="button"
               disabled={offset + PAGE_SIZE >= totalCount || isLoading}
               onClick={() => void loadPage(appliedQuery, appliedView, offset + PAGE_SIZE)}
               className={`h-9 rounded-lg border border-gray-200 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 ${focusClass}`}
             >Next</button>
-          </div>
+          </nav>
         </div>
       </div>
     </div>
