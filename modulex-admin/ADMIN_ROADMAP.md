@@ -228,9 +228,9 @@ These rules are mandatory for all future Modulex Admin work:
   - Transaction-scoped authenticated acceptance proved a temporarily `shipped` order rejects commercial revision and a profiles-less authenticated subject is denied; both tests rolled back and the sample order remained `draft` with no acceptance-test data persistence.
   - Post-DDL security/performance advisors reported no A1.2C-specific new finding; unrelated existing Store/security and index/policy backlog remains separately tracked.
 - [x] Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.
-  - Production migrations `a1_core_operations_hardening`, `a1_order_confirmation_validation`, and `a1_order_legacy_progression_compatibility` install DB-authoritative line/commercial guards plus explicit order/shipment/installation transition policies. Draft orders may remain incomplete, while new confirmation validates fulfillment readiness; historical Confirmed orders are not retroactively blocked by status-only progression.
+  - Production migrations `a1_core_operations_hardening`, `a1_order_confirmation_validation`, `a1_order_legacy_progression_compatibility`, `a1_fulfillment_order_status_compatibility`, and `a1_order_product_lifecycle_compatibility` install DB-authoritative line/commercial guards plus explicit order/shipment/installation transition policies. Draft orders may remain incomplete, while new confirmation validates fulfillment readiness; historical Confirmed orders are not retroactively blocked by status-only progression.
   - Transaction-scoped production acceptance proved Draft → Shipped is rejected and a legacy Confirmed → In Preparation progression is allowed; all acceptance writes were rolled back.
-  - TDD evidence: A1 workflow run `33304214076` failed on the missing legacy-compatibility contract before the fix; GREEN run `33304311685` passed the A1 contract, order regressions, Admin portal regression, RBAC, lint and production build.
+  - TDD evidence: RED runs `33304214076`, `33304574072`, and `33304725633` caught missing compatibility guards; final GREEN run `33304761896` passed the A1 contract, order regressions, Admin portal regression, RBAC, Admin lint/build, Store portal boundaries, scoped Store lint and Store production build.
 - [x] Verify customer portal order projections remain narrower than Admin order data.
   - Store `smoke:store-portal` continues to reject monetary/internal fields such as unit price, totals, payment commission and internal notes from the customer portal projection.
   - Fresh A1 Store boundary verification passed in Actions run `33304311685`.
@@ -239,13 +239,13 @@ These rules are mandatory for all future Modulex Admin work:
 
 - [x] Review shipment creation/edit/status workflow.
   - Shipment creation remains reservation-backed; source quantity/location edits remain limited to Draft/Picking. The operational lifecycle is now fail-closed as Draft → Picking → Packed → Shipped → Delivered, with cancellation allowed only before shipment.
-  - Admin actions now expose only valid next workflow operations; Draft can no longer jump directly to Packed or Shipped.
+  - Admin actions now expose only valid next workflow operations; Draft can no longer jump directly to Packed or Shipped. Shipment RPCs also preserve later order lifecycle states (`installation_scheduled`, `installation_in_progress`, `completed`) instead of regressing the order when ship/deliver events arrive.
 - [x] Verify shipment-to-order/customer associations.
   - `a1_customer_shipment_guard` rejects shipment rows whose customer does not match the source order; existing reservation/source-location checks remain authoritative for shipment lines.
 - [x] Define tracking/carrier/reference fields and status transition rules.
   - `shipment_number` remains the canonical immutable shipment reference. Carrier, service level and tracking number remain optional operational metadata captured at ship time so local-delivery flows are not forced into carrier semantics. Status progression is enforced in DB and mirrored by Admin actions.
 - [x] Verify only approved fulfillment fields are exposed to portals.
-  - Store fulfillment contracts continue to exclude source warehouse/location IDs, stock-deduction metadata and internal notes; fresh portal boundary verification passed in Actions run `33304311685`.
+  - Store fulfillment contracts continue to exclude source warehouse/location IDs, stock-deduction metadata and internal notes; fresh portal boundary verification passed in final Actions run `33304761896`.
 
 ## A1.4 Installations
 
@@ -275,10 +275,10 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Invalid status transitions are prevented or explicitly handled.
   - Rollback-only production acceptance passed six lifecycle assertions: valid order/shipment/installation next steps succeeded and Draft → Shipped, Draft shipment → Packed, and Scheduled installation → Completed were rejected. Production row-status counts were unchanged after rollback.
 - [x] Portal-visible projections expose only approved fields.
-  - Fresh Store order and fulfillment portal contracts passed in Actions run `33304311685`, protecting financial, source-stock, assignment and internal-note boundaries.
+  - Fresh Store order and fulfillment portal contracts passed in final Actions run `33304761896`, protecting financial, source-stock, assignment and internal-note boundaries.
 - [x] Core customer/order/fulfillment smoke coverage exists.
   - `smoke:a1-core-operations` is permanent in the Admin smoke chain and `.github/workflows/admin-a1-core-operations.yml` runs A1, order-domain/lifecycle, portal, RBAC, lint and production-build verification across Admin and Store.
-  - Post-DDL Supabase Security/Performance Advisor review found no A1-specific new finding; unrelated existing Store/support/HR/index backlog remains outside A1.
+  - Final post-DDL Supabase Security/Performance Advisor review found no A1-specific new finding. Rollback acceptance also proved inactive products cannot confirm and left all 462 production products Active; unrelated existing Store/support/HR/index backlog remains outside A1.
 
 ---
 

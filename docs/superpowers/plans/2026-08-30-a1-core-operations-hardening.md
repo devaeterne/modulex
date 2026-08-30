@@ -4,7 +4,7 @@
 
 **Goal:** Complete Phase A1 by hardening order, shipment, installation and invoice operational boundaries, proving portal projections remain narrow, and adding deterministic core-operation smoke coverage.
 
-**Architecture:** Preserve the existing Admin → authenticated RPC → private domain-function architecture. Add one additive Supabase migration that centralizes validation/transition helpers and hardens the existing mutation functions; keep Store portal access read-only through the existing narrow RPC projections. Admin UI changes are limited to installation next-action affordances so the browser mirrors—but never replaces—the database transition policy.
+**Architecture:** Preserve the existing Admin → authenticated RPC → private domain-function architecture. Add focused Supabase SQL hardening patches that centralize validation/transition helpers and harden the existing mutation functions; keep Store portal access read-only through the existing narrow RPC projections. Admin shipment and installation actions mirror—but never replace—the database transition policy.
 
 **Tech Stack:** Next.js 16, React/TypeScript, Supabase PostgreSQL/RPC/RLS, Node.js dependency-free contract tests, GitHub Actions.
 
@@ -52,7 +52,7 @@ Commit message: `test: define A1 core operations contract`.
 ### Task 2: Harden database operational contracts
 
 **Files:**
-- Create: `modulex-admin/supabase/migrations/20260830100000_a1_core_operations_hardening.sql`
+- Create: `modulex-admin/sql/a1-core-operations-hardening.sql` and focused A1 compatibility SQL patches under `modulex-admin/sql/`
 
 **Interfaces:**
 - Consumes: existing public RPC signatures for order, shipment, installation and invoice mutations.
@@ -60,7 +60,7 @@ Commit message: `test: define A1 core operations contract`.
 
 - [ ] **Step 1: Add order validation helpers**
 
-Create private helpers for fulfillment/tax/shipping validation and forward lifecycle transition validation. Delivery and delivery+installation require a customer-owned active shipping address; configured active `order_tax_rules` are authoritative; new order products must be active; update lines may retain an inactive product only when it already belongs to the order; quantities must remain positive; server-derived pricing-source classification remains authoritative.
+Create private helpers for fulfillment/tax/shipping validation and forward lifecycle transition validation. Delivery and delivery+installation require a customer-owned active shipping address; configured active `order_tax_rules` are authoritative; Draft records may remain editable, while confirmation/non-Draft commercial validation requires Active products; quantities must remain positive; server-derived pricing-source classification remains authoritative.
 
 - [ ] **Step 2: Harden order create/update/status functions**
 
