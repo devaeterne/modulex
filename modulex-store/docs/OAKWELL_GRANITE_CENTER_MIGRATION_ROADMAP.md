@@ -526,9 +526,9 @@ Goal: seed real, curated, CMS-managed cabinet portfolio content.
 
 Goal: publish real Oakwell cabinet knowledge without parent marketing noise.
 
-- `[~]` adapt process as typed CMS content;
-- `[~]` create Oakwell cabinetry FAQ in managed data;
-**GC-6 implementation status — 2026-08-30:** typed process and FAQ domains are migrated to production; 4 source-adapted cabinet-planning steps and 6 original Oakwell cabinetry FAQs are published in controlled data. Draft gating was verified at 0/0 public rows before publication; after publication the narrow RPCs return 4/6 while anon direct table selects remain denied and source provenance remains private. The CMS CTA is `Start a Project Consultation` → `/contact`; Home Office/accessories remain hold; source discounts, SLAs, guarantees and installation promises were omitted. Store/Admin CI is green. Final GC-6 completion remains pending PR merge/deploy and live `/cabinet-process` acceptance.
+- `[x]` adapt process as typed CMS content;
+- `[x]` create Oakwell cabinetry FAQ in managed data;
+**GC-6 production closeout — 2026-08-30:** production live acceptance is complete. `/cabinet-process` returns HTTP 200 with 4 source-adapted cabinet-planning steps, 6 original Oakwell cabinetry FAQs, `Start a Project Consultation` → `/contact`, FAQPage structured data and sitemap inclusion. Anonymous direct reads remain denied and provenance stays outside the public projection. Source discounts, SLAs, guarantees and installation promises remain omitted.
 
 - `[x]` add approved consultation CTA content;
 - `[x]` decide Home Office/accessory scope separately — remains hold / outside initial Oakwell scope;
@@ -540,11 +540,14 @@ Goal: publish real Oakwell cabinet knowledge without parent marketing noise.
 
 Goal: add trust signals with correct source identity.
 
-- `[ ]` implement/manage review/testimonial domain;
-- `[ ]` import only approved source-linked excerpts/data;
-- `[ ]` enforce parent attribution;
-- `[ ]` avoid third-party broken widgets;
-- `[ ]` verify a parent review cannot render as Oakwell-specific by mistake.
+- `[~]` implement/manage review/testimonial domain;
+- `[x]` import only approved source-linked excerpts/data;
+- `[x]` enforce parent attribution;
+- `[x]` avoid third-party broken widgets;
+- `[~]` verify a parent review cannot render as Oakwell-specific by mistake.
+
+
+**GC-7 implementation status — 2026-08-30:** `store_testimonials` is migrated to production with Admin-only CRUD/RLS and a narrow published-only RPC. Draft-gate verification returned 2 draft / 0 public; after controlled publication the RPC returns 2 parent-attributed records, both with Granite & Cabinet Center source identity, HTTPS source URL and visible attribution while anon direct table select remains denied. The homepage code explicitly labels these as `Granite & Cabinet Center customer reviews` and `not Oakwell-specific reviews`; no rating or third-party widget is inferred. Store/Admin CI is green. Final GC-7 completion remains pending PR merge/deploy and live homepage acceptance.
 
 **Exit gate:** every visible review has valid identity/source/attribution and can be managed from Admin.
 

@@ -1,20 +1,29 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `e0ccbcc239a52ac734ede69ed80fcf205bc2a93d`
+Main baseline: `edbea195973591cfe64f095a98011a9b6efe3091`
 Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**
-Current cross-roadmap package: **Granite GC-5 Gallery/media migration is production-accepted. GC-6 Cabinet Journey is in progress: Admin now has a store.manage-gated Cabinet Content editor for process steps and cabinetry FAQ with explicit draft/publish/unpublish controls; production data and CI are verified, while live acceptance remains pending PR merge/deploy. Admin primary Phase A1 work remains independently owned by its current roadmap next action.**
+Current cross-roadmap package: **Granite GC-5 Gallery and GC-6 Cabinet Journey are production-accepted. GC-7 Reviews / Social Proof is in progress: Admin now has a `store.manage`-gated Reviews & Social Proof editor with explicit draft/publish/unpublish/delete controls and mandatory parent attribution fields; production schema/data and Store/Admin CI are verified, while live homepage acceptance remains pending PR merge/deploy. Admin primary Phase A1 work remains independently owned by its current roadmap next action.**
 Current Admin next action: **Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.**
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
 ## GC-6 Cabinet Content cross-roadmap status
 
-- [~] Add Admin-managed Cabinet Planning process and FAQ content.
+- [x] Add Admin-managed Cabinet Planning process and FAQ content.
   - `/store/cabinet-content` manages typed process/FAQ records under `store.manage` with explicit draft/publish/unpublish/delete behavior and source attribution metadata.
   - `cabinet-process` page-level copy, CTA and SEO remain managed through the existing Store Pages editor rather than a parallel page system.
   - Production schema/data and Admin scoped lint + production build are verified.
-  - Live Admin/Store acceptance remains pending PR merge/deploy; do not mark complete before that gate.
+  - Live `/cabinet-process` acceptance is complete: HTTP 200, 4 process steps, 6 FAQs, CTA, FAQ structured data and sitemap inclusion verified on production.
+
+## GC-7 Reviews & Social Proof cross-roadmap status
+
+- [~] Add Admin-managed, source-attributed Store review excerpts.
+  - `/store/reviews` is protected by `store.manage` in both sidebar and direct-route RBAC.
+  - Parent-attributed records require source entity, HTTPS source URL and visible attribution before they can be valid public content.
+  - Production contains two curated source-linked Granite & Cabinet Center excerpts; no third-party widget or inferred rating is used.
+  - Admin RBAC, scoped lint and production build are verified.
+  - Live Store homepage acceptance remains pending PR merge/deploy.
 
 ## Mandatory Session & Change Tracking Protocol
 

@@ -1,9 +1,9 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-08-30
-Main baseline: `e0ccbcc239a52ac734ede69ed80fcf205bc2a93d`
+Main baseline: `edbea195973591cfe64f095a98011a9b6efe3091`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
-Current Granite migration status: **GC-5 Gallery/media migration is production-accepted: 20 projects imported, 13 curated projects published, and 7 non-cabinet-focused Residential source groups intentionally retained as non-publishable drafts. GC-6 Cabinet Journey is in progress: typed process/FAQ CMS, Admin management, production data publication, public RPC gating, lint and production builds are verified; live Store acceptance remains pending PR merge/deploy.**
+Current Granite migration status: **GC-5 Gallery and GC-6 Cabinet Journey are production-accepted. GC-6 live acceptance verified `/cabinet-process` HTTP 200 with 4 process steps, 6 FAQs, consultation CTA, FAQ structured data and sitemap inclusion. GC-7 Reviews / Social Proof is in progress: typed attributed testimonial CMS, Admin management, two source-linked parent-company excerpts in production, public attribution gating, RBAC, lint and Store/Admin production builds are verified; live homepage acceptance remains pending PR merge/deploy.**
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
 
@@ -191,6 +191,16 @@ The broader Granite migration now has an approved dynamic-content architecture a
   - Source promotions, fixed SLAs, installation promises, guarantees and other unconfirmed Granite claims were deliberately not migrated.
   - Branch verification: GC-6 contract, company/gallery/showroom regressions, changed-file lint and Store/Admin production builds pass.
   - Completion remains `[~]` until the PR is merged/deployed and `/cabinet-process` receives live acceptance.
+
+### Granite GC-7 — Reviews / Social Proof
+
+- [~] Publish source-identified social proof without converting parent-company reviews into Oakwell reviews.
+  - Typed `store_testimonials` CMS + narrow published-only public RPC are implemented; anon direct table reads remain denied.
+  - Admin `/store/reviews` is protected by `store.manage` and supports draft/publish/unpublish/delete.
+  - Two short source-linked Granite & Cabinet Center excerpts are published in production data with required source entity, HTTPS source link and visible attribution; no rating is inferred.
+  - Store homepage renders the section only when published rows exist and explicitly labels the content `Granite & Cabinet Center customer reviews` and `not Oakwell-specific reviews`.
+  - GC-7 contract, GC-6/GC-5/company regressions, Admin RBAC, scoped lint and Store/Admin production builds pass.
+  - Completion remains `[~]` until PR merge/deploy and live homepage acceptance.
 
 ## 2.1.2 Shared Store chrome
 
