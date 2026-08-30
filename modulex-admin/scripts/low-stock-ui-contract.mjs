@@ -91,9 +91,11 @@ expect(
 );
 expect(
   tracker.includes("### [x] 03 — Product List (`/products`)") &&
-    tracker.includes("### [ ] 04 — Low Stock (`/low-stock`)") &&
-    tracker.includes("PR: #151"),
-  "AdminUICheck.md must close Product List and track Low Stock as current"
+    tracker.includes("### [x] 04 — Low Stock (`/low-stock`)") &&
+    tracker.includes("PR: #151") &&
+    tracker.includes("PR: #153") &&
+    tracker.includes("Follow-up PR: #154"),
+  "AdminUICheck.md must retain Product List and Low Stock as completed audit history"
 );
 
 console.log("low stock UI contract: ok");
