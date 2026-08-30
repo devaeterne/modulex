@@ -46,11 +46,10 @@ assert(queries.includes("getStorePublicProcessSteps"), "Store process query wrap
 assert(queries.includes("getStorePublicFaqEntries"), "Store FAQ query wrapper missing");
 assert(queries.includes("get_store_public_process_steps"), "Store does not use process public RPC");
 assert(queries.includes("get_store_public_faq_entries"), "Store does not use FAQ public RPC");
+assert(queries.includes('getStorePublicPage("cabinet-process")'), "Cabinet readiness is not CMS-backed");
 
 const publicPage = read(storePagePath);
-assert(publicPage.includes('getStorePublicPage("cabinet-process")'), "Cabinet page is not CMS-backed");
-assert(publicPage.includes("getStorePublicProcessSteps"), "Cabinet page does not read typed process content");
-assert(publicPage.includes("getStorePublicFaqEntries"), "Cabinet page does not read typed FAQ content");
+assert(publicPage.includes("getStoreCabinetJourneyReadiness"), "Cabinet page does not use the readiness boundary");
 assert(!/granitecenterva\.com/i.test(publicPage), "Granite source URL leaked into Store runtime page");
 for (const banned of ["50% off", "24 business hours", "2–4 weeks", "100% Satisfaction", "licensed, bonded", "free 3D design"]) {
   assert(!publicPage.toLowerCase().includes(banned.toLowerCase()), `Unsupported source promise leaked into Store page: ${banned}`);
@@ -61,6 +60,7 @@ assert(secondaryCms.includes('"cabinet-process"'), "cabinet-process is not an Ad
 const sidebar = read(sidebarPath);
 assert(sidebar.includes('path: "/store/cabinet-content"'), "Cabinet Content is missing from Admin Store navigation");
 const sitemap = read(sitemapPath);
-assert(sitemap.includes("cabinet-process"), "Cabinet process readiness is missing from sitemap handling");
+assert(sitemap.includes("getStoreCabinetJourneyReadiness"), "Cabinet process readiness is missing from sitemap handling");
+assert(sitemap.includes("/cabinet-process"), "Cabinet process URL is missing from sitemap handling");
 
 console.log("GC-6 cabinet journey contract passed");
