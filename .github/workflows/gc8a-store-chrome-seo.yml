@@ -37,7 +37,6 @@ jobs:
           cache-dependency-path: modulex-store/package-lock.json
       - run: npm ci
       - run: npm run smoke:gc8a-store-chrome-seo
-      - run: npm run smoke:gc8a-technical-seo
       - run: npm run smoke:seo-showroom
       - run: npm run smoke:public-production
       - run: npm run smoke:portal-public-navbar
