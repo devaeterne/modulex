@@ -18,143 +18,22 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: feat/a1-core-operations-hardening-active
-      - name: Update Admin roadmap
+      - name: Sync A2 header wording
         shell: python
         run: |
           from pathlib import Path
-
           path = Path("modulex-admin/ADMIN_ROADMAP.md")
           text = path.read_text()
-
-          def replace_once(old: str, new: str):
-              global text
-              if old not in text:
-                  raise SystemExit(f"Roadmap marker not found: {old}")
-              text = text.replace(old, new, 1)
-
-          replace_once(
-              "Main baseline: `edbea195973591cfe64f095a98011a9b6efe3091`",
-              "Main baseline: `74013f90561e023b0453aea57cd010456de2c597`"
-          )
-          replace_once(
-              "Current phase: **Phase A1 — Customer, Order & Fulfillment Operations**",
-              "Current phase: **Phase A2 — Inventory, Warehouses & Physical Operations**"
-          )
-          replace_once(
-              "Current Admin next action: **Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.**",
-              "Current Admin next action: **Review warehouses CRUD and role restrictions, then verify the zones/locations hierarchy and active-stock integrity.**"
-          )
-          text = text.replace(
-              "while live homepage acceptance remains pending PR merge/deploy.",
-              "while PR #167 is merged on `main`; live homepage acceptance was not re-verified during the A1 closeout."
-          )
-          text = text.replace(
-              "Live Store homepage acceptance remains pending PR merge/deploy.",
-              "PR #167 is merged on `main`; live Store homepage acceptance remains a separate verification item."
-          )
-
-          replace_once(
-              "- [ ] Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.",
-              "- [x] Add validation for quantity, product/variant validity, pricing source, tax/shipping fields, and status transitions.\n"
-              "  - Production migrations `a1_core_operations_hardening`, `a1_order_confirmation_validation`, and `a1_order_legacy_progression_compatibility` install DB-authoritative line/commercial guards plus explicit order/shipment/installation transition policies. Draft orders may remain incomplete, while new confirmation validates fulfillment readiness; historical Confirmed orders are not retroactively blocked by status-only progression.\n"
-              "  - Transaction-scoped production acceptance proved Draft → Shipped is rejected and a legacy Confirmed → In Preparation progression is allowed; all acceptance writes were rolled back.\n"
-              "  - TDD evidence: A1 workflow run `33304214076` failed on the missing legacy-compatibility contract before the fix; GREEN run `33304311685` passed the A1 contract, order regressions, Admin portal regression, RBAC, lint and production build."
-          )
-          replace_once(
-              "- [ ] Verify customer portal order projections remain narrower than Admin order data.",
-              "- [x] Verify customer portal order projections remain narrower than Admin order data.\n"
-              "  - Store `smoke:store-portal` continues to reject monetary/internal fields such as unit price, totals, payment commission and internal notes from the customer portal projection.\n"
-              "  - Fresh A1 Store boundary verification passed in Actions run `33304311685`."
-          )
-
-          replace_once(
-              "- [ ] Review shipment creation/edit/status workflow.",
-              "- [x] Review shipment creation/edit/status workflow.\n"
-              "  - Shipment creation remains reservation-backed; source quantity/location edits remain limited to Draft/Picking. The operational lifecycle is now fail-closed as Draft → Picking → Packed → Shipped → Delivered, with cancellation allowed only before shipment.\n"
-              "  - Admin actions now expose only valid next workflow operations; Draft can no longer jump directly to Packed or Shipped."
-          )
-          replace_once(
-              "- [ ] Verify shipment-to-order/customer associations.",
-              "- [x] Verify shipment-to-order/customer associations.\n"
-              "  - `a1_customer_shipment_guard` rejects shipment rows whose customer does not match the source order; existing reservation/source-location checks remain authoritative for shipment lines."
-          )
-          replace_once(
-              "- [ ] Define tracking/carrier/reference fields and status transition rules.",
-              "- [x] Define tracking/carrier/reference fields and status transition rules.\n"
-              "  - `shipment_number` remains the canonical immutable shipment reference. Carrier, service level and tracking number remain optional operational metadata captured at ship time so local-delivery flows are not forced into carrier semantics. Status progression is enforced in DB and mirrored by Admin actions."
-          )
-          replace_once(
-              "- [ ] Verify only approved fulfillment fields are exposed to portals.",
-              "- [x] Verify only approved fulfillment fields are exposed to portals.\n"
-              "  - Store fulfillment contracts continue to exclude source warehouse/location IDs, stock-deduction metadata and internal notes; fresh portal boundary verification passed in Actions run `33304311685`."
-          )
-
-          replace_once(
-              "- [ ] Review installation scheduling/status workflow.",
-              "- [x] Review installation scheduling/status workflow.\n"
-              "  - Installation mutations now use controlled private cores behind authenticated `SECURITY INVOKER` public wrappers. Admin workflow is Scheduled → Confirmed → In Progress → Completed, with cancellation available before completion.\n"
-              "  - Production rollback acceptance proved Scheduled → Completed is rejected while Scheduled → Confirmed succeeds."
-          )
-          replace_once(
-              "- [ ] Define installer/contact/location/date fields and transition rules.",
-              "- [x] Define installer/contact/location/date fields and transition rules.\n"
-              "  - `assigned_to` remains an internal staff identifier; team/contact fields are operational appointment metadata; the installation location remains the order-derived address snapshot. Scheduled start is required and scheduled end, when supplied, must be after start. Status transitions are now explicit and fail closed."
-          )
-          replace_once(
-              "- [ ] Verify portal installation visibility and neutral foreign-ID behavior.",
-              "- [x] Verify portal installation visibility and neutral foreign-ID behavior.\n"
-              "  - Existing portal installation RPCs remain customer-scoped, omit internal assignment/notes fields, and return neutral `installation_unavailable` behavior for foreign/non-visible IDs; fresh Store portal experience contract passed in Actions run `33304311685`."
-          )
-
-          replace_once(
-              "- [ ] Review current invoice list/detail/print behavior.",
-              "- [x] Review current invoice list/detail/print behavior.\n"
-              "  - Existing invoice list/detail/print surfaces and issue/paid/void workflow remain the active A1 financial operations surface; A1 hardening did not widen portal visibility or bypass invoice approval rules."
-          )
-          replace_once(
-              "- [ ] Define whether payment methods/payment records are active scope or intentionally deferred.",
-              "- [x] Define whether payment methods/payment records are active scope or intentionally deferred.\n"
-              "  - Payment Methods remain active order/invoice commercial configuration. Invoice `paid_amount`/status remains the current payment-recording boundary; a standalone payment transaction ledger is intentionally deferred beyond A1."
-          )
-          replace_once(
-              "- [ ] Keep portal invoice/payment visibility out of scope until explicitly approved.",
-              "- [x] Keep portal invoice/payment visibility out of scope until explicitly approved.\n"
-              "  - A1 creates no Store portal invoice/payment RPC, projection or navigation surface; the permanent A1 contract guards this boundary."
-          )
-          replace_once(
-              "- [ ] Verify financial fields are protected by appropriate roles.",
-              "- [x] Verify financial fields are protected by appropriate roles.\n"
-              "  - Admin permissions retain `invoices.view` / `invoices.manage`; Finance retains invoice management while portal projections continue excluding order financial/internal fields. Fresh RBAC and portal boundary tests passed in Actions run `33304311685`."
-          )
-
-          replace_once(
-              "- [ ] Customer → order → shipment/installation lifecycle can be operated without manual SQL.",
-              "- [x] Customer → order → shipment/installation lifecycle can be operated without manual SQL.\n"
-              "  - Existing Admin create/edit/detail operations now sit on the hardened RPC/DB lifecycle contracts; production acceptance used the same mutation boundaries and required no persistent manual data correction."
-          )
-          replace_once(
-              "- [ ] Invalid status transitions are prevented or explicitly handled.",
-              "- [x] Invalid status transitions are prevented or explicitly handled.\n"
-              "  - Rollback-only production acceptance passed six lifecycle assertions: valid order/shipment/installation next steps succeeded and Draft → Shipped, Draft shipment → Packed, and Scheduled installation → Completed were rejected. Production row-status counts were unchanged after rollback."
-          )
-          replace_once(
-              "- [ ] Portal-visible projections expose only approved fields.",
-              "- [x] Portal-visible projections expose only approved fields.\n"
-              "  - Fresh Store order and fulfillment portal contracts passed in Actions run `33304311685`, protecting financial, source-stock, assignment and internal-note boundaries."
-          )
-          replace_once(
-              "- [ ] Core customer/order/fulfillment smoke coverage exists.",
-              "- [x] Core customer/order/fulfillment smoke coverage exists.\n"
-              "  - `smoke:a1-core-operations` is permanent in the Admin smoke chain and `.github/workflows/admin-a1-core-operations.yml` runs A1, order-domain/lifecycle, portal, RBAC, lint and production-build verification across Admin and Store.\n"
-              "  - Post-DDL Supabase Security/Performance Advisor review found no A1-specific new finding; unrelated existing Store/support/HR/index backlog remains outside A1."
-          )
-
-          path.write_text(text)
-      - name: Commit roadmap closeout
+          old = "Admin primary Phase A1 work remains independently owned by its current roadmap next action."
+          new = "Admin primary roadmap work has advanced to Phase A2 after verified A1 closeout."
+          if old not in text:
+              raise SystemExit("Expected stale A1 header wording was not found")
+          path.write_text(text.replace(old, new, 1))
+      - name: Commit header sync
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add modulex-admin/ADMIN_ROADMAP.md
           git diff --cached --quiet && exit 0
-          git commit -m "docs: close Phase A1 operations roadmap"
+          git commit -m "docs: sync A2 roadmap header"
           git push origin HEAD:feat/a1-core-operations-hardening-active
