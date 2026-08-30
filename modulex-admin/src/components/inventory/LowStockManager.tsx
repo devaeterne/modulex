@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { hasPermission } from "@/lib/auth/permissions";
+import { downloadCsv } from "@/lib/reports/csv";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
 
@@ -26,70 +26,65 @@ type StockRow = {
   is_low_stock: boolean;
   stock_status: string;
   last_inventory_update: string | null;
+  threshold_configured: boolean;
+  is_out_of_stock: boolean;
+  is_stock_alert: boolean;
+  total_count: number | string;
 };
 
-type RetryAction =
-  | { type: "load" }
-  | { type: "threshold"; row: StockRow };
+type LowStockSummary = {
+  summary_active_products: number | string;
+  summary_stock_alerts: number | string;
+  summary_out_of_stock: number | string;
+  summary_thresholds_set: number | string;
+  summary_threshold_shortfall: number | string;
+};
 
-const PAGE_SIZE_OPTIONS = [25, 50, 100];
+type RetryAction = { type: "load" } | { type: "threshold"; row: StockRow };
 
+const PAGE_SIZE = 25;
+const EXPORT_PAGE_SIZE = 500;
 const focusClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900";
-
 const inputClass =
   "h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-theme-xs outline-none transition focus-visible:border-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500/20 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90";
+const numberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
-function numberValue(value: number | string | null | undefined) {
+function n(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function formatNumber(value: number | string | null | undefined) {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(numberValue(value));
-}
-
-function csvCell(value: unknown) {
-  const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
+  return numberFormatter.format(n(value));
 }
 
 function stockState(row: StockRow) {
-  const available = numberValue(row.total_available_quantity);
-  if (available <= 0) {
-    return {
-      label: "OUT OF STOCK",
-      className: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
-    };
+  switch (row.stock_status) {
+    case "OUT_OF_STOCK":
+      return {
+        label: "OUT OF STOCK",
+        className: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
+      };
+    case "LOW_STOCK":
+      return {
+        label: "LOW STOCK",
+        className: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
+      };
+    case "PARTIALLY_RESERVED":
+      return {
+        label: "PARTIALLY RESERVED",
+        className: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400",
+      };
+    default:
+      return {
+        label: "OK",
+        className: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
+      };
   }
-  if (row.is_low_stock) {
-    return {
-      label: "LOW STOCK",
-      className: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
-    };
-  }
-  if (numberValue(row.total_reserved_quantity) > 0) {
-    return {
-      label: "PARTIALLY RESERVED",
-      className: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400",
-    };
-  }
-  return {
-    label: "OK",
-    className: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
-  };
 }
 
-function getPageNumbers(currentPage: number, totalPages: number) {
-  if (totalPages <= 5) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
-  return Array.from({ length: 5 }, (_, index) => start + index);
-}
-
-function reportLowStockError(context: string, error: unknown) {
+function reportError(context: string, error: unknown) {
   console.error(`[Low Stock] ${context}`, error);
 }
 
@@ -98,40 +93,68 @@ export default function LowStockManager() {
   const [rows, setRows] = useState<StockRow[]>([]);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewFilter>("alerts");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [appliedView, setAppliedView] = useState<ViewFilter>("alerts");
+  const [offset, setOffset] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [summary, setSummary] = useState<LowStockSummary>({
+    summary_active_products: 0,
+    summary_stock_alerts: 0,
+    summary_out_of_stock: 0,
+    summary_thresholds_set: 0,
+    summary_threshold_shortfall: 0,
+  });
   const [thresholdDrafts, setThresholdDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<RetryAction | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const canEditThresholds = hasPermission(profile?.roles, "products.manage");
 
-  const loadRows = useCallback(async () => {
+  const loadPage = useCallback(async (nextQuery: string, nextView: ViewFilter, nextOffset: number) => {
     setIsLoading(true);
     setErrorMessage(null);
     setRetryAction(null);
 
-    const { data, error } = await supabase
-      .from("v_product_stock_summary")
-      .select(
-        "product_id,sku,barcode,product_name,brand,category,unit,min_stock_level,product_status,location_count,warehouse_count,total_quantity,total_reserved_quantity,total_available_quantity,is_low_stock,stock_status,last_inventory_update"
-      )
-      .eq("product_status", "active")
-      .order("sku")
-      .limit(1000);
+    const [pageResult, summaryResult] = await Promise.all([
+      supabase.rpc("search_low_stock_page", {
+        p_query: nextQuery || null,
+        p_view: nextView,
+        p_offset: nextOffset,
+        p_limit: PAGE_SIZE,
+      }),
+      supabase.rpc("get_low_stock_summary"),
+    ]);
 
+    const error = pageResult.error || summaryResult.error;
     if (error) {
-      reportLowStockError("stock summary load failed", error);
+      reportError("load failed", error);
       setRows([]);
+      setTotalCount(0);
       setErrorMessage("Low-stock data is temporarily unavailable. Please try again.");
       setRetryAction({ type: "load" });
-    } else {
-      setRows((data ?? []) as StockRow[]);
-      setThresholdDrafts({});
+      setIsLoading(false);
+      return;
     }
+
+    const nextRows = (pageResult.data as StockRow[]) ?? [];
+    const nextSummary = ((summaryResult.data as LowStockSummary[]) ?? [])[0];
+    setRows(nextRows);
+    setTotalCount(n(nextRows[0]?.total_count));
+    setSummary(
+      nextSummary ?? {
+        summary_active_products: 0,
+        summary_stock_alerts: 0,
+        summary_out_of_stock: 0,
+        summary_thresholds_set: 0,
+        summary_threshold_shortfall: 0,
+      }
+    );
+    setOffset(nextOffset);
+    setThresholdDrafts({});
     setIsLoading(false);
   }, []);
 
@@ -141,73 +164,43 @@ export default function LowStockManager() {
     async function initialize() {
       const { profile: currentProfile, error } = await getCurrentProfile();
       if (cancelled) return;
-
-      if (error) {
-        reportLowStockError("profile load failed", error);
-      }
+      if (error) reportError("profile load failed", error);
       setProfile(currentProfile ?? null);
-      await loadRows();
+      await loadPage("", "alerts", 0);
     }
 
     void initialize();
     return () => {
       cancelled = true;
     };
-  }, [loadRows]);
+  }, [loadPage]);
 
-  const summary = useMemo(() => {
-    const alerts = rows.filter((row) => row.is_low_stock);
-    return {
-      products: rows.length,
-      alerts: alerts.length,
-      outOfStock: alerts.filter((row) => numberValue(row.total_available_quantity) <= 0).length,
-      thresholdsSet: rows.filter((row) => numberValue(row.min_stock_level) > 0).length,
-      shortfall: alerts.reduce(
-        (sum, row) =>
-          sum +
-          Math.max(
-            numberValue(row.min_stock_level) - numberValue(row.total_available_quantity),
-            0
-          ),
-        0
-      ),
-    };
-  }, [rows]);
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const firstVisible = totalCount === 0 ? 0 : offset + 1;
+  const lastVisible = Math.min(offset + rows.length, totalCount);
 
-  const filteredRows = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return rows.filter((row) => {
-      if (view === "alerts" && !row.is_low_stock) return false;
-      if (view === "unset" && numberValue(row.min_stock_level) > 0) return false;
-      if (!normalized) return true;
-      return [row.sku, row.barcode, row.product_name, row.brand, row.category]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized));
-    });
-  }, [rows, query, view]);
+  const configuredRatio = useMemo(
+    () => `${formatNumber(summary.summary_thresholds_set)}/${formatNumber(summary.summary_active_products)}`,
+    [summary.summary_active_products, summary.summary_thresholds_set]
+  );
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  function applyFilters() {
+    const nextQuery = query.trim();
+    setAppliedQuery(nextQuery);
+    setAppliedView(view);
+    void loadPage(nextQuery, view, 0);
+  }
 
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const paginatedRows = useMemo(() => {
-    const offset = (currentPage - 1) * pageSize;
-    return filteredRows.slice(offset, offset + pageSize);
-  }, [currentPage, filteredRows, pageSize]);
-
-  const startRow = filteredRows.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const endRow = Math.min(currentPage * pageSize, filteredRows.length);
-  const pageNumbers = getPageNumbers(currentPage, totalPages);
+  function refresh() {
+    void loadPage(appliedQuery, appliedView, offset);
+  }
 
   async function saveThreshold(row: StockRow) {
-    const raw = thresholdDrafts[row.product_id] ?? String(numberValue(row.min_stock_level));
+    const raw = thresholdDrafts[row.product_id] ?? String(n(row.min_stock_level));
     const nextValue = Number(raw);
     if (!Number.isFinite(nextValue) || nextValue < 0) {
-      setErrorMessage("Minimum stock level must be zero or greater.");
+      setErrorMessage("Minimum stock level must be zero or greater. Zero means threshold is unset.");
       setRetryAction(null);
       return;
     }
@@ -216,93 +209,99 @@ export default function LowStockManager() {
     setErrorMessage(null);
     setRetryAction(null);
     setSuccessMessage(null);
+
     const { error } = await supabase
       .from("products")
       .update({ min_stock_level: nextValue })
       .eq("id", row.product_id);
 
     if (error) {
-      reportLowStockError("minimum stock update failed", error);
+      reportError("minimum stock update failed", error);
       setErrorMessage("We couldn’t update the minimum stock level. Please try again.");
       setRetryAction({ type: "threshold", row });
       setSavingId(null);
       return;
     }
 
-    setSuccessMessage(`${row.sku} minimum stock level updated.`);
-    setRetryAction(null);
+    setSuccessMessage(
+      nextValue === 0
+        ? `${row.sku} threshold cleared.`
+        : `${row.sku} minimum stock level updated.`
+    );
     setSavingId(null);
-    await loadRows();
+    await loadPage(appliedQuery, appliedView, 0);
   }
 
-  function exportAlerts() {
-    const alertRows = rows.filter((row) => row.is_low_stock);
-    const header = [
-      "SKU",
-      "Product",
-      "Brand",
-      "Category",
-      "On Hand",
-      "Reserved",
-      "Available",
-      "Minimum",
-      "Shortfall",
-      "Status",
-    ];
-    const lines = alertRows.map((row) => {
-      const state = stockState(row);
-      return [
-        row.sku,
-        row.product_name,
-        row.brand ?? "",
-        row.category ?? "",
-        formatNumber(row.total_quantity),
-        formatNumber(row.total_reserved_quantity),
-        formatNumber(row.total_available_quantity),
-        formatNumber(row.min_stock_level),
-        formatNumber(
-          Math.max(
-            numberValue(row.min_stock_level) - numberValue(row.total_available_quantity),
-            0
-          )
-        ),
-        state.label,
-      ]
-        .map(csvCell)
-        .join(",");
-    });
-    const blob = new Blob([[header.map(csvCell).join(","), ...lines].join("\n")], {
-      type: "text/csv;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `low-stock-${new Date().toISOString().slice(0, 10)}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+  async function exportAlerts() {
+    setIsExporting(true);
+    setErrorMessage(null);
+    try {
+      const allRows: StockRow[] = [];
+      let exportOffset = 0;
+      let exportTotal = Number.POSITIVE_INFINITY;
+
+      while (exportOffset < exportTotal) {
+        const { data, error } = await supabase.rpc("search_low_stock_page", {
+          p_query: appliedQuery || null,
+          p_view: "alerts",
+          p_offset: exportOffset,
+          p_limit: EXPORT_PAGE_SIZE,
+        });
+        if (error) throw error;
+        const page = (data as StockRow[]) ?? [];
+        exportTotal = n(page[0]?.total_count);
+        allRows.push(...page);
+        if (page.length === 0) break;
+        exportOffset += page.length;
+      }
+
+      const date = new Date().toISOString().slice(0, 10);
+      downloadCsv(
+        `low-stock-alerts-${date}.csv`,
+        ["SKU", "Product", "Brand", "Category", "On Hand", "Reserved", "Available", "Minimum", "Threshold", "Status"],
+        allRows.map((row) => [
+          row.sku,
+          row.product_name,
+          row.brand ?? "",
+          row.category ?? "",
+          row.total_quantity,
+          row.total_reserved_quantity,
+          row.total_available_quantity,
+          row.min_stock_level,
+          row.threshold_configured ? "Configured" : "Unset",
+          stockState(row).label,
+        ])
+      );
+    } catch (error) {
+      reportError("export failed", error);
+      setErrorMessage("Low-stock alerts could not be exported. Please try again.");
+      setRetryAction(null);
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   return (
     <div className="space-y-5" aria-busy={isLoading || Boolean(savingId)}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Metric label="Active Products" value={summary.products} />
+        <Metric label="Active Products" value={formatNumber(summary.summary_active_products)} />
         <Metric
-          label="Low Stock Alerts"
-          value={summary.alerts}
-          emphasis={summary.alerts > 0 ? "warning" : "success"}
+          label="Stock Alerts"
+          value={formatNumber(summary.summary_stock_alerts)}
+          emphasis={n(summary.summary_stock_alerts) > 0 ? "warning" : "success"}
         />
         <Metric
           label="Out of Stock"
-          value={summary.outOfStock}
-          emphasis={summary.outOfStock > 0 ? "error" : "default"}
+          value={formatNumber(summary.summary_out_of_stock)}
+          emphasis={n(summary.summary_out_of_stock) > 0 ? "error" : "default"}
         />
-        <Metric label="Thresholds Set" value={`${summary.thresholdsSet}/${summary.products}`} />
-        <Metric label="Total Shortfall" value={formatNumber(summary.shortfall)} />
+        <Metric label="Thresholds Set" value={configuredRatio} />
+        <Metric label="Threshold Shortfall" value={formatNumber(summary.summary_threshold_shortfall)} />
       </div>
 
-      {summary.thresholdsSet === 0 && !isLoading ? (
+      {n(summary.summary_thresholds_set) === 0 && !isLoading ? (
         <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-          Minimum stock thresholds are not configured yet. Use <strong>Threshold Not Set</strong> to assign reorder levels; low-stock alerts become operational once those values are defined.
+          Minimum stock thresholds are not configured yet. <strong>0 means unset.</strong> Out-of-stock alerts remain active even without a threshold; Low Stock starts only after a positive threshold is configured.
         </div>
       ) : null}
 
@@ -315,13 +314,10 @@ export default function LowStockManager() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (retryAction.type === "load") {
-                      void loadRows();
-                      return;
-                    }
-                    void saveThreshold(retryAction.row);
+                    if (retryAction.type === "load") refresh();
+                    else void saveThreshold(retryAction.row);
                   }}
-                  className={`font-medium text-error-800 underline underline-offset-2 dark:text-error-300 ${focusClass}`}
+                  className={`font-medium underline underline-offset-2 ${focusClass}`}
                 >
                   {retryAction.type === "load" ? "Retry" : "Retry update"}
                 </button>
@@ -337,92 +333,63 @@ export default function LowStockManager() {
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Low Stock Control</h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Availability includes reservations. Minimum levels can be maintained by users with product management access.
+              Available = On Hand − Reserved. Out of Stock is independent of thresholds; Low Stock requires a positive minimum.
             </p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              applyFilters();
+            }}
+            className="flex flex-col gap-2 sm:flex-row sm:items-end"
+          >
             <div>
-              <label htmlFor="low-stock-search" className="sr-only">
-                Search low stock products
-              </label>
+              <label htmlFor="low-stock-search" className="sr-only">Search low stock products</label>
               <input
                 id="low-stock-search"
                 type="search"
                 value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search SKU, product, brand..."
                 className={`${inputClass} w-full sm:w-[280px]`}
               />
             </div>
             <div>
-              <label htmlFor="low-stock-view" className="sr-only">
-                Filter low stock products
-              </label>
+              <label htmlFor="low-stock-view" className="sr-only">Filter low stock products</label>
               <select
                 id="low-stock-view"
                 value={view}
-                onChange={(event) => {
-                  setView(event.target.value as ViewFilter);
-                  setCurrentPage(1);
-                }}
+                onChange={(event) => setView(event.target.value as ViewFilter)}
                 className={`${inputClass} min-w-[180px]`}
               >
-                <option value="alerts">Alerts Only</option>
+                <option value="alerts">Stock Alerts</option>
                 <option value="all">All Products</option>
                 <option value="unset">Threshold Not Set</option>
               </select>
             </div>
+            <button type="submit" className={`h-10 rounded-lg bg-gray-900 px-4 text-sm font-medium text-white dark:bg-white dark:text-gray-900 ${focusClass}`}>Apply</button>
+            <button type="button" onClick={refresh} className={`h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 dark:border-gray-800 dark:text-gray-300 ${focusClass}`}>Refresh</button>
             <button
               type="button"
-              onClick={() => void loadRows()}
-              className={`h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
+              onClick={() => void exportAlerts()}
+              disabled={n(summary.summary_stock_alerts) === 0 || isExporting}
+              className={`h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 ${focusClass}`}
             >
-              Refresh
+              {isExporting ? "Exporting..." : "Export Alerts"}
             </button>
-            <button
-              type="button"
-              onClick={exportAlerts}
-              disabled={summary.alerts === 0}
-              className={`h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 ${focusClass}`}
-            >
-              Export Alerts
-            </button>
-          </div>
+          </form>
         </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-[1120px] divide-y divide-gray-100 dark:divide-gray-800">
             <thead className="bg-gray-50 dark:bg-white/[0.02]">
               <tr>
-                {[
-                  "Product",
-                  "Category",
-                  "On Hand",
-                  "Reserved",
-                  "Available",
-                  "Minimum",
-                  "Shortfall",
-                  "Status",
-                  "Action",
-                ].map((label) => (
-                  <th
-                    key={label}
-                    scope="col"
-                    className={`${[
-                      "On Hand",
-                      "Reserved",
-                      "Available",
-                      "Minimum",
-                      "Shortfall",
-                    ].includes(label) ? "text-right" : "text-left"} px-5 py-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400`}
-                  >
+                {["Product", "Category", "On Hand", "Reserved", "Available", "Minimum", "Threshold", "Status", "Action"].map((label) => (
+                  <th key={label} scope="col" className={`${["On Hand", "Reserved", "Available", "Minimum"].includes(label) ? "text-right" : "text-left"} px-5 py-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400`}>
                     {label}
                   </th>
                 ))}
@@ -430,195 +397,92 @@ export default function LowStockManager() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading ? (
-                <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">
-                    Loading stock thresholds...
-                  </td>
-                </tr>
-              ) : paginatedRows.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">
-                    {view === "alerts"
-                      ? "No low-stock alerts right now."
-                      : "No products match the current filters."}
-                  </td>
-                </tr>
-              ) : (
-                paginatedRows.map((row) => {
-                  const state = stockState(row);
-                  const minimum = numberValue(row.min_stock_level);
-                  const available = numberValue(row.total_available_quantity);
-                  const draft = thresholdDrafts[row.product_id] ?? String(minimum);
-                  const changed = Number(draft) !== minimum;
-                  return (
-                    <tr key={row.product_id}>
-                      <td className="px-5 py-4">
-                        <Link
-                          href={`/products/${row.product_id}`}
-                          className={`text-sm font-semibold text-gray-800 transition hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400 ${focusClass}`}
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">Loading stock thresholds...</td></tr>
+              ) : rows.length === 0 ? (
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">No products match the current filters.</td></tr>
+              ) : rows.map((row) => {
+                const state = stockState(row);
+                const minimum = n(row.min_stock_level);
+                const draft = thresholdDrafts[row.product_id] ?? String(minimum);
+                const changed = Number(draft) !== minimum;
+                return (
+                  <tr key={row.product_id}>
+                    <td className="px-5 py-4">
+                      <p className="text-sm font-semibold text-gray-800 dark:text-white/90">{row.sku}</p>
+                      <p className="text-xs text-gray-500">{row.product_name}</p>
+                      {row.barcode ? <p className="text-xs text-gray-400">{row.barcode}</p> : null}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
+                      <p>{row.category || "—"}</p><p className="text-xs text-gray-400">{row.brand || "No brand"}</p>
+                    </td>
+                    <td className="px-5 py-4 text-right text-sm font-medium text-gray-800 dark:text-white/90">{formatNumber(row.total_quantity)}</td>
+                    <td className="px-5 py-4 text-right text-sm text-gray-600 dark:text-gray-300">{formatNumber(row.total_reserved_quantity)}</td>
+                    <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{formatNumber(row.total_available_quantity)}</td>
+                    <td className="px-5 py-4 text-right">
+                      {canEditThresholds ? (
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={draft}
+                          aria-label={`Minimum stock level for ${row.sku}`}
+                          onChange={(event) => setThresholdDrafts((current) => ({ ...current, [row.product_id]: event.target.value }))}
+                          className={`${inputClass} w-24 text-right`}
+                        />
+                      ) : <span className="text-sm text-gray-700 dark:text-gray-300">{formatNumber(row.min_stock_level)}</span>}
+                    </td>
+                    <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{row.threshold_configured ? "Configured" : "Unset"}</td>
+                    <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${state.className}`}>{state.label}</span></td>
+                    <td className="px-5 py-4">
+                      {canEditThresholds ? (
+                        <button
+                          type="button"
+                          disabled={!changed || savingId === row.product_id}
+                          onClick={() => void saveThreshold(row)}
+                          className={`h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 ${focusClass}`}
                         >
-                          {row.sku}
-                        </Link>
-                        <p className="mt-0.5 text-xs text-gray-500">{row.product_name}</p>
-                        {row.barcode ? <p className="text-xs text-gray-400">{row.barcode}</p> : null}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
-                        <p>{row.category || "—"}</p>
-                        <p className="text-xs text-gray-400">{row.brand || "No brand"}</p>
-                      </td>
-                      <td className="px-5 py-4 text-right text-sm font-medium text-gray-800 dark:text-white/90">
-                        {formatNumber(row.total_quantity)}
-                      </td>
-                      <td className="px-5 py-4 text-right text-sm text-gray-600 dark:text-gray-300">
-                        {formatNumber(row.total_reserved_quantity)}
-                      </td>
-                      <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">
-                        {formatNumber(row.total_available_quantity)}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        {canEditThresholds ? (
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={draft}
-                            aria-label={`Minimum stock level for ${row.sku}`}
-                            onChange={(event) =>
-                              setThresholdDrafts((current) => ({
-                                ...current,
-                                [row.product_id]: event.target.value,
-                              }))
-                            }
-                            className={`${inputClass} w-24 text-right`}
-                          />
-                        ) : (
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            {formatNumber(row.min_stock_level)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-right text-sm font-medium text-gray-800 dark:text-white/90">
-                        {row.is_low_stock
-                          ? formatNumber(Math.max(minimum - available, 0))
-                          : "—"}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${state.className}`}>
-                          {state.label}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        {canEditThresholds ? (
-                          <button
-                            type="button"
-                            disabled={!changed || savingId === row.product_id}
-                            onClick={() => void saveThreshold(row)}
-                            aria-label={`Save minimum stock level for ${row.sku}`}
-                            className={`h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
-                          >
-                            {savingId === row.product_id ? "Saving..." : "Save"}
-                          </button>
-                        ) : (
-                          <Link
-                            href={`/products/${row.product_id}`}
-                            className={`text-sm font-medium text-brand-600 transition hover:text-brand-700 dark:text-brand-400 ${focusClass}`}
-                          >
-                            View
-                          </Link>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                          {savingId === row.product_id ? "Saving..." : "Save"}
+                        </button>
+                      ) : <span className="text-xs text-gray-400">View only</span>}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        <div className="flex flex-col gap-4 border-t border-gray-200 px-5 py-4 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-3 text-sm text-gray-500 dark:text-gray-400 sm:flex-row sm:items-center">
-            <p aria-live="polite">
-              Showing {startRow}–{endRow} of {filteredRows.length} matching products
-            </p>
-            <div className="flex items-center gap-2">
-              <label htmlFor="low-stock-page-size" className="text-xs font-medium">
-                Rows per page
-              </label>
-              <select
-                id="low-stock-page-size"
-                value={pageSize}
-                onChange={(event) => {
-                  setPageSize(Number(event.target.value));
-                  setCurrentPage(1);
-                }}
-                className={`${inputClass} h-9 min-w-[76px] py-0`}
-              >
-                {PAGE_SIZE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
+          <p>Showing {firstVisible}–{lastVisible} of {totalCount}</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={offset === 0 || isLoading}
+              onClick={() => void loadPage(appliedQuery, appliedView, Math.max(0, offset - PAGE_SIZE))}
+              className={`h-9 rounded-lg border border-gray-200 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 ${focusClass}`}
+            >Previous</button>
+            <span>Page {currentPage} of {totalPages}</span>
+            <button
+              type="button"
+              disabled={offset + PAGE_SIZE >= totalCount || isLoading}
+              onClick={() => void loadPage(appliedQuery, appliedView, offset + PAGE_SIZE)}
+              className={`h-9 rounded-lg border border-gray-200 px-3 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 ${focusClass}`}
+            >Next</button>
           </div>
-
-          <nav className="flex flex-wrap items-center gap-1" aria-label="Low stock pagination">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={currentPage === 1 || filteredRows.length === 0}
-              className={`h-9 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
-            >
-              Previous
-            </button>
-            {pageNumbers.map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                aria-current={currentPage === page ? "page" : undefined}
-                className={`h-9 min-w-9 rounded-lg px-3 text-sm font-medium transition ${
-                  currentPage === page
-                    ? "bg-brand-500 text-white"
-                    : "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-                } ${focusClass}`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={currentPage === totalPages || filteredRows.length === 0}
-              className={`h-9 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
-            >
-              Next
-            </button>
-          </nav>
         </div>
       </div>
     </div>
   );
 }
 
-function Metric({
-  label,
-  value,
-  emphasis = "default",
-}: {
-  label: string;
-  value: string | number;
-  emphasis?: "default" | "success" | "warning" | "error";
-}) {
-  const valueClass =
-    emphasis === "error"
-      ? "text-error-600 dark:text-error-400"
-      : emphasis === "warning"
-        ? "text-warning-600 dark:text-warning-400"
-        : emphasis === "success"
-          ? "text-success-600 dark:text-success-400"
-          : "text-gray-800 dark:text-white/90";
-
+function Metric({ label, value, emphasis = "default" }: { label: string; value: string; emphasis?: "default" | "success" | "warning" | "error" }) {
+  const valueClass = emphasis === "error"
+    ? "text-error-600 dark:text-error-400"
+    : emphasis === "warning"
+      ? "text-warning-600 dark:text-warning-400"
+      : emphasis === "success"
+        ? "text-success-600 dark:text-success-400"
+        : "text-gray-800 dark:text-white/90";
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
       <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
