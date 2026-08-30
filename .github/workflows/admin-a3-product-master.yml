@@ -45,9 +45,11 @@ jobs:
       - run: npm ci
       - run: npm run smoke:a3-product-master
       - run: node scripts/product-list-ui-contract.mjs
+      - run: node scripts/products-pricing-ui-contract.mjs
       - run: npm run smoke:a1-core-operations
       - run: npm run smoke:a2-warehouse-integrity
       - run: npm run smoke:a2-inventory-movements
+      - run: node scripts/a2-stock-operations-scanning-contract.mjs
       - run: npm run smoke:a2-low-stock-reporting
       - run: npm run smoke:rbac
       - run: npm run typecheck
