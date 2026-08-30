@@ -1,4 +1,5 @@
 name: GC-6 Cabinet Journey
+# Verifies the final Store/Admin GC-6 surface, including direct-route RBAC.
 
 on:
   push:
