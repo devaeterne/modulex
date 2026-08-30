@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
-import { formatDbDecimal, parseDbDecimal } from "@/lib/validation";
+import { calculateDbDecimalBulk, canonicalizeDbDecimal, formatDbDecimal, parseDbDecimal } from "@/lib/validation";
 
 type ProductStatus = "active" | "inactive";
 type StockFilter = "all" | "in_stock" | "out_of_stock";
@@ -61,7 +61,7 @@ function key(productId: string, groupId: string) {
 const PRICE_DECIMAL = { precision: 18, scale: 4, min: 0, allowNull: true } as const;
 function normalize(value: string | undefined) {
   const parsed = parseDbDecimal(value, PRICE_DECIMAL);
-  return parsed.error ? `invalid:${(value ?? "").trim()}` : parsed.value ?? "";
+  return parsed.error ? `invalid:${(value ?? "").trim()}` : canonicalizeDbDecimal(parsed.value, PRICE_DECIMAL);
 }
 function toInput(value: string | number | null | undefined) {
   return formatDbDecimal(value, PRICE_DECIMAL);
@@ -262,8 +262,8 @@ export default function ProductPricesServerTable() {
     setError(null); setSuccess(null);
     const ids = [...selectedIds];
     if (!ids.length) { setError("Select at least one product."); return; }
-    const adjustment = Number(bulkValue.trim().replace(",", "."));
-    if (!Number.isFinite(adjustment)) { setError("Enter a valid bulk adjustment value."); return; }
+    const adjustment = bulkValue.trim().replace(",", ".");
+    if (!adjustment) { setError("Enter a valid bulk adjustment value."); return; }
     if (!bulkTargetGroupId) { setError("Select a target price group."); return; }
     if (bulkMode === "source_percent" && (!bulkSourceGroupId || bulkSourceGroupId === bulkTargetGroupId)) { setError("Select a different source and target price group."); return; }
     try {
@@ -272,17 +272,10 @@ export default function ProductPricesServerTable() {
       let applied = 0, skipped = 0;
       for (const id of ids) {
         const targetKey = key(id, bulkTargetGroupId);
-        const current = Number((next[targetKey] ?? "").replace(",", "."));
-        let result: number | null = null;
-        if (bulkMode === "set_amount") result = adjustment;
-        if (bulkMode === "current_percent" && Number.isFinite(current)) result = current * (1 + adjustment / 100);
-        if (bulkMode === "current_amount" && Number.isFinite(current)) result = current + adjustment;
-        if (bulkMode === "source_percent") {
-          const source = Number((next[key(id, bulkSourceGroupId)] ?? "").replace(",", "."));
-          if (Number.isFinite(source)) result = source * (1 + adjustment / 100);
-        }
-        if (result === null || !Number.isFinite(result) || result < 0) { skipped += 1; continue; }
-        next[targetKey] = result.toFixed(4); applied += 1;
+        const source = bulkMode === "source_percent" ? next[key(id, bulkSourceGroupId)] ?? null : next[targetKey] ?? null;
+        const result = calculateDbDecimalBulk(source, adjustment, bulkMode, PRICE_DECIMAL);
+        if (result.error || result.value === null) { skipped += 1; continue; }
+        next[targetKey] = result.value; applied += 1;
       }
       setDrafts(next);
       setSuccess(skipped ? `Bulk preview applied to ${applied} products; ${skipped} skipped.` : `Bulk preview applied to ${applied} products. Review and save.`);

@@ -20,7 +20,7 @@ const roadmap = read("ADMIN_ROADMAP.md");
 const validationModuleSource = ts.transpileModule(read("src/lib/validation.ts"), {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 }
 }).outputText;
-const { parseDbDecimal, formatDbDecimal } = await import(`data:text/javascript,${encodeURIComponent(validationModuleSource)}`);
+const { parseDbDecimal, formatDbDecimal, canonicalizeDbDecimal, calculateDbDecimalBulk } = await import(`data:text/javascript,${encodeURIComponent(validationModuleSource)}`);
 
 const expectValid = (value, contract, expected, label) => {
   const result = parseDbDecimal(value, contract);
@@ -52,8 +52,23 @@ assert(formatDbDecimal("12.345", marginContract) === "12.345", "three-decimal fo
 assert(formatDbDecimal("100000000000000", moneyContract) === "", "invalid overflow must not format as valid");
 assert(formatDbDecimal("1.23456", marginContract) === "", "invalid scale must not format as valid");
 
+const bulk = (current, adjustment, mode = "current_amount") => calculateDbDecimalBulk(current, adjustment, mode, moneyContract);
+assert(bulk("10.0000", "0.00005").value === "10.0001", "exact amount adjustment must round half-up at four decimals");
+assert(bulk("10.0000", "0.00005", "current_amount").error === null, "exact amount adjustment should be accepted");
+assert(bulk("10.0000", "0.00005", "current_percent").error === null, "exact percent adjustment should be accepted");
+assert(calculateDbDecimalBulk("10.0000", "0.001", "current_percent", moneyContract).value === "10.0001", "percentage result must round deterministically to four decimals");
+assert(bulk("10.0000", "-0.00005").value === "10.0000", "exact subtraction must use DB-compatible half-up rounding at four decimals");
+assert(bulk("99999999999999.9999", "0.0001").error !== null, "bulk overflow must be rejected");
+assert(bulk("0.0000", "-0.0001").error !== null, "negative final amount must be rejected");
+for (const [left, right] of [["1.2", "1.20"], ["1.2000", "1.2"], ["0", "0.0000"], ["-0.000", "0"]]) {
+  assert(canonicalizeDbDecimal(left, moneyContract) === canonicalizeDbDecimal(right, moneyContract), `${left} and ${right} must compare equal`);
+}
+assert(canonicalizeDbDecimal("1.2000", moneyContract) !== canonicalizeDbDecimal("1.2001", moneyContract), "different decimals must compare different");
+
 assert(/parseDbDecimal[\s\S]*precision[\s\S]*scale/.test(validation), "Shared decimal parser must enforce precision and scale");
 assert(/Number\.isFinite\(numericValue\)/.test(validation), "Decimal parser must reject non-finite values");
+assert(/function canonicalizeDbDecimal/.test(validation), "Decimal comparison must expose canonical numeric representation");
+assert(/function calculateDbDecimalBulk/.test(validation) && /BigInt/.test(validation), "Bulk decimal arithmetic must use exact integer-scaled arithmetic");
 assert(/contract\.min[\s\S]*contract\.max/.test(validation), "Decimal parser must enforce configured ranges");
 assert(/return contract\.allowNull === false/.test(validation), "Decimal parser must distinguish nullable and required inputs");
 assert(/parseDbDecimal\(values\.min_stock_level,[\s\S]*precision: 12,[\s\S]*scale: 2,[\s\S]*min: 0/.test(productForm), "Product minimum stock must use numeric(12,2) non-negative validation");
@@ -63,9 +78,11 @@ assert(/precision: 18, scale: 4, min: 0/.test(productPrices), "Product prices mu
 assert(/formatDbDecimal[\s\S]*scale: 4/.test(productPrices), "Product price hydration must preserve four decimal places");
 assert(!/next\[targetKey\] = result\.toFixed\(2\)/.test(productPrices), "Bulk price preview must not truncate to two decimals");
 assert(/parseDbDecimal\(value, PRICE_DECIMAL\)/.test(productPrices), "Invalid price precision/range must be rejected before RPC mutation");
+assert(/calculateDbDecimalBulk/.test(productPrices) && !/currentValue\s*\+\s*parsedValue/.test(productPrices), "Server price bulk arithmetic must use exact decimal helper");
 assert(/set_product_prices_bulk/.test(productPrices), "Product prices must retain the existing RPC mutation boundary");
 assert(!/result\.toFixed\(\s*2\s*\)/.test(legacyProductPrices), "Legacy product price preview must not truncate to two decimals");
 assert(/parseDbDecimal\(raw, \{ precision: 18, scale: 4/.test(legacyProductPrices), "Legacy product price save must enforce numeric(18,4)");
+assert(/calculateDbDecimalBulk/.test(legacyProductPrices) && !/result\.toFixed\(\s*4\s*\)/.test(legacyProductPrices), "Legacy price bulk arithmetic must use exact decimal helper");
 
 assert(/COST_DECIMAL = \{ precision: 18, scale: 4, min: 0/.test(costMargin), "Product costs must use numeric(18,4) validation");
 assert(/MARGIN_DECIMAL = \{ precision: 7, scale: 3, min: 0, max: 100/.test(costMargin), "Margins must use numeric(7,3) with a 0..100 range");
@@ -77,6 +94,7 @@ assert(/nextCosts[\s\S]*formatCostInput[\s\S]*nextMargins[\s\S]*formatMarginInpu
 assert(/default_min_margin_percent[\s\S]*formatMarginInput/.test(costMargin), "Pricing settings hydration must use the margin formatter");
 assert(!/next\[id\] = result\.toFixed\(2\)/.test(costMargin), "Bulk cost preview must not truncate to two decimals");
 assert(/parseDbDecimal\(raw, COST_DECIMAL\)/.test(costMargin), "Cost mutations must validate before the existing RPC");
+assert(/calculateDbDecimalBulk/.test(costMargin) && !/current \* \(1 \+ adjustment \/ 100\)/.test(costMargin), "Cost bulk arithmetic must use exact decimal helper");
 assert(/parseDbDecimal\(raw, MARGIN_DECIMAL\)/.test(costMargin), "Product margin mutations must validate numeric(7,3) and range");
 assert(/set_product_costs_bulk/.test(costMargin), "Product costs must retain the existing RPC mutation boundary");
 assert(/product_margin_settings/.test(costMargin), "Product-specific margin settings boundary must remain covered");

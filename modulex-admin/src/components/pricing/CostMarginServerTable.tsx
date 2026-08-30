@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
-import { formatDbDecimal, parseDbDecimal } from "@/lib/validation";
+import { calculateDbDecimalBulk, canonicalizeDbDecimal, formatDbDecimal, parseDbDecimal } from "@/lib/validation";
 
 type ProductStatus = "active" | "inactive";
 type StockFilter = "all" | "in_stock" | "out_of_stock";
@@ -35,8 +35,8 @@ const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 
 const buttonClass = "inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
 const primaryButtonClass = "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
 
-function normalizeCost(value: string | undefined) { const parsed = parseDbDecimal(value, COST_DECIMAL); return parsed.error ? `invalid:${(value ?? "").trim()}` : parsed.value ?? ""; }
-function normalizeMargin(value: string | undefined) { const parsed = parseDbDecimal(value, MARGIN_DECIMAL); return parsed.error ? `invalid:${(value ?? "").trim()}` : parsed.value ?? ""; }
+function normalizeCost(value: string | undefined) { const parsed = parseDbDecimal(value, COST_DECIMAL); return parsed.error ? `invalid:${(value ?? "").trim()}` : canonicalizeDbDecimal(parsed.value, COST_DECIMAL); }
+function normalizeMargin(value: string | undefined) { const parsed = parseDbDecimal(value, MARGIN_DECIMAL); return parsed.error ? `invalid:${(value ?? "").trim()}` : canonicalizeDbDecimal(parsed.value, MARGIN_DECIMAL); }
 function formatCostInput(value: string | number | null | undefined) { return formatDbDecimal(value, COST_DECIMAL); }
 function formatMarginInput(value: string | number | null | undefined) { return formatDbDecimal(value, MARGIN_DECIMAL); }
 function parse(value: string | undefined) { const raw = (value ?? "").trim().replace(",", "."); if (!raw) return null; const number = Number(raw); return Number.isFinite(number) ? number : null; }
@@ -129,9 +129,9 @@ export default function CostMarginServerTable() {
   }
   async function applyBulkCost() {
     setError(null); setSuccess(null); const ids = [...selectedIds]; if (!ids.length) { setError("Select at least one product."); return; }
-    const adjustment = parse(bulkValue); if (adjustment === null) { setError("Enter a valid adjustment value."); return; }
+    const adjustment = bulkValue.trim().replace(",", "."); if (!adjustment) { setError("Enter a valid adjustment value."); return; }
     try { const hydrated = await hydrateSelectedCosts(ids); const next = { ...hydrated }; let applied = 0, skipped = 0;
-      for (const id of ids) { const current = parse(next[id]); let result: number | null = null; if (bulkMode === "set_amount") result = adjustment; if (bulkMode === "current_percent" && current !== null) result = current * (1 + adjustment / 100); if (bulkMode === "current_amount" && current !== null) result = current + adjustment; if (result === null || !Number.isFinite(result) || result < 0) { skipped += 1; continue; } next[id] = result.toFixed(4); applied += 1; }
+      for (const id of ids) { const result = calculateDbDecimalBulk(next[id] ?? null, adjustment, bulkMode, COST_DECIMAL); if (result.error || result.value === null) { skipped += 1; continue; } next[id] = result.value; applied += 1; }
       setCostDrafts(next); setSuccess(skipped ? `Bulk cost preview applied to ${applied} products; ${skipped} skipped.` : `Bulk cost preview applied to ${applied} products. Review and save.`);
     } catch (err) { setError(err instanceof Error ? err.message : "Unable to load selected costs."); }
   }
