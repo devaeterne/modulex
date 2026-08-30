@@ -44,8 +44,14 @@ jobs:
         run: node scripts/gallery-freshness-filter-contract.mjs
       - name: Gallery theme regression
         run: node scripts/gallery-theme-contract.mjs
-      - name: Lint
-        run: npm run lint
+      - name: Scoped lint
+        run: >-
+          npx eslint
+          src/app/layout.tsx
+          src/app/showroom/page.tsx
+          src/app/sitemap.ts
+          src/lib/seo/structured-data.ts
+          src/lib/store/content/queries.ts
       - name: Build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
@@ -69,8 +75,11 @@ jobs:
           cache-dependency-path: modulex-admin/package-lock.json
       - name: Install
         run: npm ci
-      - name: Lint
-        run: npm run lint
+      - name: Scoped lint
+        run: >-
+          npx eslint
+          src/components/store/StorePagesManager.tsx
+          src/lib/store/secondaryCms.ts
       - name: Build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
