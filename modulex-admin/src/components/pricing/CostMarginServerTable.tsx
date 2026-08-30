@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { hasPermission } from "@/lib/auth/permissions";
 
 type ProductStatus = "active" | "inactive";
 type StockFilter = "all" | "in_stock" | "out_of_stock";
@@ -80,7 +81,7 @@ export default function CostMarginServerTable() {
   const settingsDirty = normalize(defaultMin) !== normalize(originalDefaultMin) || normalize(warningBuffer) !== normalize(originalWarningBuffer);
   useEffect(() => { if (!dirtyCount && !settingsDirty) return; const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; }; window.addEventListener("beforeunload", handler); return () => window.removeEventListener("beforeunload", handler); }, [dirtyCount, settingsDirty]);
 
-  useEffect(() => { let mounted = true; getCurrentProfile().then(({ profile }) => { if (!mounted) return; setHasAccess(profile?.role === "super_admin" || profile?.role === "admin"); }); return () => { mounted = false; }; }, []);
+  useEffect(() => { let mounted = true; getCurrentProfile().then(({ profile }) => { if (!mounted) return; setHasAccess(hasPermission(profile?.roles, "pricing.cost.view")); }); return () => { mounted = false; }; }, []);
 
   const load = useCallback(async () => {
     if (hasAccess !== true) return;

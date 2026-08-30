@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { hasPermission } from "@/lib/auth/permissions";
 
 type PriceGroup = {
   id: string;
@@ -156,10 +157,7 @@ export default function PriceGroupsTable() {
     async function initialize() {
       const { profile } = await getCurrentProfile();
 
-      setCanManage(
-        profile?.role === "super_admin" ||
-        profile?.role === "admin"
-      );
+      setCanManage(hasPermission(profile?.roles, "pricing.manage"));
 
       await loadPriceGroups();
     }

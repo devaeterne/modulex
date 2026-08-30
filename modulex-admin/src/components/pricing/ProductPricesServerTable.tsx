@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { hasPermission } from "@/lib/auth/permissions";
 
 type ProductStatus = "active" | "inactive";
 type StockFilter = "all" | "in_stock" | "out_of_stock";
@@ -185,7 +186,7 @@ export default function ProductPricesServerTable() {
     let mounted = true;
     getCurrentProfile().then(({ profile }) => {
       if (!mounted) return;
-      setCanManage(profile?.role === "super_admin" || profile?.role === "admin");
+      setCanManage(hasPermission(profile?.roles, "pricing.manage"));
     });
     return () => { mounted = false; };
   }, []);
