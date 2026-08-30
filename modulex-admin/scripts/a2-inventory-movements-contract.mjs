@@ -8,9 +8,12 @@ const expect = (ok, message) => {
 };
 
 const migrationPath = "sql/a2-inventory-movements.sql";
+const reversalLockFixPath = "sql/a2-inventory-movements-reversal-lock-fix.sql";
 expect(fs.existsSync(path.join(root, migrationPath)), "A2.2 migration must exist");
+expect(fs.existsSync(path.join(root, reversalLockFixPath)), "A2.2 reversal lock corrective migration must exist");
 
 const migration = read(migrationPath);
+const reversalLockFix = read(reversalLockFixPath);
 const inventoryTable = read("src/components/inventory/InventoryTable.tsx");
 const stockOperationForm = read("src/components/stock-operations/StockOperationForm.tsx");
 const guidedStockOperation = read("src/components/scan/GuidedStockOperation.tsx");
@@ -48,19 +51,24 @@ expect(/drop\s+policy\s+if\s+exists\s+inventory_movements_update_admin_only/i.te
 expect(/drop\s+policy\s+if\s+exists\s+inventory_movements_delete_super_admin_only/i.test(migration), "Legacy movement DELETE policy must be removed");
 expect(/reason/i.test(migration) && /reference_no/i.test(migration), "Movement validation must explicitly address reason/reference traceability");
 
-// Reversal runs as SECURITY INVOKER after UPDATE is revoked on the ledger. It must
-// serialize corrections without SELECT ... FOR UPDATE on inventory_movements,
-// because that row-locking form itself requires UPDATE privilege.
+// Reversal runs as SECURITY INVOKER after UPDATE is revoked on the ledger. The
+// corrective migration is part of the A2.2 bundle and must serialize corrections
+// without SELECT ... FOR UPDATE on inventory_movements, because that row-locking
+// form itself requires UPDATE privilege.
 const reversalFunction =
-  migration.match(/create\s+or\s+replace\s+function\s+public\.reverse_inventory_movement[\s\S]*?\$\$;/i)?.[0] ?? "";
-expect(reversalFunction.length > 0, "A2.2 migration must define reverse_inventory_movement");
+  reversalLockFix.match(/create\s+or\s+replace\s+function\s+public\.reverse_inventory_movement[\s\S]*?\$\$;/i)?.[0] ?? "";
+expect(reversalFunction.length > 0, "A2.2 reversal lock fix must redefine reverse_inventory_movement");
 expect(
-  /pg_advisory_xact_lock[\s\S]{0,180}p_movement_id/i.test(reversalFunction),
+  /pg_advisory_xact_lock[\s\S]{0,220}p_movement_id/i.test(reversalFunction),
   "Movement reversal must serialize by movement ID with an advisory transaction lock",
 );
 expect(
   !/where\s+id\s*=\s*p_movement_id\s+for\s+update/i.test(reversalFunction),
   "Movement reversal must not require UPDATE privilege on the append-only ledger",
+);
+expect(
+  /where\s+id\s*=\s*p_movement_id\s*;/i.test(reversalFunction),
+  "Movement reversal must still read the original immutable movement after acquiring the advisory lock",
 );
 
 console.log("A2.2 inventory + movements contract: PASS");
