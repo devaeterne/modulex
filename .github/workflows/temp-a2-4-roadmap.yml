@@ -1,0 +1,74 @@
+name: Temporary A2.4 Roadmap Update
+
+on:
+  push:
+    branches:
+      - feat/a2-4-low-stock-reporting
+    paths:
+      - .github/workflows/temp-a2-4-roadmap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  roadmap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/a2-4-low-stock-reporting
+      - name: Update A2.4 roadmap release state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('modulex-admin/ADMIN_ROADMAP.md')
+          text = path.read_text()
+          replacements = [
+            (
+              'Main baseline: `9e92f1eb3b89b996d17005538012b6587c24f99f`',
+              'Main baseline: `c5c9af0601a18eda9840ff8c00e401ce0a27c82a`',
+            ),
+            (
+              'Current Admin next action: **A2.3 Stock Operations & Scanning is production-accepted and CI-GREEN; proceed to A2.4 Low-stock & Reporting after merge/deploy verification.**',
+              'Current Admin next action: **A2.4 Low-stock & Reporting is release-candidate complete and CI-GREEN; merge first, then apply the A2.4 production migration, reconcile/advisor-check, verify Admin deploy, and only then close the Phase A2 exit gate.**',
+            ),
+            (
+              '''## A2.4 Low-stock and reporting\n\n- [ ] Define low-stock threshold source of truth.\n- [ ] Verify low-stock views use efficient queries/indexes.\n- [ ] Review inventory and movement reports for correctness and export needs.''',
+              '''## A2.4 Low-stock and reporting\n\n- [x] Define low-stock threshold source of truth.\n  - `products.min_stock_level` is authoritative; `0` means threshold unset. Available remains A2.2 On Hand − Reserved. Out of Stock is threshold-independent, while Low Stock requires a positive configured threshold and positive Available at/below that threshold.\n- [x] Verify low-stock views use efficient queries/indexes.\n  - `v_product_stock_summary` / `v_low_stock_products` remain `security_invoker`; A2.4 adds authenticated SECURITY INVOKER search/summary RPCs with deterministic server-side filtering/pagination and a 500-row page cap for exports.\n  - Production preflight confirmed existing product/inventory/location/movement indexes cover the report join/filter keys used by A2.4. No speculative index is added before a production plan/advisor demonstrates a need.\n- [x] Review inventory and movement reports for correctness and export needs.\n  - Low Stock, Inventory Product, Inventory Location and Movement reports no longer rely on a browser-side latest-1,000-row boundary; filtered aggregates come from PostgreSQL and CSV export exhausts the same filtered RPC in pages.\n  - Read-only production preflight reconciles inventory to 462 On Hand / 3 Reserved / 459 Available and movement source/history to 4 events / 4.00 units. Final production reconciliation remains post-merge because the threshold-semantic migration must ship with the updated Admin client.''',
+            ),
+            (
+              '- [ ] Inventory reports reconcile against source records.',
+              '- [ ] Inventory reports reconcile against source records.\n  - A2.4 read-only preflight reconciliation is PASS. Final exit-gate acceptance remains pending until `a2-low-stock-reporting.sql` is applied in production and the deployed Admin RPC surfaces are reconciled against the post-migration source records.',
+            ),
+            (
+              '  - A2.1 warehouse/location integrity, A2.2 inventory/movement, and A2.3 stock-operations/scanning contracts are permanent Admin workflow gates. A2.3 protects scanner duplicate handling, guided confirmation/error recovery, QR label printing, mobile fallback behavior, and continued use of the A2.2 idempotent write boundary.',
+              '  - A2.1 warehouse/location integrity, A2.2 inventory/movement, A2.3 stock-operations/scanning, and A2.4 low-stock/reporting contracts are permanent Admin workflow gates. A2.4 protects threshold semantics, server-side report paging/aggregates, complete filtered CSV export, and the A2.2 Available quantity model.',
+            ),
+            (
+              '- [x] A2.3 does not add a scan-specific write ledger or new mutation API. Camera/manual scans resolve workflow inputs; confirmed stock changes continue through the A2.2 idempotent RPC + movement-ledger boundary.',
+              '- [x] A2.3 does not add a scan-specific write ledger or new mutation API. Camera/manual scans resolve workflow inputs; confirmed stock changes continue through the A2.2 idempotent RPC + movement-ledger boundary.\n- [x] A2.4 defines `products.min_stock_level = 0` as threshold-unset. Out of Stock remains an alert independent of threshold configuration; Low Stock is only a configured-threshold state. Reporting RPCs are SECURITY INVOKER and do not introduce a second inventory source of truth.',
+            ),
+            (
+              '''Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. **A2.3 — Stock Operations & Scanning is production-accepted and closed.**\n\n1. Merge/deploy the A2.3 acceptance package after final branch checks remain GREEN; verify Admin production is on the merge SHA and has no new runtime errors.\n2. Start **A2.4 — Low-stock & Reporting** from the resulting current `main`.\n3. Define the low-stock threshold source of truth against A2.2 Available semantics and product minimum-stock configuration.\n4. Verify low-stock/report queries and indexes, then reconcile inventory and movement reports against source records and decide export requirements.\n5. Close the Phase A2 exit gate only after A2.4 reporting reconciliation is complete.\n\n**Cross-roadmap coordination:** A2.3 is Admin-only acceptance/hardening and introduces no Store runtime, shared schema, or production stock mutation change; Store production acceptance remains tracked by the Store roadmap.''',
+              '''Primary Admin roadmap work is **Phase A2 — Inventory, Warehouses & Physical Operations**. **A2.4 — Low-stock & Reporting is release-candidate complete; final production acceptance is pending.**\n\n1. Merge the A2.4 package only while final CI remains GREEN.\n2. Apply `modulex-admin/sql/a2-low-stock-reporting.sql` to production Supabase immediately before/with the updated Admin release.\n3. Reconcile production Low Stock / Inventory / Movement RPC results against source records, then run Security + Performance Advisors and record any intentional pre-existing findings.\n4. Verify the Admin production deployment is on the merge SHA and `/low-stock`, `/reports/inventory`, `/reports/movements` use the new production RPCs without runtime errors.\n5. Update A2.4 acceptance to production PASS, check the final Phase A2 reconciliation exit gate, then advance Admin roadmap work to **Phase A3 — Products, Catalog & Pricing Control**.\n\n**Cross-roadmap coordination:** A2.4 is Admin/shared-Supabase inventory reporting work only; it introduces no Store runtime change and does not mutate production inventory/movement data during preflight. Store production acceptance remains tracked by the Store roadmap.''',
+            ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected one roadmap match, found {count}: {old[:100]!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+      - name: Remove temporary workflow and commit
+        run: |
+          rm .github/workflows/temp-a2-4-roadmap.yml
+          git config user.name "devaeterne"
+          git config user.email "info@safaksariyildiz.com"
+          git add modulex-admin/ADMIN_ROADMAP.md .github/workflows/temp-a2-4-roadmap.yml
+          git diff --cached --check
+          git commit -m "docs(admin): record A2.4 release candidate state"
+          git push origin HEAD:feat/a2-4-low-stock-reporting
