@@ -1,33 +1,46 @@
 import fs from "node:fs";
 import path from "node:path";
+
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const expect = (ok, message) => { if (!ok) throw new Error(message); };
-const routes = [
-  ["src/app/(admin)/inventory/page.tsx", "/inventory"],
-  ["src/app/(admin)/stock-movements/page.tsx", "/stock-movements"],
-  ["src/app/(admin)/stock-operations/page.tsx", "/stock-operations"],
-  ["src/app/(admin)/warehouses/page.tsx", "/warehouses"],
-  ["src/app/(admin)/zones/page.tsx", "/zones"],
-  ["src/app/(admin)/locations/page.tsx", "/locations"],
-  ["src/app/(admin)/qr-labels/page.tsx", "/qr-labels"],
-  ["src/app/(admin)/scan/page.tsx", "/scan"],
-  ["src/app/(admin)/shelf-inventory/page.tsx", "/shelf-inventory"],
-];
-for (const [file] of routes) expect(fs.existsSync(path.join(root, file)), `Missing operations route: ${file}`);
-const sidebar = read("src/layout/AppSidebar.tsx");
-for (const [, route] of routes) expect(sidebar.includes(`path: "${route}"`), `Sidebar missing ${route}`);
+
 function collect(dir) {
   const full = path.join(root, dir);
   if (!fs.existsSync(full)) return [];
-  return fs.readdirSync(full, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? collect(path.join(dir, entry.name)) : entry.name.endsWith(".tsx") ? [read(path.join(dir, entry.name))] : []);
+  return fs.readdirSync(full, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? collect(path.join(dir, entry.name))
+      : entry.name.endsWith(".tsx")
+        ? [read(path.join(dir, entry.name))]
+        : []
+  );
 }
-const dirs = ["src/components/inventory", "src/components/stock-movements", "src/components/stock-operations", "src/components/warehouses", "src/components/zones", "src/components/locations", "src/components/qr-labels", "src/components/qr", "src/components/scan"];
-const sources = [...dirs.flatMap(collect), ...routes.map(([file]) => read(file))].join("\n");
-expect(sources.includes("dark:"), "Inventory/Warehouse/QR surfaces must support dark mode");
-expect(sources.includes("overflow-x-auto") || /\b(sm|md|lg|xl):/.test(sources), "Operations surfaces need responsive behavior");
-expect(/aria-|htmlFor=|role=/.test(sources), "Operations surfaces need accessible labels/state");
-expect(/isLoading|loading|Loading/.test(sources) && /error|Error/.test(sources), "Operations surfaces need loading and error handling");
-expect(!sources.includes('href="#"') && !sources.includes("javascript:void") && !sources.includes("TailAdmin"), "Operations surfaces must not ship dead/template controls");
-expect(/inventory\.(view|manage)|warehouse|qr/.test(sidebar.toLowerCase()), "Operations navigation must remain permission-gated");
+
+const surfaces = [
+  { file: "src/app/(admin)/inventory/page.tsx", route: "/inventory", permission: "inventory.view", dirs: ["src/components/inventory"] },
+  { file: "src/app/(admin)/stock-movements/page.tsx", route: "/stock-movements", permission: "inventory.view", dirs: ["src/components/stock-movements"] },
+  { file: "src/app/(admin)/stock-operations/page.tsx", route: "/stock-operations", permission: "inventory.manage", dirs: ["src/components/stock-operations"] },
+  { file: "src/app/(admin)/warehouses/page.tsx", route: "/warehouses", permission: "warehouse.view", dirs: ["src/components/warehouses"] },
+  { file: "src/app/(admin)/zones/page.tsx", route: "/zones", permission: "warehouse.view", dirs: ["src/components/zones"] },
+  { file: "src/app/(admin)/locations/page.tsx", route: "/locations", permission: "warehouse.view", dirs: ["src/components/locations"] },
+  { file: "src/app/(admin)/qr-labels/page.tsx", route: "/qr-labels", permission: "qr.view", dirs: ["src/components/qr-labels", "src/components/qr"] },
+  { file: "src/app/(admin)/scan/page.tsx", route: "/scan", permission: "qr.manage", dirs: ["src/components/scan"] },
+  { file: "src/app/(admin)/shelf-inventory/page.tsx", route: "/shelf-inventory", permission: "qr.manage", dirs: ["src/components/inventory"] },
+];
+
+const sidebar = read("src/layout/AppSidebar.tsx");
+
+for (const surface of surfaces) {
+  expect(fs.existsSync(path.join(root, surface.file)), `Missing operations route: ${surface.file}`);
+  expect(sidebar.includes(`path: "${surface.route}", permission: "${surface.permission}"`), `${surface.route} must remain gated by ${surface.permission}`);
+
+  const source = [read(surface.file), ...surface.dirs.flatMap(collect)].join("\n");
+  expect(source.includes("dark:"), `${surface.route} must support dark mode`);
+  expect(source.includes("overflow-x-auto") || /\b(sm|md|lg|xl):/.test(source), `${surface.route} needs responsive behavior`);
+  expect(/aria-|htmlFor=|role=/.test(source), `${surface.route} needs accessible labels/state`);
+  expect(/isLoading|loading|Loading/.test(source) && /error|Error/.test(source), `${surface.route} needs loading and error handling`);
+  expect(!source.includes('href="#"') && !source.includes("javascript:void") && !source.includes("TailAdmin"), `${surface.route} must not ship dead/template controls`);
+}
+
 console.log("inventory + warehouse + QR UI contract: ok");
