@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  accessibility-contract:
+  store-verification:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,5 +27,65 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: GC-8B accessibility contract
-        run: node scripts/gc8b-accessibility-contract.mjs
+          cache: npm
+          cache-dependency-path: modulex-store/package-lock.json
+      - run: npm ci
+      - run: npm run smoke:gc8b-accessibility
+      - run: npm run smoke:gc8a-store-chrome-seo
+      - run: npm run smoke:gallery-theme
+      - run: npm run smoke:gc5-gallery-projects
+      - run: npm run smoke:public-production
+      - run: npm run smoke:portal-public-navbar
+      - run: npm run smoke:seo-showroom
+      - name: GC-8B scoped lint
+        run: >-
+          npx eslint
+          src/components/GalleryLightbox.tsx
+          src/components/gallery/StoreProjectsGallery.tsx
+          src/components/Navbar.tsx
+          src/components/leads/LeadForm.tsx
+          src/components/Home/Hero.tsx
+          src/lib/store/content/queries.ts
+      - name: Store production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+          NEXT_PUBLIC_SITE_URL: https://oakwellcabinetry.com
+        run: npm run build
+
+  production-lighthouse-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Capture production mobile Lighthouse baseline
+        working-directory: modulex-store
+        run: >-
+          npx --yes lighthouse https://oakwell-phi.vercel.app/
+          --quiet
+          --chrome-flags="--headless --no-sandbox"
+          --only-categories=performance,accessibility,seo
+          --output=json
+          --output-path=./lighthouse-home.json
+      - name: Publish baseline summary
+        working-directory: modulex-store
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const report = JSON.parse(fs.readFileSync("lighthouse-home.json", "utf8"));
+          const score = (key) => Math.round((report.categories[key]?.score ?? 0) * 100);
+          const metric = (key) => report.audits[key]?.numericValue ?? null;
+          const summary = [
+            "## GC-8B production Lighthouse mobile baseline",
+            `- Performance: ${score("performance")}`,
+            `- Accessibility: ${score("accessibility")}`,
+            `- SEO: ${score("seo")}`,
+            `- LCP: ${metric("largest-contentful-paint")?.toFixed(0) ?? "n/a"} ms`,
+            `- CLS: ${metric("cumulative-layout-shift")?.toFixed(3) ?? "n/a"}`,
+            `- TBT: ${metric("total-blocking-time")?.toFixed(0) ?? "n/a"} ms`,
+          ].join("\n");
+          console.log(summary);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+          NODE
