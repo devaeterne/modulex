@@ -101,3 +101,5 @@ A2.3 introduces no production DDL, no parallel scan ledger, and no new stock mut
 Production inventory/movement mutation: NONE
 
 The permanent A2.3 GitHub Actions gate re-runs A2.3 scanner/label contracts together with A2.2 inventory/movement, A2.1 warehouse/location, production-surface, RBAC, lint, and Next.js production-build regressions.
+
+Repository closeout cleanup: PASS — temporary roadmap-update tooling was removed before the final branch verification; only permanent A2.3 plan, acceptance, contract, workflow, and roadmap changes remain.
