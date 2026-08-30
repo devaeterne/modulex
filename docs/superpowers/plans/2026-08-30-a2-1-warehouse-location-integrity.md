@@ -4,7 +4,7 @@
 
 **Goal:** Make warehouse, zone, location, and inventory structure changes fail closed so role boundaries, hierarchy, stock state, and history cannot be silently corrupted.
 
-**Architecture:** Keep the existing Supabase-first Admin architecture. Put integrity and lifecycle rules in Postgres/RLS as the authoritative boundary, retain existing browser reads and mutations, and surface database guard failures through a shared Admin formatter. Avoid introducing a parallel API layer for warehouse structure.
+**Architecture:** Keep the existing Supabase-first Admin architecture. Postgres RLS, constraints, and triggers are authoritative for integrity and lifecycle rules; existing browser mutation surfaces continue to display database `error.message` directly. No parallel warehouse API or duplicate UI error layer is introduced. Location creation/master-data changes remain Admin/Super Admin responsibilities, while the warehouse role keeps the narrow location UPDATE capability required by existing SECURITY INVOKER QR RPCs through a field-level database guard.
 
 **Tech Stack:** Next.js 16, React 19, TypeScript, Supabase/Postgres RLS and triggers, Node contract smoke scripts.
 
@@ -12,8 +12,8 @@
 
 ## Global Constraints
 
-- Location master writes must match `warehouse.manage`: Admin/Super Admin only.
-- Warehouse-role users remain read-only for warehouse structure.
+- Location creation and master-data changes must match `warehouse.manage`: Admin/Super Admin only.
+- Warehouse-role users remain read-only for warehouse structure but retain approved QR operational updates.
 - Active stock or reservations must not be orphaned by deactivation or deletion.
 - Warehouse/location hierarchy must be validated in the database, not only in the UI.
 - Existing audit triggers remain authoritative; no second audit system is introduced.
@@ -26,23 +26,20 @@
 **Files:**
 - Create: `modulex-admin/scripts/a2-warehouse-location-integrity-contract.mjs`
 - Modify: `modulex-admin/package.json`
+- Modify: `.github/workflows/admin-inventory-warehouse-qr-ui.yml`
 
 **Interfaces:**
-- Consumes: repository SQL and Admin component source files.
-- Produces: `npm run smoke:a2-warehouse-integrity` and a permanent assertion set for A2.1.
+- Consumes: repository SQL and existing Admin mutation surfaces.
+- Produces: `npm run smoke:a2-warehouse-integrity` and permanent A2.1 assertions.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing contract**
+  - Initial RED required the missing A2.1 SQL contract and failed in Actions run `33306590705`.
 
-Add assertions that require `sql/a2-warehouse-location-integrity.sql`, Admin-only location policies, RESTRICT-style operational foreign keys, hierarchy/deactivation guard triggers, and shared UI error formatting.
+- [x] **Step 2: Cover QR-role compatibility before hardening UPDATE access**
+  - A second RED explicitly required the warehouse role's existing QR mutation path to survive the hardening; Actions run `33306811410` failed until the field-level role guard was implemented.
 
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `npm run smoke:a2-warehouse-integrity`
-Expected: FAIL because `sql/a2-warehouse-location-integrity.sql` and shared error formatter do not exist.
-
-- [ ] **Step 3: Commit RED evidence**
-
-Commit only the contract and package script.
+- [x] **Step 3: Wire the contract permanently**
+  - `smoke:a2-warehouse-integrity` is part of the Admin `smoke` chain and the inventory/warehouse/QR workflow.
 
 ---
 
@@ -52,86 +49,80 @@ Commit only the contract and package script.
 - Create: `modulex-admin/sql/a2-warehouse-location-integrity.sql`
 
 **Interfaces:**
-- Consumes: existing `warehouses`, `zones`, `locations`, `inventory`, `inventory_movements`, RLS helpers, and audit triggers.
-- Produces: Admin-only location policies; hierarchy guards; active-parent/active-stock lifecycle guards; history-safe foreign keys.
+- Consumes: existing `warehouses`, `zones`, `locations`, `inventory`, `inventory_movements`, RLS helpers, QR RPCs, and audit triggers.
+- Produces: master-data role guards, hierarchy guards, active-parent/active-stock lifecycle guards, and history-safe foreign keys.
 
-- [ ] **Step 1: Replace location write policies**
+- [x] **Step 1: Align location roles without breaking QR operations**
+  - Removed warehouse-role location INSERT and replaced it with `locations_insert_admin_only`.
+  - UPDATE remains RLS-visible to Admin/Super Admin/Warehouse only because existing SECURITY INVOKER QR RPCs update location QR fields.
+  - `private.guard_location_master_role()` allows Admin/Super Admin full master-data changes and limits warehouse-role UPDATEs to QR operational fields; warehouse users cannot change warehouse/zone assignment, name/code/type, aisle/rack/shelf/bin, capacity, or active state.
 
-Drop `locations_insert_admin_or_warehouse` and `locations_update_admin_or_warehouse`; create Admin-only INSERT/UPDATE policies using the existing `is_admin()` helper.
+- [x] **Step 2: Add hierarchy validation functions/triggers**
+  - Location zone must belong to the same warehouse.
+  - Inventory location must belong to the same warehouse as its inventory row.
+  - Zone warehouse changes are rejected while locations remain assigned.
+  - Location warehouse changes are rejected while inventory rows remain assigned.
 
-- [ ] **Step 2: Add hierarchy validation functions/triggers**
+- [x] **Step 3: Add parent-state and deactivation guards**
+  - Active zones require an active warehouse.
+  - Active locations require an active warehouse and, when assigned, an active zone.
+  - Stock/reservations block location deactivation.
+  - Active child locations/stock block zone deactivation.
+  - Active child zones/locations or stock block warehouse deactivation.
 
-Validate `locations.zone_id` belongs to `locations.warehouse_id`; validate `inventory.location_id` belongs to `inventory.warehouse_id`; reject zone warehouse changes that would strand locations and location warehouse changes that would strand inventory.
+- [x] **Step 4: Harden operational foreign keys**
+  - Inventory, zone/location structure, and inventory movement warehouse/location references use `ON DELETE RESTRICT` so physical deletion cannot silently cascade stock away or null historical provenance.
 
-- [ ] **Step 3: Add lifecycle guards**
-
-Reject activating zones under inactive warehouses, activating locations under inactive warehouse/zone parents, and deactivating locations/zones/warehouses while active stock or active children would be orphaned.
-
-- [ ] **Step 4: Harden operational foreign keys**
-
-Replace cascade/set-null warehouse/location/zone relationships that can erase stock or movement provenance with `ON DELETE RESTRICT` while preserving existing update behavior where needed.
-
-- [ ] **Step 5: Run contract to verify GREEN**
-
-Run: `npm run smoke:a2-warehouse-integrity`
-Expected: SQL-side assertions pass; UI formatter assertions remain RED until Task 3.
+- [x] **Step 5: Verify targeted GREEN**
+  - Actions run `33306913730` passed the existing inventory/warehouse/QR contract, A2.1 contract, production-surface, RBAC, lint, and Next.js production build.
 
 ---
 
-### Task 3: Surface lifecycle failures consistently in Admin
+### Task 3: Keep operator-facing errors database-authoritative
 
 **Files:**
-- Create: `modulex-admin/src/lib/inventory/warehouse-structure-errors.ts`
-- Modify: `modulex-admin/src/components/warehouses/WarehouseForm.tsx`
-- Modify: `modulex-admin/src/components/warehouses/WarehousesTable.tsx`
-- Modify: `modulex-admin/src/components/zones/ZoneForm.tsx`
-- Modify: `modulex-admin/src/components/zones/ZonesTable.tsx`
-- Modify: `modulex-admin/src/components/locations/LocationForm.tsx`
-- Modify: `modulex-admin/src/components/locations/LocationsTable.tsx`
+- Existing warehouse/zone/location forms and tables remain unchanged.
 
 **Interfaces:**
-- Produces: `formatWarehouseStructureError(error)` returning concise operator-facing messages without hiding unknown database errors.
+- Existing mutation surfaces already render Supabase `error.message` directly.
 
-- [ ] **Step 1: Implement the minimal formatter**
+- [x] **Step 1: Put actionable failure messages in the database guards**
+  - Stock-blocked operations instruct operators to move stock first.
+  - Parent/child lifecycle errors state the required deactivation order.
+  - Hierarchy errors explain the same-warehouse requirement.
+  - Warehouse-role violations explain that only QR operational fields are allowed.
 
-Map A2.1 guard messages/constraint codes to actionable text; fall back to the original Supabase message.
-
-- [ ] **Step 2: Use the formatter at all structure mutation surfaces**
-
-Replace direct `setErrorMessage(error.message)` calls for warehouse/zone/location writes and status toggles.
-
-- [ ] **Step 3: Run the A2.1 contract**
-
-Run: `npm run smoke:a2-warehouse-integrity`
-Expected: PASS.
+- [x] **Step 2: Avoid duplicate UI error translation**
+  - A temporary formatter was intentionally removed after verification showed the existing mutation surfaces already propagate the authoritative guard messages. This keeps one source of truth for operational failures.
 
 ---
 
 ### Task 4: Apply and verify production schema safely
 
 **Files:**
-- Modify: `modulex-admin/ADMIN_ROADMAP.md`
+- `modulex-admin/ADMIN_ROADMAP.md` Phase A2.1 closeout is the remaining project-status update.
 
 **Interfaces:**
-- Consumes: reviewed A2.1 SQL.
-- Produces: production DB hardening plus documented acceptance evidence.
+- Consumes: committed A2.1 SQL.
+- Produces: production DB hardening plus acceptance evidence.
 
-- [ ] **Step 1: Apply reviewed SQL to production**
+- [x] **Step 1: Preflight exact DDL in production with rollback**
+  - The reviewed DDL executed successfully inside an explicit `BEGIN ... ROLLBACK` transaction before permanent application.
 
-Execute the exact committed A2.1 SQL through the connected Supabase project.
+- [x] **Step 2: Apply reviewed SQL to production**
+  - Supabase migration `20260830103947_a2_warehouse_location_integrity` applied successfully.
 
-- [ ] **Step 2: Run catalog verification**
+- [x] **Step 3: Verify the live catalog**
+  - All eight A2 trigger families are enabled.
+  - Location INSERT is Admin-only and warehouse-role UPDATE is field-guarded to preserve QR operations.
+  - All nine targeted warehouse/location/history foreign keys report `ON DELETE RESTRICT`.
 
-Confirm location write policies are Admin-only, the new guard triggers are enabled, and targeted foreign keys are `RESTRICT` rather than cascade/set-null.
+- [x] **Step 4: Run rollback acceptance**
+  - Transaction-scoped acceptance proved a temporary warehouse-role subject can perform a QR-only location update but receives `42501` for master-data changes.
+  - Stocked location deactivation and active warehouse deactivation were rejected by the new guards.
+  - The transaction rolled back; post-acceptance production counts and hierarchy mismatch counts were unchanged.
 
-- [ ] **Step 3: Run rollback acceptance**
-
-Inside explicit transactions, verify representative invalid hierarchy/deactivation operations fail and valid unchanged operations remain possible; rollback all test mutations.
-
-- [ ] **Step 4: Run security/performance advisors and deterministic application verification**
-
-Run the A2.1 contract, main Admin smoke chain, lint, and production build. Review Supabase advisor output for A2.1-specific findings.
-
-- [ ] **Step 5: Close A2.1 roadmap items**
-
-Document role parity, hierarchy rules, lifecycle protections, production acceptance, and verification evidence in `ADMIN_ROADMAP.md`.
+- [x] **Step 5: Run advisors and deterministic application verification**
+  - Post-DDL Security/Performance Advisor review found no A2.1-specific new finding; existing Store/support/HR/security and unused-index backlog remains separate.
+  - Actions run `33306913730` passed A2.1 + inventory/warehouse/QR + production-surface + RBAC + lint + production build.
+  - Actions run `33306913738` additionally passed Admin A1 regressions, Store portal boundary checks, lint, and production builds on the same branch head.
