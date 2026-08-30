@@ -10,13 +10,19 @@ import {
   type StorePage,
 } from "@/lib/store/secondaryCms";
 
+function defaultPageTitle(slug: ControlledPageSlug) {
+  if (slug === "about") return "About Oakwell Cabinetry";
+  if (slug === "showroom") return "Oakwell Cabinetry Showroom Information";
+  return "Projects";
+}
+
 function emptyPage(slug: ControlledPageSlug): StorePage {
   return {
     id: null,
     slug,
     status: "draft",
     eyebrow: null,
-    title: slug === "about" ? "About Oakwell Cabinetry" : "Projects",
+    title: defaultPageTitle(slug),
     intro: null,
     body: null,
     hero_image_url: null,
@@ -99,7 +105,7 @@ export default function StorePagesManager() {
       <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
         <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Secondary Store Pages</h1>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-          Manage the controlled About and Gallery page records. Saving a draft never publishes content; publishing is an explicit action.
+          Manage the controlled About, Gallery, and Showroom page records. Saving a draft never publishes content; publishing is an explicit action.
         </p>
         {error ? <p className="mt-3 text-sm text-error-600">{error}</p> : null}
       </section>

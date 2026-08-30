@@ -1,4 +1,4 @@
-export const CONTROLLED_PAGE_SLUGS = ["about", "gallery"] as const;
+export const CONTROLLED_PAGE_SLUGS = ["about", "gallery", "showroom"] as const;
 export type ControlledPageSlug = (typeof CONTROLLED_PAGE_SLUGS)[number];
 
 export const PROJECT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

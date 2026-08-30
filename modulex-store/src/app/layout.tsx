@@ -87,7 +87,7 @@ export default async function RootLayout({
     <html lang={siteConfig.language}>
       <body>
         <AnalyticsProvider settings={marketing} />
-        <JsonLd data={[createOrganizationJsonLd(), createWebSiteJsonLd()]} />
+        <JsonLd data={[createOrganizationJsonLd(company), createWebSiteJsonLd()]} />
         <StoreChrome
           company={company}
           siteSettings={siteSettings}
