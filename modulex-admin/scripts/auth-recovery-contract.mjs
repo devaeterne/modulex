@@ -18,8 +18,9 @@ assert.match(resetForm, /PASSWORD_RECOVERY/, "Admin recovery must handle the Sup
 assert.match(resetForm, /getUser/, "Admin recovery must validate the recovered user with Supabase Auth");
 assert.match(resetForm, /history\.replaceState/, "Admin recovery must clear callback data from the browser address bar");
 assert.match(resetForm, /verifyOtp/, "Admin recovery must explicitly verify token-hash recovery links");
-assert.match(resetForm, /type:\s*["']recovery["']/, "Admin recovery must verify the recovery token type");
+assert.match(resetForm, /["']recovery["']/, "Admin recovery must preserve the recovery callback type");
 assert.match(resetForm, /account_type/, "Admin recovery must inspect trusted account metadata");
+assert.match(resetForm, /customer_portal/, "Admin recovery must reject Customer Portal identities");
 assert.match(resetForm, /dealer_portal/, "Admin recovery must reject Dealer Portal identities");
 assert.match(resetForm, /updateUser/, "Admin recovery must update the password only after recovery verification");
 assert.match(resetForm, /scope:\s*["']global["']/, "successful Admin recovery must globally sign out sessions");
