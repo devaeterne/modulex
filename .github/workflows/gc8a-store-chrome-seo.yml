@@ -10,98 +10,19 @@ on:
       - "modulex-admin/src/lib/store/**"
       - "modulex-admin/src/app/(admin)/store/content/**"
       - ".github/workflows/gc8a-store-chrome-seo.yml"
+  pull_request:
+    paths:
+      - "modulex-store/**"
+      - "modulex-admin/src/components/store/**"
+      - "modulex-admin/src/lib/store/**"
+      - "modulex-admin/src/app/(admin)/store/content/**"
+      - ".github/workflows/gc8a-store-chrome-seo.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  roadmap-sync:
-    if: github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: feat/gc8a-store-chrome-seo
-      - name: Update Store and Granite roadmaps
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          store_path = Path("modulex-store/STORE_ROADMAP.md")
-          store = store_path.read_text()
-          store = re.sub(r"Main baseline: `[^`]+`", "Main baseline: `cc670f511225c6e57b48c1bae321ef986f7da93c`", store, count=1)
-          store = re.sub(
-              r"Current Granite migration status: \*\*.*?\*\*\n",
-              "Current Granite migration status: **GC-5, GC-6 and GC-7 are production-accepted. GC-7 live homepage acceptance is recorded after PR #167 / commit `74013f90561e023b0453aea57cd010456de2c597`. GC-8A — managed public navigation/footer + technical SEO — is implementation/data/CI complete on its conflict-safe latest-main branch; PR merge/deploy and live acceptance remain the final closeout gate before `[x]`.**\n",
-              store,
-              count=1,
-          )
-          store = re.sub(
-              r"### Granite GC-6 — Cabinet Journey / FAQ extension\n\n.*?(?=### Granite GC-7 — Reviews / Social Proof)",
-              """### Granite GC-6 — Cabinet Journey / FAQ extension\n\n- [x] Publish a CMS-backed cabinet planning/customer-journey surface.\n  - Production live acceptance is complete: `/cabinet-process` returns HTTP 200 with 4 process steps, 6 FAQs, consultation CTA, FAQ structured data and sitemap inclusion.\n  - Anonymous direct reads remain denied; unsupported source promotions, guarantees and SLAs remain omitted.\n\n""",
-              store,
-              flags=re.S,
-          )
-          store = re.sub(
-              r"### Granite GC-7 — Reviews / Social Proof\n\n.*?(?=## 2\.1\.2 Shared Store chrome)",
-              """### Granite GC-7 — Reviews / Social Proof\n\n- [x] Publish source-identified social proof without converting parent-company reviews into Oakwell reviews.\n  - Production acceptance completed after PR #167 / commit `74013f90561e023b0453aea57cd010456de2c597`; live homepage verification confirmed two source-linked Granite & Cabinet Center excerpts with visible parent attribution and no inferred rating.\n  - Admin remains `store.manage`-gated; anon direct table reads remain denied and the public RPC exposes only published attributed rows.\n\n""",
-              store,
-              flags=re.S,
-          )
-          store = store.replace("- [ ] Make primary navigation configurable from approved site settings/CMS data if business navigation is expected to change without deployment.", "- [x] Make primary navigation configurable from approved site settings/CMS data if business navigation is expected to change without deployment.")
-          store = store.replace("- [ ] Review footer sections and links for CMS configurability.", "- [x] Review footer sections and links for CMS configurability.")
-          store = store.replace("- [ ] Ensure public Navbar and portal Navbar coexist without breaking the portal sidebar experience.", "- [x] Ensure public Navbar and portal Navbar coexist without breaking the portal sidebar experience.")
-          store = store.replace("- [ ] Add a clear path from Customer/Dealer portal back to the public site.", "- [x] Add a clear path from Customer/Dealer portal back to the public site.")
-          store = store.replace("- [ ] GC-5 — Projects / Gallery migration.", "- [x] GC-5 — Projects / Gallery migration.")
-          store = store.replace("- [ ] GC-6 — Cabinet content / customer journey.", "- [x] GC-6 — Cabinet content / customer journey.")
-          store = store.replace("- [ ] GC-7 — Reviews / social proof.", "- [x] GC-7 — Reviews / social proof.")
-          store = store.replace("- [ ] GC-8 — Navigation/footer, SEO, accessibility & performance QA.", "- [~] GC-8 — Navigation/footer, SEO, accessibility & performance QA. GC-8A implementation/data/CI complete; live acceptance pending, GC-8B remains next.")
-          store = re.sub(
-              r"# Next Action\n[\s\S]*\Z",
-              """# Next Action\n\n1. Merge/deploy **GC-8A — managed Store chrome + technical SEO** only after final branch CI is green and the PR remains `behind_by = 0`.\n2. Post-merge, verify live public nav/footer order, portal coexistence, Oakwell-facing Organization JSON-LD with Granite & Cabinet Center as distinct parent, managed-title de-duplication, canonical/robots/sitemap behavior, and no Granite runtime backend/media dependency; then mark GC-8A `[x]` in the closeout.\n3. Proceed to **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning**.\n""",
-              store,
-          )
-          store_path.write_text(store)
-
-          migration_path = Path("modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md")
-          migration = migration_path.read_text()
-          marker = "GC-4 production acceptance: `modulex-store/docs/granite-center/GC4_PRODUCTION_ACCEPTANCE.md`\n"
-          if "GC-8A design:" not in migration:
-              migration = migration.replace(marker, marker + "GC-8A design: `modulex-store/docs/superpowers/specs/2026-08-30-gc8a-store-chrome-seo-design.md`\nGC-8A implementation plan: `modulex-store/docs/superpowers/plans/2026-08-30-gc8a-store-chrome-seo.md`\n")
-          migration = re.sub(
-              r"## GC-7 — Reviews / social proof\n\n.*?(?=## GC-8 — Navigation, footer, SEO, accessibility & performance QA)",
-              """## GC-7 — Reviews / social proof\n\nGoal: add trust signals with correct source identity.\n\n- `[x]` implement/manage review/testimonial domain;\n- `[x]` import only approved source-linked excerpts/data;\n- `[x]` enforce parent attribution;\n- `[x]` avoid third-party broken widgets;\n- `[x]` verify a parent review cannot render as Oakwell-specific by mistake.\n\n**GC-7 production closeout — 2026-08-30:** PR #167 / commit `74013f90561e023b0453aea57cd010456de2c597` is production-accepted. Live homepage verification confirmed two Granite & Cabinet Center excerpts with source identity/HTTPS citation/visible parent attribution and no inferred rating; anon direct testimonial-table read remains denied.\n\n**Exit gate:** `[x]` every visible review has valid identity/source/attribution and can be managed from Admin.\n\n""",
-              migration,
-              flags=re.S,
-          )
-          migration = re.sub(
-              r"## GC-8 — Navigation, footer, SEO, accessibility & performance QA\n\n.*?(?=---\n\n# 9\. Current Scope Decisions)",
-              """## GC-8 — Navigation, footer, SEO, accessibility & performance QA\n\n### GC-8A — Managed Store chrome + technical SEO\n\nStatus: `[~]` implementation/data/CI complete; PR merge/deploy + live acceptance pending.\n\n- `[x]` add typed `store_chrome_items` with code-owned placement/destination allowlists, Admin-only direct access and narrow published-only public RPC;\n- `[x]` preserve current public chrome as exactly 11 approved rows: 6 primary + 2 Footer Products + 3 Footer Company;\n- `[x]` prove draft-first rollout: 11 draft / 0 public before controlled publication, anon direct table read denied, anon RPC execution allowed;\n- `[x]` publish and verify the exact 11-row ordered projection;\n- `[x]` make Navbar/Footer consume published data while keeping Account/Contact code-owned and preserving `/account` + `/dealer` portal shell behavior;\n- `[x]` add Store-only Admin editing inside existing `/store/content` with the same eight destination keys and no arbitrary href input;\n- `[x]` fix managed SEO-title duplication using absolute managed titles;\n- `[x]` model Oakwell as the public Organization/Brand and Granite & Cabinet Center as `parentOrganization` when the legal parent differs;\n- `[x]` audit canonical/robots/sitemap readiness and reject Granite runtime backend/media hotlinks;\n- `[x]` Store/Admin contracts, RBAC, scoped lint and production builds verified; final conflict-safe branch is based on latest `main` with no A1 business files or `ADMIN_ROADMAP.md` changes;\n- `[~]` post-merge live acceptance: nav/footer, portal coexistence, JSON-LD, titles, canonical/robots/sitemap and deployment commit match.\n\n**GC-8A exit gate:** code/data/CI are complete; mark `[x]` only after merge/deploy and live production acceptance.\n\n### GC-8B — Accessibility + performance acceptance\n\n- `[ ]` alt-text/accessibility audit;\n- `[ ]` keyboard/mobile/lightbox/form QA;\n- `[ ]` Lighthouse/Core Web Vitals baseline vs post-migration;\n- `[ ]` LCP/CLS media verification;\n- `[ ]` final sitemap/indexing verification;\n- `[ ]` final lint/build/smoke/live checks after tuning.\n\n**GC-8 exit gate:** migration is production-verified; mutable business content is managed through Admin/Supabase and Store contains behavior/layout rather than production content constants.\n\n""",
-              migration,
-              flags=re.S,
-          )
-          migration = re.sub(
-              r"# 10\. Next Action\n[\s\S]*\Z",
-              """# 10. Next Action\n\n1. Complete GC-8A PR merge/deploy and live acceptance; do not mark GC-8A `[x]` before the production deployment/commit and public/portal/SEO checks pass.\n2. Then execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from the latest `main`.\n3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend.\n""",
-              migration,
-          )
-          migration_path.write_text(migration)
-          PY
-      - name: Commit roadmap status
-        shell: bash
-        run: |
-          if git diff --quiet -- modulex-store/STORE_ROADMAP.md modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add modulex-store/STORE_ROADMAP.md modulex-store/docs/OAKWELL_GRANITE_CENTER_MIGRATION_ROADMAP.md
-          git commit -m "docs(store): record GC-8A implementation status [skip ci]"
-          git push origin HEAD:feat/gc8a-store-chrome-seo
-
   store-gc8a-verification:
     runs-on: ubuntu-latest
     defaults:
