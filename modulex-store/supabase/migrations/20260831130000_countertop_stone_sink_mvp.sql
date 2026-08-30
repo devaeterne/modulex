@@ -31,21 +31,162 @@ create or replace function public.calculate_countertop_price(p_stone_product_id 
 revoke all on function public.calculate_countertop_price(uuid,uuid,numeric,uuid,numeric,uuid,jsonb,numeric) from public,anon; grant execute on function public.calculate_countertop_price(uuid,uuid,numeric,uuid,numeric,uuid,jsonb,numeric) to authenticated;
 create or replace function public.attach_countertop_configuration(p_order_item_id uuid,p_stone_product_id uuid,p_price_group_id uuid,p_sqft numeric,p_edge_profile_id uuid default null,p_edge_linear_ft numeric default 0,p_sink_product_id uuid default null,p_services jsonb default '[]'::jsonb,p_configuration jsonb default '{}'::jsonb,p_manual_material_price numeric default null,p_slab_quantity numeric default 1,p_override_reason text default null) returns uuid language plpgsql security definer set search_path=pg_catalog,public as $$ declare v_order_id uuid; v_snapshot jsonb; v_subtotal numeric(18,4); v_actor uuid:=auth.uid(); begin if not public.current_user_has_any_role(array['super_admin','admin','sales']) then raise exception 'You do not have permission to configure countertop order items.'; end if; if p_slab_quantity<=0 then raise exception 'Slab quantity must be greater than zero.'; end if; if p_manual_material_price is not null and nullif(btrim(coalesce(p_override_reason,'')),'') is null then raise exception 'Override reason is required.'; end if; select oi.order_id into v_order_id from public.customer_order_items oi join public.customer_orders o on o.id=oi.order_id where oi.id=p_order_item_id and o.status='draft'; if v_order_id is null then raise exception 'Countertop configuration is only editable on draft orders.'; end if; v_snapshot:=public.calculate_countertop_price(p_stone_product_id,p_price_group_id,p_sqft,p_edge_profile_id,p_edge_linear_ft,p_sink_product_id,p_services,p_manual_material_price); v_subtotal:=(v_snapshot->>'subtotal')::numeric; update public.customer_order_items set product_id=p_stone_product_id,countertop_reservation_quantity=p_slab_quantity,sku_snapshot=v_snapshot->'stone'->>'sku',product_name_snapshot=v_snapshot->'stone'->>'name',quantity=1,unit_price=v_subtotal,discount_amount=0,line_subtotal=v_subtotal,line_total=v_subtotal,price_source=case when p_manual_material_price is null then 'price_group' else 'manual' end where id=p_order_item_id; insert into public.countertop_configurations(order_id,order_item_id,stone_product_id,sink_product_id,price_group_id,sqft,edge_linear_ft,slab_quantity,manual_price_per_sqft,override_reason,overridden_by,overridden_at,configuration,pricing_snapshot,subtotal) values(v_order_id,p_order_item_id,p_stone_product_id,p_sink_product_id,p_price_group_id,p_sqft,p_edge_linear_ft,p_slab_quantity,p_manual_material_price,nullif(btrim(p_override_reason),''),case when p_manual_material_price is null then null else v_actor end,case when p_manual_material_price is null then null else now() end,jsonb_build_object('client_notes',p_configuration->'notes'),v_snapshot,v_subtotal) on conflict(order_item_id) do update set stone_product_id=excluded.stone_product_id,sink_product_id=excluded.sink_product_id,price_group_id=excluded.price_group_id,sqft=excluded.sqft,edge_linear_ft=excluded.edge_linear_ft,slab_quantity=excluded.slab_quantity,manual_price_per_sqft=excluded.manual_price_per_sqft,override_reason=excluded.override_reason,overridden_by=excluded.overridden_by,overridden_at=excluded.overridden_at,configuration=excluded.configuration,pricing_snapshot=excluded.pricing_snapshot,subtotal=excluded.subtotal,updated_at=now(); return p_order_item_id; end; $$;
 revoke all on function public.attach_countertop_configuration(uuid,uuid,uuid,numeric,uuid,numeric,uuid,jsonb,jsonb,numeric,numeric,text) from public,anon; grant execute on function public.attach_countertop_configuration(uuid,uuid,uuid,numeric,uuid,numeric,uuid,jsonb,jsonb,numeric,numeric,text) to authenticated;
-
--- Reconcile the extra physical slab quantity after the existing order reservation trigger.
-create or replace function private.reserve_countertop_slab_delta(p_order_item_id uuid) returns void language plpgsql security definer set search_path = public, pg_temp as $$
-declare v record; v_target numeric(18,4); v_active numeric(18,4); v_needed numeric(18,4); r record; take_qty numeric(18,4);
+create or replace function private.reserve_customer_order_item_stock(p_order_item_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_item record;
+  v_consumed numeric(18,4) := 0;
+  v_active numeric(18,4) := 0;
+  v_target numeric(18,4) := 0;
+  v_needed numeric(18,4) := 0;
+  v_excess numeric(18,4) := 0;
+  v_take numeric(18,4) := 0;
+  v_res record;
+  v_inv record;
 begin
-  select oi.id,oi.order_id,oi.product_id,oi.sku_snapshot,oi.product_name_snapshot,coalesce(cc.slab_quantity,oi.quantity) target_qty,o.order_number,o.status into v from public.customer_order_items oi join public.customer_orders o on o.id=oi.order_id left join public.countertop_configurations cc on cc.order_item_id=oi.id where oi.id=p_order_item_id;
-  if not found or not private.order_status_reserves_stock(v.status) then return; end if;
-  select coalesce(sum(remaining_quantity) filter(where status='active'),0) into v_active from public.customer_order_reservations where order_item_id=p_order_item_id;
-  v_needed:=greatest(v.target_qty-v_active,0); if v_needed<=0 then return; end if;
-  for r in select i.id,i.product_id,i.warehouse_id,i.location_id,i.quantity-i.reserved_quantity available_quantity from public.inventory i join public.warehouses w on w.id=i.warehouse_id join public.locations l on l.id=i.location_id where i.product_id=v.product_id and w.is_active and w.warehouse_type='sellable' and l.is_active and i.quantity-i.reserved_quantity>0 order by w.code,l.code,i.id for update of i loop
-    exit when v_needed<=0; take_qty:=least(r.available_quantity,v_needed); update public.inventory set reserved_quantity=reserved_quantity+take_qty where id=r.id; insert into public.customer_order_reservations(order_id,order_item_id,product_id,warehouse_id,location_id,order_number_snapshot,sku_snapshot,product_name_snapshot,quantity,status,created_by) values(v.order_id,v.id,v.product_id,r.warehouse_id,r.location_id,v.order_number,v.sku_snapshot,v.product_name_snapshot,take_qty,'active',auth.uid()); insert into public.inventory_movements(product_id,from_warehouse_id,from_location_id,movement_type,quantity,reference_no,reason,notes,created_by) values(v.product_id,r.warehouse_id,r.location_id,'reservation',take_qty,'ORDER:'||v.order_number,'Countertop slab reservation','Additional slabs for countertop job',auth.uid()); v_needed:=v_needed-take_qty;
+  select oi.id, oi.order_id, oi.product_id, oi.quantity,
+         oi.sku_snapshot, oi.product_name_snapshot,
+         o.order_number, o.status as order_status
+  into v_item
+  from public.customer_order_items oi
+  join public.customer_orders o on o.id = oi.order_id
+  where oi.id = p_order_item_id
+  for share of oi, o;
+
+  if not found or v_item.product_id is null then return; end if;
+  if not private.order_status_reserves_stock(v_item.order_status) then return; end if;
+
+  select
+    coalesce(sum(r.consumed_quantity), 0),
+    coalesce(sum(r.remaining_quantity) filter (
+      where r.status = 'active' and r.remaining_quantity > 0
+    ), 0)
+  into v_consumed, v_active
+  from public.customer_order_reservations r
+  where r.order_item_id = p_order_item_id;
+
+  -- Countertop jobs reserve physical slabs independently from commercial job quantity.
+  v_target := greatest(coalesce((select cc.slab_quantity from public.countertop_configurations cc where cc.order_item_id = p_order_item_id), v_item.quantity) - v_consumed, 0);
+
+  if v_active > v_target then
+    v_excess := v_active - v_target;
+
+    for v_res in
+      select r.id, r.product_id, r.warehouse_id, r.location_id,
+             r.order_number_snapshot, r.remaining_quantity
+      from public.customer_order_reservations r
+      where r.order_item_id = p_order_item_id
+        and r.status = 'active'
+        and r.remaining_quantity > 0
+      order by r.created_at desc, r.id desc
+      for update
+    loop
+      exit when v_excess <= 0;
+      v_take := least(v_res.remaining_quantity, v_excess);
+
+      perform 1
+      from public.inventory i
+      where i.product_id = v_res.product_id
+        and i.warehouse_id = v_res.warehouse_id
+        and i.location_id = v_res.location_id
+      for update;
+
+      if not found then
+        raise exception 'ORDER_RESERVATION_INVENTORY_MISSING: inventory record not found for reservation %', v_res.id;
+      end if;
+
+      update public.inventory
+      set reserved_quantity = reserved_quantity - v_take
+      where product_id = v_res.product_id
+        and warehouse_id = v_res.warehouse_id
+        and location_id = v_res.location_id
+        and reserved_quantity >= v_take;
+
+      if not found then
+        raise exception 'ORDER_RESERVATION_DRIFT: inventory reserved quantity is lower than order reservation %', v_res.id;
+      end if;
+
+      insert into public.inventory_movements (
+        product_id, from_warehouse_id, from_location_id, movement_type,
+        quantity, reference_no, reason, notes, created_by
+      ) values (
+        v_res.product_id, v_res.warehouse_id, v_res.location_id, 'release',
+        v_take, 'ORDER:' || v_res.order_number_snapshot,
+        'Customer order reservation reconciliation',
+        'Reservation reduced after order line change', auth.uid()
+      );
+
+      update public.customer_order_reservations
+      set released_quantity = released_quantity + v_take,
+          status = case when remaining_quantity - v_take <= 0 then 'released' else 'active' end,
+          released_at = case when remaining_quantity - v_take <= 0 then now() else released_at end,
+          updated_at = now()
+      where id = v_res.id;
+
+      v_excess := v_excess - v_take;
+    end loop;
+
+    v_active := v_target;
+  end if;
+
+  v_needed := v_target - v_active;
+  if v_needed <= 0 then return; end if;
+
+  for v_inv in
+    select i.id as inventory_id, i.product_id, i.warehouse_id, i.location_id,
+           i.quantity - i.reserved_quantity as available_quantity,
+           w.code as warehouse_code, l.code as location_code
+    from public.inventory i
+    join public.warehouses w on w.id = i.warehouse_id
+    join public.locations l on l.id = i.location_id
+    where i.product_id = v_item.product_id
+      and w.is_active = true
+      and w.warehouse_type = 'sellable'
+      and l.is_active = true
+      and i.quantity - i.reserved_quantity > 0
+    order by w.code, l.code, i.id
+    for update of i
+  loop
+    exit when v_needed <= 0;
+    v_take := least(v_inv.available_quantity, v_needed);
+
+    update public.inventory
+    set reserved_quantity = reserved_quantity + v_take
+    where id = v_inv.inventory_id;
+
+    insert into public.customer_order_reservations (
+      order_id, order_item_id, product_id, warehouse_id, location_id,
+      order_number_snapshot, sku_snapshot, product_name_snapshot,
+      quantity, status, created_by
+    ) values (
+      v_item.order_id, v_item.id, v_item.product_id,
+      v_inv.warehouse_id, v_inv.location_id,
+      v_item.order_number, v_item.sku_snapshot, v_item.product_name_snapshot,
+      v_take, 'active', auth.uid()
+    );
+
+    insert into public.inventory_movements (
+      product_id, from_warehouse_id, from_location_id, movement_type,
+      quantity, reference_no, reason, notes, created_by
+    ) values (
+      v_item.product_id, v_inv.warehouse_id, v_inv.location_id, 'reservation',
+      v_take, 'ORDER:' || v_item.order_number,
+      'Customer order reservation',
+      'Reserved for order item ' || v_item.sku_snapshot,
+      auth.uid()
+    );
+
+    v_needed := v_needed - v_take;
   end loop;
-  if v_needed>0 then raise exception 'ORDER_STOCK_SHORTAGE: countertop requires % more slab(s).',v_needed; end if;
-end; $$;
-revoke all on function private.reserve_countertop_slab_delta(uuid) from public,anon,authenticated;
-create or replace function private.reserve_countertop_slab_after_order_status() returns trigger language plpgsql security definer set search_path = public, pg_temp as $$ declare i record; begin if new.status is distinct from old.status and private.order_status_reserves_stock(new.status) then for i in select oi.id from public.customer_order_items oi join public.countertop_configurations cc on cc.order_item_id=oi.id where oi.order_id=new.id loop perform private.reserve_countertop_slab_delta(i.id); end loop; end if; return new; end; $$;
-drop trigger if exists trg_countertop_slab_reservation on public.customer_orders;
-create trigger trg_countertop_slab_reservation after update of status on public.customer_orders for each row execute function private.reserve_countertop_slab_after_order_status();
+
+  if v_needed > 0 then
+    raise exception 'ORDER_STOCK_SHORTAGE: SKU % requires % more unit(s) of sellable stock.',
+      v_item.sku_snapshot, v_needed;
+  end if;
+end;
+$$;
+revoke all on function private.reserve_customer_order_item_stock(uuid)

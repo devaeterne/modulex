@@ -29,7 +29,8 @@ assert(sql.includes("countertop_configurations") && sql.includes("pricing_snapsh
 assert(sql.includes("countertop_material_price_bands") && sql.includes("countertop_stone_product_profiles"), "stone material bands and product profiles must be relational");
 for (const [code, price] of [["B1",34],["R1",45],["R22",150]]) assert(sql.includes(`'${code}',${price}`), `${code} material band seed missing`);
 assert(sql.includes("slab_quantity") && sql.includes("countertop_reservation_quantity"), "commercial quantity and slab reservation quantity must be distinct");
-assert(sql.includes("reserve_countertop_slab_delta") && sql.includes("Additional slabs for countertop job"), "countertop slab reservation must reconcile extra quantity through existing reservation tables");
+assert(!sql.includes("reserve_countertop_slab_delta") && !sql.includes("countertop_slab_reservation"), "countertop must not create a second reservation engine");
+assert(migration.includes("coalesce((select cc.slab_quantity") && migration.includes("reserve_customer_order_item_stock"), "canonical reservation target must include slab quantity");
 assert(sql.includes("product_kind","sink") || sql.includes("product_kind"), "sink domain identity must be validated");
 assert(migration.includes("countertop_material_price_bands") && migration.includes("attach_countertop_configuration"), "canonical timestamped migration must contain the domain");
 assert(sql.includes("calculate_countertop_price") && /set search_path\s*=\s*pg_catalog\s*,\s*public/.test(sql), "server-side pricing RPC must be pinned and present");

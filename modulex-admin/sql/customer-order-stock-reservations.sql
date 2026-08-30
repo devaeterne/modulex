@@ -191,7 +191,8 @@ begin
   from public.customer_order_reservations r
   where r.order_item_id = p_order_item_id;
 
-  v_target := greatest(v_item.quantity - v_consumed, 0);
+  -- Countertop jobs reserve physical slabs independently from commercial job quantity.
+  v_target := greatest(coalesce((select cc.slab_quantity from public.countertop_configurations cc where cc.order_item_id = p_order_item_id), v_item.quantity) - v_consumed, 0);
 
   if v_active > v_target then
     v_excess := v_active - v_target;
