@@ -28,29 +28,25 @@ for (const absolute of sourceFiles) {
   }
 }
 
-if (iconUsages.length) {
-  console.log("GC-8B Bootstrap icon inventory:\n" + iconUsages.join("\n"));
-}
-
-const homeCriticalFiles = new Set([
-  "src/app/page.tsx",
-  "src/components/BackToTop.tsx",
-  "src/components/ThemeToggle.tsx",
-  "src/components/Footer.tsx",
-  "src/components/GalleryLightbox.tsx",
-]);
-const criticalIconUsages = iconUsages.filter((usage) => homeCriticalFiles.has(usage.split(": ")[0]));
 assert.equal(
-  criticalIconUsages.length,
+  iconUsages.length,
   0,
-  `Home critical rendering path must not depend on the 128 KiB Bootstrap icon font:\n${criticalIconUsages.join("\n")}`,
+  `Store source must not depend on the 128 KiB Bootstrap icon font:\n${iconUsages.join("\n")}`,
 );
 
-const style = await readFile(path.join(srcRoot, "css/style.css"), "utf8");
-assert.doesNotMatch(
-  style,
-  /@import\s+url\(["']?https:\/\/fonts\.googleapis\.com/i,
-  "Primary stylesheet must not create a render-blocking Google Fonts @import chain",
-);
+const [style, layout] = await Promise.all([
+  readFile(path.join(srcRoot, "css/style.css"), "utf8"),
+  readFile(path.join(srcRoot, "app/layout.tsx"), "utf8"),
+]);
+
+assert.doesNotMatch(style, /fonts\.googleapis\.com/i, "Primary stylesheet must not reference Google Fonts CSS");
+assert.doesNotMatch(style, /display=swap['"]?\);?/i, "Primary stylesheet must not retain a partial Google Fonts import fragment");
+assert.doesNotMatch(style, /font-family:\s*['"](?:Outfit|Playfair Display)['"]/i, "Legacy external font-family declarations must be replaced by Next font variables");
+assert.match(style, /font-family:\s*var\(--font-outfit\)/, "Body typography must use the optimized Outfit variable");
+assert.match(style, /font-family:\s*var\(--font-playfair\)/, "Display typography must use the optimized Playfair variable");
+assert.match(layout, /from\s+["']next\/font\/google["']/, "Root layout must use next/font for self-hosted Google font delivery");
+assert.match(layout, /--font-outfit/, "Root layout must expose the Outfit CSS variable");
+assert.match(layout, /--font-playfair/, "Root layout must expose the Playfair CSS variable");
+assert.doesNotMatch(layout, /bootstrap-icons\.css/, "Root layout must not load the Bootstrap Icons stylesheet");
 
 console.log("GC-8B performance delivery contract: PASS");
