@@ -1,0 +1,23 @@
+name: Admin Inventory Warehouse QR UI
+on:
+  push:
+    paths: ["modulex-admin/src/app/(admin)/inventory/**", "modulex-admin/src/app/(admin)/stock-movements/**", "modulex-admin/src/app/(admin)/stock-operations/**", "modulex-admin/src/app/(admin)/warehouses/**", "modulex-admin/src/app/(admin)/zones/**", "modulex-admin/src/app/(admin)/locations/**", "modulex-admin/src/app/(admin)/qr-labels/**", "modulex-admin/src/app/(admin)/scan/**", "modulex-admin/src/app/(admin)/shelf-inventory/**", "modulex-admin/src/components/inventory/**", "modulex-admin/src/components/stock-movements/**", "modulex-admin/src/components/stock-operations/**", "modulex-admin/src/components/warehouses/**", "modulex-admin/src/components/zones/**", "modulex-admin/src/components/locations/**", "modulex-admin/src/components/qr-labels/**", "modulex-admin/src/components/qr/**", "modulex-admin/src/components/scan/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/inventory-warehouse-qr-ui-contract.mjs", ".github/workflows/admin-inventory-warehouse-qr-ui.yml"]
+  pull_request:
+    paths: ["modulex-admin/src/app/(admin)/inventory/**", "modulex-admin/src/app/(admin)/stock-movements/**", "modulex-admin/src/app/(admin)/stock-operations/**", "modulex-admin/src/app/(admin)/warehouses/**", "modulex-admin/src/app/(admin)/zones/**", "modulex-admin/src/app/(admin)/locations/**", "modulex-admin/src/app/(admin)/qr-labels/**", "modulex-admin/src/app/(admin)/scan/**", "modulex-admin/src/app/(admin)/shelf-inventory/**", "modulex-admin/src/components/inventory/**", "modulex-admin/src/components/stock-movements/**", "modulex-admin/src/components/stock-operations/**", "modulex-admin/src/components/warehouses/**", "modulex-admin/src/components/zones/**", "modulex-admin/src/components/locations/**", "modulex-admin/src/components/qr-labels/**", "modulex-admin/src/components/qr/**", "modulex-admin/src/components/scan/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/inventory-warehouse-qr-ui-contract.mjs", ".github/workflows/admin-inventory-warehouse-qr-ui.yml"]
+permissions: { contents: read }
+jobs:
+  operations-verification:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: modulex-admin } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: modulex-admin/package-lock.json }
+      - run: npm ci
+      - run: node scripts/inventory-warehouse-qr-ui-contract.mjs
+      - run: npm run smoke:production-surface
+      - run: npm run smoke:rbac
+      - run: npm run lint
+      - name: Build
+        env: { NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key }
+        run: npm run build
