@@ -1,0 +1,38 @@
+name: GC-8B Style Cleanup
+
+on:
+  push:
+    branches:
+      - feat/gc8b-accessibility-performance
+    paths:
+      - ".github/workflows/gc8b-style-cleanup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/gc8b-accessibility-performance
+      - name: Remove partial font import residue
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          style = Path("modulex-store/src/css/style.css")
+          text = style.read_text()
+          text = text.replace("600;800;900&family=Outfit:wght@300;400;500;600;700&display=swap');\n", "")
+          assert "fonts.googleapis.com" not in text
+          assert "display=swap');" not in text
+          style.write_text(text)
+          Path(".github/workflows/gc8b-style-cleanup.yml").unlink()
+          PY
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(store): remove residual font import fragment"
+          git push origin HEAD:feat/gc8b-accessibility-performance
