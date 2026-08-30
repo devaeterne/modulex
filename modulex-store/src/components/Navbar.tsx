@@ -89,7 +89,7 @@ export default function Navbar({
       <div className="container">
         <Link href="/" className="logo" onClick={handleLinkClick}>
           <img src={lightLogo} className="logo" alt={companyName} />
-          <img src={darkLogo} className="logo-dark" alt={companyName} />
+          <img src={darkLogo} className="logo-dark" alt="" aria-hidden="true" />
         </Link>
 
         <ul className={`navbar-nav custom-nav ${isMobileOpen ? "active" : ""}`} id="mobileNav">
