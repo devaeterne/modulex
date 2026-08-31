@@ -1,38 +1,900 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import MultiSelect from "@/components/form/MultiSelect";
+import Select from "@/components/form/Select";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { Modal } from "@/components/ui/modal";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableViewport,
+} from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 
 type Kind = "product_types" | "units_of_measure";
-type Uom = { id: string; name: string; code: string };
-type Row = { id: string; code: string; name: string; description?: string | null; is_active: boolean; pricing_model?: string; inventory_tracking?: boolean; reservable?: boolean; requires_variant_identity?: boolean; qr_required?: boolean; store_eligible?: boolean; default_uom_id?: string | null; allows_decimal?: boolean; product_count?: number; allowed_uoms?: string[] };
-const pricingLabels: Record<string, string> = { price_group: "Price Group", countertop_material_band: "Countertop Material Band", none: "No Commercial Pricing" };
-const unitManagementLabel = "Units of Measure";
-// Unit of Measure editor includes Name, Code, and decimal quantity controls.
-const emptyForm = { name: "", code: "", description: "", pricing_model: "none", inventory_tracking: true, reservable: true, requires_variant_identity: true, qr_required: false, store_eligible: false, allows_decimal: false, default_uom_id: "", allowed_uoms: [] as string[] };
+
+type Uom = {
+  id: string;
+  name: string;
+  code: string;
+  is_active: boolean;
+};
+
+type Row = {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+  pricing_model?: string;
+  inventory_tracking?: boolean;
+  reservable?: boolean;
+  requires_variant_identity?: boolean;
+  qr_required?: boolean;
+  store_eligible?: boolean;
+  default_uom_id?: string | null;
+  allows_decimal?: boolean;
+  product_count?: number;
+  allowed_uoms?: string[];
+};
+
+type FormState = {
+  name: string;
+  code: string;
+  description: string;
+  pricing_model: string;
+  inventory_tracking: boolean;
+  reservable: boolean;
+  requires_variant_identity: boolean;
+  qr_required: boolean;
+  store_eligible: boolean;
+  allows_decimal: boolean;
+  default_uom_id: string;
+  allowed_uoms: string[];
+};
+
+const pricingLabels: Record<string, string> = {
+  price_group: "Price Group",
+  countertop_material_band: "Countertop Material Band",
+  none: "No Commercial Pricing",
+};
+
+const pricingDescriptions: Record<string, string> = {
+  price_group: "Uses the standard product and customer price-group engine.",
+  countertop_material_band: "Uses the countertop material-band pricing engine.",
+  none: "No commercial product pricing is assigned by this Product Type.",
+};
+
+const statusOptions = [
+  { value: "all", label: "All Status" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+];
+
+const pricingFilterOptions = [
+  { value: "all", label: "All Pricing Models" },
+  { value: "price_group", label: "Price Group" },
+  { value: "countertop_material_band", label: "Countertop Material Band" },
+  { value: "none", label: "No Commercial Pricing" },
+];
+
+const pricingModelOptions = pricingFilterOptions.slice(1);
+
+const inventoryOptions = [
+  { value: "all", label: "All Inventory" },
+  { value: "tracked", label: "Inventory Tracked" },
+  { value: "untracked", label: "Not Tracked" },
+];
+
+const quantityOptions = [
+  { value: "all", label: "All Quantity Types" },
+  { value: "whole", label: "Whole numbers" },
+  { value: "decimal", label: "Decimals allowed" },
+];
+
+const emptyForm: FormState = {
+  name: "",
+  code: "",
+  description: "",
+  pricing_model: "none",
+  inventory_tracking: true,
+  reservable: true,
+  requires_variant_identity: true,
+  qr_required: false,
+  store_eligible: false,
+  allows_decimal: false,
+  default_uom_id: "",
+  allowed_uoms: [],
+};
 
 function friendlyError(message: string, kind: Kind) {
   const value = message.toLowerCase();
-  if (value.includes("default") && value.includes("allow")) return "Default UOM must be one of the allowed UOMs.";
-  if (value.includes("referenced") || value.includes("active product") || value.includes("in use")) return kind === "units_of_measure" ? "Unit is used by active products or Product Types. Reassign references before deactivating." : "Product Type is used by active products. Reassign products before deactivating.";
-  if (value.includes("duplicate") || value.includes("unique")) return "A record with this name or code already exists.";
+
+  if (value.includes("default") && value.includes("allow")) {
+    return "Default UOM must be one of the allowed UOMs.";
+  }
+  if (value.includes("active product") && kind === "product_types") {
+    return "Product Type is used by active products. Reassign products before deactivating.";
+  }
+  if (
+    kind === "units_of_measure" &&
+    (value.includes("referenced") || value.includes("active product") || value.includes("in use"))
+  ) {
+    return "Unit is used by active products or Product Types. Reassign references before deactivating.";
+  }
+  if (value.includes("duplicate") || value.includes("unique")) {
+    return "A record with this name or code already exists.";
+  }
+
   return "This change could not be saved. Check the values and try again.";
 }
 
 export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) {
-  const [rows, setRows] = useState<Row[]>([]); const [uoms, setUoms] = useState<Uom[]>([]); const [query, setQuery] = useState(""); const [status, setStatus] = useState("all"); const [inventoryFilter, setInventoryFilter] = useState("all"); const [pricingFilter, setPricingFilter] = useState("all"); const [quantityFilter, setQuantityFilter] = useState("all"); const [editing, setEditing] = useState<Row | null>(null); const [isEditorOpen, setIsEditorOpen] = useState(false); const [saving, setSaving] = useState(false); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null); const [success, setSuccess] = useState<string | null>(null); const [form, setForm] = useState(emptyForm);
-  const load = useCallback(async () => { setLoading(true); const cols = kind === "product_types" ? "id,code,name,description,is_active,pricing_model,inventory_tracking,reservable,requires_variant_identity,qr_required,store_eligible,default_uom_id,products(count)" : "id,code,name,is_active,allows_decimal,products(count)"; const { data, error: e } = await supabase.from(kind).select(cols).order("name"); if (e) { setError("Unable to load reference data. Please retry."); setLoading(false); return; } const source = (data ?? []) as unknown as Array<Row & { products?: Array<{ count: number }> }>; const maps = kind === "product_types" ? await supabase.from("product_type_allowed_uoms").select("product_type_id,uom_id") : { data: [] as { product_type_id: string; uom_id: string }[] }; const allowed = new Map<string, string[]>(); (maps.data ?? []).forEach((m) => allowed.set(m.product_type_id, [...(allowed.get(m.product_type_id) ?? []), m.uom_id])); setRows(source.map((r) => ({ ...r, allowed_uoms: allowed.get(r.id) ?? [], product_count: r.products?.[0]?.count ?? 0 }))); setLoading(false); }, [kind]);
-  useEffect(() => { void load(); if (kind === "product_types") void supabase.from("units_of_measure").select("id,name,code").eq("is_active", true).order("sort_order").then(({ data }) => setUoms((data ?? []) as Uom[])); }, [kind, load]);
-  const visible = useMemo(() => rows.filter((r) => { const q = !query || `${r.name} ${r.code}`.toLowerCase().includes(query.toLowerCase()); const s = status === "all" || (status === "active" ? r.is_active : !r.is_active); const i = kind !== "product_types" || inventoryFilter === "all" || (inventoryFilter === "tracked" ? r.inventory_tracking : !r.inventory_tracking); const p = kind !== "product_types" || pricingFilter === "all" || r.pricing_model === pricingFilter; const u = kind !== "units_of_measure" || quantityFilter === "all" || (quantityFilter === "decimal" ? r.allows_decimal : !r.allows_decimal); return q && s && i && p && u; }), [rows, query, status, inventoryFilter, pricingFilter, quantityFilter, kind]);
-  function openEditor(row?: Row) { setError(null); setSuccess(null); setEditing(row ?? null); setForm(row ? { ...emptyForm, name: row.name, code: row.code, description: row.description ?? "", pricing_model: row.pricing_model ?? "none", inventory_tracking: row.inventory_tracking ?? true, reservable: row.reservable ?? true, requires_variant_identity: row.requires_variant_identity ?? true, qr_required: row.qr_required ?? false, store_eligible: row.store_eligible ?? false, allows_decimal: row.allows_decimal ?? false, default_uom_id: row.default_uom_id ?? "", allowed_uoms: row.allowed_uoms ?? [] } : emptyForm); setIsEditorOpen(true); }
-  function closeEditor() { if (!saving) { setIsEditorOpen(false); setEditing(null); setForm(emptyForm); } }
-  async function save() { if (!form.name.trim() || !form.code.trim()) return setError("Name and code are required."); if (kind === "product_types" && (!form.allowed_uoms.length || !form.default_uom_id || !form.allowed_uoms.includes(form.default_uom_id))) return setError("Select at least one allowed UOM and a default from that list."); setSaving(true); setError(null); const effectiveReservable = form.inventory_tracking ? form.reservable : false; const result = kind === "product_types" ? await supabase.rpc("save_product_type_v2", { p_id: editing?.id ?? null, p_code: form.code.trim().toUpperCase(), p_name: form.name.trim(), p_description: form.description.trim() || null, p_default_uom_id: form.default_uom_id, p_allowed_uom_ids: form.allowed_uoms, p_inventory_tracking: form.inventory_tracking, p_reservable: effectiveReservable, p_requires_variant_identity: form.requires_variant_identity, p_pricing_model: form.pricing_model, p_qr_required: form.qr_required, p_store_eligible: form.store_eligible }) : (editing ? await supabase.from(kind).update({ name: form.name.trim(), code: form.code.trim().toUpperCase(), allows_decimal: form.allows_decimal }).eq("id", editing.id) : await supabase.from(kind).insert({ name: form.name.trim(), code: form.code.trim().toUpperCase(), allows_decimal: form.allows_decimal })); if (result.error) setError(friendlyError(result.error.message, kind)); else { setSuccess(`${kind === "product_types" ? "Product Type" : "Unit"} saved successfully.`); closeEditor(); await load(); } setSaving(false); }
-  async function toggle(row: Row) { setSaving(true); setError(null); const { error: e } = await supabase.from(kind).update({ is_active: !row.is_active }).eq("id", row.id); if (e) setError(friendlyError(e.message, kind)); else { setSuccess(`${row.name} ${row.is_active ? "deactivated" : "activated"}.`); await load(); } setSaving(false); }
-  const title = kind === "product_types" ? "Product Types" : unitManagementLabel;
-  return <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800"><header className="mb-4 flex items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">{title}</h2><p className="text-sm text-gray-500">{kind === "product_types" ? "Define how products behave across inventory, pricing, QR and Store." : "Manage controlled units used by products and inventory."}</p></div><Button size="sm" onClick={() => openEditor()}>Add {kind === "product_types" ? "Product Type" : "Unit"}</Button></header><div className="mb-4 flex flex-wrap gap-2"><input aria-label="Search" placeholder="Search name or code" value={query} onChange={(e) => setQuery(e.target.value)} className="h-10 rounded-lg border px-3" /><select aria-label="Status filter" value={status} onChange={(e) => setStatus(e.target.value)} className="h-10 rounded-lg border px-3"> <option value="all">All Status</option><option value="active">Active</option><option value="inactive">Inactive</option></select>{kind === "product_types" ? <><select aria-label="Pricing Model filter" value={pricingFilter} onChange={(e) => setPricingFilter(e.target.value)} className="h-10 rounded-lg border px-3"><option value="all">All Pricing Models</option><option value="price_group">Price Group</option><option value="countertop_material_band">Countertop Material Band</option><option value="none">No Commercial Pricing</option></select><select aria-label="Inventory filter" value={inventoryFilter} onChange={(e) => setInventoryFilter(e.target.value)} className="h-10 rounded-lg border px-3"><option value="all">All Inventory</option><option value="tracked">Inventory Tracked</option><option value="untracked">Not Tracked</option></select></> : <select aria-label="Quantity filter" value={quantityFilter} onChange={(e) => setQuantityFilter(e.target.value)} className="h-10 rounded-lg border px-3"><option value="all">All Quantities</option><option value="whole">Whole numbers</option><option value="decimal">Decimals allowed</option></select>}</div>{error && <p role="alert" className="mb-3 text-sm text-error-600">{error}</p>}{success && <p role="status" className="mb-3 text-sm text-success-600">{success}</p>}{loading && <p className="mb-3 text-sm text-gray-500">Loading {title.toLowerCase()}…</p>}{!loading && !visible.length && <p className="mb-3 text-sm text-gray-500">No {title.toLowerCase()} found.</p>}
-    {isEditorOpen && <div role="dialog" aria-modal="true" aria-label={`${title} editor`} className="mb-4 rounded-xl border p-4"><h3 className="mb-3 font-medium">{editing ? `Edit ${kind === "product_types" ? "Product Type" : "Unit"}` : `Add ${kind === "product_types" ? "Product Type" : "Unit"}`}</h3>{kind === "product_types" ? <div className="space-y-4"><fieldset><legend>Identity</legend><div className="grid gap-3 md:grid-cols-2"><input aria-label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Name" className="h-10 rounded border px-3" /><input aria-label="Code" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} placeholder="CODE" className="h-10 rounded border px-3" /><textarea aria-label="Description" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Description" className="rounded border px-3 py-2 md:col-span-2" /></div></fieldset><fieldset><legend>Inventory Behavior</legend><label className="mr-4 inline-flex gap-2"><input type="checkbox" checked={form.inventory_tracking} onChange={(e) => setForm((f) => ({ ...f, inventory_tracking: e.target.checked, reservable: e.target.checked ? f.reservable : false }))} /> Inventory Tracking</label><label className="inline-flex gap-2"><input type="checkbox" checked={form.reservable} disabled={!form.inventory_tracking} onChange={(e) => setForm((f) => ({ ...f, reservable: e.target.checked }))} /> Reservable</label>{!form.inventory_tracking && <p className="mt-1 text-xs text-gray-500">Reservation requires inventory tracking.</p>}</fieldset><fieldset><legend>Units of Measure</legend><div className="flex flex-wrap gap-2">{uoms.map((u) => <label key={u.id} className={`rounded-full border px-2 py-1 text-sm ${form.allowed_uoms.includes(u.id) ? "bg-brand-50" : ""}`}><input type="checkbox" className="sr-only" checked={form.allowed_uoms.includes(u.id)} onChange={() => setForm((f) => ({ ...f, allowed_uoms: f.allowed_uoms.includes(u.id) ? f.allowed_uoms.filter((id) => id !== u.id) : [...f.allowed_uoms, u.id] }))} />{u.name} ({u.code})</label>)}</div><p className="mt-2 text-xs text-gray-500">Selected: {form.allowed_uoms.map((id) => uoms.find((u) => u.id === id)?.code).filter(Boolean).join(", ") || "None"}</p><select aria-label="Default UOM" value={form.default_uom_id} onChange={(e) => setForm((f) => ({ ...f, default_uom_id: e.target.value }))} className="mt-2 h-10 rounded border px-3"><option value="">Default Unit</option>{uoms.filter((u) => form.allowed_uoms.includes(u.id)).map((u) => <option key={u.id} value={u.id}>{u.name} ({u.code})</option>)}</select></fieldset><fieldset><legend>Pricing Behavior</legend><select aria-label="Pricing Model" value={form.pricing_model} onChange={(e) => setForm((f) => ({ ...f, pricing_model: e.target.value }))} className="h-10 rounded border px-3"><option value="price_group">Price Group — standard product/customer engine</option><option value="countertop_material_band">Countertop Material Band — countertop material engine</option><option value="none">No Commercial Pricing — no product pricing</option></select></fieldset><fieldset><legend>Product Behavior</legend><label className="inline-flex gap-2"><input type="checkbox" checked={form.requires_variant_identity} onChange={(e) => setForm((f) => ({ ...f, requires_variant_identity: e.target.checked }))} /> Requires Variant Identity</label><p className="mt-1 text-xs text-gray-500">When enabled, family/base product and color identity are required.</p></fieldset><fieldset><legend>Capabilities</legend><label className="mr-4 inline-flex gap-2"><input type="checkbox" checked={form.qr_required} onChange={(e) => setForm((f) => ({ ...f, qr_required: e.target.checked }))} /> QR Required</label><label className="inline-flex gap-2"><input type="checkbox" checked={form.store_eligible} onChange={(e) => setForm((f) => ({ ...f, store_eligible: e.target.checked }))} /> Store Eligible</label><p className="mt-1 text-xs text-gray-500">Store Eligible does not publish automatically.</p></fieldset></div> : <div><fieldset><legend>Identity</legend><div className="grid gap-3 md:grid-cols-2"><input aria-label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Name" className="h-10 rounded border px-3" /><input aria-label="Code" value={form.code} onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))} placeholder="CODE" className="h-10 rounded border px-3" /></div></fieldset><fieldset><legend>Quantity Behavior</legend><label className="inline-flex gap-2"><input type="checkbox" checked={form.allows_decimal} onChange={(e) => setForm((f) => ({ ...f, allows_decimal: e.target.checked }))} /> Allows Decimal Quantities</label><p className="mt-1 text-xs text-gray-500">Whole units suit Piece or Slab. Decimal units support fractional quantities such as SQ_FT or LINEAR_FT.</p></fieldset></div>}<div className="mt-4 flex gap-2"><Button disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save"}</Button><Button variant="outline" disabled={saving} onClick={closeEditor}>Cancel</Button></div></div>}
-    <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead><tr><th className="p-2">{kind === "product_types" ? "Product Type" : "Unit"}</th><th className="p-2">Code</th>{kind === "units_of_measure" && <th className="p-2">Quantity Type</th>}{kind === "product_types" && <><th className="p-2">Default UOM</th><th className="p-2">Allowed UOMs</th><th className="p-2">Inventory</th><th className="p-2">Pricing</th><th className="p-2">QR</th><th className="p-2">Store</th></>}<th className="p-2">Products</th><th className="p-2">Status</th><th className="p-2">Actions</th></tr></thead><tbody>{visible.map((r) => <tr key={r.id} className="border-t"><td className="p-2"><div className="font-medium">{r.name}</div>{r.description && <div className="text-xs text-gray-500">{r.description}</div>}</td><td className="p-2 font-mono">{r.code}</td>{kind === "units_of_measure" && <td className="p-2">{r.allows_decimal ? "Decimals allowed" : "Whole numbers"}</td>}{kind === "product_types" && <><td className="p-2">{uoms.find((u) => u.id === r.default_uom_id)?.code ?? "—"}</td><td className="p-2">{(r.allowed_uoms ?? []).map((id) => <span key={id} className="mr-1 rounded bg-gray-100 px-1 text-xs">{uoms.find((u) => u.id === id)?.code ?? id}</span>)}</td><td className="p-2">{r.inventory_tracking ? "Tracked" : "Not tracked"}<br /><span className="text-xs">{r.reservable ? "Reservable" : "Not reservable"}</span></td><td className="p-2">{pricingLabels[r.pricing_model ?? "none"]}</td><td className="p-2">{r.qr_required ? "Required" : "Optional"}</td><td className="p-2">{r.store_eligible ? "Eligible" : "Not eligible"}</td></>}<td className="p-2"><Link href={`/products?${kind === "product_types" ? "type" : "uom"}=${r.id}`} className="text-brand-600">{r.product_count ?? 0} · View Products</Link></td><td className="p-2">{r.is_active ? "Active" : "Inactive"}</td><td className="p-2"><Button size="sm" variant="outline" onClick={() => openEditor(r)}>Edit</Button><Button size="sm" variant="outline" disabled={saving} onClick={() => void toggle(r)}>{r.is_active ? "Deactivate" : "Activate"}</Button></td></tr>)}</tbody></table></div>
-  </section>;
+  const [rows, setRows] = useState<Row[]>([]);
+  const [uoms, setUoms] = useState<Uom[]>([]);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [inventoryFilter, setInventoryFilter] = useState("all");
+  const [pricingFilter, setPricingFilter] = useState("all");
+  const [quantityFilter, setQuantityFilter] = useState("all");
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(emptyForm);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    const cols =
+      kind === "product_types"
+        ? "id,code,name,description,is_active,pricing_model,inventory_tracking,reservable,requires_variant_identity,qr_required,store_eligible,default_uom_id,products(count)"
+        : "id,code,name,is_active,allows_decimal,products(count)";
+
+    const { data, error: rowError } = await supabase.from(kind).select(cols).order("name");
+
+    if (rowError) {
+      setRows([]);
+      setError("Unable to load reference data. Please retry.");
+      setLoading(false);
+      return;
+    }
+
+    const source = (data ?? []) as unknown as Array<Row & { products?: Array<{ count: number }> }>;
+    const allowed = new Map<string, string[]>();
+
+    if (kind === "product_types") {
+      const [relationResult, uomResult] = await Promise.all([
+        supabase.from("product_type_allowed_uoms").select("product_type_id,uom_id"),
+        supabase.from("units_of_measure").select("id,name,code,is_active").order("sort_order"),
+      ]);
+
+      if (relationResult.error || uomResult.error) {
+        setRows([]);
+        setUoms([]);
+        setError("Unable to load Product Type unit references. Please retry.");
+        setLoading(false);
+        return;
+      }
+
+      (relationResult.data ?? []).forEach((relation) => {
+        allowed.set(relation.product_type_id, [
+          ...(allowed.get(relation.product_type_id) ?? []),
+          relation.uom_id,
+        ]);
+      });
+      setUoms((uomResult.data ?? []) as Uom[]);
+    } else {
+      setUoms([]);
+    }
+
+    setRows(
+      source.map((row) => ({
+        ...row,
+        allowed_uoms: allowed.get(row.id) ?? [],
+        product_count: row.products?.[0]?.count ?? 0,
+      }))
+    );
+    setLoading(false);
+  }, [kind]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const visible = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return rows.filter((row) => {
+      const matchesQuery =
+        !normalizedQuery || `${row.name} ${row.code}`.toLowerCase().includes(normalizedQuery);
+      const matchesStatus =
+        status === "all" || (status === "active" ? row.is_active : !row.is_active);
+      const matchesInventory =
+        kind !== "product_types" ||
+        inventoryFilter === "all" ||
+        (inventoryFilter === "tracked" ? row.inventory_tracking : !row.inventory_tracking);
+      const matchesPricing =
+        kind !== "product_types" || pricingFilter === "all" || row.pricing_model === pricingFilter;
+      const matchesQuantity =
+        kind !== "units_of_measure" ||
+        quantityFilter === "all" ||
+        (quantityFilter === "decimal" ? row.allows_decimal : !row.allows_decimal);
+
+      return matchesQuery && matchesStatus && matchesInventory && matchesPricing && matchesQuantity;
+    });
+  }, [rows, query, status, inventoryFilter, pricingFilter, quantityFilter, kind]);
+
+  const selectableUoms = useMemo(
+    () => uoms.filter((uom) => uom.is_active || form.allowed_uoms.includes(uom.id)),
+    [uoms, form.allowed_uoms]
+  );
+
+  function openEditor(row?: Row) {
+    setError(null);
+    setSuccess(null);
+    setEditing(row ?? null);
+    setForm(
+      row
+        ? {
+            ...emptyForm,
+            name: row.name,
+            code: row.code,
+            description: row.description ?? "",
+            pricing_model: row.pricing_model ?? "none",
+            inventory_tracking: row.inventory_tracking ?? true,
+            reservable: row.reservable ?? true,
+            requires_variant_identity: row.requires_variant_identity ?? true,
+            qr_required: row.qr_required ?? false,
+            store_eligible: row.store_eligible ?? false,
+            allows_decimal: row.allows_decimal ?? false,
+            default_uom_id: row.default_uom_id ?? "",
+            allowed_uoms: row.allowed_uoms ?? [],
+          }
+        : emptyForm
+    );
+    setIsEditorOpen(true);
+  }
+
+  function closeEditor() {
+    if (saving) return;
+    setIsEditorOpen(false);
+    setEditing(null);
+    setForm(emptyForm);
+    setError(null);
+  }
+
+  async function save() {
+    if (!form.name.trim() || !form.code.trim()) {
+      setError("Name and code are required.");
+      return;
+    }
+
+    if (
+      kind === "product_types" &&
+      (!form.allowed_uoms.length ||
+        !form.default_uom_id ||
+        !form.allowed_uoms.includes(form.default_uom_id))
+    ) {
+      setError("Select at least one allowed UOM and a default from that list.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    const effectiveReservable = form.inventory_tracking ? form.reservable : false;
+    const result =
+      kind === "product_types"
+        ? await supabase.rpc("save_product_type_v2", {
+            p_id: editing?.id ?? null,
+            p_code: form.code.trim().toUpperCase(),
+            p_name: form.name.trim(),
+            p_description: form.description.trim() || null,
+            p_default_uom_id: form.default_uom_id,
+            p_allowed_uom_ids: form.allowed_uoms,
+            p_inventory_tracking: form.inventory_tracking,
+            p_reservable: effectiveReservable,
+            p_requires_variant_identity: form.requires_variant_identity,
+            p_pricing_model: form.pricing_model,
+            p_qr_required: form.qr_required,
+            p_store_eligible: form.store_eligible,
+          })
+        : editing
+          ? await supabase
+              .from(kind)
+              .update({
+                name: form.name.trim(),
+                code: form.code.trim().toUpperCase(),
+                allows_decimal: form.allows_decimal,
+              })
+              .eq("id", editing.id)
+          : await supabase.from(kind).insert({
+              name: form.name.trim(),
+              code: form.code.trim().toUpperCase(),
+              allows_decimal: form.allows_decimal,
+            });
+
+    if (result.error) {
+      setError(friendlyError(result.error.message, kind));
+      setSaving(false);
+      return;
+    }
+
+    const successMessage = `${kind === "product_types" ? "Product Type" : "Unit"} saved successfully.`;
+    setIsEditorOpen(false);
+    setEditing(null);
+    setForm(emptyForm);
+    await load();
+    setSuccess(successMessage);
+    setSaving(false);
+  }
+
+  async function toggle(row: Row) {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    const { error: toggleError } = await supabase
+      .from(kind)
+      .update({ is_active: !row.is_active })
+      .eq("id", row.id);
+
+    if (toggleError) {
+      setError(friendlyError(toggleError.message, kind));
+      setSaving(false);
+      return;
+    }
+
+    const successMessage = `${row.name} ${row.is_active ? "deactivated" : "activated"}.`;
+    await load();
+    setSuccess(successMessage);
+    setSaving(false);
+  }
+
+  const title = kind === "product_types" ? "Product Types" : "Units of Measure";
+  const description =
+    kind === "product_types"
+      ? "Define how products behave across inventory, pricing, QR and Store."
+      : "Manage controlled units used by products and inventory.";
+  const addLabel = kind === "product_types" ? "Add Product Type" : "Add Unit";
+  const columnCount = kind === "product_types" ? 11 : 6;
+
+  return (
+    <div className="space-y-6">
+      <ComponentCard title={title} desc={description}>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+          <div
+            className={
+              kind === "product_types"
+                ? "grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+                : "grid gap-4 md:grid-cols-3"
+            }
+          >
+            <div>
+              <Label htmlFor={`${kind}-search`}>Search</Label>
+              <Input
+                id={`${kind}-search`}
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search name or code"
+              />
+            </div>
+
+            <div>
+              <Label>Status</Label>
+              <Select options={statusOptions} value={status} onChange={setStatus} />
+            </div>
+
+            {kind === "product_types" ? (
+              <>
+                <div>
+                  <Label>Pricing Model</Label>
+                  <Select
+                    options={pricingFilterOptions}
+                    value={pricingFilter}
+                    onChange={setPricingFilter}
+                  />
+                </div>
+                <div>
+                  <Label>Inventory</Label>
+                  <Select
+                    options={inventoryOptions}
+                    value={inventoryFilter}
+                    onChange={setInventoryFilter}
+                  />
+                </div>
+              </>
+            ) : (
+              <div>
+                <Label>Quantity Type</Label>
+                <Select
+                  options={quantityOptions}
+                  value={quantityFilter}
+                  onChange={setQuantityFilter}
+                />
+              </div>
+            )}
+          </div>
+
+          <Button className="w-full xl:w-auto" onClick={() => openEditor()}>
+            {addLabel}
+          </Button>
+        </div>
+      </ComponentCard>
+
+      <ComponentCard
+        title={kind === "product_types" ? "Product Type Directory" : "Unit Directory"}
+        desc={
+          kind === "product_types"
+            ? "Review capabilities, unit rules, pricing behavior and product usage."
+            : "Review quantity behavior, product usage and lifecycle status."
+        }
+      >
+        {!isEditorOpen && error ? (
+          <div className="space-y-3">
+            <Alert variant="error" title="Reference data unavailable" message={error} />
+            <Button variant="outline" onClick={() => void load()}>
+              Retry
+            </Button>
+          </div>
+        ) : null}
+
+        {success ? <Alert variant="success" title="Saved" message={success} /> : null}
+
+        {loading ? (
+          <Alert
+            variant="info"
+            title={`Loading ${title}`}
+            message="Reference data is being loaded."
+          />
+        ) : (
+          <TableViewport>
+            <Table
+              variant="admin"
+              className={kind === "product_types" ? "min-w-[1280px]" : "min-w-[760px]"}
+            >
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell isHeader variant="admin" className="text-left">
+                    {kind === "product_types" ? "Product Type" : "Unit"}
+                  </TableCell>
+                  <TableCell isHeader variant="admin" className="text-left">
+                    Code
+                  </TableCell>
+                  {kind === "product_types" ? (
+                    <>
+                      <TableCell isHeader variant="admin" className="text-left">
+                        Default UOM
+                      </TableCell>
+                      <TableCell isHeader variant="admin" className="text-left">
+                        Allowed UOMs
+                      </TableCell>
+                      <TableCell isHeader variant="admin" className="text-left">
+                        Inventory
+                      </TableCell>
+                      <TableCell isHeader variant="admin" className="text-left">
+                        Pricing Model
+                      </TableCell>
+                      <TableCell isHeader variant="admin" className="text-left">
+                        QR
+                      </TableCell>
+                      <TableCell isHeader variant="admin" className="text-left">
+                        Store
+                      </TableCell>
+                    </>
+                  ) : (
+                    <TableCell isHeader variant="admin" className="text-left">
+                      Quantity Type
+                    </TableCell>
+                  )}
+                  <TableCell isHeader variant="admin" className="text-left">
+                    Products
+                  </TableCell>
+                  <TableCell isHeader variant="admin" className="text-left">
+                    Status
+                  </TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">
+                    Actions
+                  </TableCell>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody variant="admin">
+                {visible.length === 0 ? (
+                  <TableRow>
+                    <TableCell variant="admin" colSpan={columnCount} className="text-center">
+                      No {title.toLowerCase()} match the current filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  visible.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell variant="admin" className="align-top">
+                        <div className="space-y-1">
+                          <span>{row.name}</span>
+                          {row.description ? <small>{row.description}</small> : null}
+                        </div>
+                      </TableCell>
+
+                      <TableCell variant="admin" className="align-top">
+                        <Badge color="light" size="sm">
+                          {row.code}
+                        </Badge>
+                      </TableCell>
+
+                      {kind === "product_types" ? (
+                        <>
+                          <TableCell variant="admin" className="align-top">
+                            <Badge color="primary" size="sm">
+                              {uoms.find((uom) => uom.id === row.default_uom_id)?.code ?? "—"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell variant="admin" className="align-top">
+                            <div className="flex flex-wrap gap-1">
+                              {(row.allowed_uoms ?? []).length ? (
+                                (row.allowed_uoms ?? []).map((id) => (
+                                  <Badge key={id} color="light" size="sm">
+                                    {uoms.find((uom) => uom.id === id)?.code ?? "Unknown"}
+                                  </Badge>
+                                ))
+                              ) : (
+                                <Badge color="light" size="sm">
+                                  None
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell variant="admin" className="align-top">
+                            <div className="flex flex-wrap gap-1">
+                              <Badge color={row.inventory_tracking ? "success" : "light"} size="sm">
+                                {row.inventory_tracking ? "Tracked" : "Not tracked"}
+                              </Badge>
+                              <Badge color={row.reservable ? "info" : "light"} size="sm">
+                                {row.reservable ? "Reservable" : "Not reservable"}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell variant="admin" className="align-top">
+                            <Badge color="info" size="sm">
+                              {pricingLabels[row.pricing_model ?? "none"]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell variant="admin" className="align-top">
+                            <Badge color={row.qr_required ? "warning" : "light"} size="sm">
+                              {row.qr_required ? "Required" : "Optional"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell variant="admin" className="align-top">
+                            <Badge color={row.store_eligible ? "success" : "light"} size="sm">
+                              {row.store_eligible ? "Eligible" : "Not eligible"}
+                            </Badge>
+                          </TableCell>
+                        </>
+                      ) : (
+                        <TableCell variant="admin" className="align-top">
+                          <Badge color={row.allows_decimal ? "info" : "light"} size="sm">
+                            {row.allows_decimal ? "Decimals allowed" : "Whole numbers"}
+                          </Badge>
+                        </TableCell>
+                      )}
+
+                      <TableCell variant="admin" className="align-top">
+                        <Link
+                          href={`/products?${kind === "product_types" ? "type" : "uom"}=${row.id}`}
+                          className="font-medium underline underline-offset-2"
+                        >
+                          {row.product_count ?? 0} · View Products
+                        </Link>
+                      </TableCell>
+
+                      <TableCell variant="admin" className="align-top">
+                        <Badge color={row.is_active ? "success" : "light"} size="sm">
+                          {row.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell variant="admin" className="text-right align-top">
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => openEditor(row)}>
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={saving}
+                            onClick={() => void toggle(row)}
+                          >
+                            {row.is_active ? "Deactivate" : "Activate"}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableViewport>
+        )}
+      </ComponentCard>
+
+      <Modal
+        isOpen={isEditorOpen}
+        onClose={closeEditor}
+        className="m-4 max-w-[960px]"
+      >
+        <div className="max-h-[88vh] overflow-y-auto p-4 sm:p-6">
+          <div className="space-y-5">
+            {error ? <Alert variant="error" title="Unable to save" message={error} /> : null}
+
+            {kind === "product_types" ? (
+              <>
+                <ComponentCard
+                  title={editing ? "Edit Product Type" : "Add Product Type"}
+                  desc="Set the canonical identity for this Product Type."
+                >
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="product-type-name">Name</Label>
+                      <Input
+                        id="product-type-name"
+                        value={form.name}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, name: event.target.value }))
+                        }
+                        placeholder="Product Type name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="product-type-code">Code</Label>
+                      <Input
+                        id="product-type-code"
+                        value={form.code}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            code: event.target.value.toUpperCase(),
+                          }))
+                        }
+                        placeholder="CODE"
+                        hint="Codes are normalized to uppercase."
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Description</Label>
+                      <TextArea
+                        value={form.description}
+                        onChange={(value) =>
+                          setForm((current) => ({ ...current, description: value }))
+                        }
+                        placeholder="Describe how this Product Type is used."
+                      />
+                    </div>
+                  </div>
+                </ComponentCard>
+
+                <ComponentCard
+                  title="Inventory Behavior"
+                  desc="Control whether products of this type participate in inventory and reservations."
+                >
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Checkbox
+                      id="product-type-inventory"
+                      label="Inventory Tracking"
+                      checked={form.inventory_tracking}
+                      onChange={(checked) =>
+                        setForm((current) => ({
+                          ...current,
+                          inventory_tracking: checked,
+                          reservable: checked ? current.reservable : false,
+                        }))
+                      }
+                    />
+                    <div className="space-y-2">
+                      <Checkbox
+                        id="product-type-reservable"
+                        label="Reservable"
+                        checked={form.reservable}
+                        disabled={!form.inventory_tracking}
+                        onChange={(checked) =>
+                          setForm((current) => ({ ...current, reservable: checked }))
+                        }
+                      />
+                      {!form.inventory_tracking ? (
+                        <small>Reservation requires inventory tracking.</small>
+                      ) : null}
+                    </div>
+                  </div>
+                </ComponentCard>
+
+                <ComponentCard
+                  title="Units of Measure"
+                  desc="Choose the allowed units first, then select exactly one default unit."
+                >
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <MultiSelect
+                      key={`${editing?.id ?? "new"}-${isEditorOpen ? "open" : "closed"}`}
+                      label="Allowed Units"
+                      options={selectableUoms.map((uom) => ({
+                        value: uom.id,
+                        text: `${uom.name} (${uom.code})${uom.is_active ? "" : " — Inactive"}`,
+                        selected: form.allowed_uoms.includes(uom.id),
+                      }))}
+                      defaultSelected={form.allowed_uoms}
+                      onChange={(selected) =>
+                        setForm((current) => ({
+                          ...current,
+                          allowed_uoms: selected,
+                          default_uom_id: selected.includes(current.default_uom_id)
+                            ? current.default_uom_id
+                            : "",
+                        }))
+                      }
+                    />
+                    <div>
+                      <Label>Default Unit</Label>
+                      <Select
+                        placeholder="Select default unit"
+                        value={form.default_uom_id}
+                        options={form.allowed_uoms.map((id) => {
+                          const uom = uoms.find((item) => item.id === id);
+                          return {
+                            value: id,
+                            label: uom ? `${uom.name} (${uom.code})` : "Unknown unit",
+                          };
+                        })}
+                        onChange={(value) =>
+                          setForm((current) => ({ ...current, default_uom_id: value }))
+                        }
+                      />
+                    </div>
+                  </div>
+                </ComponentCard>
+
+                <ComponentCard
+                  title="Pricing Behavior"
+                  desc="Select the supported pricing engine. Pricing values do not belong in Product Type."
+                >
+                  <div className="space-y-2">
+                    <Label>Pricing Model</Label>
+                    <Select
+                      options={pricingModelOptions}
+                      value={form.pricing_model}
+                      onChange={(value) =>
+                        setForm((current) => ({ ...current, pricing_model: value }))
+                      }
+                    />
+                    <small>{pricingDescriptions[form.pricing_model]}</small>
+                  </div>
+                </ComponentCard>
+
+                <ComponentCard
+                  title="Product Behavior & Capabilities"
+                  desc="Configure identity, QR and Store eligibility without changing publication state."
+                >
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Checkbox
+                        id="product-type-variant-identity"
+                        label="Requires Variant Identity"
+                        checked={form.requires_variant_identity}
+                        onChange={(checked) =>
+                          setForm((current) => ({
+                            ...current,
+                            requires_variant_identity: checked,
+                          }))
+                        }
+                      />
+                      <small>Requires family/base-product and color identity when enabled.</small>
+                    </div>
+                    <Checkbox
+                      id="product-type-qr-required"
+                      label="QR Required"
+                      checked={form.qr_required}
+                      onChange={(checked) =>
+                        setForm((current) => ({ ...current, qr_required: checked }))
+                      }
+                    />
+                    <div className="space-y-2">
+                      <Checkbox
+                        id="product-type-store-eligible"
+                        label="Store Eligible"
+                        checked={form.store_eligible}
+                        onChange={(checked) =>
+                          setForm((current) => ({ ...current, store_eligible: checked }))
+                      }
+                    />
+                      <small>Store eligibility does not publish a product automatically.</small>
+                    </div>
+                  </div>
+                </ComponentCard>
+              </>
+            ) : (
+              <>
+                <ComponentCard
+                  title={editing ? "Edit Unit" : "Add Unit"}
+                  desc="Define the controlled unit used by products and inventory."
+                >
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="uom-name">Name</Label>
+                      <Input
+                        id="uom-name"
+                        value={form.name}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, name: event.target.value }))
+                        }
+                        placeholder="Unit name"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="uom-code">Code</Label>
+                      <Input
+                        id="uom-code"
+                        value={form.code}
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            code: event.target.value.toUpperCase(),
+                          }))
+                        }
+                        placeholder="CODE"
+                        hint="Codes are normalized to uppercase."
+                      />
+                    </div>
+                  </div>
+                </ComponentCard>
+
+                <ComponentCard
+                  title="Quantity Behavior"
+                  desc="Choose whether this unit supports fractional quantities."
+                >
+                  <div className="space-y-2">
+                    <Checkbox
+                      id="uom-allows-decimal"
+                      label="Allows Decimal Quantities"
+                      checked={form.allows_decimal}
+                      onChange={(checked) =>
+                        setForm((current) => ({ ...current, allows_decimal: checked }))
+                      }
+                    />
+                    <small>
+                      Whole units suit Piece or Slab. Decimal units support fractional quantities such as
+                      SQ_FT or LINEAR_FT.
+                    </small>
+                  </div>
+                </ComponentCard>
+              </>
+            )}
+
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button className="w-full sm:w-auto" variant="outline" disabled={saving} onClick={closeEditor}>
+                Cancel
+              </Button>
+              <Button className="w-full sm:w-auto" disabled={saving} onClick={() => void save()}>
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
 }

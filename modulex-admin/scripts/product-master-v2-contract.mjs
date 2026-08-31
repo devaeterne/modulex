@@ -22,6 +22,24 @@ assert.match(manager, /Units of Measure/);
 assert.match(manager, /Quantity Type/);
 assert.match(manager, /Whole numbers/);
 assert.match(manager, /Decimals allowed/);
+for (const sharedPrimitive of [
+  /ComponentCard/,
+  /<Modal/,
+  /<Input/,
+  /<Select/,
+  /<MultiSelect/,
+  /<Checkbox/,
+  /<Badge/,
+  /<Alert/,
+  /<TableViewport/,
+  /<Table/,
+  /variant="admin"/,
+]) {
+  assert.match(manager, sharedPrimitive, "Product Type/UOM UI must compose shared Admin UI primitives");
+}
+assert.doesNotMatch(manager, /<input\b/, "Product Type/UOM UI must not create route-local native inputs");
+assert.doesNotMatch(manager, /<select\b/, "Product Type/UOM UI must not create route-local native selects");
+assert.doesNotMatch(manager, /<table\b/, "Product Type/UOM UI must use the shared Table primitive");
 assert.doesNotMatch(form, /brand_id: current\.brand_id \|\| loadedBrands/);
 assert.match(list, /get_products_page_v2/);
 assert.match(list, /getLegacyRpcArgs/);
