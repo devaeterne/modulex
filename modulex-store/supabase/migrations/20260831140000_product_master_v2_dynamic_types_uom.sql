@@ -20,6 +20,7 @@ create table if not exists public.product_types (
   inventory_tracking boolean not null default true,
   reservable boolean not null default true,
   pricing_model text not null default 'price_group' check (pricing_model in ('price_group','countertop_material_band','none')),
+  requires_variant_identity boolean not null default true,
   qr_required boolean not null default false,
   store_eligible boolean not null default false,
   is_active boolean not null default true,
@@ -47,9 +48,10 @@ on conflict (code) do nothing;
 
 insert into public.product_types(code,name,pricing_model,inventory_tracking,reservable,qr_required,store_eligible,sort_order)
 values ('STANDARD','Standard','price_group',true,true,false,false,10),
-       ('STONE','Stone','countertop_material_band',true,true,false,true,20),
-       ('SINK','Sink','price_group',true,true,false,true,30)
+       ('STONE','Stone','countertop_material_band',true,true,false,false,20),
+       ('SINK','Sink','price_group',true,true,false,false,30)
 on conflict (code) do update set name=excluded.name,pricing_model=excluded.pricing_model;
+update public.product_types set requires_variant_identity = case when code in ('SINK','STONE') then false else true end where code in ('STANDARD','STONE','SINK');
 
 update public.product_types t set default_uom_id=u.id
 from public.units_of_measure u
@@ -105,6 +107,30 @@ begin
   return new;
 end; $$;
 
+create or replace function public.search_low_stock_page_v2(
+  p_query text default '', p_view text default 'alerts', p_type_id uuid default null,
+  p_uom_id uuid default null, p_offset integer default 0, p_limit integer default 25,
+  p_export_all boolean default false
+) returns table(product_id uuid, sku text, barcode text, product_name text, brand text, category text,
+  unit text, min_stock_level numeric, product_status product_status, location_count bigint, warehouse_count bigint,
+  total_quantity numeric, total_reserved_quantity numeric, total_available_quantity numeric, is_low_stock boolean,
+  stock_status text, last_inventory_update timestamptz, product_type text, uom_code text, total_count bigint)
+language sql stable set search_path=public as $$
+  select v.product_id,v.sku,v.barcode,v.product_name,v.brand,v.category,v.unit,v.min_stock_level,v.product_status,
+    v.location_count,v.warehouse_count,v.total_quantity,v.total_reserved_quantity,v.total_available_quantity,
+    v.is_low_stock,v.stock_status,v.last_inventory_update,pt.name,u.code,count(*) over()
+  from public.v_product_stock_summary v join public.products p on p.id=v.product_id
+  left join public.product_types pt on pt.id=p.product_type_id left join public.units_of_measure u on u.id=p.uom_id
+  where v.product_status='active'::product_status
+    and (coalesce(p_view,'alerts')='all' or (p_view='alerts' and v.is_low_stock) or (p_view='unset' and v.min_stock_level=0))
+    and (p_type_id is null or p.product_type_id=p_type_id) and (p_uom_id is null or p.uom_id=p_uom_id)
+    and (coalesce(trim(p_query),'')='' or concat_ws(' ',v.sku,v.barcode,v.product_name,v.brand,v.category,pt.name,u.code) ilike '%'||trim(p_query)||'%')
+  order by v.sku,v.product_id limit case when p_export_all then null else greatest(1,least(coalesce(p_limit,25),100)) end
+  offset case when p_export_all then 0 else greatest(0,coalesce(p_offset,0)) end;
+$$;
+revoke all on function public.search_low_stock_page_v2(text,text,uuid,uuid,integer,integer,boolean) from public,anon;
+grant execute on function public.search_low_stock_page_v2(text,text,uuid,uuid,integer,integer,boolean) to authenticated;
+
 drop trigger if exists trg_products_validate_master_contract on public.products;
 create trigger trg_products_validate_master_contract before insert or update of product_type_id,uom_id,unit,metadata on public.products
 for each row execute function private.validate_product_master_contract();
@@ -148,17 +174,6 @@ create policy product_master_type_manage on public.product_types for all to auth
 drop policy if exists product_master_allowed_uom_manage on public.product_type_allowed_uoms;
 create policy product_master_allowed_uom_manage on public.product_type_allowed_uoms for all to authenticated using (public.current_user_has_any_role(array['super_admin','admin'])) with check (public.current_user_has_any_role(array['super_admin','admin']));
 
-create or replace function public.get_products_page_v2(p_query text default null,p_type_id uuid default null,p_uom_id uuid default null,p_status text default null,p_qr_status text default null,p_brand_id uuid default null,p_category_id uuid default null,p_sort text default 'created_at',p_direction text default 'desc',p_page integer default 1,p_page_size integer default 25)
-returns jsonb language plpgsql security invoker set search_path=pg_catalog,public as $$
-declare v_offset integer:=greatest(p_page-1,0)*least(greatest(p_page_size,1),100); v_limit integer:=least(greatest(p_page_size,1),100); v_items jsonb; v_total integer;
-begin
-  with base as (select p.id,p.sku,p.barcode,p.name,p.status,p.unit,p.min_stock_level,p.qr_svg_path,p.created_at,pt.id product_type_id,pt.code product_type_code,pt.name product_type_name,u.id uom_id,u.code uom_code,u.name uom_name,b.name brand,c.name category,coalesce(sum(i.quantity),0) on_hand,coalesce(sum(i.reserved_quantity),0) reserved from public.products p left join public.product_types pt on pt.id=p.product_type_id left join public.units_of_measure u on u.id=p.uom_id left join public.product_brands b on b.id=p.brand_id left join public.product_categories c on c.id=p.category_id left join public.inventory i on i.product_id=p.id where (p_status is null or p.status::text=p_status) and (p_type_id is null or p.product_type_id=p_type_id) and (p_uom_id is null or p.uom_id=p_uom_id) and (p_brand_id is null or p.brand_id=p_brand_id) and (p_category_id is null or p.category_id=p_category_id) and (p_qr_status is null or (p_qr_status='ready' and p.qr_svg_path is not null) or (p_qr_status='missing' and p.qr_svg_path is null)) and (nullif(btrim(p_query),'') is null or concat_ws(' ',p.sku,p.barcode,p.name,b.name,c.name,pt.code,pt.name,u.code) ilike '%'||btrim(p_query)||'%') group by p.id,pt.id,u.id,b.name,c.name), counted as (select count(*) over() total_count,* from base), paged as (select * from counted order by case when p_sort='sku' and p_direction='asc' then sku end asc,case when p_sort='sku' and p_direction<>'asc' then sku end desc,case when p_sort='name' and p_direction='asc' then name end asc,case when p_sort='name' and p_direction<>'asc' then name end desc,created_at desc offset v_offset limit v_limit)
-  select coalesce(jsonb_agg(to_jsonb(paged)-'total_count'||jsonb_build_object('available',on_hand-reserved,'qr_status',case when qr_svg_path is null then 'missing' else 'ready' end) order by created_at desc),'[]'::jsonb),coalesce(max(total_count),0) into v_items,v_total from paged;
-  return jsonb_build_object('items',v_items,'total_count',v_total,'page',p_page,'page_size',v_limit);
-end; $$;
-revoke all on function public.get_products_page_v2(text,uuid,uuid,text,text,uuid,uuid,text,text,integer,integer) from public,anon;
-grant execute on function public.get_products_page_v2(text,uuid,uuid,text,text,uuid,uuid,text,text,integer,integer) to authenticated;
-
 -- Full projection replacement: all list filters and lookup options are server-side.
 create or replace function public.get_products_page_v2(p_query text default null,p_type_id uuid default null,p_uom_id uuid default null,p_status text default null,p_qr_status text default null,p_brand_id uuid default null,p_category_id uuid default null,p_sort text default 'created_at',p_direction text default 'desc',p_page integer default 1,p_page_size integer default 25)
 returns jsonb language plpgsql security invoker set search_path=pg_catalog,public as $$
@@ -166,7 +181,7 @@ declare v_offset integer:=greatest(p_page-1,0)*least(greatest(p_page_size,1),100
 begin
   with base as (
     select p.id,p.sku,p.barcode,p.name,p.base_product_code,p.color_code,p.color_name,p.brand_id,p.category_id,p.status,p.unit,p.min_stock_level,p.qr_svg_path,p.created_at,
-      pt.id product_type_id,pt.code product_type_code,pt.name product_type_name,u.id uom_id,u.code uom_code,u.name uom_name,b.name brand,c.name category,st.name stone_type,mb.code material_price_band,
+      pt.id product_type_id,pt.code product_type_code,pt.name product_type_name,pt.pricing_model product_type_pricing_model,u.id uom_id,u.code uom_code,u.name uom_name,b.name brand,c.name category,st.name stone_type,mb.code material_price_band,
       coalesce(sum(i.quantity),0) on_hand,coalesce(sum(i.reserved_quantity),0) reserved
     from public.products p
     left join public.product_types pt on pt.id=p.product_type_id

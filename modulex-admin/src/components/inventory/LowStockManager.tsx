@@ -17,6 +17,8 @@ type StockRow = {
   category: string | null;
   unit: string;
   product_type?: string | null;
+  product_type_id?: string | null;
+  uom_code?: string | null;
   min_stock_level: number | string;
   product_status: string;
   location_count: number | string;
@@ -101,6 +103,11 @@ export default function LowStockManager() {
   const [rows, setRows] = useState<StockRow[]>([]);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewFilter>("alerts");
+  const [typeId, setTypeId] = useState("");
+  const [uomId, setUomId] = useState("");
+  const [typeOptions, setTypeOptions] = useState<{id:string;name:string}[]>([]);
+  const [uomOptions, setUomOptions] = useState<{id:string;name:string;code:string}[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [thresholdDrafts, setThresholdDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -117,23 +124,12 @@ export default function LowStockManager() {
     setErrorMessage(null);
     setRetryAction(null);
 
-    const nextRows: StockRow[] = [];
-    let nextOffset = 0;
-    let loadError: unknown = null;
-    do {
-      const { data, error } = await supabase.rpc("search_low_stock_page", {
-        p_query: "", p_view: "all", p_offset: nextOffset,
-        p_limit: RPC_PAGE_SIZE, p_export_all: false,
-      });
-      if (error) {
-        loadError = error;
-        break;
-      }
-      const page = (data ?? []) as StockRow[];
-      nextRows.push(...page);
-      nextOffset += page.length;
-      if (page.length === 0 || nextOffset >= numberValue(page[0]?.total_count)) break;
-    } while (true);
+    const { data, error: loadError } = await supabase.rpc("search_low_stock_page_v2", {
+      p_query: query, p_view: view, p_type_id: typeId || null, p_uom_id: uomId || null,
+      p_offset: (currentPage - 1) * pageSize, p_limit: pageSize, p_export_all: false,
+    });
+    const nextRows = (data ?? []) as StockRow[];
+    setTotalCount(numberValue(nextRows[0]?.total_count));
 
     if (loadError) {
       reportLowStockError("stock summary load failed", loadError);
@@ -145,7 +141,7 @@ export default function LowStockManager() {
       setThresholdDrafts({});
     }
     setIsLoading(false);
-  }, []);
+  }, [currentPage, pageSize, query, typeId, uomId, view]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,6 +163,13 @@ export default function LowStockManager() {
     };
   }, [loadRows]);
 
+  useEffect(() => {
+    void Promise.all([
+      supabase.from("product_types").select("id,name").eq("is_active", true).order("sort_order"),
+      supabase.from("units_of_measure").select("id,name,code").eq("is_active", true).order("sort_order"),
+    ]).then(([types, uoms]) => { setTypeOptions((types.data ?? []) as typeof typeOptions); setUomOptions((uoms.data ?? []) as typeof uomOptions); });
+  }, []);
+
   const summary = useMemo(() => {
     const alerts = rows.filter((row) => row.is_low_stock);
     return {
@@ -178,19 +181,9 @@ export default function LowStockManager() {
     };
   }, [rows]);
 
-  const filteredRows = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return rows.filter((row) => {
-      if (view === "alerts" && !row.is_low_stock) return false;
-      if (view === "unset" && numberValue(row.min_stock_level) > 0) return false;
-      if (!normalized) return true;
-      return [row.sku, row.barcode, row.product_name, row.brand, row.category]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized));
-    });
-  }, [rows, query, view]);
+  const filteredRows = rows;
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -199,12 +192,11 @@ export default function LowStockManager() {
   }, [currentPage, totalPages]);
 
   const paginatedRows = useMemo(() => {
-    const offset = (currentPage - 1) * pageSize;
-    return filteredRows.slice(offset, offset + pageSize);
+    return filteredRows;
   }, [currentPage, filteredRows, pageSize]);
 
   const startRow = filteredRows.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const endRow = Math.min(currentPage * pageSize, filteredRows.length);
+  const endRow = startRow + filteredRows.length - 1;
   const pageNumbers = getPageNumbers(currentPage, totalPages);
 
   async function saveThreshold(row: StockRow) {
@@ -400,6 +392,12 @@ export default function LowStockManager() {
                 <option value="unset">Threshold Not Set</option>
               </select>
             </div>
+            <select aria-label="Product Type" value={typeId} onChange={(e) => { setTypeId(e.target.value); setCurrentPage(1); }} className={`${inputClass} min-w-[150px]`}>
+              <option value="">All types</option>{typeOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
+            <select aria-label="Unit of Measure" value={uomId} onChange={(e) => { setUomId(e.target.value); setCurrentPage(1); }} className={`${inputClass} min-w-[140px]`}>
+              <option value="">All UOMs</option>{uomOptions.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.code})</option>)}
+            </select>
             <button
               type="button"
               onClick={() => void loadRows()}
@@ -418,7 +416,7 @@ export default function LowStockManager() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="admin-table-viewport">
           <table className="min-w-[1120px] divide-y divide-gray-100 dark:divide-gray-800">
             <thead className="bg-gray-50 dark:bg-white/[0.02]">
               <tr>

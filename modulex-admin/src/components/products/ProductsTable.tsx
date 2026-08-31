@@ -38,6 +38,7 @@ type Product = {
   created_at: string;
   product_type_code?: string | null;
   product_type_name?: string | null;
+  product_type_pricing_model?: string | null;
   uom_code?: string | null;
   uom_name?: string | null;
   on_hand?: number | string;
@@ -109,7 +110,7 @@ function reportProductError(context: string, error: unknown) {
 }
 
 function normalizeV2Product(item: Record<string, unknown>): Product {
-  return { product_id: String(item.id), sku: String(item.sku ?? ""), barcode: item.barcode as string | null, product_name: String(item.name ?? ""), base_product_code: String(item.base_product_code ?? ""), color_code: String(item.color_code ?? ""), color_name: item.color_name as string | null, brand_id: String(item.brand_id ?? ""), category_id: String(item.category_id ?? ""), brand: String(item.brand ?? ""), category: String(item.category ?? ""), unit: String(item.unit ?? ""), min_stock_level: Number(item.min_stock_level ?? 0), product_status: item.status as ProductStatus, created_at: String(item.created_at ?? ""), product_type_code: item.product_type_code as string | null, product_type_name: item.product_type_name as string | null, uom_code: item.uom_code as string | null, uom_name: item.uom_name as string | null, on_hand: item.on_hand as number | string, reserved: item.reserved as number | string, available: item.available as number | string, qr_status: item.qr_status as "ready" | "missing", stone_type: item.stone_type as string | null, material_price_band: item.material_price_band as string | null };
+  return { product_id: String(item.id), sku: String(item.sku ?? ""), barcode: item.barcode as string | null, product_name: String(item.name ?? ""), base_product_code: String(item.base_product_code ?? ""), color_code: String(item.color_code ?? ""), color_name: item.color_name as string | null, brand_id: String(item.brand_id ?? ""), category_id: String(item.category_id ?? ""), brand: String(item.brand ?? ""), category: String(item.category ?? ""), unit: String(item.unit ?? ""), min_stock_level: Number(item.min_stock_level ?? 0), product_status: item.status as ProductStatus, created_at: String(item.created_at ?? ""), product_type_code: item.product_type_code as string | null, product_type_name: item.product_type_name as string | null, product_type_pricing_model: item.product_type_pricing_model as string | null, uom_code: item.uom_code as string | null, uom_name: item.uom_name as string | null, on_hand: item.on_hand as number | string, reserved: item.reserved as number | string, available: item.available as number | string, qr_status: item.qr_status as "ready" | "missing", stone_type: item.stone_type as string | null, material_price_band: item.material_price_band as string | null };
 }
 
 function lifecycleErrorMessage(error: RpcError) {
@@ -423,7 +424,7 @@ export default function ProductsTable() {
           product.product_type_name || product.product_type_code,
           product.brand,
           product.category,
-          product.product_type_code === "STONE" ? `${product.stone_type || "Stone"} · ${product.material_price_band || ""}` : `${product.base_product_code} · ${product.color_name || product.color_code}`,
+                      product.product_type_pricing_model === "countertop_material_band" ? `${product.stone_type || "Stone"} · ${product.material_price_band || ""}` : `${product.base_product_code} · ${product.color_name || product.color_code}`,
           product.uom_name || product.uom_code || product.unit,
           product.on_hand,
           product.reserved,
@@ -689,7 +690,7 @@ export default function ProductsTable() {
                       </td>
                       <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.product_type_name || product.product_type_code || "—"}</td>
                       <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.brand || "—"}<br />{product.category || "—"}</td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.product_type_code === "STONE" ? `${product.stone_type || "Stone"} · ${product.material_price_band || "—"}` : `${product.base_product_code || "—"} · ${product.color_name || product.color_code || "—"}`}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.product_type_pricing_model === "countertop_material_band" ? `${product.stone_type || "Stone"} · ${product.material_price_band || "—"}` : `${product.base_product_code || "—"} · ${product.color_name || product.color_code || "—"}`}</td>
                       <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.uom_name || product.uom_code || product.unit}</td>
                       <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.on_hand == null ? "—" : `${formatNumber(Number(product.on_hand))} / ${formatNumber(Number(product.reserved))} / ${formatNumber(Number(product.available))}`}</td>
                       <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.qr_status || "missing"}</td>

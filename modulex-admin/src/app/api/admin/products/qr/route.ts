@@ -8,10 +8,11 @@ export async function POST(request: Request) {
     const auth = await requireAdmin(request);
     if ("response" in auth && auth.response) return auth.response;
     const actor = auth.actor;
-    const body = await request.json() as { product_id?: unknown };
+    const body = await request.json() as { product_id?: unknown; force?: boolean };
     if (typeof body.product_id !== "string") return NextResponse.json({ error: "product_id is required" }, { status: 400 });
-    const { data: product, error } = await supabaseAdmin.from("products").select("id,sku,qr_value,color_code").eq("id", body.product_id).single();
+    const { data: product, error } = await supabaseAdmin.from("products").select("id,sku,qr_value,qr_svg_path,color_code").eq("id", body.product_id).single();
     if (error || !product) return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    if (!body.force && product.qr_svg_path && product.qr_value === product.sku) return NextResponse.json({ ok: true, skipped: true, qr_svg_path: product.qr_svg_path });
     const value = product.qr_value || product.sku;
     const svg = await QRCode.toString(value, { type: "svg", errorCorrectionLevel: "H", margin: 2, width: 512 });
     const safeSku = product.sku.trim().replace(/\s+/g, "-").replace(/[^a-zA-Z0-9-_]/g, "-");
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
     const { data: urlData } = supabaseAdmin.storage.from("product-qrcodes").getPublicUrl(path);
     const { error: updateError } = await supabaseAdmin.from("products").update({ qr_value: value, qr_svg_path: path, qr_svg_url: urlData.publicUrl, qr_generated_at: new Date().toISOString() }).eq("id", product.id);
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (product.qr_svg_path && product.qr_svg_path !== path) await supabaseAdmin.storage.from("product-qrcodes").remove([product.qr_svg_path]);
     return NextResponse.json({ ok: true, actor: actor.profile.id, qr_svg_path: path, qr_svg_url: urlData.publicUrl });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to generate QR" }, { status: 403 }); }
 }

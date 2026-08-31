@@ -282,6 +282,7 @@
 
 
 @layer utilities {
+  .admin-table-viewport { @apply max-w-full overflow-x-auto custom-scrollbar; }
   /* For Remove Date Icon */
   input[type="date"]::-webkit-inner-spin-button,
   input[type="time"]::-webkit-inner-spin-button,
