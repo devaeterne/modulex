@@ -44,6 +44,7 @@ for (const surface of surfaces) {
 }
 
 const inventoryTable = read("src/components/inventory/InventoryTable.tsx");
+const sharedSelect = read("src/components/form/Select.tsx");
 for (const primitive of [
   "ComponentCard",
   "Input",
@@ -66,6 +67,8 @@ expect(inventoryTable.includes("<TableViewport"), "Inventory must use the shared
 expect(inventoryTable.includes('supabase.rpc("search_stock_page"'), "Inventory must preserve the server-side stock search RPC");
 expect(inventoryTable.includes('mode = "overview"') && inventoryTable.includes('mode === "shelf"'), "Inventory must preserve overview and shelf modes");
 expect(inventoryTable.includes('href="/scan"'), "Shelf inventory must preserve Scan QR / Barcode navigation");
+expect(sharedSelect.includes("disabled?: boolean"), "Shared Select must support disabled inventory filter states");
+expect(sharedSelect.includes("disabled={disabled}"), "Shared Select must forward disabled state to the native select");
 
 const warehouseTable = read("src/components/warehouses/WarehousesTable.tsx");
 const warehouseForm = read("src/components/warehouses/WarehouseForm.tsx");
