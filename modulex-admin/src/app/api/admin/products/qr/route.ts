@@ -27,6 +27,6 @@ export async function POST(request: Request) {
       const { error: cleanupError } = await supabaseAdmin.storage.from("product-qrcodes").remove([product.qr_svg_path]);
       if (cleanupError) console.warn("QR old asset cleanup failed after successful replacement", cleanupError.message);
     }
-    return NextResponse.json({ ok: true, actor: actor.profile.id, qr_svg_path: path, qr_svg_url: urlData.publicUrl });
+    return NextResponse.json({ ok: true, actor: actor.profile.id, qr_value: value, qr_svg_path: path, qr_svg_url: urlData.publicUrl, qr_generated_at: new Date().toISOString() });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to generate QR" }, { status: 403 }); }
 }

@@ -383,6 +383,16 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     setValues((current) => ({ ...current, [field]: value }));
   }
 
+  async function generateQr(productId: string, force = false) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return { ok: false, message: "Your session has expired. Sign in again before generating the QR code." };
+    const response = await fetch("/api/admin/products/qr", { method: "POST", headers: { "content-type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ product_id: productId, force }) });
+    const body = await response.json().catch(() => ({})) as { error?: string; qr_value?: string; qr_svg_path?: string; qr_svg_url?: string; qr_generated_at?: string };
+    if (!response.ok) return { ok: false, message: response.status === 401 ? "Your session has expired. Sign in again before generating the QR code." : response.status === 403 ? "You do not have permission to generate product QR codes." : body.error || "Product was saved, but the QR file could not be generated. Retry QR." };
+    setValues((current) => ({ ...current, qr_value: body.qr_value ?? current.sku, qr_svg_path: body.qr_svg_path ?? current.qr_svg_path, qr_svg_url: body.qr_svg_url ?? current.qr_svg_url, qr_generated_at: body.qr_generated_at ?? current.qr_generated_at }));
+    return { ok: true, message: "QR code generated." };
+  }
+
   function validateForm() {
     if (!values.sku.trim()) return "SKU is required.";
     if (!values.name.trim()) return "Product name is required.";
@@ -470,9 +480,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     const savedProductId = String(savedId ?? "");
 
     if (savedProductId) {
-      const qrResponse = await fetch("/api/admin/products/qr", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ product_id: savedProductId }) });
-      if (!qrResponse.ok) {
-        setErrorMessage("Product saved, but QR generation failed. Retry from the product detail.");
+      const qrResult = await generateQr(savedProductId);
+      if (!qrResult.ok) {
+        setErrorMessage(qrResult.message);
         setIsSubmitting(false);
         return;
       }
@@ -733,7 +743,7 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
                     {values.qr_generated_at ? new Date(values.qr_generated_at).toLocaleString("en-US") : "-"}
                   </span>
                 </div>
-                {mode === "edit" && productId ? <button type="button" disabled={isSubmitting} onClick={async () => { setIsSubmitting(true); const response = await fetch("/api/admin/products/qr", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ product_id: productId, force: true }) }); if (!response.ok) setErrorMessage("QR generation failed. Please retry."); else setErrorMessage(null); setIsSubmitting(false); }} className="rounded-lg bg-brand-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60">Regenerate QR</button> : null}
+                {mode === "edit" && productId ? <button type="button" disabled={isSubmitting} onClick={async () => { setIsSubmitting(true); const result = await generateQr(productId, true); if (!result.ok) setErrorMessage(result.message); else setErrorMessage(null); setIsSubmitting(false); }} className="rounded-lg bg-brand-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60">Regenerate QR</button> : null}
               </div>
             </div>
           </div>
