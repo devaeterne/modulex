@@ -9,6 +9,8 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const sql = read("sql/countertop-stone-sink-domain.sql");
 const migration = read("../modulex-store/supabase/migrations/20260831130000_countertop_stone_sink_mvp.sql");
 const revisionMigration = read("../modulex-store/supabase/migrations/20260901090000_customer_order_revision_identity.sql");
+const securityMigration = read("../modulex-store/supabase/migrations/20260901110000_countertop_security_fk_hardening.sql");
+const lifecycleSql = read("sql/customer-order-lifecycle-editability.sql");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
 const orderDomain = read("src/lib/customers/order-domain.ts");
@@ -71,6 +73,15 @@ assert(orderEditingSql.includes("Order item does not belong to this order") && o
 assert(revisionMigration.includes("v_item_id := nullif(v_item->>'id','')::uuid") && !revisionMigration.includes("delete from public.customer_order_items where order_id = p_order_id"), "pending revision migration must preserve stable item identity without bulk delete");
 assert(orderDomain.includes("...(item.id ? { id: item.id } : {})"), "order domain must pass existing item identity to the revision RPC");
 assert(editOrder.includes("type DraftItem = { id?: string") && editOrder.includes("id: item.id"), "edit order UI must retain existing item identity internally");
+assert(revisionMigration.includes("function private.update_customer_order(") && !revisionMigration.includes("function public.update_customer_order("), "stable revision core must be private and must not add a public 14-argument overload");
+assert(orderDomain.includes("p_fulfillment_type") && orderEditingSql.includes("function private.update_customer_order(") && !orderEditingSql.includes("function public.update_customer_order("), "public fulfillment-aware API and private 14-argument core boundaries must remain distinct");
+assert(lifecycleSql.includes("p_fulfillment_type text") && lifecycleSql.includes("customer_order_revision_mode") && lifecycleSql.includes("create_approval_request"), "fulfillment/lifecycle/approval wrapper must remain intact");
+assert(securityMigration.includes("function private.upsert_countertop_reference") && securityMigration.includes("function public.upsert_countertop_reference") && securityMigration.includes("language sql security invoker"), "reference mutation must use private definer plus public invoker wrapper");
+assert(securityMigration.includes("function private.attach_countertop_configuration") && securityMigration.includes("function public.attach_countertop_configuration"), "attach mutation must use private definer plus public invoker wrapper");
+assert(securityMigration.includes("function private.audit_countertop_reference_change") && !securityMigration.includes("function public.audit_countertop_reference_change"), "reference audit trigger must be private");
+assert(securityMigration.includes("revoke all on function private.upsert_countertop_reference") && securityMigration.includes("grant execute on function private.upsert_countertop_reference") && securityMigration.includes("revoke all on function public.upsert_countertop_reference"), "reference grants must keep the private privileged boundary explicit");
+assert(securityMigration.includes("revoke all on function private.attach_countertop_configuration") && securityMigration.includes("grant execute on function private.attach_countertop_configuration") && securityMigration.includes("revoke all on function public.attach_countertop_configuration"), "attach grants must keep the private privileged boundary explicit");
+for (const index of ["countertop_stone_profiles_material_band_idx", "countertop_configurations_sink_idx", "countertop_configurations_price_group_idx", "countertop_configurations_edge_profile_idx", "countertop_configurations_overridden_by_idx"]) assert(securityMigration.includes(index), `countertop FK index missing: ${index}`);
 assert(sql.includes("audit_countertop_reference_change") && sql.includes("countertop_profiles_audit") && sql.includes("changed_by"), "countertop reference mutations must use audit_logs actor mechanism");
 assert(refs.includes("toggleProfile(row)") && refs.includes("p_product_id: row.product_id") && refs.includes("p_is_active: !row.is_active"), "profile toggle must pass row values directly without stale state");
 assert(refs.includes("value={drafts.profile?.product_id") && refs.includes("value={drafts.profile?.stone_type_id") && refs.includes("value={drafts.profile?.material_price_band_id"), "profile edit selectors must hydrate selected values");

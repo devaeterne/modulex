@@ -1,6 +1,6 @@
 -- Preserve customer_order_items identity during revisions so countertop
 -- configuration rows (and their historical snapshots) are not cascade-deleted.
-+create or replace function public.update_customer_order(
+create or replace function private.update_customer_order(
   p_order_id uuid,
   p_items jsonb,
   p_price_group_id uuid,
@@ -224,4 +224,4 @@ begin
 end;
 $$;
 
-revoke all on function public.update_customer_order(uuid,jsonb,uuid,uuid,uuid,date,text,text,text,numeric,numeric,uuid,numeric,text) from public;
+revoke all on function private.update_customer_order(uuid,jsonb,uuid,uuid,uuid,date,text,text,text,numeric,numeric,uuid,numeric,text) from public, anon, authenticated;

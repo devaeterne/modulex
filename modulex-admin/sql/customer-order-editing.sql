@@ -28,7 +28,7 @@ using (public.current_user_has_any_role(array['super_admin','admin','sales']));
 revoke all on public.customer_order_revisions from anon;
 grant select on public.customer_order_revisions to authenticated;
 
-create or replace function public.update_customer_order(
+create or replace function private.update_customer_order(
   p_order_id uuid,
   p_items jsonb,
   p_price_group_id uuid,
@@ -252,8 +252,6 @@ begin
 end;
 $$;
 
-revoke all on function public.update_customer_order(uuid,jsonb,uuid,uuid,uuid,date,text,text,text,numeric,numeric,uuid,numeric,text) from public;
-revoke all on function public.update_customer_order(uuid,jsonb,uuid,uuid,uuid,date,text,text,text,numeric,numeric,uuid,numeric,text) from anon;
-grant execute on function public.update_customer_order(uuid,jsonb,uuid,uuid,uuid,date,text,text,text,numeric,numeric,uuid,numeric,text) to authenticated;
+revoke all on function private.update_customer_order(uuid,jsonb,uuid,uuid,uuid,date,text,text,text,numeric,numeric,uuid,numeric,text) from public, anon, authenticated;
 
 commit;
