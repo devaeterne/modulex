@@ -22,6 +22,10 @@ function collect(dir) {
   if (!fs.existsSync(full)) return [];
   return fs.readdirSync(full, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? collect(path.join(dir, entry.name)) : entry.name.endsWith(".tsx") ? [read(path.join(dir, entry.name))] : []);
 }
+const overview = read("src/components/settings/GeneralSettingsOverview.tsx");
+expect(overview.includes("ComponentCard"), "General Settings overview must use the shared ComponentCard for its page-intro surface");
+expect(!overview.includes("<section"), "General Settings overview must not reimplement the shared page-intro card surface");
+expect(overview.includes('<nav aria-label="General settings sections"'), "General Settings section links must remain an explicit navigation landmark");
 const sources = [...collect("src/components/settings"), ...routes.map(([file]) => read(file))].join("\n");
 expect(sources.includes("dark:"), "General Settings surfaces must support dark mode");
 expect(/\b(sm|md|lg|xl):/.test(sources) || sources.includes("overflow-x-auto"), "General Settings surfaces need responsive behavior");
