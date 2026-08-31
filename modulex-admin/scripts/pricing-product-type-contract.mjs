@@ -25,6 +25,7 @@ assert.match(migration, /product_type_id/i, "Pricing v2 RPC must expose Product 
 assert.match(migration, /uom_id/i, "Pricing v2 RPC must expose UOM identity");
 assert.match(migration, /pricing_model/i, "Pricing v2 RPC must expose pricing_model");
 assert.match(migration, /pricing_model\s*=\s*'price_group'/i, "Price Group directory must be DB-filtered by pricing_model");
+assert.match(migration, /page_order/i, "Pricing v2 RPC must preserve the selected server sort in its JSON item order");
 assert.match(migration, /This Product Type does not use Price Group pricing\./, "set_product_price must fail closed for non-price_group Product Types");
 assert.match(migration, /create or replace function public\.set_product_price/i, "Existing price mutation boundary must be hardened in-place");
 
