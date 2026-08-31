@@ -35,4 +35,21 @@ expect(
   "Product reference helper text must use TailAdmin light and dark typography"
 );
 
+expect(
+  manager.includes('className="m-4 max-w-[960px] overflow-hidden"'),
+  "Product reference editor must keep the modal shell clipped to one viewport surface"
+);
+expect(
+  manager.includes("shrink-0 border-b") && manager.includes("shrink-0 border-t"),
+  "Product reference editor must keep a fixed header and footer around the scrollable form body"
+);
+expect(
+  manager.includes("min-h-0 flex-1 overflow-y-auto"),
+  "Product reference editor must scroll only the form body"
+);
+expect(
+  !manager.includes('className="max-h-[88vh] overflow-y-auto p-4 sm:p-6"'),
+  "Product reference editor must not use the legacy nested full-content scroll surface"
+);
+
 console.log("product reference UI contract: ok");
