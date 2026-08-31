@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-01
-Main baseline: `f3996f6a519cc819dfc903e73102e7700373d192`
+Main baseline: `3671c66929e79dae9f27b0f0029c0db45dd0519b`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
-Current Admin next action: **Product Master UX v2 implementation and acceptance; preserve the closed A3.1/A3.2/A3.3 and Countertop / Stone / Sink contracts.**
+Current Admin next action: **Pricing UI v2 / Product Type pricing routing is in review in PR #206. Preserve the closed A3.3 price-group/effective-date/audit/Dealer no-fallback contract; production migration, exact-SHA deploy, authenticated route smoke and advisor acceptance remain pending.**
 
 ## Admin UI standardization program
 
@@ -14,7 +14,17 @@ Current Admin next action: **Product Master UX v2 implementation and acceptance;
 ## Product Master UX v2
 
 - [~] Dynamic Product Types, Units of Measure, Product create/edit/list, QR compatibility, Brands/Categories usage-aware UX, and type/UOM-aware Low Stock.
-  - Additive migration `20260831140000_product_master_v2_dynamic_types_uom.sql` introduces canonical product type/UOM references while retaining `products.unit` as a compatibility mirror. Production migration and authenticated UI acceptance remain pending.
+  - PR #190 and advisor-hardening PR #191 are merged/deployed; production Product Master migrations, DB/runtime acceptance, canonical type/UOM backfill, and post-migration advisor verification are complete. Signed-in browser click-through remains the only unclosed Product Master UX acceptance item, so this row is not marked `[x]` yet.
+
+## Pricing UI v2 — Product Type routing
+
+- [~] Route Admin pricing workspaces through `product_types.pricing_model` without moving price amounts into Product Type or UOM.
+  - `price_group` remains canonical on `product_prices + price_groups`; `countertop_material_band` remains canonical on Stone profile → `countertop_material_price_bands`; `none` exposes no editable commercial product price. UOM remains quantity/measurement semantics only.
+  - PR #206 adds Product Type/UOM-aware server-side Product Prices filtering, the focused `/pricing/material-bands` rate workspace, and a DB-authoritative guard that rejects new Price Group amounts for non-`price_group` Product Types while retaining an explicit null-cleanup path for legacy rows.
+  - Rollback-only production-schema acceptance passed before merge: only `price_group` products are returned by the v2 directory, sort order is preserved, Stone price writes fail closed, canonical Material Band mutation works, rollback leaves the v2 function unapplied, and production B1–R22 values remain unchanged. No production business data mutation persisted.
+  - Fresh post-`main` sync Admin Products Pricing workflow run `33451480069` passed Product/Pricing UI contract, Product Type pricing contract, production-surface regression, RBAC, lint, and production build on branch head `016cccdc94aec8ab0fd19c7a889f48c8e3d69ae6`.
+  - Production migration `20260901010000_pricing_product_type_routing.sql` is intentionally **not applied before merge**. Close this row only after merge, one-time production migration, exact merge-SHA Admin deployment, authenticated Product Prices/Material Bands acceptance, and post-DDL Supabase Security + Performance Advisor review.
+  - Store public/Dealer projection behavior is unchanged by this package; the migration lives in the shared Supabase migration directory but does not widen Store data exposure, so `STORE_ROADMAP.md` requires no functional status change for this package.
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -159,8 +169,7 @@ These rules are mandatory for all future Modulex Admin work:
   - PR #113 merged as `f6d7f9673dc874b5c254e47c750ff1bd4793c7c3`; Vercel deployment `dpl_5jbrwJDsdJv3FtXuMhfsstX7DY6k` is production `READY` from that exact merge SHA.
   - Post-merge Codex review found a P1 gap in source-wide privileged `NEXT_PUBLIC_*` detection and a P2 gap in Store activation-origin configuration/fallback handling.
   - Follow-up scope: strict source-wide browser-safe env allowlist, configuration-owned `STORE_SITE_URL` / `NEXT_PUBLIC_STORE_URL`, removal of the legacy `oakwell-phi.vercel.app` fallback, and fresh deterministic verification.
-  - TDD RED: Actions run `33256670583` proved the previous runtime contract did not reject an injected `NEXT_PUBLIC_DATABASE_URL` source reference.
-  - Targeted GREEN: Actions run `33256841429` rejected the negative fixture and passed the positive runtime-config contract.
+  - TDD RED: Actions run `33256670583` failed on the pre-fix parity gaps before implementation; targeted GREEN run `33256841429` rejected the negative fixture and passed the positive runtime-config contract.
   - Full deterministic verification: Actions run `33256903655` passed runtime-config, production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
 
 ### Phase A0 Exit Gate
@@ -409,6 +418,8 @@ A3.2 implementation, migration, production deployment, authenticated route smoke
 - [x] Add validation/audit coverage for price changes.
 
 A3.3 implementation, production migration `20260830213328_a3_3_pricing_hardening`, rollback-only lifecycle/audit acceptance, authenticated pricing RPC acceptance, Dealer no-fallback boundary reconciliation, production pricing-route smoke, and post-migration advisor review are complete. Detailed evidence: `docs/acceptance/a3-3-pricing.md`.
+
+Pricing UI v2 / Product Type routing above is an additive follow-up to this closed A3.3 foundation; it does not replace or reopen the A3.3 lifecycle/audit/Dealer boundary.
 
 ## Cross-cutting Admin UI hardening track (UI-2A → UI-2E)
 
@@ -729,17 +740,20 @@ Record material decisions here when they affect future phases.
 - [x] A2.2 keeps the existing hybrid inventory architecture: mutable `inventory` snapshot for operational reads plus append-safe `inventory_movements` ledger. It does not adopt full event sourcing or create separate damaged/hold quantity buckets.
 - [x] A2.3 does not add a scan-specific write ledger or new mutation API. Camera/manual scans resolve workflow inputs; confirmed stock changes continue through the A2.2 idempotent RPC + movement-ledger boundary.
 - [x] A3.1 keeps `brand_id` / `category_id` canonical while legacy text taxonomy columns remain synchronized compatibility mirrors; physical product deletion is not part of the Admin product-master lifecycle.
+- [x] Product Type is dynamic master data and selects a controlled pricing behavior; it does not store price amounts. UOM is dynamic quantity/measurement master data and does not select pricing behavior.
+- [x] Pricing UI v2 keeps Stone material rates in canonical `countertop_material_price_bands`, Sink/Standard Price Group amounts in canonical `product_prices`, and unsupported `none` Product Types without an editable commercial amount.
 
 ---
 
 # Next Action
 
-Primary near-term Admin work is **VAL-2 — Products & Pricing**. Phase A3 functional delivery is CLOSED; Phase A4 is now the active functional phase, while VAL-2 is the next cross-cutting hardening package.
+Primary near-term Admin work is **Pricing UI v2 / Product Type routing production closeout in PR #206**. A3.3 remains CLOSED; this is an additive routing/UX hardening package. **VAL-2 — Products & Pricing** resumes as the next cross-cutting hardening package after #206 is production-accepted.
 
-1. Audit Product and Pricing forms/mutations against the authoritative production DB column, enum, nullability, precision, FK, constraint, and RPC argument contracts.
-2. Inventory mismatches first; then remediate only verified DB-contract incompatibilities using shared validation/normalization helpers and targeted regression coverage.
-3. Preserve the closed A3.1 canonical taxonomy/family/color/lifecycle/export contract, A3.2 Store publication/public-RPC boundaries, and A3.3 price-group/effective-date/audit/Dealer no-fallback contracts.
+1. Merge PR #206 only after fresh head CI is green apart from the documented unrelated Store GC-8B baseline failure.
+2. Apply `20260901010000_pricing_product_type_routing.sql` once to production, verify exact merge-SHA Admin deployment, repeat authenticated Product Prices/Material Bands acceptance, and run Supabase Security + Performance Advisors.
+3. Mark Pricing UI v2 `[x]` only after that production closeout; keep Product Master UX v2 `[~]` until signed-in browser click-through is explicitly accepted.
+4. Resume VAL-2 without widening Store public data or Dealer pricing visibility.
 
-**Cross-roadmap coordination:** Store remains on the existing approved canonical product/public projections. VAL-2 must not widen Store public data or Dealer pricing visibility while hardening Admin input compatibility.
+**Cross-roadmap coordination:** Store remains on the existing approved canonical product/public projections. Pricing UI v2 and VAL-2 must not widen Store public data or Dealer pricing visibility while hardening Admin input/pricing compatibility.
 
 **Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A4, VAL, UI, or other concurrently merged Admin work is preserved rather than overwritten.
