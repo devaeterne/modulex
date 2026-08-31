@@ -1,18 +1,48 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableViewport,
+} from "@/components/ui/table";
+import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
-import { hasPermission } from "@/lib/auth/permissions";
-import { calculateDbDecimalBulk, canonicalizeDbDecimal, formatDbDecimal, parseDbDecimal } from "@/lib/validation";
+import {
+  calculateDbDecimalBulk,
+  canonicalizeDbDecimal,
+  formatDbDecimal,
+  parseDbDecimal,
+} from "@/lib/validation";
 
 type ProductStatus = "active" | "inactive";
 type StockFilter = "all" | "in_stock" | "out_of_stock";
-type SortBy = "sku" | "name" | "brand" | "category" | "stock" | "status";
+type SortBy =
+  | "sku"
+  | "name"
+  | "brand"
+  | "category"
+  | "product_type"
+  | "uom"
+  | "stock"
+  | "status";
 type SortDirection = "asc" | "desc";
 type BulkMode = "source_percent" | "current_percent" | "current_amount" | "set_amount";
 
-type Lookup = { id: string; name: string };
+type Lookup = { id: string; name: string; code?: string };
 type PriceGroup = {
   id: string;
   system_key: string;
@@ -32,6 +62,13 @@ type ProductRow = {
   brand: string | null;
   category: string | null;
   product_status: ProductStatus;
+  product_type_id: string;
+  product_type_code: string;
+  product_type_name: string;
+  pricing_model: "price_group";
+  uom_id: string;
+  uom_code: string;
+  uom_name: string;
   available_stock: string | number;
   prices: Record<string, string | number>;
 };
@@ -42,37 +79,63 @@ type Payload = {
   page: number;
   page_size: number;
   total_pages: number;
-  summary: { total_products: number; price_groups: number; filled_prices: number; missing_prices: number };
-  filters: { brands: Lookup[]; categories: Lookup[] };
+  summary: {
+    total_products: number;
+    price_groups: number;
+    filled_prices: number;
+    missing_prices: number;
+  };
+  routing_summary: {
+    price_group_products: number;
+    material_band_products: number;
+    no_pricing_products: number;
+  };
+  filters: {
+    brands: Lookup[];
+    categories: Lookup[];
+    product_types: Lookup[];
+    uoms: Lookup[];
+  };
   price_groups: PriceGroup[];
 };
-
 type PriceChange = { product_id: string; price_group_id: string; amount: string | null };
 
 const pageSizes = [25, 50, 100];
-const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs outline-none focus:border-brand-300 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const selectClass = inputClass;
-const buttonClass = "inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
-const primaryButtonClass = "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
+const PRICE_DECIMAL = { precision: 18, scale: 4, min: 0, allowNull: true } as const;
 
 function key(productId: string, groupId: string) {
   return `${productId}:${groupId}`;
 }
-const PRICE_DECIMAL = { precision: 18, scale: 4, min: 0, allowNull: true } as const;
+
 function normalize(value: string | undefined) {
   const parsed = parseDbDecimal(value, PRICE_DECIMAL);
-  return parsed.error ? `invalid:${(value ?? "").trim()}` : canonicalizeDbDecimal(parsed.value, PRICE_DECIMAL);
+  return parsed.error
+    ? `invalid:${(value ?? "").trim()}`
+    : canonicalizeDbDecimal(parsed.value, PRICE_DECIMAL);
 }
+
 function toInput(value: string | number | null | undefined) {
   return formatDbDecimal(value, PRICE_DECIMAL);
 }
+
 function money(value: string) {
   const number = Number(value.replace(",", "."));
   if (!Number.isFinite(number)) return "—";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(number);
 }
+
 function stock(value: string | number) {
   return Number(value ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+function pricingErrorMessage(message: string) {
+  if (message.includes("does not use Price Group pricing")) {
+    return "This product uses a different pricing engine and cannot receive a Price Group price.";
+  }
+  if (message.includes("permission")) {
+    return "You do not have permission to manage product prices.";
+  }
+  return "Product pricing could not be loaded or saved. Please retry.";
 }
 
 export default function ProductPricesServerTable() {
@@ -80,13 +143,27 @@ export default function ProductPricesServerTable() {
   const [groups, setGroups] = useState<PriceGroup[]>([]);
   const [brands, setBrands] = useState<Lookup[]>([]);
   const [categories, setCategories] = useState<Lookup[]>([]);
+  const [productTypes, setProductTypes] = useState<Lookup[]>([]);
+  const [uoms, setUoms] = useState<Lookup[]>([]);
   const [filteredIds, setFilteredIds] = useState<string[]>([]);
-  const [summary, setSummary] = useState<Payload["summary"]>({ total_products: 0, price_groups: 0, filled_prices: 0, missing_prices: 0 });
+  const [summary, setSummary] = useState<Payload["summary"]>({
+    total_products: 0,
+    price_groups: 0,
+    filled_prices: 0,
+    missing_prices: 0,
+  });
+  const [routingSummary, setRoutingSummary] = useState<Payload["routing_summary"]>({
+    price_group_products: 0,
+    material_band_products: 0,
+    no_pricing_products: 0,
+  });
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ProductStatus>("all");
   const [brandFilter, setBrandFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [productTypeFilter, setProductTypeFilter] = useState("");
+  const [uomFilter, setUomFilter] = useState("");
   const [stockFilter, setStockFilter] = useState<StockFilter>("all");
   const [sortBy, setSortBy] = useState<SortBy>("sku");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -114,11 +191,12 @@ export default function ProductPricesServerTable() {
       if (normalize(current) === normalize(originals[priceKey])) continue;
       const [product_id, price_group_id] = priceKey.split(":");
       const raw = current.trim().replace(",", ".");
-      if (!raw) changes.push({ product_id, price_group_id, amount: null });
-      else {
-        const amount = parseDbDecimal(raw, PRICE_DECIMAL);
-        if (!amount.error) changes.push({ product_id, price_group_id, amount: amount.value });
+      if (!raw) {
+        changes.push({ product_id, price_group_id, amount: null });
+        continue;
       }
+      const amount = parseDbDecimal(raw, PRICE_DECIMAL);
+      if (!amount.error) changes.push({ product_id, price_group_id, amount: amount.value });
     }
     return changes;
   }, [drafts, originals]);
@@ -126,7 +204,10 @@ export default function ProductPricesServerTable() {
 
   useEffect(() => {
     if (!dirtyCount) return;
-    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirtyCount]);
@@ -135,7 +216,8 @@ export default function ProductPricesServerTable() {
     const currentRequest = ++requestId.current;
     setIsLoading(true);
     setError(null);
-    const { data, error: rpcError } = await supabase.rpc("get_product_prices_page", {
+
+    const { data, error: rpcError } = await supabase.rpc("get_product_prices_page_v2", {
       p_query: query,
       p_page: page,
       p_page_size: pageSize,
@@ -143,21 +225,27 @@ export default function ProductPricesServerTable() {
       p_brand_id: brandFilter || null,
       p_category_id: categoryFilter || null,
       p_stock_filter: stockFilter === "all" ? null : stockFilter,
+      p_product_type_id: productTypeFilter || null,
+      p_uom_id: uomFilter || null,
       p_sort_by: sortBy,
       p_sort_direction: sortDirection,
       p_currency_code: "USD",
     });
+
     if (currentRequest !== requestId.current) return;
     if (rpcError) {
-      setError(rpcError.message);
+      setRows([]);
+      setError(pricingErrorMessage(rpcError.message));
       setIsLoading(false);
       return;
     }
+
     const payload = data as Payload;
     if (page > payload.total_pages) {
       setPage(payload.total_pages);
       return;
     }
+
     const nextOriginals: Record<string, string> = {};
     for (const product of payload.items ?? []) {
       for (const group of payload.price_groups ?? []) {
@@ -165,19 +253,48 @@ export default function ProductPricesServerTable() {
         nextOriginals[priceKey] = toInput(product.prices?.[group.id]);
       }
     }
+
     setRows(payload.items ?? []);
     setGroups(payload.price_groups ?? []);
     setBrands(payload.filters?.brands ?? []);
     setCategories(payload.filters?.categories ?? []);
+    setProductTypes(payload.filters?.product_types ?? []);
+    setUoms(payload.filters?.uoms ?? []);
     setFilteredIds(payload.filtered_ids ?? []);
-    setSummary(payload.summary ?? { total_products: 0, price_groups: 0, filled_prices: 0, missing_prices: 0 });
+    setSummary(
+      payload.summary ?? {
+        total_products: 0,
+        price_groups: 0,
+        filled_prices: 0,
+        missing_prices: 0,
+      }
+    );
+    setRoutingSummary(
+      payload.routing_summary ?? {
+        price_group_products: 0,
+        material_band_products: 0,
+        no_pricing_products: 0,
+      }
+    );
     setTotalCount(payload.total_count ?? 0);
     setTotalPages(payload.total_pages ?? 1);
     setOriginals(nextOriginals);
     setDrafts(nextOriginals);
     setSelectedIds(new Set());
     setIsLoading(false);
-  }, [query, page, pageSize, statusFilter, brandFilter, categoryFilter, stockFilter, sortBy, sortDirection]);
+  }, [
+    query,
+    page,
+    pageSize,
+    statusFilter,
+    brandFilter,
+    categoryFilter,
+    productTypeFilter,
+    uomFilter,
+    stockFilter,
+    sortBy,
+    sortDirection,
+  ]);
 
   useEffect(() => {
     let mounted = true;
@@ -185,183 +302,671 @@ export default function ProductPricesServerTable() {
       if (!mounted) return;
       setCanManage(hasPermission(profile?.roles, "pricing.manage"));
     });
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
-  useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (!groups.length) return;
-    setBulkSourceGroupId((value) => value || groups.find((group) => group.is_base_price)?.id || groups[0].id);
-    setBulkTargetGroupId((value) => value || groups.find((group) => !group.is_base_price)?.id || groups[0].id);
+    setBulkSourceGroupId(
+      (value) => value || groups.find((group) => group.is_base_price)?.id || groups[0].id
+    );
+    setBulkTargetGroupId(
+      (value) => value || groups.find((group) => !group.is_base_price)?.id || groups[0].id
+    );
   }, [groups]);
 
   const currentPageIds = rows.map((row) => row.product_id);
-  const allPageSelected = currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.has(id));
-  const activeFilters = [query, statusFilter !== "all" ? statusFilter : "", brandFilter, categoryFilter, stockFilter !== "all" ? stockFilter : ""].filter(Boolean).length;
+  const allPageSelected =
+    currentPageIds.length > 0 && currentPageIds.every((id) => selectedIds.has(id));
+  const activeFilters = [
+    query,
+    statusFilter !== "all" ? statusFilter : "",
+    brandFilter,
+    categoryFilter,
+    productTypeFilter,
+    uomFilter,
+    stockFilter !== "all" ? stockFilter : "",
+  ].filter(Boolean).length;
 
   function ensureNoDirty() {
     if (!dirtyCount) return true;
     setError("Save or reset unsaved price changes before changing page, filters or sort order.");
     return false;
   }
+
   function applyNavigation(action: () => void) {
     if (!ensureNoDirty()) return;
     setSuccess(null);
     action();
   }
+
   function submitSearch(event: FormEvent) {
     event.preventDefault();
-    applyNavigation(() => { setPage(1); setQuery(queryInput.trim()); });
-  }
-  function clearFilters() {
     applyNavigation(() => {
-      setQueryInput(""); setQuery(""); setStatusFilter("all"); setBrandFilter(""); setCategoryFilter(""); setStockFilter("all"); setSortBy("sku"); setSortDirection("asc"); setPage(1);
+      setPage(1);
+      setQuery(queryInput.trim());
     });
   }
+
+  function clearFilters() {
+    applyNavigation(() => {
+      setQueryInput("");
+      setQuery("");
+      setStatusFilter("all");
+      setBrandFilter("");
+      setCategoryFilter("");
+      setProductTypeFilter("");
+      setUomFilter("");
+      setStockFilter("all");
+      setSortBy("sku");
+      setSortDirection("asc");
+      setPage(1);
+    });
+  }
+
   function setPrice(productId: string, groupId: string, value: string) {
-    setError(null); setSuccess(null);
+    setError(null);
+    setSuccess(null);
     setDrafts((current) => ({ ...current, [key(productId, groupId)]: value }));
   }
+
   function resetChanges() {
-    setDrafts({ ...originals }); setError(null); setSuccess(null);
+    setDrafts({ ...originals });
+    setError(null);
+    setSuccess(null);
   }
+
   function togglePage() {
     setSelectedIds((current) => {
       const next = new Set(current);
-      currentPageIds.forEach((id) => allPageSelected ? next.delete(id) : next.add(id));
+      currentPageIds.forEach((id) => (allPageSelected ? next.delete(id) : next.add(id)));
       return next;
     });
   }
+
   function toggleOne(id: string) {
     setSelectedIds((current) => {
-      const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next;
+      const next = new Set(current);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
   }
-  function selectAllFiltered() { setSelectedIds(new Set(filteredIds)); }
+
+  function selectAllFiltered() {
+    setSelectedIds(new Set(filteredIds));
+  }
 
   async function hydrateSelectedPrices(ids: string[]) {
-    const { data, error: rpcError } = await supabase.rpc("get_product_prices_for_products", { p_product_ids: ids, p_currency_code: "USD" });
+    const { data, error: rpcError } = await supabase.rpc("get_product_prices_for_products", {
+      p_product_ids: ids,
+      p_currency_code: "USD",
+    });
     if (rpcError) throw rpcError;
+
     const nextOriginals = { ...originals };
     const nextDrafts = { ...drafts };
-    for (const id of ids) for (const group of groups) {
-      const priceKey = key(id, group.id);
-      if (!(priceKey in nextOriginals)) { nextOriginals[priceKey] = ""; nextDrafts[priceKey] = ""; }
-    }
-    for (const row of (data ?? []) as { product_id: string; price_group_id: string; amount: string | number }[]) {
-      const priceKey = key(row.product_id, row.price_group_id);
-      if (!(priceKey in originals)) {
-        const value = toInput(row.amount); nextOriginals[priceKey] = value; nextDrafts[priceKey] = value;
+    for (const id of ids) {
+      for (const group of groups) {
+        const priceKey = key(id, group.id);
+        if (!(priceKey in nextOriginals)) {
+          nextOriginals[priceKey] = "";
+          nextDrafts[priceKey] = "";
+        }
       }
     }
-    setOriginals(nextOriginals); setDrafts(nextDrafts);
+
+    for (const row of (data ?? []) as {
+      product_id: string;
+      price_group_id: string;
+      amount: string | number;
+    }[]) {
+      const priceKey = key(row.product_id, row.price_group_id);
+      if (!(priceKey in originals)) {
+        const value = toInput(row.amount);
+        nextOriginals[priceKey] = value;
+        nextDrafts[priceKey] = value;
+      }
+    }
+
+    setOriginals(nextOriginals);
+    setDrafts(nextDrafts);
     return { nextOriginals, nextDrafts };
   }
 
   async function applyBulk() {
-    setError(null); setSuccess(null);
+    setError(null);
+    setSuccess(null);
     const ids = [...selectedIds];
-    if (!ids.length) { setError("Select at least one product."); return; }
+    if (!ids.length) {
+      setError("Select at least one product.");
+      return;
+    }
     const adjustment = bulkValue.trim().replace(",", ".");
-    if (!adjustment) { setError("Enter a valid bulk adjustment value."); return; }
-    if (!bulkTargetGroupId) { setError("Select a target price group."); return; }
-    if (bulkMode === "source_percent" && (!bulkSourceGroupId || bulkSourceGroupId === bulkTargetGroupId)) { setError("Select a different source and target price group."); return; }
+    if (!adjustment) {
+      setError("Enter a valid bulk adjustment value.");
+      return;
+    }
+    if (!bulkTargetGroupId) {
+      setError("Select a target price group.");
+      return;
+    }
+    if (
+      bulkMode === "source_percent" &&
+      (!bulkSourceGroupId || bulkSourceGroupId === bulkTargetGroupId)
+    ) {
+      setError("Select a different source and target price group.");
+      return;
+    }
+
     try {
       const { nextDrafts } = await hydrateSelectedPrices(ids);
       const next = { ...nextDrafts };
-      let applied = 0, skipped = 0;
+      let applied = 0;
+      let skipped = 0;
+
       for (const id of ids) {
         const targetKey = key(id, bulkTargetGroupId);
-        const source = bulkMode === "source_percent" ? next[key(id, bulkSourceGroupId)] ?? null : next[targetKey] ?? null;
+        const source =
+          bulkMode === "source_percent"
+            ? next[key(id, bulkSourceGroupId)] ?? null
+            : next[targetKey] ?? null;
         const result = calculateDbDecimalBulk(source, adjustment, bulkMode, PRICE_DECIMAL);
-        if (result.error || result.value === null) { skipped += 1; continue; }
-        next[targetKey] = result.value; applied += 1;
+        if (result.error || result.value === null) {
+          skipped += 1;
+          continue;
+        }
+        next[targetKey] = result.value;
+        applied += 1;
       }
+
       setDrafts(next);
-      setSuccess(skipped ? `Bulk preview applied to ${applied} products; ${skipped} skipped.` : `Bulk preview applied to ${applied} products. Review and save.`);
-    } catch (err) { setError(err instanceof Error ? err.message : "Unable to load selected prices."); }
+      setSuccess(
+        skipped
+          ? `Bulk preview applied to ${applied} products; ${skipped} skipped.`
+          : `Bulk preview applied to ${applied} products. Review and save.`
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? pricingErrorMessage(caught.message) : "Unable to load selected prices.");
+    }
   }
 
   async function saveChanges() {
-    setError(null); setSuccess(null);
+    setError(null);
+    setSuccess(null);
+
     for (const [priceKey, value] of Object.entries(drafts)) {
       if (normalize(value) === normalize(originals[priceKey])) continue;
       const parsed = parseDbDecimal(value, PRICE_DECIMAL);
-      if (parsed.error) { setError(`Price: ${parsed.error}`); return; }
+      if (parsed.error) {
+        setError(`Price: ${parsed.error}`);
+        return;
+      }
     }
     if (!dirtyChanges.length) return;
+
     setIsSaving(true);
-    const { data, error: rpcError } = await supabase.rpc("set_product_prices_bulk", { p_changes: dirtyChanges, p_currency_code: "USD" });
-    if (rpcError) { setError(rpcError.message); setIsSaving(false); return; }
+    const { data, error: rpcError } = await supabase.rpc("set_product_prices_bulk", {
+      p_changes: dirtyChanges,
+      p_currency_code: "USD",
+    });
+    if (rpcError) {
+      setError(pricingErrorMessage(rpcError.message));
+      setIsSaving(false);
+      return;
+    }
+
     const saved = typeof data === "number" ? data : dirtyChanges.length;
-    setIsSaving(false); setSuccess(`${saved} price change${saved === 1 ? "" : "s"} saved successfully.`); await load();
+    setIsSaving(false);
+    setSuccess(`${saved} price change${saved === 1 ? "" : "s"} saved successfully.`);
+    await load();
   }
 
   const start = totalCount ? (page - 1) * pageSize + 1 : 0;
   const end = Math.min(page * pageSize, totalCount);
-  const visiblePages = Array.from({ length: Math.min(5, totalPages) }, (_, index) => Math.max(1, Math.min(totalPages - 4, page - 2)) + index).filter((value) => value <= totalPages);
+  const visiblePages = Array.from(
+    { length: Math.min(5, totalPages) },
+    (_, index) => Math.max(1, Math.min(totalPages - 4, page - 2)) + index
+  ).filter((value) => value <= totalPages);
+  const tableColumnCount = groups.length + (canManage ? 6 : 5);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="border-b border-gray-200 px-5 py-5 dark:border-gray-800 sm:px-6">
+    <div className="space-y-6">
+      <ComponentCard
+        title="Product Prices"
+        desc="Manage Price Group pricing only. Product Type routes each product to its supported pricing engine."
+      >
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div><h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Product Prices</h3><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Server-side pagination, filtering and sorting. Only the current product page is loaded.</p></div>
-          {canManage && <div className="flex gap-2"><button className={buttonClass} disabled={!dirtyCount || isSaving} onClick={resetChanges}>Reset</button><button className={primaryButtonClass} disabled={!dirtyCount || isSaving} onClick={saveChanges}>{isSaving ? "Saving..." : `Save Changes${dirtyCount ? ` (${dirtyCount})` : ""}`}</button></div>}
-        </div>
-      </div>
-
-      <div className="p-5 sm:p-6">
-        {error && <div className="mb-4 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{error}</div>}
-        {success && <div className="mb-4 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">{success}</div>}
-
-        <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <Summary title="Products" value={summary.total_products} /><Summary title="Price Groups" value={summary.price_groups} /><Summary title="Prices Entered" value={summary.filled_prices} /><Summary title="Missing Prices" value={summary.missing_prices} />
-        </div>
-
-        <form onSubmit={submitSearch} className="mb-4 grid gap-3 lg:grid-cols-8">
-          <input value={queryInput} onChange={(e) => setQueryInput(e.target.value)} placeholder="SKU, barcode, product, brand..." className={`${inputClass} lg:col-span-2`} disabled={dirtyCount > 0} />
-          <select value={statusFilter} onChange={(e) => applyNavigation(() => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1); })} className={selectClass} disabled={dirtyCount > 0}><option value="all">All Statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
-          <select value={brandFilter} onChange={(e) => applyNavigation(() => { setBrandFilter(e.target.value); setPage(1); })} className={selectClass} disabled={dirtyCount > 0}><option value="">All Brands</option>{brands.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-          <select value={categoryFilter} onChange={(e) => applyNavigation(() => { setCategoryFilter(e.target.value); setPage(1); })} className={selectClass} disabled={dirtyCount > 0}><option value="">All Categories</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
-          <select value={stockFilter} onChange={(e) => applyNavigation(() => { setStockFilter(e.target.value as StockFilter); setPage(1); })} className={selectClass} disabled={dirtyCount > 0}><option value="all">All Stock</option><option value="in_stock">In Stock</option><option value="out_of_stock">Out of Stock</option></select>
-          <button className={primaryButtonClass} disabled={dirtyCount > 0}>Search</button>
-          <button type="button" className={buttonClass} onClick={clearFilters} disabled={dirtyCount > 0 || activeFilters === 0}>Clear{activeFilters ? ` (${activeFilters})` : ""}</button>
-        </form>
-
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <select value={sortBy} onChange={(e) => applyNavigation(() => { setSortBy(e.target.value as SortBy); setPage(1); })} className={`${selectClass} w-auto`} disabled={dirtyCount > 0}>{["sku","name","brand","category","stock","status"].map((value) => <option key={value} value={value}>Sort: {value}</option>)}</select>
-          <select value={sortDirection} onChange={(e) => applyNavigation(() => { setSortDirection(e.target.value as SortDirection); setPage(1); })} className={`${selectClass} w-auto`} disabled={dirtyCount > 0}><option value="asc">Ascending</option><option value="desc">Descending</option></select>
-          <select value={pageSize} onChange={(e) => applyNavigation(() => { setPageSize(Number(e.target.value)); setPage(1); })} className={`${selectClass} w-auto`} disabled={dirtyCount > 0}>{pageSizes.map((value) => <option key={value} value={value}>{value} / page</option>)}</select>
-          <span className="text-sm text-gray-500 dark:text-gray-400">Showing {start}–{end} of {totalCount}</span>
-        </div>
-
-        {canManage && <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-          <div className="mb-3 flex flex-wrap items-center gap-2"><strong className="text-sm text-gray-800 dark:text-white/90">Bulk Pricing</strong><span className="text-xs text-gray-500 dark:text-gray-400">{selectedIds.size} selected</span><button className={buttonClass} onClick={selectAllFiltered} disabled={!filteredIds.length}>Select all filtered ({filteredIds.length})</button><button className={buttonClass} onClick={() => setSelectedIds(new Set())} disabled={!selectedIds.size}>Clear selection</button></div>
-          <div className="grid gap-3 md:grid-cols-5">
-            <select value={bulkTargetGroupId} onChange={(e) => setBulkTargetGroupId(e.target.value)} className={selectClass}>{groups.map((group) => <option key={group.id} value={group.id}>Target: {group.name}</option>)}</select>
-            <select value={bulkMode} onChange={(e) => setBulkMode(e.target.value as BulkMode)} className={selectClass}><option value="source_percent">From group %</option><option value="current_percent">Adjust current %</option><option value="current_amount">Adjust current $</option><option value="set_amount">Set exact</option></select>
-            {bulkMode === "source_percent" ? <select value={bulkSourceGroupId} onChange={(e) => setBulkSourceGroupId(e.target.value)} className={selectClass}>{groups.map((group) => <option key={group.id} value={group.id}>Source: {group.name}</option>)}</select> : <div />}
-            <input value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} placeholder={bulkMode === "set_amount" ? "Price" : "Adjustment"} className={inputClass} />
-            <button className={primaryButtonClass} onClick={applyBulk} disabled={!selectedIds.size || !bulkValue.trim()}>Apply Preview</button>
+          <div className="flex flex-wrap gap-2">
+            <Badge color="primary">Price Group: {routingSummary.price_group_products}</Badge>
+            <Badge color="warning">Material Band: {routingSummary.material_band_products}</Badge>
+            <Badge color="light">No Pricing: {routingSummary.no_pricing_products}</Badge>
+            <Link href="/pricing/material-bands">
+              <Badge color="info">Manage Material Bands</Badge>
+            </Link>
           </div>
-        </div>}
+          {canManage ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={!dirtyCount || isSaving} onClick={resetChanges}>
+                Reset
+              </Button>
+              <Button disabled={!dirtyCount || isSaving} onClick={() => void saveChanges()}>
+                {isSaving ? "Saving…" : `Save Changes${dirtyCount ? ` (${dirtyCount})` : ""}`}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </ComponentCard>
 
-        {isLoading ? <Loading /> : <div className="overflow-auto rounded-xl border border-gray-200 dark:border-gray-800">
-          <table className="min-w-max divide-y divide-gray-200 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-gray-900"><tr>{canManage && <th className="px-3 py-3"><input type="checkbox" checked={allPageSelected} onChange={togglePage} /></th>}<th className="px-4 py-3 text-left text-xs uppercase text-gray-500">SKU</th><th className="min-w-[260px] px-4 py-3 text-left text-xs uppercase text-gray-500">Product</th><th className="px-4 py-3 text-right text-xs uppercase text-gray-500">Stock</th>{groups.map((group) => <th key={group.id} className="min-w-[160px] px-4 py-3 text-left text-xs uppercase text-gray-500">{group.name}</th>)}</tr></thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">{rows.length ? rows.map((row) => <tr key={row.product_id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">{canManage && <td className="px-3 py-3"><input type="checkbox" checked={selectedIds.has(row.product_id)} onChange={() => toggleOne(row.product_id)} /></td>}<td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-white/90">{row.sku}</td><td className="px-4 py-3"><div className="text-sm text-gray-800 dark:text-white/90">{row.product_name}</div><div className="text-xs text-gray-500 dark:text-gray-400">{[row.brand,row.category].filter(Boolean).join(" • ") || "—"}</div></td><td className="px-4 py-3 text-right text-sm text-gray-600 dark:text-gray-300">{stock(row.available_stock)}</td>{groups.map((group) => { const priceKey = key(row.product_id, group.id); const value = drafts[priceKey] ?? ""; const dirty = normalize(value) !== normalize(originals[priceKey]); return <td key={group.id} className="px-4 py-3">{canManage ? <input value={value} onChange={(e) => setPrice(row.product_id, group.id, e.target.value)} className={`${inputClass} w-32 ${dirty ? "border-brand-400 ring-2 ring-brand-500/10" : ""}`} inputMode="decimal" /> : <span className="text-sm text-gray-700 dark:text-gray-300">{value ? money(value) : "—"}</span>}</td>; })}</tr>) : <tr><td colSpan={groups.length + (canManage ? 4 : 3)} className="px-6 py-14 text-center text-sm text-gray-500 dark:text-gray-400">No products found.</td></tr>}</tbody>
-          </table>
-        </div>}
+      {error ? <Alert variant="error" title="Pricing unavailable" message={error} /> : null}
+      {success ? <Alert variant="success" title="Pricing updated" message={success} /> : null}
 
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><span className="text-sm text-gray-500 dark:text-gray-400">Page {page} of {totalPages}</span><div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={page <= 1 || isLoading || dirtyCount > 0} onClick={() => applyNavigation(() => setPage((value) => Math.max(1, value - 1)))}>Previous</button>{visiblePages.map((value) => <button key={value} className={value === page ? primaryButtonClass : buttonClass} disabled={dirtyCount > 0} onClick={() => applyNavigation(() => setPage(value))}>{value}</button>)}<button className={buttonClass} disabled={page >= totalPages || isLoading || dirtyCount > 0} onClick={() => applyNavigation(() => setPage((value) => Math.min(totalPages, value + 1)))}>Next</button></div></div>
-      </div>
+      <ComponentCard title="Pricing Summary" desc="Current USD Price Group coverage for eligible products.">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <small>Products</small>
+            <div><strong>{summary.total_products.toLocaleString()}</strong></div>
+          </div>
+          <div>
+            <small>Price Groups</small>
+            <div><strong>{summary.price_groups.toLocaleString()}</strong></div>
+          </div>
+          <div>
+            <small>Prices Entered</small>
+            <div><strong>{summary.filled_prices.toLocaleString()}</strong></div>
+          </div>
+          <div>
+            <small>Missing Prices</small>
+            <div><strong>{summary.missing_prices.toLocaleString()}</strong></div>
+          </div>
+        </div>
+      </ComponentCard>
+
+      <ComponentCard title="Filters" desc="Search and filter the server-side Price Group product directory.">
+        <form onSubmit={submitSearch} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="md:col-span-2">
+            <Label htmlFor="pricing-product-search">Search</Label>
+            <Input
+              id="pricing-product-search"
+              value={queryInput}
+              onChange={(event) => setQueryInput(event.target.value)}
+              placeholder="SKU, barcode, product, brand, Product Type or UOM"
+              disabled={dirtyCount > 0}
+            />
+          </div>
+          <div>
+            <Label>Status</Label>
+            <Select
+              options={[
+                { value: "all", label: "All Statuses" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+              ]}
+              value={statusFilter}
+              onChange={(value) =>
+                applyNavigation(() => {
+                  setStatusFilter(value as typeof statusFilter);
+                  setPage(1);
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label>Stock</Label>
+            <Select
+              options={[
+                { value: "all", label: "All Stock" },
+                { value: "in_stock", label: "In Stock" },
+                { value: "out_of_stock", label: "Out of Stock" },
+              ]}
+              value={stockFilter}
+              onChange={(value) =>
+                applyNavigation(() => {
+                  setStockFilter(value as StockFilter);
+                  setPage(1);
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label>Brand</Label>
+            <Select
+              allowEmpty
+              placeholder="All Brands"
+              options={brands.map((item) => ({ value: item.id, label: item.name }))}
+              value={brandFilter}
+              onChange={(value) =>
+                applyNavigation(() => {
+                  setBrandFilter(value);
+                  setPage(1);
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label>Category</Label>
+            <Select
+              allowEmpty
+              placeholder="All Categories"
+              options={categories.map((item) => ({ value: item.id, label: item.name }))}
+              value={categoryFilter}
+              onChange={(value) =>
+                applyNavigation(() => {
+                  setCategoryFilter(value);
+                  setPage(1);
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label>Product Type</Label>
+            <Select
+              allowEmpty
+              placeholder="All Product Types"
+              options={productTypes.map((item) => ({
+                value: item.id,
+                label: item.code ? `${item.name} (${item.code})` : item.name,
+              }))}
+              value={productTypeFilter}
+              onChange={(value) =>
+                applyNavigation(() => {
+                  setProductTypeFilter(value);
+                  setPage(1);
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label>Unit of Measure</Label>
+            <Select
+              allowEmpty
+              placeholder="All Units"
+              options={uoms.map((item) => ({
+                value: item.id,
+                label: item.code ? `${item.name} (${item.code})` : item.name,
+              }))}
+              value={uomFilter}
+              onChange={(value) =>
+                applyNavigation(() => {
+                  setUomFilter(value);
+                  setPage(1);
+                })
+              }
+            />
+          </div>
+          <div className="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-4">
+            <Button type="submit" disabled={dirtyCount > 0}>Search</Button>
+            <Button
+              variant="outline"
+              disabled={dirtyCount > 0 || activeFilters === 0}
+              onClick={clearFilters}
+            >
+              Clear{activeFilters ? ` (${activeFilters})` : ""}
+            </Button>
+          </div>
+        </form>
+      </ComponentCard>
+
+      <ComponentCard title="Directory Controls" desc={`Showing ${start}–${end} of ${totalCount} eligible products.`}>
+        <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-4">
+          <div>
+            <Label>Sort By</Label>
+            <Select
+              options={[
+                { value: "sku", label: "SKU" },
+                { value: "name", label: "Product Name" },
+                { value: "brand", label: "Brand" },
+                { value: "category", label: "Category" },
+                { value: "product_type", label: "Product Type" },
+                { value: "uom", label: "Unit of Measure" },
+                { value: "stock", label: "Stock" },
+                { value: "status", label: "Status" },
+              ]}
+              value={sortBy}
+              onChange={(value) =>
+                applyNavigation(() => {
+                  setSortBy(value as SortBy);
+                  setPage(1);
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label>Direction</Label>
+            <Select
+              options={[
+                { value: "asc", label: "Ascending" },
+                { value: "desc", label: "Descending" },
+              ]}
+              value={sortDirection}
+              onChange={(value) =>
+                applyNavigation(() => {
+                  setSortDirection(value as SortDirection);
+                  setPage(1);
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label>Page Size</Label>
+            <Select
+              options={pageSizes.map((value) => ({ value: String(value), label: `${value} / page` }))}
+              value={String(pageSize)}
+              onChange={(value) =>
+                applyNavigation(() => {
+                  setPageSize(Number(value));
+                  setPage(1);
+                })
+              }
+            />
+          </div>
+        </div>
+      </ComponentCard>
+
+      {canManage ? (
+        <ComponentCard
+          title="Bulk Pricing"
+          desc="Bulk operations only receive products already routed to Price Group pricing."
+        >
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge color="light">{selectedIds.size} selected</Badge>
+              <Button variant="outline" disabled={!filteredIds.length} onClick={selectAllFiltered}>
+                Select all filtered ({filteredIds.length})
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!selectedIds.size}
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear selection
+              </Button>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div>
+                <Label>Target Price Group</Label>
+                <Select
+                  options={groups.map((group) => ({ value: group.id, label: group.name }))}
+                  value={bulkTargetGroupId}
+                  onChange={setBulkTargetGroupId}
+                />
+              </div>
+              <div>
+                <Label>Bulk Mode</Label>
+                <Select
+                  options={[
+                    { value: "source_percent", label: "From group %" },
+                    { value: "current_percent", label: "Adjust current %" },
+                    { value: "current_amount", label: "Adjust current $" },
+                    { value: "set_amount", label: "Set exact" },
+                  ]}
+                  value={bulkMode}
+                  onChange={(value) => setBulkMode(value as BulkMode)}
+                />
+              </div>
+              {bulkMode === "source_percent" ? (
+                <div>
+                  <Label>Source Price Group</Label>
+                  <Select
+                    options={groups.map((group) => ({ value: group.id, label: group.name }))}
+                    value={bulkSourceGroupId}
+                    onChange={setBulkSourceGroupId}
+                  />
+                </div>
+              ) : <div />}
+              <div>
+                <Label htmlFor="bulk-price-value">Value</Label>
+                <Input
+                  id="bulk-price-value"
+                  value={bulkValue}
+                  onChange={(event) => setBulkValue(event.target.value)}
+                  placeholder={bulkMode === "set_amount" ? "Price" : "Adjustment"}
+                  inputMode="decimal"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  disabled={!selectedIds.size || !bulkValue.trim()}
+                  onClick={() => void applyBulk()}
+                >
+                  Apply Preview
+                </Button>
+              </div>
+            </div>
+          </div>
+        </ComponentCard>
+      ) : null}
+
+      <ComponentCard
+        title="Price Group Matrix"
+        desc="Stone/material-band and no-pricing products are intentionally excluded from this matrix."
+      >
+        {isLoading ? (
+          <Alert variant="info" title="Loading product prices" message="Loading the current server page." />
+        ) : (
+          <TableViewport>
+            <Table variant="admin" className="min-w-[1280px]">
+              <TableHeader variant="admin">
+                <TableRow>
+                  {canManage ? (
+                    <TableCell isHeader variant="admin">
+                      <Checkbox checked={allPageSelected} onChange={togglePage} />
+                    </TableCell>
+                  ) : null}
+                  <TableCell isHeader variant="admin" className="text-left">SKU</TableCell>
+                  <TableCell isHeader variant="admin" className="text-left">Product</TableCell>
+                  <TableCell isHeader variant="admin" className="text-left">Product Type</TableCell>
+                  <TableCell isHeader variant="admin" className="text-left">Unit of Measure</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Stock</TableCell>
+                  {groups.map((group) => (
+                    <TableCell key={group.id} isHeader variant="admin" className="text-left">
+                      {group.name}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody variant="admin">
+                {rows.length ? (
+                  rows.map((row) => (
+                    <TableRow key={row.product_id}>
+                      {canManage ? (
+                        <TableCell variant="admin">
+                          <Checkbox
+                            checked={selectedIds.has(row.product_id)}
+                            onChange={() => toggleOne(row.product_id)}
+                          />
+                        </TableCell>
+                      ) : null}
+                      <TableCell variant="admin"><strong>{row.sku}</strong></TableCell>
+                      <TableCell variant="admin">
+                        <div className="space-y-1">
+                          <div>{row.product_name}</div>
+                          <small>{[row.brand, row.category].filter(Boolean).join(" • ") || "—"}</small>
+                        </div>
+                      </TableCell>
+                      <TableCell variant="admin">
+                        <div className="flex flex-wrap gap-1">
+                          <Badge color="primary" size="sm">{row.product_type_name}</Badge>
+                          <Badge color="light" size="sm">{row.product_type_code}</Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell variant="admin">
+                        <Badge color="info" size="sm">{row.uom_name} ({row.uom_code})</Badge>
+                      </TableCell>
+                      <TableCell variant="admin" className="text-right">
+                        {stock(row.available_stock)}
+                      </TableCell>
+                      {groups.map((group) => {
+                        const priceKey = key(row.product_id, group.id);
+                        const value = drafts[priceKey] ?? "";
+                        const parsed = parseDbDecimal(value, PRICE_DECIMAL);
+                        return (
+                          <TableCell key={group.id} variant="admin">
+                            {canManage ? (
+                              <div className="w-36">
+                                <Input
+                                  value={value}
+                                  onChange={(event) => setPrice(row.product_id, group.id, event.target.value)}
+                                  inputMode="decimal"
+                                  error={Boolean(value.trim() && parsed.error)}
+                                />
+                              </div>
+                            ) : (
+                              <span>{value ? money(value) : "—"}</span>
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell variant="admin" colSpan={tableColumnCount} className="text-center">
+                      No Price Group products match the current filters.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableViewport>
+        )}
+      </ComponentCard>
+
+      <ComponentCard title="Pagination" desc={`Page ${page} of ${totalPages}`}>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={page <= 1 || isLoading || dirtyCount > 0}
+            onClick={() => applyNavigation(() => setPage((value) => Math.max(1, value - 1)))}
+          >
+            Previous
+          </Button>
+          {visiblePages.map((value) => (
+            <Button
+              key={value}
+              variant={value === page ? "primary" : "outline"}
+              disabled={dirtyCount > 0}
+              onClick={() => applyNavigation(() => setPage(value))}
+            >
+              {value}
+            </Button>
+          ))}
+          <Button
+            variant="outline"
+            disabled={page >= totalPages || isLoading || dirtyCount > 0}
+            onClick={() =>
+              applyNavigation(() => setPage((value) => Math.min(totalPages, value + 1)))
+            }
+          >
+            Next
+          </Button>
+        </div>
+      </ComponentCard>
     </div>
   );
-}
-
-function Summary({ title, value }: { title: string; value: number }) {
-  return <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]"><div className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{title}</div><div className="mt-1 text-xl font-semibold text-gray-800 dark:text-white/90">{value.toLocaleString()}</div></div>;
-}
-function Loading() {
-  return <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800"><div className="text-center"><div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500 dark:border-brand-500/20 dark:border-t-brand-400" /><p className="text-sm text-gray-500 dark:text-gray-400">Loading product prices...</p></div></div>;
 }
