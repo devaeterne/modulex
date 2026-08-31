@@ -37,7 +37,7 @@ for (const surface of surfaces) {
 
   const source = [read(surface.file), ...surface.dirs.flatMap(collect)].join("\n");
   expect(source.includes("dark:"), `${surface.route} must support dark mode`);
-  expect(source.includes("overflow-x-auto") || /\b(sm|md|lg|xl):/.test(source), `${surface.route} needs responsive behavior`);
+  expect(source.includes("overflow-x-auto") || source.includes("TableViewport") || /\b(sm|md|lg|xl):/.test(source), `${surface.route} needs responsive behavior`);
   expect(/aria-|htmlFor=|role=|<label\b/.test(source), `${surface.route} needs accessible labels/state`);
   expect(/isLoading|loading|Loading/.test(source) && /error|Error/.test(source), `${surface.route} needs loading and error handling`);
   expect(!source.includes('href="#"') && !source.includes("javascript:void") && !source.includes("TailAdmin"), `${surface.route} must not ship dead/template controls`);
@@ -70,6 +70,29 @@ expect(inventoryTable.includes('mode = "overview"') && inventoryTable.includes('
 expect(inventoryTable.includes('href="/scan"'), "Shelf inventory must preserve Scan QR / Barcode navigation");
 expect(sharedSelect.includes("disabled?: boolean"), "Shared Select must support disabled inventory filter states");
 expect(sharedSelect.includes("disabled={disabled}"), "Shared Select must forward disabled state to the native select");
+
+const stockMovements = read("src/components/stock-movements/StockMovementsTable.tsx");
+for (const primitive of [
+  "ComponentCard",
+  "Alert",
+  "Badge",
+  "Button",
+  "TableViewport",
+  "TableHeader",
+  "TableBody",
+  "TableRow",
+  "TableCell",
+]) {
+  expect(stockMovements.includes(primitive), `Stock Movements UI must compose shared ${primitive} primitives`);
+}
+expect(!/<(?:table|thead|tbody|tr|th|td|button)\b/.test(stockMovements), "Stock Movements UI must not reimplement shared button or table primitives");
+expect(stockMovements.includes('<Table variant="admin"'), "Stock Movements must use the shared admin table variant");
+expect(stockMovements.includes("<TableViewport"), "Stock Movements must use the shared responsive table viewport");
+expect(stockMovements.includes('className="w-full min-w-[1120px]"'), "Stock Movements table must fill the available card width while retaining its responsive minimum width");
+expect(stockMovements.includes('.from("v_inventory_movement_history")'), "Stock Movements must preserve the movement history view");
+expect(stockMovements.includes('.order("created_at", { ascending: false })'), "Stock Movements must preserve newest-first ordering");
+expect(stockMovements.includes(".limit(100)"), "Stock Movements must preserve the 100-row history limit");
+expect(stockMovements.includes("Refresh stock movement history"), "Stock Movements must preserve an accessible refresh label");
 
 const warehouseTable = read("src/components/warehouses/WarehousesTable.tsx");
 const warehouseForm = read("src/components/warehouses/WarehouseForm.tsx");
@@ -105,4 +128,4 @@ expect(sharedTable.includes("title?: string"), "Shared TableRow must support nat
 expect(warehouseForm.includes('htmlFor="warehouse-code"') && warehouseForm.includes('id="warehouse-code"'), "Warehouse code label must remain associated with its input");
 expect(warehouseForm.includes('htmlFor="warehouse-type"') && warehouseForm.includes('id="warehouse-type"'), "Warehouse type label must remain associated with its select");
 
-console.log("inventory + warehouse + QR UI contract: ok");
+console.log("inventory + stock movements + warehouse + QR UI contract: ok");
