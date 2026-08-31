@@ -364,7 +364,7 @@ export default function InventoryTable({ mode = "overview" }: InventoryTableProp
 
       <div aria-busy={isLoading}>
         <TableViewport>
-          <Table variant="admin" className="min-w-[1040px]">
+          <Table variant="admin" className="w-full min-w-[1040px]">
             <caption className="sr-only">
               {isShelfMode
                 ? "Shelf inventory by product and location"
