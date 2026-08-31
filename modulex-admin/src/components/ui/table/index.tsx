@@ -36,6 +36,7 @@ interface TableCellProps {
   isHeader?: boolean;
   className?: string;
   variant?: TableVariant;
+  colSpan?: number;
 }
 
 const TableViewport: React.FC<TableViewportProps> = ({ children, className = "" }) => (
@@ -82,6 +83,7 @@ const TableCell: React.FC<TableCellProps> = ({
   isHeader = false,
   className = "",
   variant = "plain",
+  colSpan,
 }) => {
   const CellTag = isHeader ? "th" : "td";
   const variantClass =
@@ -91,7 +93,11 @@ const TableCell: React.FC<TableCellProps> = ({
         : "px-5 py-4 text-sm text-gray-700 dark:text-gray-300"
       : "";
 
-  return <CellTag className={`${variantClass} ${className}`}>{children}</CellTag>;
+  return (
+    <CellTag colSpan={colSpan} className={`${variantClass} ${className}`}>
+      {children}
+    </CellTag>
+  );
 };
 
 export { TableViewport, Table, TableHeader, TableBody, TableRow, TableCell };
