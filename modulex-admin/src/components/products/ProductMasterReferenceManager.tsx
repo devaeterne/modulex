@@ -7,6 +7,7 @@ type Kind = "product_types" | "units_of_measure";
 type Uom = { id: string; name: string; code: string };
 type Row = { id: string; code: string; name: string; description?: string | null; is_active: boolean; pricing_model?: string; inventory_tracking?: boolean; reservable?: boolean; requires_variant_identity?: boolean; qr_required?: boolean; store_eligible?: boolean; default_uom_id?: string | null; allows_decimal?: boolean; product_count?: number; allowed_uoms?: string[] };
 const pricingLabels: Record<string, string> = { price_group: "Price Group", countertop_material_band: "Countertop Material Band", none: "No Commercial Pricing" };
+const unitManagementLabel = "Unit of Measure";
 
 export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) {
   const [rows, setRows] = useState<Row[]>([]); const [uoms, setUoms] = useState<Uom[]>([]); const [query, setQuery] = useState(""); const [status, setStatus] = useState("all"); const [filter, setFilter] = useState("all"); const [editing, setEditing] = useState<Row | null>(null); const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null); const [success, setSuccess] = useState<string | null>(null);
