@@ -47,6 +47,10 @@ assert(fs.existsSync(path.join(root, "src/app/(admin)/pricing/countertop/setting
 const refs = read("src/components/countertop/CountertopReferenceManager.tsx");
 for (const field of ["Stone Product Profiles", "Product", "Stone type", "Material band", "Vendor", "Source", "Save mapping"]) assert(refs.includes(field), `stone profile management field missing: ${field}`);
 assert(!/<label>Material price band<Select/.test(configurator) && configurator.includes("price_per_sqft"), "configurator material band must be profile-derived and read-only");
+assert(!configurator.includes("bandId") && !configurator.includes("setBandId"), "configurator must not keep editable material band state");
+assert(!configurator.includes('from("countertop_material_price_bands")'), "configurator must not independently query material price bands");
+assert(configurator.includes("material_price_band_code") && configurator.includes("countertop_material_price_bands(code,price_per_sqft)"), "selected stone profile must supply material band code and price");
+assert(configurator.includes("Select a stone to view its material price band."), "configurator must explain missing profile-derived material band");
 assert(sql.includes("audit_countertop_reference_change") && sql.includes("countertop_profiles_audit") && sql.includes("changed_by"), "countertop reference mutations must use audit_logs actor mechanism");
 assert(refs.includes("toggleProfile(row)") && refs.includes("p_product_id: row.product_id") && refs.includes("p_is_active: !row.is_active"), "profile toggle must pass row values directly without stale state");
 assert(refs.includes("value={drafts.profile?.product_id") && refs.includes("value={drafts.profile?.stone_type_id") && refs.includes("value={drafts.profile?.material_price_band_id"), "profile edit selectors must hydrate selected values");
