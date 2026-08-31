@@ -454,24 +454,20 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       status: values.status,
     };
 
-    const result =
-      mode === "edit" && productId
-        ? await supabase.from("products").update(payload).eq("id", productId)
-        : await supabase.from("products").insert(payload).select("id").single();
+    const selectedTypeForSave = productTypeOptions.find((type) => type.id === values.product_type_id);
+    const { data: savedId, error: resultError } = await supabase.rpc("save_product_master_v2", {
+      p_product: { ...payload, id: mode === "edit" ? productId : null },
+      p_stone_profile: selectedTypeForSave?.pricing_model === "countertop_material_band" ? { stone_type_id: values.stone_type_id, material_price_band_id: values.material_price_band_id, vendor_name: values.vendor_name.trim() || null, source_ref: values.source_ref.trim() || null } : null,
+    });
 
-    if (result.error) {
-      console.error("Product save failed:", result.error);
-      setErrorMessage(productWriteErrorMessage(result.error));
+    if (resultError) {
+      console.error("Product save failed:", resultError);
+      setErrorMessage(productWriteErrorMessage(resultError));
       setIsSubmitting(false);
       return;
     }
 
-    const savedProductId = mode === "edit" && productId ? productId : (result.data as { id?: string } | null)?.id;
-    const selectedType = productTypeOptions.find((type) => type.id === values.product_type_id);
-    if (savedProductId && selectedType?.pricing_model === "countertop_material_band") {
-      const { error: profileError } = await supabase.rpc("upsert_countertop_reference", { p_kind: "stone_profile", p_product_id: savedProductId, p_stone_type_id: values.stone_type_id, p_material_price_band_id: values.material_price_band_id, p_vendor_name: values.vendor_name.trim() || null, p_source_ref: values.source_ref.trim() || null, p_is_active: true });
-      if (profileError) { setErrorMessage(productWriteErrorMessage(profileError)); setIsSubmitting(false); return; }
-    }
+    const savedProductId = String(savedId ?? "");
 
     if (savedProductId) {
       const qrResponse = await fetch("/api/admin/products/qr", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ product_id: savedProductId }) });

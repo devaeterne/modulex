@@ -131,6 +131,38 @@ $$;
 revoke all on function public.search_low_stock_page_v2(text,text,uuid,uuid,integer,integer,boolean) from public,anon;
 grant execute on function public.search_low_stock_page_v2(text,text,uuid,uuid,integer,integer,boolean) to authenticated;
 
+create or replace function public.save_product_master_v2(p_product jsonb, p_stone_profile jsonb default null)
+returns uuid language plpgsql security invoker set search_path=pg_catalog,public as $$
+declare v_id uuid; v_old public.products; v_type public.product_types; v_uom public.units_of_measure;
+begin
+  if not public.current_user_has_any_role(array['super_admin','admin']) then raise exception 'Product management permission required.'; end if;
+  v_id := nullif(p_product->>'id','')::uuid;
+  select * into v_type from public.product_types where id=(p_product->>'product_type_id')::uuid and is_active;
+  select * into v_uom from public.units_of_measure where id=(p_product->>'uom_id')::uuid and is_active;
+  if v_type.id is null or v_uom.id is null then raise exception 'Active product type and UOM are required.'; end if;
+  if not exists (select 1 from public.product_type_allowed_uoms where product_type_id=v_type.id and uom_id=v_uom.id) then raise exception 'Unit of measure is not allowed for this product type.'; end if;
+  if v_id is not null then
+    select * into v_old from public.products where id=v_id for update;
+    if v_old.id is null then raise exception 'Product not found.'; end if;
+    if v_old.product_type_id is distinct from v_type.id and (exists(select 1 from public.inventory where product_id=v_id and (quantity>0 or reserved_quantity>0)) or exists(select 1 from public.customer_order_items where product_id=v_id) or exists(select 1 from public.countertop_configurations where stone_product_id=v_id)) then raise exception 'Product type cannot change while business history or stock dependencies exist.'; end if;
+  end if;
+  if v_type.pricing_model='countertop_material_band' and p_stone_profile is null then raise exception 'Stone profile is required for countertop material products.'; end if;
+  if v_type.pricing_model<>'countertop_material_band' and exists(select 1 from public.countertop_configurations where stone_product_id=v_id) then raise exception 'Configured stone products cannot change type.'; end if;
+  if v_id is null then
+    insert into public.products(sku,barcode,name,description,brand_id,category_id,base_product_code,color_code,color_name,brand,category,unit,product_type_id,uom_id,min_stock_level,status,metadata)
+    values(p_product->>'sku',nullif(p_product->>'barcode',''),p_product->>'name',nullif(p_product->>'description',''),(p_product->>'brand_id')::uuid,(p_product->>'category_id')::uuid,coalesce(nullif(p_product->>'base_product_code',''),p_product->>'sku'),coalesce(nullif(p_product->>'color_code',''),'DEFAULT'),nullif(p_product->>'color_name',''),p_product->>'brand',p_product->>'category',lower(v_uom.code),v_type.id,v_uom.id,(p_product->>'min_stock_level')::numeric,(p_product->>'status')::product_status,coalesce(p_product->'metadata','{}'::jsonb)) returning id into v_id;
+  else
+    update public.products set sku=p_product->>'sku',barcode=nullif(p_product->>'barcode',''),name=p_product->>'name',description=nullif(p_product->>'description',''),brand_id=(p_product->>'brand_id')::uuid,category_id=(p_product->>'category_id')::uuid,base_product_code=coalesce(nullif(p_product->>'base_product_code',''),p_product->>'sku'),color_code=coalesce(nullif(p_product->>'color_code',''),'DEFAULT'),color_name=nullif(p_product->>'color_name',''),brand=p_product->>'brand',category=p_product->>'category',unit=lower(v_uom.code),product_type_id=v_type.id,uom_id=v_uom.id,min_stock_level=(p_product->>'min_stock_level')::numeric,status=(p_product->>'status')::product_status,metadata=coalesce(p_product->'metadata','{}'::jsonb) where id=v_id;
+  end if;
+  if v_type.pricing_model='countertop_material_band' then
+    perform public.upsert_countertop_reference('stone_profile',v_id,(p_stone_profile->>'stone_type_id')::uuid,(p_stone_profile->>'material_price_band_id')::uuid,nullif(p_stone_profile->>'vendor_name',''),nullif(p_stone_profile->>'source_ref',''),true);
+  elsif v_id is not null then delete from public.countertop_stone_product_profiles where product_id=v_id;
+  end if;
+  return v_id;
+end; $$;
+revoke all on function public.save_product_master_v2(jsonb,jsonb) from public,anon;
+grant execute on function public.save_product_master_v2(jsonb,jsonb) to authenticated;
+
 drop trigger if exists trg_products_validate_master_contract on public.products;
 create trigger trg_products_validate_master_contract before insert or update of product_type_id,uom_id,unit,metadata on public.products
 for each row execute function private.validate_product_master_contract();
