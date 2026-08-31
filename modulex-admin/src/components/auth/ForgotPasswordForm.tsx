@@ -98,7 +98,7 @@ export default function ForgotPasswordForm() {
               </div>
 
               <div>
-                <Button className="w-full" size="sm" disabled={isLoading}>
+                <Button type="submit" className="w-full" size="sm" disabled={isLoading}>
                   {isLoading ? "Sending reset link..." : "Send reset link"}
                 </Button>
               </div>
