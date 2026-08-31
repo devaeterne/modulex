@@ -18,12 +18,18 @@ type ProductFormValues = {
   color_code: string;
   color_name: string;
   unit: string;
+  product_type_id: string;
+  uom_id: string;
   min_stock_level: string;
   status: ProductStatus;
   qr_value: string;
   qr_svg_url: string;
   qr_svg_path: string;
   qr_generated_at: string;
+  stone_type_id: string;
+  material_price_band_id: string;
+  vendor_name: string;
+  source_ref: string;
 };
 
 type ProductRow = {
@@ -44,6 +50,8 @@ type ProductRow = {
   qr_svg_url: string | null;
   qr_svg_path: string | null;
   qr_generated_at: string | null;
+  product_type_id?: string | null;
+  uom_id?: string | null;
 };
 
 type SelectOption = {
@@ -85,12 +93,18 @@ const initialValues: ProductFormValues = {
   color_code: "",
   color_name: "",
   unit: "piece",
+  product_type_id: "",
+  uom_id: "",
   min_stock_level: "0",
   status: "active",
   qr_value: "",
   qr_svg_url: "",
   qr_svg_path: "",
   qr_generated_at: "",
+  stone_type_id: "",
+  material_price_band_id: "",
+  vendor_name: "",
+  source_ref: "",
 };
 
 function productWriteErrorMessage(error: ProductWriteError) {
@@ -213,6 +227,10 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
   const [values, setValues] = useState<ProductFormValues>(initialValues);
   const [brandOptions, setBrandOptions] = useState<SelectOption[]>([]);
   const [categoryOptions, setCategoryOptions] = useState<SelectOption[]>([]);
+  const [productTypeOptions, setProductTypeOptions] = useState<(SelectOption & { code: string; default_uom_id: string | null })[]>([]);
+  const [uomOptions, setUomOptions] = useState<(SelectOption & { code: string; allows_decimal: boolean })[]>([]);
+  const [stoneTypeOptions, setStoneTypeOptions] = useState<SelectOption[]>([]);
+  const [materialBandOptions, setMaterialBandOptions] = useState<(SelectOption & { code: string; price_per_sqft: number | string })[]>([]);
   const [isLoading, setIsLoading] = useState(mode === "edit" || Boolean(duplicateFrom));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -243,6 +261,10 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       const [
         { data: brands, error: brandsError },
         { data: categories, error: categoriesError },
+        { data: types },
+        { data: uoms },
+        { data: stoneTypes },
+        { data: bands },
       ] = await Promise.all([
         supabase
           .from("product_brands")
@@ -254,6 +276,10 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
           .select("id, name")
           .eq("status", "active")
           .order("name", { ascending: true }),
+        supabase.from("product_types").select("id,name,code,default_uom_id").eq("is_active", true).order("sort_order"),
+        supabase.from("units_of_measure").select("id,name,code,allows_decimal").eq("is_active", true).order("sort_order"),
+        supabase.from("countertop_stone_types").select("id,name").eq("is_active", true).order("name"),
+        supabase.from("countertop_material_price_bands").select("id,code,price_per_sqft").eq("is_active", true).order("sort_order"),
       ]);
 
       if (brandsError) console.error("Failed to load brands:", brandsError.message);
@@ -264,10 +290,15 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
 
       setBrandOptions(loadedBrands);
       setCategoryOptions(loadedCategories);
+      setProductTypeOptions((types ?? []) as typeof productTypeOptions);
+      setUomOptions((uoms ?? []) as typeof uomOptions);
+      setStoneTypeOptions((stoneTypes ?? []) as SelectOption[]);
+      setMaterialBandOptions((bands ?? []).map((row) => ({ id: row.id, name: row.code, code: row.code, price_per_sqft: row.price_per_sqft })) as typeof materialBandOptions);
       setValues((current) => ({
         ...current,
-        brand_id: current.brand_id || loadedBrands[0]?.id || "",
-        category_id: current.category_id || loadedCategories[0]?.id || "",
+        brand_id: current.brand_id,
+        category_id: current.category_id,
+        product_type_id: current.product_type_id || (types?.find((type) => type.code === "STANDARD")?.id ?? ""),
       }));
     }
 
@@ -284,7 +315,7 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       const { data, error } = await supabase
         .from("products")
         .select(
-          "id, sku, barcode, name, description, brand_id, category_id, base_product_code, color_code, color_name, unit, min_stock_level, status, qr_value, qr_svg_url, qr_svg_path, qr_generated_at"
+          "id, sku, barcode, name, description, brand_id, category_id, base_product_code, color_code, color_name, unit, min_stock_level, status, qr_value, qr_svg_url, qr_svg_path, qr_generated_at, product_type_id, uom_id"
         )
         .eq("id", sourceProductId)
         .single();
@@ -311,6 +342,8 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
         color_code: isDuplicate ? "" : product.color_code ?? "",
         color_name: isDuplicate ? "" : product.color_name ?? "",
         unit: product.unit ?? "piece",
+        product_type_id: (product as ProductRow & { product_type_id?: string }).product_type_id ?? current.product_type_id,
+        uom_id: (product as ProductRow & { uom_id?: string }).uom_id ?? current.uom_id,
         min_stock_level: String(product.min_stock_level ?? 0),
         status: isDuplicate ? "active" : product.status,
         qr_value: isDuplicate ? "" : product.qr_value ?? "",
@@ -318,6 +351,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
         qr_svg_path: isDuplicate ? "" : product.qr_svg_path ?? "",
         qr_generated_at: isDuplicate ? "" : product.qr_generated_at ?? "",
       }));
+
+      const { data: profile } = await supabase.from("countertop_stone_product_profiles").select("stone_type_id,material_price_band_id,vendor_name,source_ref").eq("product_id", sourceProductId).maybeSingle();
+      if (profile) setValues((current) => ({ ...current, stone_type_id: profile.stone_type_id, material_price_band_id: profile.material_price_band_id, vendor_name: profile.vendor_name ?? "", source_ref: profile.source_ref ?? "" }));
 
       setIsLoading(false);
     }
@@ -337,6 +373,10 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     if (!values.base_product_code.trim()) return "Base product code is required.";
     if (!values.color_code.trim()) return "Color code is required.";
     if (!values.unit.trim()) return "Unit is required.";
+    if (!values.product_type_id) return "Product type is required.";
+    if (!values.uom_id) return "Unit of measure is required.";
+    const selectedType = productTypeOptions.find((type) => type.id === values.product_type_id);
+    if (selectedType?.code === "STONE" && (!values.stone_type_id || !values.material_price_band_id)) return "Stone type and material price band are required for stone products.";
 
     const minStock = parseDbDecimal(values.min_stock_level, {
       precision: 12,
@@ -389,6 +429,8 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       brand: selectedBrand?.name ?? null,
       category: selectedCategory?.name ?? null,
       unit: values.unit.trim(),
+      product_type_id: values.product_type_id,
+      uom_id: values.uom_id,
       min_stock_level: minStock.value,
       status: values.status,
     };
@@ -396,13 +438,29 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     const result =
       mode === "edit" && productId
         ? await supabase.from("products").update(payload).eq("id", productId)
-        : await supabase.from("products").insert(payload);
+        : await supabase.from("products").insert(payload).select("id").single();
 
     if (result.error) {
       console.error("Product save failed:", result.error);
       setErrorMessage(productWriteErrorMessage(result.error));
       setIsSubmitting(false);
       return;
+    }
+
+    const savedProductId = mode === "edit" && productId ? productId : (result.data as { id?: string } | null)?.id;
+    const selectedType = productTypeOptions.find((type) => type.id === values.product_type_id);
+    if (savedProductId && selectedType?.code === "STONE") {
+      const { error: profileError } = await supabase.rpc("upsert_countertop_reference", { p_kind: "stone_profile", p_product_id: savedProductId, p_stone_type_id: values.stone_type_id, p_material_price_band_id: values.material_price_band_id, p_vendor_name: values.vendor_name.trim() || null, p_source_ref: values.source_ref.trim() || null, p_is_active: true });
+      if (profileError) { setErrorMessage(productWriteErrorMessage(profileError)); setIsSubmitting(false); return; }
+    }
+
+    if (savedProductId) {
+      const qrResponse = await fetch("/api/admin/products/qr", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ product_id: savedProductId }) });
+      if (!qrResponse.ok) {
+        setErrorMessage("Product saved, but QR generation failed. Retry from the product detail.");
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     router.push("/products");
@@ -547,17 +605,35 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
         />
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Unit <span className="text-error-500">*</span>
-          </label>
-          <input
-            value={values.unit}
-            onChange={(event) => updateField("unit", event.target.value)}
-            type="text"
-            placeholder="piece"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
+          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Product Type *</label>
+          <select value={values.product_type_id} onChange={(event) => {
+            const nextType = productTypeOptions.find((type) => type.id === event.target.value);
+            updateField("product_type_id", event.target.value);
+            if (nextType?.default_uom_id) updateField("uom_id", nextType.default_uom_id);
+          }} className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90">
+            <option value="">Select product type...</option>
+            {productTypeOptions.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+          </select>
         </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+            Unit of Measure <span className="text-error-500">*</span>
+          </label>
+          <select value={values.uom_id} onChange={(event) => { const uom = uomOptions.find((item) => item.id === event.target.value); updateField("uom_id", event.target.value); if (uom) updateField("unit", uom.code.toLowerCase()); }} className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90">
+            <option value="">Select unit...</option>
+            {uomOptions.map((uom) => <option key={uom.id} value={uom.id}>{uom.name} ({uom.code})</option>)}
+          </select>
+        </div>
+
+        {productTypeOptions.find((type) => type.id === values.product_type_id)?.code === "STONE" ? (
+          <div className="md:col-span-2 grid grid-cols-1 gap-5 rounded-xl border border-gray-200 p-4 dark:border-gray-800 md:grid-cols-2">
+            <div><label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Stone Type *</label><select value={values.stone_type_id} onChange={(event) => updateField("stone_type_id", event.target.value)} className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"><option value="">Select stone type...</option>{stoneTypeOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+            <div><label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Material Price Band *</label><select value={values.material_price_band_id} onChange={(event) => updateField("material_price_band_id", event.target.value)} className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"><option value="">Select material band...</option>{materialBandOptions.map((item) => <option key={item.id} value={item.id}>{item.code} — ${Number(item.price_per_sqft).toFixed(2)} / sq ft</option>)}</select></div>
+            <div><label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Vendor</label><input value={values.vendor_name} onChange={(event) => updateField("vendor_name", event.target.value)} className="h-11 w-full rounded-lg border border-gray-200 px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90" /></div>
+            <div><label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Source</label><input value={values.source_ref} onChange={(event) => updateField("source_ref", event.target.value)} className="h-11 w-full rounded-lg border border-gray-200 px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90" /></div>
+          </div>
+        ) : null}
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Minimum Stock Level</label>

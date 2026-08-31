@@ -4,7 +4,12 @@ Last reviewed: 2026-08-31
 Main baseline: `82cc94508c7845d0dd50cd8e4ae9ff0e855db965`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
-Current Admin next action: **Continue VAL-2 Products & Pricing validation acceptance; preserve the closed A3.1/A3.2/A3.3 and Countertop / Stone / Sink contracts.**
+Current Admin next action: **Product Master UX v2 implementation and acceptance; preserve the closed A3.1/A3.2/A3.3 and Countertop / Stone / Sink contracts.**
+
+## Product Master UX v2
+
+- [~] Dynamic Product Types, Units of Measure, Product create/edit/list, QR compatibility, Brands/Categories usage-aware UX, and type/UOM-aware Low Stock.
+  - Additive migration `20260831140000_product_master_v2_dynamic_types_uom.sql` introduces canonical product type/UOM references while retaining `products.unit` as a compatibility mirror. Production migration and authenticated UI acceptance remain pending.
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 

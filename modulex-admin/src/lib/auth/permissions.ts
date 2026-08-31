@@ -277,7 +277,7 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/pricing/groups" || path.startsWith("/pricing/groups/"), permission: "pricing.manage" },
   { match: (path) => path === "/pricing" || path.startsWith("/pricing/"), permission: "pricing.view" },
   { match: (path) => path === "/brands" || path.startsWith("/brands/") || path === "/categories" || path.startsWith("/categories/"), permission: "products.manage" },
-  { match: (path) => path.startsWith("/products/") && (path.endsWith("/new") || path.endsWith("/edit")), permission: "products.manage" },
+  { match: (path) => path.startsWith("/products/") && (path.endsWith("/new") || path.endsWith("/edit") || path.startsWith("/products/types") || path.startsWith("/products/uom")), permission: "products.manage" },
   { match: (path) => path === "/products" || path.startsWith("/products/"), permission: "products.view" },
   { match: (path) => path === "/low-stock" || path.startsWith("/low-stock/"), permission: "inventory.view" },
   { match: (path) => path === "/stock-operations" || path.startsWith("/stock-operations/"), permission: "inventory.manage" },

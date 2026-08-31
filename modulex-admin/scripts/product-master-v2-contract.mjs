@@ -1,0 +1,20 @@
+import fs from "node:fs";
+import assert from "node:assert/strict";
+
+const migration = fs.readFileSync("../modulex-store/supabase/migrations/20260831140000_product_master_v2_dynamic_types_uom.sql", "utf8");
+const form = fs.readFileSync("src/components/products/ProductForm.tsx", "utf8");
+const manager = fs.readFileSync("src/components/products/ProductMasterReferenceManager.tsx", "utf8");
+assert.match(migration, /create table if not exists public\.product_types/);
+assert.match(migration, /create table if not exists public\.units_of_measure/);
+assert.match(migration, /product_type_allowed_uoms/);
+assert.match(migration, /countertop_stone_product_profiles/);
+assert.match(migration, /product_type_id/);
+assert.match(migration, /new\.unit := v_uom\.code/);
+assert.match(form, /Product Type/);
+assert.match(form, /Unit of Measure/);
+assert.match(form, /Stone Type/);
+assert.match(form, /Material Price Band/);
+assert.match(manager, /Product Type/);
+assert.match(manager, /Unit of Measure/);
+assert.doesNotMatch(form, /brand_id: current\.brand_id \|\| loadedBrands/);
+console.log("product-master-v2 contract: PASS");

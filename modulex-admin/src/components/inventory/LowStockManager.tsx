@@ -16,6 +16,7 @@ type StockRow = {
   brand: string | null;
   category: string | null;
   unit: string;
+  product_type?: string | null;
   min_stock_level: number | string;
   product_status: string;
   location_count: number | string;
@@ -173,15 +174,7 @@ export default function LowStockManager() {
       alerts: alerts.length,
       outOfStock: alerts.filter((row) => numberValue(row.total_available_quantity) <= 0).length,
       thresholdsSet: rows.filter((row) => numberValue(row.min_stock_level) > 0).length,
-      shortfall: alerts.reduce(
-        (sum, row) =>
-          sum +
-          Math.max(
-            numberValue(row.min_stock_level) - numberValue(row.total_available_quantity),
-            0
-          ),
-        0
-      ),
+      shortfallByUnit: alerts.reduce<Record<string, number>>((acc, row) => { const unit = row.unit || "Unknown"; acc[unit] = (acc[unit] ?? 0) + Math.max(numberValue(row.min_stock_level) - numberValue(row.total_available_quantity), 0); return acc; }, {}),
     };
   }, [rows]);
 
@@ -325,7 +318,7 @@ export default function LowStockManager() {
           emphasis={summary.outOfStock > 0 ? "error" : "default"}
         />
         <Metric label="Thresholds Set" value={`${summary.thresholdsSet}/${summary.products}`} />
-        <Metric label="Total Shortfall" value={formatNumber(summary.shortfall)} />
+        <Metric label="Shortfall by UOM" value={Object.entries(summary.shortfallByUnit).map(([unit, value]) => `${unit}: ${formatNumber(value)}`).join(" · ") || "—"} />
       </div>
 
       {summary.thresholdsSet === 0 && !isLoading ? (
@@ -431,7 +424,7 @@ export default function LowStockManager() {
               <tr>
                 {[
                   "Product",
-                  "Category",
+                  "Type / Category",
                   "On Hand",
                   "Reserved",
                   "Available",
@@ -491,7 +484,7 @@ export default function LowStockManager() {
                         {row.barcode ? <p className="text-xs text-gray-400">{row.barcode}</p> : null}
                       </td>
                       <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
-                        <p>{row.category || "—"}</p>
+                        <p>{row.product_type || "Standard"} · {row.category || "—"}</p>
                         <p className="text-xs text-gray-400">{row.brand || "No brand"}</p>
                       </td>
                       <td className="px-5 py-4 text-right text-sm font-medium text-gray-800 dark:text-white/90">
