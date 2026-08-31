@@ -39,8 +39,11 @@ with params as (
     case when p_stock_filter in ('in_stock', 'out_of_stock') then p_stock_filter else null end as stock_filter,
     p_product_type_id as product_type_filter,
     p_uom_id as uom_filter,
-    case when lower(coalesce(p_sort_by, 'sku')) in ('sku', 'name', 'brand', 'category', 'stock', 'status', 'product_type', 'uom')
-      then lower(coalesce(p_sort_by, 'sku')) else 'sku' end as sort_by,
+    case
+      when lower(coalesce(p_sort_by, 'sku')) in ('sku', 'name', 'brand', 'category', 'stock', 'status', 'product_type', 'uom')
+        then lower(coalesce(p_sort_by, 'sku'))
+      else 'sku'
+    end as sort_by,
     case when lower(coalesce(p_sort_direction, 'asc')) = 'desc' then 'desc' else 'asc' end as sort_direction,
     upper(coalesce(nullif(btrim(p_currency_code), ''), 'USD')) as currency_code
 ),
@@ -59,14 +62,16 @@ current_prices as (
     and pp.currency_code = x.currency_code
 ),
 price_maps as (
-  select cp.product_id,
-         jsonb_object_agg(cp.price_group_id::text, cp.amount order by cp.price_group_id::text) as prices
+  select
+    cp.product_id,
+    jsonb_object_agg(cp.price_group_id::text, cp.amount order by cp.price_group_id::text) as prices
   from current_prices cp
   group by cp.product_id
 ),
 stock as (
-  select i.product_id,
-         coalesce(sum(i.quantity - i.reserved_quantity), 0)::numeric as available_stock
+  select
+    i.product_id,
+    coalesce(sum(i.quantity - i.reserved_quantity), 0)::numeric as available_stock
   from public.inventory i
   group by i.product_id
 ),
@@ -128,33 +133,42 @@ filtered as (
     )
 ),
 totals as (
-  select count(*)::integer as total_count from filtered
+  select count(*)::integer as total_count
+  from filtered
 ),
-page_rows as (
-  select f.*
+ordered as (
+  select
+    f.*,
+    row_number() over (
+      order by
+        case when x.sort_by = 'sku' and x.sort_direction = 'asc' then lower(f.sku) end asc,
+        case when x.sort_by = 'sku' and x.sort_direction = 'desc' then lower(f.sku) end desc,
+        case when x.sort_by = 'name' and x.sort_direction = 'asc' then lower(f.product_name) end asc,
+        case when x.sort_by = 'name' and x.sort_direction = 'desc' then lower(f.product_name) end desc,
+        case when x.sort_by = 'brand' and x.sort_direction = 'asc' then lower(coalesce(f.brand, '')) end asc,
+        case when x.sort_by = 'brand' and x.sort_direction = 'desc' then lower(coalesce(f.brand, '')) end desc,
+        case when x.sort_by = 'category' and x.sort_direction = 'asc' then lower(coalesce(f.category, '')) end asc,
+        case when x.sort_by = 'category' and x.sort_direction = 'desc' then lower(coalesce(f.category, '')) end desc,
+        case when x.sort_by = 'product_type' and x.sort_direction = 'asc' then lower(f.product_type_name) end asc,
+        case when x.sort_by = 'product_type' and x.sort_direction = 'desc' then lower(f.product_type_name) end desc,
+        case when x.sort_by = 'uom' and x.sort_direction = 'asc' then lower(f.uom_code) end asc,
+        case when x.sort_by = 'uom' and x.sort_direction = 'desc' then lower(f.uom_code) end desc,
+        case when x.sort_by = 'stock' and x.sort_direction = 'asc' then f.available_stock end asc,
+        case when x.sort_by = 'stock' and x.sort_direction = 'desc' then f.available_stock end desc,
+        case when x.sort_by = 'status' and x.sort_direction = 'asc' then f.product_status end asc,
+        case when x.sort_by = 'status' and x.sort_direction = 'desc' then f.product_status end desc,
+        lower(f.sku) asc,
+        f.product_id asc
+    ) as page_order
   from filtered f
   cross join params x
-  order by
-    case when x.sort_by = 'sku' and x.sort_direction = 'asc' then lower(f.sku) end asc,
-    case when x.sort_by = 'sku' and x.sort_direction = 'desc' then lower(f.sku) end desc,
-    case when x.sort_by = 'name' and x.sort_direction = 'asc' then lower(f.product_name) end asc,
-    case when x.sort_by = 'name' and x.sort_direction = 'desc' then lower(f.product_name) end desc,
-    case when x.sort_by = 'brand' and x.sort_direction = 'asc' then lower(coalesce(f.brand, '')) end asc,
-    case when x.sort_by = 'brand' and x.sort_direction = 'desc' then lower(coalesce(f.brand, '')) end desc,
-    case when x.sort_by = 'category' and x.sort_direction = 'asc' then lower(coalesce(f.category, '')) end asc,
-    case when x.sort_by = 'category' and x.sort_direction = 'desc' then lower(coalesce(f.category, '')) end desc,
-    case when x.sort_by = 'product_type' and x.sort_direction = 'asc' then lower(f.product_type_name) end asc,
-    case when x.sort_by = 'product_type' and x.sort_direction = 'desc' then lower(f.product_type_name) end desc,
-    case when x.sort_by = 'uom' and x.sort_direction = 'asc' then lower(f.uom_code) end asc,
-    case when x.sort_by = 'uom' and x.sort_direction = 'desc' then lower(f.uom_code) end desc,
-    case when x.sort_by = 'stock' and x.sort_direction = 'asc' then f.available_stock end asc,
-    case when x.sort_by = 'stock' and x.sort_direction = 'desc' then f.available_stock end desc,
-    case when x.sort_by = 'status' and x.sort_direction = 'asc' then f.product_status end asc,
-    case when x.sort_by = 'status' and x.sort_direction = 'desc' then f.product_status end desc,
-    lower(f.sku) asc,
-    f.product_id asc
-  limit (select page_size from params)
-  offset ((select page_number from params) - 1) * (select page_size from params)
+),
+page_rows as (
+  select o.*
+  from ordered o
+  cross join params x
+  where o.page_order > (x.page_number - 1) * x.page_size
+    and o.page_order <= x.page_number * x.page_size
 ),
 items as (
   select coalesce(
@@ -178,7 +192,7 @@ items as (
         'uom_name', r.uom_name,
         'available_stock', r.available_stock,
         'prices', r.prices
-      ) order by lower(r.sku), r.product_id
+      ) order by r.page_order
     ),
     '[]'::jsonb
   ) as rows
@@ -192,9 +206,11 @@ summary as (
   select
     (select count(*)::integer from base) as total_products,
     (select count(*)::integer from active_groups) as price_groups,
-    (select count(distinct (cp.product_id, cp.price_group_id))::integer
-       from current_prices cp
-       join base b on b.product_id = cp.product_id) as filled_prices
+    (
+      select count(distinct (cp.product_id, cp.price_group_id))::integer
+      from current_prices cp
+      join base b on b.product_id = cp.product_id
+    ) as filled_prices
 ),
 routing_summary as (
   select
