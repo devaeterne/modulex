@@ -33,11 +33,15 @@ const PRICE_DECIMAL = { precision: 18, scale: 4, min: 0, allowNull: false } as c
 
 function bandErrorMessage(message: string) {
   const normalized = message.toLowerCase();
-  if (normalized.includes("permission")) return "You do not have permission to manage material pricing.";
+  if (normalized.includes("permission")) {
+    return "You do not have permission to manage material pricing.";
+  }
   if (normalized.includes("duplicate") || normalized.includes("already exists")) {
     return "A material band with this code already exists.";
   }
-  if (normalized.includes("price")) return "Enter a valid non-negative price per square foot.";
+  if (normalized.includes("price")) {
+    return "Enter a valid non-negative price per square foot.";
+  }
   return "Material band pricing could not be saved. Please retry.";
 }
 
@@ -136,36 +140,6 @@ export default function MaterialBandPricingTable() {
     setSaving(false);
   }
 
-  async function toggle(row: MaterialBand) {
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    const { error: toggleError } = await supabase.rpc("upsert_countertop_reference", {
-      p_kind: "material_band",
-      p_id: row.id,
-      p_name: null,
-      p_code: row.code,
-      p_price: row.price_per_sqft,
-      p_pricing_method: null,
-      p_product_id: null,
-      p_stone_type_id: null,
-      p_material_price_band_id: null,
-      p_vendor_name: null,
-      p_source_ref: null,
-      p_is_active: !row.is_active,
-    });
-
-    if (toggleError) {
-      setError(bandErrorMessage(toggleError.message));
-      setSaving(false);
-      return;
-    }
-
-    await load();
-    setSuccess(`${row.code} ${row.is_active ? "deactivated" : "activated"}.`);
-    setSaving(false);
-  }
-
   return (
     <div className="space-y-6">
       <ComponentCard
@@ -179,24 +153,38 @@ export default function MaterialBandPricingTable() {
         </div>
       </ComponentCard>
 
-      {error && !editing ? <Alert variant="error" title="Material pricing unavailable" message={error} /> : null}
+      {error && !editing ? (
+        <Alert variant="error" title="Material pricing unavailable" message={error} />
+      ) : null}
       {success ? <Alert variant="success" title="Material pricing updated" message={success} /> : null}
 
       <ComponentCard
         title="Material Price Band Directory"
-        desc="Stone products reference one of these bands through their stone profile. Changing a rate affects every product using that band."
+        desc="Stone products reference one of these bands through their stone profile. This focused Pricing workspace changes rates only; reference lifecycle stays outside Product Pricing."
       >
         {loading ? (
-          <Alert variant="info" title="Loading material bands" message="Loading canonical pricing references." />
+          <Alert
+            variant="info"
+            title="Loading material bands"
+            message="Loading canonical pricing references."
+          />
         ) : (
           <TableViewport>
             <Table variant="admin" className="min-w-[720px]">
               <TableHeader variant="admin">
                 <TableRow>
-                  <TableCell isHeader variant="admin" className="text-left">Band</TableCell>
-                  <TableCell isHeader variant="admin" className="text-right">Price / sq ft</TableCell>
-                  <TableCell isHeader variant="admin" className="text-left">Status</TableCell>
-                  <TableCell isHeader variant="admin" className="text-right">Actions</TableCell>
+                  <TableCell isHeader variant="admin" className="text-left">
+                    Band
+                  </TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">
+                    Price / sq ft
+                  </TableCell>
+                  <TableCell isHeader variant="admin" className="text-left">
+                    Status
+                  </TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHeader>
               <TableBody variant="admin">
@@ -221,14 +209,14 @@ export default function MaterialBandPricingTable() {
                       </TableCell>
                       <TableCell variant="admin" className="text-right">
                         {canManage ? (
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" disabled={saving} onClick={() => openEditor(row)}>
-                              Edit Price
-                            </Button>
-                            <Button size="sm" variant="outline" disabled={saving} onClick={() => void toggle(row)}>
-                              {row.is_active ? "Deactivate" : "Activate"}
-                            </Button>
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={saving || !row.is_active}
+                            onClick={() => openEditor(row)}
+                          >
+                            Edit Price
+                          </Button>
                         ) : (
                           <Badge color="light">View only</Badge>
                         )}
@@ -272,8 +260,12 @@ export default function MaterialBandPricingTable() {
                 />
               </div>
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button variant="outline" disabled={saving} onClick={closeEditor}>Cancel</Button>
-                <Button disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save Price"}</Button>
+                <Button variant="outline" disabled={saving} onClick={closeEditor}>
+                  Cancel
+                </Button>
+                <Button disabled={saving} onClick={() => void save()}>
+                  {saving ? "Saving…" : "Save Price"}
+                </Button>
               </div>
             </div>
           </ComponentCard>
