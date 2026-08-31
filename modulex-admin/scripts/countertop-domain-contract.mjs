@@ -50,6 +50,8 @@ assert(migration.includes("coalesce(v_item.countertop_reservation_quantity, v_it
 assert(sql.includes("product_kind","sink") || sql.includes("product_kind"), "sink domain identity must be validated");
 assert(migration.includes("countertop_material_price_bands") && migration.includes("attach_countertop_configuration"), "canonical timestamped migration must contain the domain");
 assert(sql.includes("calculate_countertop_price") && /set search_path\s*=\s*pg_catalog\s*,\s*public/.test(sql), "server-side pricing RPC must be pinned and present");
+assert(migration.includes("new.pricing_snapshot->>'subtotal'"), "snapshot enrichment must close the JSON subtotal key extraction quote");
+assert(sql.includes("new.pricing_snapshot->>'subtotal'"), "Admin SQL mirror must use the corrected JSON subtotal extraction");
 assert(sql.includes("attach_countertop_configuration") && sql.includes("security definer"), "snapshot mutation must use an explicit reviewed server boundary");
 for (const name of ["Regular Removal", "Granite Removal", "Kitchen Sink Plumbing", "Bathroom Sink Plumbing", "Outlet Cutout", "Kitchen Sink Cutout", "Bathroom Sink Cutout"]) assert(sql.includes(name), `${name} reference service must be seeded`);
 assert(configurator.includes("calculate_countertop_price") && configurator.includes("attach_countertop_configuration"), "Admin configurator must use server-side pricing and snapshot RPCs");
