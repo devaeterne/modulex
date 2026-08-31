@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { loadOrderDetail, setCustomerOrderStatus } from "@/lib/customers/order-domain";
+import CountertopConfigurator from "@/components/countertop/CountertopConfigurator";
 import type {
   Customer,
   CustomerOrder,
   CustomerOrderItem,
   CustomerOrderStatus,
   CustomerOrderStatusHistory,
+  CountertopOrderContext,
 } from "@/lib/customers/types";
 
 const STATUSES: CustomerOrderStatus[] = [
@@ -74,12 +76,15 @@ export default function CustomerOrderDetail() {
   const [history, setHistory] = useState<CustomerOrderStatusHistory[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [canManage, setCanManage] = useState(false);
+  const [contextCanManageCountertop, setContextCanManageCountertop] = useState(false);
+  const [countertopItems, setCountertopItems] = useState<CountertopOrderContext[]>([]);
   const [newStatus, setNewStatus] = useState<CustomerOrderStatus>("draft");
   const [statusNote, setStatusNote] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [countertopContext, setCountertopContext] = useState<CountertopOrderContext | null>(null);
 
   async function load() {
     setIsLoading(true);
@@ -91,6 +96,9 @@ export default function CustomerOrderDetail() {
       setHistory(context.history);
       setPendingApprovals(context.pendingApprovals);
       setCanManage(context.canManage);
+      setContextCanManageCountertop(context.canManageCountertop);
+      setCountertopItems(context.countertopItems);
+      if (countertopContext && !context.countertopItems.some((item) => item.orderItemId === countertopContext.orderItemId)) setCountertopContext(null);
       setNewStatus(context.order.status);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to load order detail.");
@@ -140,6 +148,7 @@ export default function CustomerOrderDetail() {
       ? Number(order.grand_total ?? 0)
       : Number(order.total_amount ?? 0);
   const currency = order.currency_code || "USD";
+  const countertopItemsById = new Map(countertopItems.map((item) => [item.orderItemId, item]));
 
   return (
     <div className="space-y-5">
@@ -195,7 +204,7 @@ export default function CustomerOrderDetail() {
         <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Order Items</h2></div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["#", "SKU", "Product", "Qty", "Unit Price", "Discount", "Total", "Source"].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>)}</tr></thead>
+            <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["#", "SKU", "Product", "Qty", "Unit Price", "Discount", "Total", "Source", "Actions"].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {items.map((item) => (
                 <tr key={item.id}>
@@ -207,13 +216,16 @@ export default function CustomerOrderDetail() {
                   <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">{Number(item.discount_percent).toFixed(1)}%</td>
                   <td className="px-4 py-4 text-sm font-semibold text-gray-800 dark:text-white/90">{money(item.line_total, currency)}</td>
                   <td className="px-4 py-4"><span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-400">{titleCase(item.price_source)}</span></td>
+                  <td className="px-4 py-4">{order.status === "draft" && contextCanManageCountertop && countertopItemsById.has(item.id) ? <button type="button" onClick={() => setCountertopContext(countertopItemsById.get(item.id) ?? null)} className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">Configure Countertop</button> : <span className="text-sm text-gray-400">—</span>}</td>
                 </tr>
               ))}
-              {items.length === 0 && <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-500">No order items found.</td></tr>}
+              {items.length === 0 && <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-gray-500">No order items found.</td></tr>}
             </tbody>
           </table>
         </div>
       </section>
+
+      {countertopContext && order.status === "draft" && contextCanManageCountertop && <CountertopConfigurator orderItemId={countertopContext.orderItemId} orderContext={countertopContext} onClose={() => setCountertopContext(null)} onAttached={() => { setSuccessMessage("Countertop snapshot attached and order refreshed."); void load(); }} />}
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="space-y-5 xl:col-span-8">

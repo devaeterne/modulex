@@ -273,6 +273,7 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/customers/orders" || path.includes("/orders"), permission: "orders.view" },
   { match: (path) => path === "/customers" || path.startsWith("/customers/"), permission: "customers.view" },
   { match: (path) => path === "/pricing/cost-margin" || path.startsWith("/pricing/cost-margin/"), permission: "pricing.cost.view" },
+  { match: (path) => path === "/pricing/countertop" || path.startsWith("/pricing/countertop/"), permission: "pricing.manage" },
   { match: (path) => path === "/pricing/groups" || path.startsWith("/pricing/groups/"), permission: "pricing.manage" },
   { match: (path) => path === "/pricing" || path.startsWith("/pricing/"), permission: "pricing.view" },
   { match: (path) => path === "/brands" || path.startsWith("/brands/") || path === "/categories" || path.startsWith("/categories/"), permission: "products.manage" },

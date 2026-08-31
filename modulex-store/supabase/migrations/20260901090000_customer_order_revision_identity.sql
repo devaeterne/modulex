@@ -1,33 +1,5 @@
-begin;
-
-create table if not exists public.customer_order_revisions (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid not null references public.customer_orders(id) on update cascade on delete cascade,
-  revision_number integer not null,
-  reason text,
-  order_snapshot jsonb not null,
-  items_snapshot jsonb not null,
-  revised_by uuid default auth.uid() references public.profiles(id) on delete set null,
-  created_at timestamptz not null default now(),
-  constraint customer_order_revisions_number_positive check (revision_number > 0),
-  constraint customer_order_revisions_unique unique(order_id, revision_number)
-);
-
-create index if not exists customer_order_revisions_order_idx
-  on public.customer_order_revisions(order_id, revision_number desc);
-
-alter table public.customer_order_revisions enable row level security;
-
-drop policy if exists customer_order_revisions_read on public.customer_order_revisions;
-create policy customer_order_revisions_read
-on public.customer_order_revisions
-for select
-to authenticated
-using (public.current_user_has_any_role(array['super_admin','admin','sales']));
-
-revoke all on public.customer_order_revisions from anon;
-grant select on public.customer_order_revisions to authenticated;
-
+-- Preserve customer_order_items identity during revisions so countertop
+-- configuration rows (and their historical snapshots) are not cascade-deleted.
 create or replace function private.update_customer_order(
   p_order_id uuid,
   p_items jsonb,
@@ -293,5 +265,3 @@ end;
 $$;
 
 revoke all on function private.update_customer_order(uuid,jsonb,uuid,uuid,uuid,date,text,text,text,numeric,numeric,uuid,numeric,text) from public, anon, authenticated;
-
-commit;

@@ -11,6 +11,7 @@ import type {
   OrderFulfillmentType,
   PaymentMethod,
   PriceGroupLookup,
+  CountertopOrderContext,
 } from "@/lib/customers/types";
 
 export type OrderDomainProduct = {
@@ -58,6 +59,8 @@ export type OrderDetailContext = {
   history: CustomerOrderStatusHistory[];
   pendingApprovals: number;
   canManage: boolean;
+  canManageCountertop: boolean;
+  countertopItems: CountertopOrderContext[];
 };
 
 type CreateOrderItemInput = {
@@ -85,6 +88,7 @@ export type CreateCustomerOrderInput = {
 };
 
 type UpdateOrderItemInput = {
+  id?: string;
   productId: string;
   quantity: string | number;
   unitPrice: string | number;
@@ -352,13 +356,30 @@ export async function loadOrderDetail(customerId: string, orderId: string): Prom
   const firstError = customerResult.error || orderResult.error || itemsResult.error || historyResult.error;
   if (firstError) throw firstError;
 
+  const itemRows = (itemsResult.data ?? []) as CustomerOrderItem[];
+  const countertopProducts = itemRows.map((item) => item.product_id).filter((id): id is string => Boolean(id));
+  const canManageCountertop = hasPermission(profile.role, "pricing.manage");
+  const countertopProfilesResult = canManageCountertop && countertopProducts.length
+    ? await supabase.from("countertop_stone_product_profiles").select("product_id").in("product_id", countertopProducts).eq("is_active", true)
+    : { data: [], error: null };
+  if (countertopProfilesResult.error) throw countertopProfilesResult.error;
+  const countertopProductIds = new Set((countertopProfilesResult.data ?? []).map((row) => row.product_id));
+
   return {
     customer: customerResult.data as Customer,
     order: orderResult.data as CustomerOrder,
-    items: (itemsResult.data ?? []) as CustomerOrderItem[],
+    items: itemRows,
     history: (historyResult.data ?? []) as CustomerOrderStatusHistory[],
     pendingApprovals: approvalsResult.error ? 0 : approvalsResult.count ?? 0,
     canManage: hasPermission(profile.role, "orders.manage"),
+    canManageCountertop,
+    countertopItems: itemRows.filter((item) => item.product_id && countertopProductIds.has(item.product_id)).map((item) => ({
+      orderItemId: item.id,
+      orderNumber: orderResult.data.order_number,
+      lineNo: item.line_no,
+      sku: item.sku_snapshot,
+      productName: item.product_name_snapshot,
+    })),
   };
 }
 
@@ -406,6 +427,7 @@ export async function updateCustomerOrder(input: UpdateCustomerOrderInput): Prom
   const { data, error } = await supabase.rpc("update_customer_order", {
     p_order_id: input.orderId,
     p_items: input.items.map((item) => ({
+      ...(item.id ? { id: item.id } : {}),
       product_id: item.productId,
       quantity: numeric(item.quantity),
       unit_price: numeric(item.unitPrice),

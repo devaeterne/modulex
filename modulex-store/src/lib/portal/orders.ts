@@ -18,7 +18,14 @@ export type PortalOrderItem = {
   sku_snapshot: string;
   product_name_snapshot: string;
   quantity: number;
+  countertop: PortalCountertopSummary | null;
 };
+
+export type PortalCountertopStone = { name: string | null; sku: string | null; stone_type: string | null; material_price_band: string | null; price_per_sqft: string | null; sqft: string | null; subtotal: string | null };
+export type PortalCountertopEdge = { name: string | null; pricing_method: string | null; unit_price: string | null; linear_ft: string | null; applicable_measure: string | null; subtotal: string | null };
+export type PortalCountertopSink = { name: string | null; sku: string | null; unit_price: string | null; subtotal: string | null };
+export type PortalCountertopService = { name: string | null; pricing_method: string | null; unit_price: string | null; quantity: string | null; applicable_measure: string | null; subtotal: string | null };
+export type PortalCountertopSummary = { stone: PortalCountertopStone; edge: PortalCountertopEdge | null; sink: PortalCountertopSink | null; services: PortalCountertopService[]; totals: { material_subtotal: string | null; edge_subtotal: string | null; sink_subtotal: string | null; services_subtotal: string | null; subtotal: string | null } };
 
 export type PortalOrderDetail = PortalOrderSummary & {
   items: PortalOrderItem[];
