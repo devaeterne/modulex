@@ -8,7 +8,38 @@ const expect = (condition, message) => {
 };
 
 const table = read("src/components/products/ProductsTable.tsx");
+const select = read("src/components/form/Select.tsx");
 const tracker = read("AdminUICheck.md");
+
+for (const sharedComponent of [
+  "ComponentCard",
+  "InputField",
+  "Label",
+  "Select",
+  "Button",
+  "Badge",
+  "Alert",
+  "Modal",
+  "TableViewport",
+  "TableHeader",
+  "TableBody",
+  "TableRow",
+  "TableCell",
+]) {
+  expect(
+    table.includes(sharedComponent),
+    `Product List must compose the shared TailAdmin ${sharedComponent} component`
+  );
+}
+
+expect(
+  !/<(?:input|select|table)\b/.test(table),
+  "Product List must not reimplement shared TailAdmin form or table primitives"
+);
+expect(
+  /id\?:\s*string/.test(select) && /allowEmpty\?:\s*boolean/.test(select),
+  "Shared Select must support accessible ids and selectable empty filter options"
+);
 
 expect(
   table.includes('hasPermission(profile?.roles, "products.manage")'),
@@ -42,20 +73,19 @@ expect(
   table.includes('id="product-search"') && table.includes('htmlFor="product-search"'),
   "Product search needs an explicit accessible label"
 );
+for (const filterId of [
+  "product-status-filter",
+  "product-brand-filter",
+  "product-category-filter",
+  "product-type-filter",
+  "product-uom-filter",
+  "product-qr-filter",
+]) {
+  expect(table.includes(`id: "${filterId}"`), `${filterId} must remain in the filter contract`);
+}
 expect(
-  table.includes('id="product-status-filter"') &&
-    table.includes('htmlFor="product-status-filter"'),
-  "Product status filter needs an explicit accessible label"
-);
-expect(
-  table.includes('id="product-brand-filter"') &&
-    table.includes('htmlFor="product-brand-filter"'),
-  "Product brand filter needs an explicit accessible label"
-);
-expect(
-  table.includes('id="product-category-filter"') &&
-    table.includes('htmlFor="product-category-filter"'),
-  "Product category filter needs an explicit accessible label"
+  table.includes("<Label htmlFor={field.id}") && table.includes("<Select id={field.id}"),
+  "Product filters need explicit accessible labels"
 );
 expect(
   table.includes('id="product-sort-by"') && table.includes('htmlFor="product-sort-by"'),
@@ -74,10 +104,10 @@ expect(
   table.includes("focus-visible:ring-2"),
   "Product List interactive controls need visible keyboard focus states"
 );
-const productTableClass = table.match(/<table className="([^"]+)"/)?.[1] ?? "";
+const productTableClass = table.match(/<Table variant="admin" className="([^"]+)"/)?.[1] ?? "";
 const productTableMinWidth = Number(productTableClass.match(/min-w-\[(\d+)px\]/)?.[1] ?? 0);
 expect(
-  productTableClass.includes("w-full") && productTableMinWidth >= 1080,
+  table.includes("<TableViewport>") && productTableMinWidth >= 1080,
   "Product table needs full-width layout with an explicit responsive minimum width"
 );
 expect(
@@ -91,6 +121,11 @@ expect(
 expect(
   table.includes('role="dialog"') && table.includes("archiveTarget"),
   "Product archive confirmation dialog is missing"
+);
+expect(
+  table.includes("archiveCancelRef") &&
+    table.includes('.querySelector("button")?.focus()'),
+  "Product archive confirmation must initially focus Cancel"
 );
 expect(
   table.includes('aria-current={currentPage === page ? "page" : undefined}'),

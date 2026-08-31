@@ -17,6 +17,8 @@ for (const route of routes) expect(fs.existsSync(path.join(root, route)), `Missi
 const brands = read(routes[0]);
 const categories = read(routes[1]);
 const taxonomy = read("src/components/products/TaxonomyManager.tsx");
+const tablePrimitives = read("src/components/ui/table/index.tsx");
+const inputField = read("src/components/form/input/InputField.tsx");
 const dashboard = read("src/components/pricing/PricingDashboard.tsx");
 const productPrices = read("src/components/pricing/ProductPricesServerTable.tsx");
 const groups = read("src/components/pricing/PriceGroupsTable.tsx");
@@ -27,9 +29,9 @@ const sidebar = read("src/layout/AppSidebar.tsx");
 expect(brands.includes("TaxonomyManager") && categories.includes("TaxonomyManager"), "Brands/Categories must use the audited taxonomy manager");
 expect(!taxonomy.includes("error.message") && !taxonomy.includes("window.confirm"), "Taxonomy UI must not expose raw errors or native confirm dialogs");
 expect(taxonomy.includes("toLocaleDateString()"), "Taxonomy dates must use runtime locale");
-expect(taxonomy.includes("min-w-[680px]") && taxonomy.includes("overflow-x-auto"), "Taxonomy tables need mobile-safe horizontal overflow");
+expect(taxonomy.includes("TableViewport") && taxonomy.includes("min-w-[680px]") && tablePrimitives.includes("overflow-x-auto"), "Taxonomy tables need mobile-safe horizontal overflow");
 expect(taxonomy.includes('role="dialog"') && taxonomy.includes('aria-live="polite"'), "Taxonomy destructive/error states need accessible UI");
-expect(taxonomy.includes("focus-visible:ring-2") && taxonomy.includes("htmlFor"), "Taxonomy controls need labels and visible keyboard focus");
+expect(taxonomy.includes("InputField") && taxonomy.includes("htmlFor") && inputField.includes("focus:ring-3"), "Taxonomy controls need labels and visible keyboard focus");
 
 expect(dashboard.includes("filtersOpen") && dashboard.includes("getCurrentProfile"), "Pricing Dashboard must keep responsive filters and access loading");
 expect(productPrices.includes("get_product_prices_page") && productPrices.includes("totalPages") && productPrices.includes("selectedIds"), "Product Prices must retain server pagination and bulk selection");
