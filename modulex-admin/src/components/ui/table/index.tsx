@@ -29,6 +29,8 @@ interface TableRowProps {
   children: ReactNode;
   className?: string;
   variant?: TableVariant;
+  title?: string;
+  onDoubleClick?: React.MouseEventHandler<HTMLTableRowElement>;
 }
 
 interface TableCellProps {
@@ -74,8 +76,17 @@ const TableBody: React.FC<TableBodyProps> = ({
   return <tbody className={`${variantClass} ${className}`}>{children}</tbody>;
 };
 
-const TableRow: React.FC<TableRowProps> = ({ children, className = "" }) => {
-  return <tr className={className}>{children}</tr>;
+const TableRow: React.FC<TableRowProps> = ({
+  children,
+  className = "",
+  title,
+  onDoubleClick,
+}) => {
+  return (
+    <tr className={className} title={title} onDoubleClick={onDoubleClick}>
+      {children}
+    </tr>
+  );
 };
 
 const TableCell: React.FC<TableCellProps> = ({
