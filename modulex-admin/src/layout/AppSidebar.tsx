@@ -59,6 +59,7 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Pricing Dashboard", path: "/pricing/dashboard", permission: "pricing.view" },
       { name: "Product Prices", path: "/pricing/products", permission: "pricing.view" },
+      { name: "Material Bands", path: "/pricing/material-bands", permission: "pricing.view" },
       { name: "Price Groups", path: "/pricing/groups", permission: "pricing.manage" },
     ],
   },
