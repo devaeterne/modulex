@@ -32,6 +32,7 @@
     "smoke:portal-experience": "node scripts/portal-experience-contract.mjs",
     "smoke:portal-auth-rpc-guard": "node scripts/portal-auth-rpc-guard-contract.mjs",
     "smoke:portal-public-navbar": "node scripts/portal-public-navbar-contract.mjs",
+    "smoke:portal-countertop": "node scripts/portal-countertop-contract.mjs",
     "smoke:a3-1-product-master": "node scripts/a3-1-product-master-contract.mjs",
     "smoke:gc1-source-manifest": "node scripts/gc1-source-manifest-contract.mjs",
     "smoke:gc2-media-schema": "node scripts/gc2-media-schema-contract.mjs",

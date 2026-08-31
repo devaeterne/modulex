@@ -1,6 +1,6 @@
 import PortalPageHeader from "@/components/portal/PortalPageHeader";
 import PortalStatusBadge from "@/components/portal/PortalStatusBadge";
-import type { PortalOrderDetail as PortalOrderDetailType } from "@/lib/portal/orders";
+import type { PortalCountertopSummary, PortalOrderDetail as PortalOrderDetailType } from "@/lib/portal/orders";
 import type { DealerPortalOrderDetail } from "@/lib/portal/dealer";
 
 type PortalOrderDetailProps =
@@ -79,7 +79,25 @@ export default function PortalOrderDetail(props: PortalOrderDetailProps) {
             </tbody>
           </table>
         </div>
+        {order.items.filter((item) => item.countertop).map((item) => <CountertopSummary key={`countertop-${item.id}`} summary={item.countertop as PortalCountertopSummary} currencyCode={dealerOrder?.currency_code || "USD"} />)}
       </section>
     </div>
   );
+}
+
+function CountertopSummary({ summary, currencyCode }: { summary: PortalCountertopSummary; currencyCode: string }) {
+  const money = (value: string | null | undefined) => value == null ? "—" : formatCurrency(Number(value), currencyCode);
+  return <div className="portal-order-countertop mt-4 border-top pt-4">
+    <div className="portal-section-heading"><div><p className="portal-kicker">Countertop configuration</p><h3>Commercial summary</h3></div></div>
+    <dl className="portal-definition-grid">
+      <div><dt>Stone</dt><dd>{summary.stone.name || "—"}</dd></div>
+      <div><dt>Stone Type</dt><dd>{summary.stone.stone_type || "—"}</dd></div>
+      <div><dt>Sq Ft</dt><dd>{summary.stone.sqft || "—"}</dd></div>
+      <div><dt>Material Band</dt><dd>{summary.stone.material_price_band ? `${summary.stone.material_price_band} · ${money(summary.stone.price_per_sqft)} / sq ft` : "—"}</dd></div>
+      {summary.edge && <div><dt>Edge</dt><dd>{summary.edge.name} · {summary.edge.linear_ft || summary.edge.applicable_measure || "—"} LF ({money(summary.edge.subtotal)})</dd></div>}
+      {summary.sink && <div><dt>Sink</dt><dd>{summary.sink.name}{summary.sink.sku ? ` · ${summary.sink.sku}` : ""} ({money(summary.sink.subtotal)})</dd></div>}
+    </dl>
+    {summary.services.length > 0 && <div className="mt-3"><p className="portal-kicker">Services</p>{summary.services.map((service, index) => <p key={`${service.name}-${index}`} className="text-sm">{service.name} · {service.quantity || "—"} × {money(service.unit_price)} ({money(service.subtotal)})</p>)}</div>}
+    <dl className="portal-definition-grid mt-3"><div><dt>Material</dt><dd>{money(summary.totals.material_subtotal)}</dd></div><div><dt>Edge</dt><dd>{money(summary.totals.edge_subtotal)}</dd></div><div><dt>Sink</dt><dd>{money(summary.totals.sink_subtotal)}</dd></div><div><dt>Services</dt><dd>{money(summary.totals.services_subtotal)}</dd></div><div><dt>Countertop Total</dt><dd>{money(summary.totals.subtotal)}</dd></div></dl>
+  </div>;
 }
