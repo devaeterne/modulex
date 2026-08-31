@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { parseDbDecimal } from "@/lib/validation";
+import Button from "@/components/ui/button/Button";
 
 type ProductStatus = "active" | "inactive" | "archived";
 
@@ -743,7 +744,7 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
                     {values.qr_generated_at ? new Date(values.qr_generated_at).toLocaleString("en-US") : "-"}
                   </span>
                 </div>
-                {mode === "edit" && productId ? <button type="button" disabled={isSubmitting} onClick={async () => { setIsSubmitting(true); const result = await generateQr(productId, true); if (!result.ok) setErrorMessage(result.message); else setErrorMessage(null); setIsSubmitting(false); }} className="rounded-lg bg-brand-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-60">Regenerate QR</button> : null}
+                {mode === "edit" && productId ? <Button size="sm" disabled={isSubmitting} onClick={async () => { setIsSubmitting(true); const result = await generateQr(productId, true); if (!result.ok) setErrorMessage(result.message); else setErrorMessage(null); setIsSubmitting(false); }}>Regenerate QR</Button> : null}
               </div>
             </div>
           </div>
@@ -751,21 +752,8 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       ) : null}
 
       <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800">
-        <button
-          type="button"
-          onClick={() => router.push("/products")}
-          className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-        >
-          Cancel
-        </button>
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSubmitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Product"}
-        </button>
+        <Button variant="outline" onClick={() => router.push("/products")}>Cancel</Button>
+        <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Product"}</Button>
       </div>
     </form>
   );
