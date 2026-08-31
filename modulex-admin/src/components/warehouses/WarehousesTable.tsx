@@ -3,6 +3,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import ComponentCard from "@/components/common/ComponentCard";
+import Input from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableViewport,
+} from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -27,23 +40,6 @@ type WarehouseRow = {
   zone_count?: number;
   location_count?: number;
 };
-
-function statusClass(isActive: boolean) {
-  return isActive
-    ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"
-    : "bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400";
-}
-
-function warehouseTypeClass(type: WarehouseType) {
-  switch (type) {
-    case "sellable":
-      return "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400";
-    case "non_sellable":
-      return "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400";
-    default:
-      return "bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400";
-  }
-}
 
 function formatWarehouseType(type: WarehouseType) {
   switch (type) {
@@ -200,129 +196,101 @@ export default function WarehousesTable() {
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Warehouse List
-          </h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Manage sellable and non-sellable warehouses used in QR-based stock operations.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <input
+    <ComponentCard
+      title="Warehouse List"
+      desc="Manage sellable and non-sellable warehouses used in QR-based stock operations."
+    >
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+        <div className="w-full sm:w-[300px]">
+          <Input
+            id="warehouse-search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            type="text"
             placeholder="Search code, name, type, QR..."
-            className="h-10 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 sm:w-[300px]"
           />
-
-          {canManage && (
-            <Link
-              href="/warehouses/new"
-              className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600"
-            >
-              Add Warehouse
-            </Link>
-          )}
         </div>
+
+        {canManage ? (
+          <Link
+            href="/warehouses/new"
+            className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+          >
+            Add Warehouse
+          </Link>
+        ) : null}
       </div>
 
-      {errorMessage && (
-        <div className="m-5 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
-          {errorMessage}
+      {errorMessage ? (
+        <div className="mb-5">
+          <Alert variant="error" title="Warehouse action failed" message={errorMessage} />
         </div>
-      )}
+      ) : null}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-          <thead className="bg-gray-50 dark:bg-white/[0.02]">
-            <tr>
-              <th className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                Warehouse
-              </th>
-              <th className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                Type
-              </th>
-              <th className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                QR
-              </th>
-              <th className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                Structure
-              </th>
-              <th className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                Status
-              </th>
-              <th className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-                Updated
-              </th>
-              <th className="px-5 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+      <TableViewport>
+        <Table variant="admin" className="min-w-[1080px]">
+          <TableHeader variant="admin">
+            <TableRow>
+              {["Warehouse", "Type", "QR", "Structure", "Status", "Updated"].map((label) => (
+                <TableCell key={label} isHeader variant="admin" className="text-left">
+                  {label}
+                </TableCell>
+              ))}
+              <TableCell isHeader variant="admin" className="text-right">
                 Actions
-              </th>
-            </tr>
-          </thead>
+              </TableCell>
+            </TableRow>
+          </TableHeader>
 
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <TableBody variant="admin">
             {isLoading ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-5 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
-                >
+              <TableRow>
+                <TableCell variant="admin" colSpan={7} className="py-8 text-center">
                   Loading warehouses...
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : filteredWarehouses.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-5 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
-                >
+              <TableRow>
+                <TableCell variant="admin" colSpan={7} className="py-8 text-center">
                   No warehouses found.
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               filteredWarehouses.map((warehouse) => {
                 const isActionLoading = actionLoadingId === warehouse.id;
 
                 return (
-                  <tr
+                  <TableRow
                     key={warehouse.id}
                     onDoubleClick={canManage ? () => openWarehouseEdit(warehouse.id) : undefined}
                     title={canManage ? "Double click to edit" : undefined}
-                    className={`${canManage ? "cursor-pointer " : ""}transition hover:bg-gray-50 dark:hover:bg-white/[0.03]`}
+                    className={canManage ? "cursor-pointer" : undefined}
                   >
-                    <td className="px-5 py-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                    <TableCell variant="admin" className="align-top">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-gray-800 dark:text-white/90">
                             {warehouse.code}
                           </span>
-                          <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">
+                          <Badge color="light" size="sm">
                             {warehouse.name}
-                          </span>
+                          </Badge>
                         </div>
-
-                        <p className="mt-1 max-w-[420px] text-xs text-gray-500 dark:text-gray-400">
+                        <p className="max-w-[420px] text-xs text-gray-500 dark:text-gray-400">
                           {warehouse.description || "No description."}
                         </p>
                       </div>
-                    </td>
+                    </TableCell>
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${warehouseTypeClass(
-                          warehouse.warehouse_type
-                        )}`}
+                    <TableCell variant="admin" className="align-top">
+                      <Badge
+                        color={warehouse.warehouse_type === "sellable" ? "success" : "warning"}
+                        size="sm"
                       >
                         {formatWarehouseType(warehouse.warehouse_type)}
-                      </span>
-                    </td>
+                      </Badge>
+                    </TableCell>
 
-                    <td className="px-5 py-4">
+                    <TableCell variant="admin" className="align-top">
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-gray-800 dark:text-white/90">
                           {warehouse.qr_code || "-"}
@@ -331,78 +299,71 @@ export default function WarehousesTable() {
                           {warehouse.qr_payload || "-"}
                         </p>
                       </div>
-                    </td>
+                    </TableCell>
 
-                    <td className="px-5 py-4">
-                      <div className="flex gap-2">
-                        <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-white/[0.06] dark:text-gray-300">
+                    <TableCell variant="admin" className="align-top">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge color="light" size="sm">
                           {warehouse.zone_count ?? 0} Zones
-                        </span>
-                        <span className="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-white/[0.06] dark:text-gray-300">
+                        </Badge>
+                        <Badge color="light" size="sm">
                           {warehouse.location_count ?? 0} Shelves
-                        </span>
+                        </Badge>
                       </div>
-                    </td>
+                    </TableCell>
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(
-                          warehouse.is_active
-                        )}`}
-                      >
+                    <TableCell variant="admin" className="align-top">
+                      <Badge color={warehouse.is_active ? "success" : "light"} size="sm">
                         {warehouse.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
+                      </Badge>
+                    </TableCell>
 
-                    <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
+                    <TableCell variant="admin" className="align-top text-gray-500 dark:text-gray-400">
                       {formatDate(warehouse.updated_at)}
-                    </td>
+                    </TableCell>
 
-                    <td className="px-5 py-4">
+                    <TableCell variant="admin" className="align-top text-right">
                       <div className="flex min-w-[260px] items-center justify-end gap-2">
-                        {canManage && (
+                        {canManage ? (
                           <Link
                             href={`/warehouses/${warehouse.id}/edit`}
                             onClick={(event) => event.stopPropagation()}
-                            className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                            className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
                           >
                             Edit
                           </Link>
-                        )}
+                        ) : null}
 
                         <Link
                           href={`/zones?warehouse=${warehouse.id}`}
                           onClick={(event) => event.stopPropagation()}
-                          className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                          className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
                         >
                           Zones
                         </Link>
 
-                        {canManage && (
-                          <button
-                            type="button"
+                        {canManage ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isActionLoading}
                             onClick={(event) => {
                               event.stopPropagation();
-                              handleToggleStatus(warehouse);
+                              void handleToggleStatus(warehouse);
                             }}
-                            disabled={isActionLoading}
-                            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${warehouse.is_active
-                              ? "bg-warning-50 text-warning-700 hover:bg-warning-100 dark:bg-warning-500/10 dark:text-warning-400"
-                              : "bg-success-50 text-success-700 hover:bg-success-100 dark:bg-success-500/10 dark:text-success-400"
-                              }`}
                           >
                             {warehouse.is_active ? "Deactivate" : "Activate"}
-                          </button>
-                        )}
+                          </Button>
+                        ) : null}
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 );
               })
             )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TableBody>
+        </Table>
+      </TableViewport>
+    </ComponentCard>
   );
 }
