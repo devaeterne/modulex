@@ -17,6 +17,7 @@ for (const route of routes) expect(fs.existsSync(path.join(root, route)), `Missi
 const brands = read(routes[0]);
 const categories = read(routes[1]);
 const taxonomy = read("src/components/products/TaxonomyManager.tsx");
+const tablePrimitives = read("src/components/ui/table/index.tsx");
 const dashboard = read("src/components/pricing/PricingDashboard.tsx");
 const productPrices = read("src/components/pricing/ProductPricesServerTable.tsx");
 const groups = read("src/components/pricing/PriceGroupsTable.tsx");
@@ -27,7 +28,7 @@ const sidebar = read("src/layout/AppSidebar.tsx");
 expect(brands.includes("TaxonomyManager") && categories.includes("TaxonomyManager"), "Brands/Categories must use the audited taxonomy manager");
 expect(!taxonomy.includes("error.message") && !taxonomy.includes("window.confirm"), "Taxonomy UI must not expose raw errors or native confirm dialogs");
 expect(taxonomy.includes("toLocaleDateString()"), "Taxonomy dates must use runtime locale");
-expect(taxonomy.includes("min-w-[680px]") && taxonomy.includes("overflow-x-auto"), "Taxonomy tables need mobile-safe horizontal overflow");
+expect(taxonomy.includes("TableViewport") && taxonomy.includes("min-w-[680px]") && tablePrimitives.includes("overflow-x-auto"), "Taxonomy tables need mobile-safe horizontal overflow");
 expect(taxonomy.includes('role="dialog"') && taxonomy.includes('aria-live="polite"'), "Taxonomy destructive/error states need accessible UI");
 expect(taxonomy.includes("focus-visible:ring-2") && taxonomy.includes("htmlFor"), "Taxonomy controls need labels and visible keyboard focus");
 
