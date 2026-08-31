@@ -6,6 +6,7 @@ const advisorHardening = fs.readFileSync("../modulex-store/supabase/migrations/2
 const form = fs.readFileSync("src/components/products/ProductForm.tsx", "utf8");
 const manager = fs.readFileSync("src/components/products/ProductMasterReferenceManager.tsx", "utf8");
 const list = fs.readFileSync("src/components/products/ProductsTable.tsx", "utf8");
+const qrRoute = fs.readFileSync("src/app/api/admin/products/qr/route.ts", "utf8");
 assert.match(migration, /create table if not exists public\.product_types/);
 assert.match(migration, /create table if not exists public\.units_of_measure/);
 assert.match(migration, /product_type_allowed_uoms/);
@@ -17,7 +18,10 @@ assert.match(form, /Unit of Measure/);
 assert.match(form, /Stone Type/);
 assert.match(form, /Material Price Band/);
 assert.match(manager, /Product Type/);
-assert.match(manager, /Unit of Measure/);
+assert.match(manager, /Units of Measure/);
+assert.match(manager, /Quantity Type/);
+assert.match(manager, /Whole numbers/);
+assert.match(manager, /Decimals allowed/);
 assert.doesNotMatch(form, /brand_id: current\.brand_id \|\| loadedBrands/);
 assert.match(list, /get_products_page_v2/);
 assert.match(list, /getLegacyRpcArgs/);
@@ -48,4 +52,9 @@ for (const mutationPolicy of [
   assert.match(advisorHardening, new RegExp(`create policy ${mutationPolicy}`));
 }
 assert.doesNotMatch(advisorHardening, /create policy product_master_(?:uom|type|allowed_uom)_manage/);
+assert.match(form, /getSession\(\)/);
+assert.match(form, /Authorization: `Bearer \$\{session\.access_token\}`/);
+assert.match(qrRoute, /requireAdmin\(request\)/);
+assert.match(qrRoute, /const value = product\.sku/);
+assert.match(qrRoute, /cleanupError/);
 console.log("product-master-v2 contract: PASS");
