@@ -146,7 +146,7 @@ Render Code, Price / sq ft, Status and Actions with `ComponentCard`, `TableViewp
 
 - [ ] **Step 2: Add edit modal**
 
-Only Code and Price / sq ft (plus lifecycle state through Activate/Deactivate) are editable. Parse price with the existing decimal validation helpers; prevent duplicate submit; map RPC errors to readable messages.
+Only Price / sq ft is editable. Band code and lifecycle status are read-only in this focused Pricing workspace; lifecycle/reference management remains outside this screen. Parse price with the existing decimal validation helpers; prevent duplicate submit; map RPC errors to readable messages.
 
 - [ ] **Step 3: Add navigation**
 
