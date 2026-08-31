@@ -41,6 +41,7 @@ assert(sql.includes("attach_countertop_configuration") && sql.includes("security
 for (const name of ["Regular Removal", "Granite Removal", "Kitchen Sink Plumbing", "Bathroom Sink Plumbing", "Outlet Cutout", "Kitchen Sink Cutout", "Bathroom Sink Cutout"]) assert(sql.includes(name), `${name} reference service must be seeded`);
 assert(configurator.includes("calculate_countertop_price") && configurator.includes("attach_countertop_configuration"), "Admin configurator must use server-side pricing and snapshot RPCs");
 assert(configurator.includes("Stone type") && configurator.includes("Material price band") && configurator.includes("Additional services"), "configurator must use managed reference selectors");
+assert(sql.includes("upsert_countertop_reference") && sql.includes("Countertop reference management requires admin permission"), "reference CRUD must use an authorized server boundary");
 const serviceInput = { materialUnitPrice: "34", sqft: "10", edgeUnitPrice: "10", edgeLinearFt: "8", services: [{ id: "sq", name: "Sq", pricing_method: "sq_ft", unit_price: "2", quantity: "3" }, { id: "lf", name: "Lf", pricing_method: "linear_ft", unit_price: "3", quantity: "2" }, { id: "flat", name: "Flat", pricing_method: "flat", unit_price: "5", quantity: "9" }] };
 assert(calculateCountertopPrice(serviceInput).services_subtotal === "49.0000", "service pricing methods must use sqft/linear-ft/flat semantics");
 console.log("Countertop / Stone / Sink domain contract: PASS");
