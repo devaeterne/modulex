@@ -2,6 +2,7 @@ import fs from "node:fs";
 import assert from "node:assert/strict";
 
 const migration = fs.readFileSync("../modulex-store/supabase/migrations/20260831140000_product_master_v2_dynamic_types_uom.sql", "utf8");
+const advisorHardening = fs.readFileSync("../modulex-store/supabase/migrations/20260831143000_product_master_v2_advisor_hardening.sql", "utf8");
 const form = fs.readFileSync("src/components/products/ProductForm.tsx", "utf8");
 const manager = fs.readFileSync("src/components/products/ProductMasterReferenceManager.tsx", "utf8");
 const list = fs.readFileSync("src/components/products/ProductsTable.tsx", "utf8");
@@ -27,4 +28,24 @@ assert.match(list, /product-qr-filter/);
 assert.match(migration, /stone_type/);
 assert.match(migration, /material_price_band/);
 assert.match(migration, /Product type used by active products cannot be deactivated/);
+assert.match(advisorHardening, /product_types_default_uom_idx/);
+for (const legacyPolicy of [
+  "product_master_uom_manage",
+  "product_master_type_manage",
+  "product_master_allowed_uom_manage",
+]) {
+  assert.match(advisorHardening, new RegExp(`drop policy if exists ${legacyPolicy}`));
+}
+for (const mutationPolicy of [
+  "product_master_uom_insert",
+  "product_master_uom_update",
+  "product_master_type_insert",
+  "product_master_type_update",
+  "product_master_allowed_uom_insert",
+  "product_master_allowed_uom_update",
+  "product_master_allowed_uom_delete",
+]) {
+  assert.match(advisorHardening, new RegExp(`create policy ${mutationPolicy}`));
+}
+assert.doesNotMatch(advisorHardening, /create policy product_master_(?:uom|type|allowed_uom)_manage/);
 console.log("product-master-v2 contract: PASS");
