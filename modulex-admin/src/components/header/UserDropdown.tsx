@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
+import Badge from "../ui/badge/Badge";
 import { getCurrentProfile, Profile } from "@/lib/supabase/profile";
 import { signOut } from "@/lib/supabase/auth";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
@@ -104,9 +105,9 @@ export default function UserDropdown() {
           text-left
           transition-colors duration-200
           hover:bg-gray-100
-          focus:outline-none
-          focus:ring-2
-          focus:ring-brand-500/20
+          focus:outline-hidden
+          focus:ring-3
+          focus:ring-brand-500/10
           dark:hover:bg-white/[0.05]
         "
       >
@@ -259,22 +260,9 @@ export default function UserDropdown() {
 
           {/* ROLE */}
           <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-800">
-            <span
-              className="
-                inline-flex items-center
-                rounded-full
-                bg-brand-50
-                px-2.5 py-1
-                text-xs font-medium
-                text-brand-600
-                ring-1 ring-inset ring-brand-100
-                dark:bg-brand-500/10
-                dark:text-brand-400
-                dark:ring-brand-500/20
-              "
-            >
+            <Badge color="primary" size="sm">
               {displayRole}
-            </span>
+            </Badge>
           </div>
         </div>
 
