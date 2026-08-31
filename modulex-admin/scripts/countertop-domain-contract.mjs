@@ -44,6 +44,10 @@ assert(configurator.includes("Stone type") && configurator.includes("Material pr
 assert(sql.includes("upsert_countertop_reference") && sql.includes("Countertop reference management requires admin permission"), "reference CRUD must use an authorized server boundary");
 for (const text of ["Stone type name is required", "Material band code already exists", "valid pricing method", "Product, stone type and material band are required", "on conflict(id) do update", "is_active"]) assert(sql.includes(text), `reference validation/soft lifecycle missing: ${text}`);
 assert(fs.existsSync(path.join(root, "src/app/(admin)/pricing/countertop/settings/page.tsx")) && configurator.includes("Material price band"), "reference management route/configurator integration missing");
+const refs = read("src/components/countertop/CountertopReferenceManager.tsx");
+for (const field of ["Stone Product Profiles", "Product", "Stone type", "Material band", "Vendor", "Source", "Save mapping"]) assert(refs.includes(field), `stone profile management field missing: ${field}`);
+assert(!/<label>Material price band<Select/.test(configurator) && configurator.includes("price_per_sqft"), "configurator material band must be profile-derived and read-only");
+assert(sql.includes("audit_countertop_reference_change") && sql.includes("countertop_profiles_audit") && sql.includes("changed_by"), "countertop reference mutations must use audit_logs actor mechanism");
 const serviceInput = { materialUnitPrice: "34", sqft: "10", edgeUnitPrice: "10", edgeLinearFt: "8", services: [{ id: "sq", name: "Sq", pricing_method: "sq_ft", unit_price: "2", quantity: "3" }, { id: "lf", name: "Lf", pricing_method: "linear_ft", unit_price: "3", quantity: "2" }, { id: "flat", name: "Flat", pricing_method: "flat", unit_price: "5", quantity: "9" }] };
 assert(calculateCountertopPrice(serviceInput).services_subtotal === "49.0000", "service pricing methods must use sqft/linear-ft/flat semantics");
 console.log("Countertop / Stone / Sink domain contract: PASS");
