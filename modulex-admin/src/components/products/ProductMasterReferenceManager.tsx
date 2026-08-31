@@ -843,6 +843,7 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
                           checked={form.store_eligible}
                           onChange={(checked) =>
                             setForm((current) => ({ ...current, store_eligible: checked }))
+                          }
                         />
                         <small className="text-gray-500 dark:text-gray-400">Store eligibility does not publish a product automatically.</small>
                       </div>
