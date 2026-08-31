@@ -11,13 +11,14 @@ const migration = read("../modulex-store/supabase/migrations/20260831130000_coun
 const revisionMigration = read("../modulex-store/supabase/migrations/20260901090000_customer_order_revision_identity.sql");
 const securityMigration = read("../modulex-store/supabase/migrations/20260901110000_countertop_security_fk_hardening.sql");
 const portalMigration = read("../modulex-store/supabase/migrations/20260901100000_countertop_portal_safe_projection.sql");
+const runtimeMigration = read("../modulex-store/supabase/migrations/20260901120000_countertop_runtime_acceptance_hardening.sql");
 const lifecycleSql = read("sql/customer-order-lifecycle-editability.sql");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
 const orderDomain = read("src/lib/customers/order-domain.ts");
 const orderEditingSql = read("sql/customer-order-editing.sql");
 const editOrder = read("src/components/customers/EditCustomerOrder.tsx");
-for (const [name, text] of [["countertop MVP", migration], ["revision identity", revisionMigration], ["portal projection", portalMigration], ["security hardening", securityMigration]]) {
+for (const [name, text] of [["countertop MVP", migration], ["revision identity", revisionMigration], ["portal projection", portalMigration], ["security hardening", securityMigration], ["runtime hardening", runtimeMigration]]) {
   assert((text.match(/\$\$/g) || []).length % 2 === 0, `${name} migration has unterminated dollar-quoted SQL`);
   assert(!/revoke\s+all\s+on\s+function[^;]*\)\s*\n\s*(create|drop|grant|revoke)/i.test(text), `${name} migration has a concatenated or incomplete REVOKE statement`);
   for (const line of text.split("\n").filter((line) => /^\s*revoke\b/i.test(line))) assert(/;\s*$/.test(line), `${name} migration has a REVOKE without a terminating semicolon`);
@@ -101,10 +102,16 @@ assert(securityMigration.includes("revoke all on function private.upsert_counter
 assert(securityMigration.includes("revoke all on function private.attach_countertop_configuration") && securityMigration.includes("grant execute on function private.attach_countertop_configuration") && securityMigration.includes("revoke all on function public.attach_countertop_configuration"), "attach grants must keep the private privileged boundary explicit");
 for (const index of ["countertop_stone_profiles_material_band_idx", "countertop_configurations_sink_idx", "countertop_configurations_price_group_idx", "countertop_configurations_edge_profile_idx", "countertop_configurations_overridden_by_idx"]) assert(securityMigration.includes(index), `countertop FK index missing: ${index}`);
 assert(sql.includes("audit_countertop_reference_change") && sql.includes("countertop_profiles_audit") && sql.includes("changed_by"), "countertop reference mutations must use audit_logs actor mechanism");
+assert(runtimeMigration.includes("create or replace function private.audit_countertop_reference_change") && runtimeMigration.includes("to_jsonb(old)") && runtimeMigration.includes("to_jsonb(new)"), "runtime audit must resolve generic trigger rows through JSON");
+assert(!runtimeMigration.includes("new.id") && !runtimeMigration.includes("old.id"), "runtime audit must not dereference non-existent trigger-row fields");
+assert(runtimeMigration.includes("sum(line_total)") && runtimeMigration.includes("Order discount cannot exceed subtotal") && runtimeMigration.includes("grand_total = v_grand_total"), "countertop attach must recalculate canonical parent order totals");
+assert(runtimeMigration.includes("v_tax_amount := round") && runtimeMigration.includes("v_commission_amount := round"), "parent order tax and commission formulas must be recalculated server-side");
 assert(refs.includes("toggleProfile(row)") && refs.includes("p_product_id: row.product_id") && refs.includes("p_is_active: !row.is_active"), "profile toggle must pass row values directly without stale state");
 assert(refs.includes("value={drafts.profile?.product_id") && refs.includes("value={drafts.profile?.stone_type_id") && refs.includes("value={drafts.profile?.material_price_band_id"), "profile edit selectors must hydrate selected values");
 assert(/countertop_stone_types.*eq\("is_active",true\)/.test(refs) && /countertop_material_price_bands.*eq\("is_active",true\)/.test(refs), "new profile selectors must use active references");
 assert(sql.includes("audit_logs(table_name,record_id,action,old_data,new_data,changed_by)") && sql.includes("created_at"), "audit contract must preserve audit_logs created_at timestamp");
 const serviceInput = { materialUnitPrice: "34", sqft: "10", edgeUnitPrice: "10", edgeLinearFt: "8", services: [{ id: "sq", name: "Sq", pricing_method: "sq_ft", unit_price: "2", quantity: "3" }, { id: "lf", name: "Lf", pricing_method: "linear_ft", unit_price: "3", quantity: "2" }, { id: "flat", name: "Flat", pricing_method: "flat", unit_price: "5", quantity: "9" }] };
 assert(calculateCountertopPrice(serviceInput).services_subtotal === "49.0000", "service pricing methods must use sqft/linear-ft/flat semantics");
+const fixture = calculateCountertopPrice({ materialUnitPrice: "41.0000", sqft: "10.0000", edgeUnitPrice: "10.0000", edgeLinearFt: "5.0000", services: [{ id: "outlet", name: "Outlet Cutout", pricing_method: "each", unit_price: "50.0000", quantity: "2" }] });
+assert(fixture.subtotal === "560.0000" && (372 - 93 + 560) === 839, "countertop parent subtotal fixture must reconcile to 839");
 console.log("Countertop / Stone / Sink domain contract: PASS");
