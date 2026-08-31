@@ -15,8 +15,10 @@ jobs:
         with: { node-version: 20, cache: npm, cache-dependency-path: modulex-admin/package-lock.json }
       - run: npm ci
       - run: node scripts/users-store-ui-contract.mjs
+      - run: npm run smoke:admin-users
       - run: npm run smoke:production-surface
       - run: npm run smoke:rbac
+      - run: npm run typecheck
       - run: npm run lint
       - name: Build
         env: { NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key }
