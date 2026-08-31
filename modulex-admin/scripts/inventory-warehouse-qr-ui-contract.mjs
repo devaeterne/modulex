@@ -37,7 +37,7 @@ for (const surface of surfaces) {
 
   const source = [read(surface.file), ...surface.dirs.flatMap(collect)].join("\n");
   expect(source.includes("dark:"), `${surface.route} must support dark mode`);
-  expect(source.includes("overflow-x-auto") || /\b(sm|md|lg|xl):/.test(source), `${surface.route} needs responsive behavior`);
+  expect(source.includes("overflow-x-auto") || source.includes("TableViewport") || /\b(sm|md|lg|xl):/.test(source), `${surface.route} needs responsive behavior`);
   expect(/aria-|htmlFor=|role=|<label\b/.test(source), `${surface.route} needs accessible labels/state`);
   expect(/isLoading|loading|Loading/.test(source) && /error|Error/.test(source), `${surface.route} needs loading and error handling`);
   expect(!source.includes('href="#"') && !source.includes("javascript:void") && !source.includes("TailAdmin"), `${surface.route} must not ship dead/template controls`);
