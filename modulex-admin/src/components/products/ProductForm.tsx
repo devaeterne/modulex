@@ -697,8 +697,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       >
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <Label>Brand *</Label>
+            <Label htmlFor="product-brand">Brand *</Label>
             <Select
+              id="product-brand"
               placeholder="Select brand"
               value={values.brand_id}
               options={brandDropdownOptions}
@@ -707,8 +708,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
           </div>
 
           <div>
-            <Label>Category *</Label>
+            <Label htmlFor="product-category">Category *</Label>
             <Select
+              id="product-category"
               placeholder="Select category"
               value={values.category_id}
               options={categoryDropdownOptions}
@@ -717,8 +719,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
           </div>
 
           <div>
-            <Label>Product Type *</Label>
+            <Label htmlFor="product-type">Product Type *</Label>
             <Select
+              id="product-type"
               placeholder="Select product type"
               value={values.product_type_id}
               options={productTypeDropdownOptions}
@@ -734,8 +737,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
           </div>
 
           <div>
-            <Label>Unit of Measure *</Label>
+            <Label htmlFor="product-uom">Unit of Measure *</Label>
             <Select
+              id="product-uom"
               placeholder="Select unit"
               value={values.uom_id}
               options={allowedUomDropdownOptions}
@@ -759,8 +763,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
         >
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label>Stone Type *</Label>
+              <Label htmlFor="stone-type">Stone Type *</Label>
               <Select
+                id="stone-type"
                 placeholder="Select stone type"
                 value={values.stone_type_id}
                 options={stoneTypeDropdownOptions}
@@ -769,8 +774,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
             </div>
 
             <div>
-              <Label>Material Price Band *</Label>
+              <Label htmlFor="material-price-band">Material Price Band *</Label>
               <Select
+                id="material-price-band"
                 placeholder="Select material band"
                 value={values.material_price_band_id}
                 options={materialBandDropdownOptions}
@@ -821,8 +827,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
           </div>
 
           <div>
-            <Label>Status</Label>
+            <Label htmlFor="product-status">Status</Label>
             <Select
+              id="product-status"
               placeholder="Select status"
               value={values.status}
               options={statusDropdownOptions}
@@ -837,8 +844,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
         desc="Add operator-facing product context without changing classification or pricing behavior."
       >
         <div>
-          <Label>Description</Label>
+          <Label htmlFor="product-description">Description</Label>
           <TextArea
+            id="product-description"
             value={values.description}
             onChange={(value) => updateField("description", value)}
             rows={4}
@@ -880,12 +888,12 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
 
               <dl className="grid gap-3">
                 <div>
-                  <dt>SVG Path</dt>
-                  <dd className="break-all">{values.qr_svg_path || "—"}</dd>
+                  <dt className="text-sm font-medium text-gray-700 dark:text-gray-400">SVG Path</dt>
+                  <dd className="break-all text-sm text-gray-500 dark:text-gray-400">{values.qr_svg_path || "—"}</dd>
                 </div>
                 <div>
-                  <dt>Generated At</dt>
-                  <dd>
+                  <dt className="text-sm font-medium text-gray-700 dark:text-gray-400">Generated At</dt>
+                  <dd className="text-sm text-gray-500 dark:text-gray-400">
                     {values.qr_generated_at
                       ? new Date(values.qr_generated_at).toLocaleString("en-US")
                       : "—"}

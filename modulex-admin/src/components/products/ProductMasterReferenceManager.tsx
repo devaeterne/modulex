@@ -399,23 +399,25 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
             </div>
 
             <div>
-              <Label>Status</Label>
-              <Select options={statusOptions} value={status} onChange={setStatus} />
+              <Label htmlFor="reference-status">Status</Label>
+              <Select id="reference-status" options={statusOptions} value={status} onChange={setStatus} />
             </div>
 
             {kind === "product_types" ? (
               <>
                 <div>
-                  <Label>Pricing Model</Label>
+                  <Label htmlFor="product-type-pricing-filter">Pricing Model</Label>
                   <Select
+                    id="product-type-pricing-filter"
                     options={pricingFilterOptions}
                     value={pricingFilter}
                     onChange={setPricingFilter}
                   />
                 </div>
                 <div>
-                  <Label>Inventory</Label>
+                  <Label htmlFor="product-type-inventory-filter">Inventory</Label>
                   <Select
+                    id="product-type-inventory-filter"
                     options={inventoryOptions}
                     value={inventoryFilter}
                     onChange={setInventoryFilter}
@@ -424,8 +426,9 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
               </>
             ) : (
               <div>
-                <Label>Quantity Type</Label>
+                <Label htmlFor="uom-quantity-filter">Quantity Type</Label>
                 <Select
+                  id="uom-quantity-filter"
                   options={quantityOptions}
                   value={quantityFilter}
                   onChange={setQuantityFilter}
@@ -530,7 +533,7 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
                       <TableCell variant="admin" className="align-top">
                         <div className="space-y-1">
                           <span>{row.name}</span>
-                          {row.description ? <small>{row.description}</small> : null}
+                          {row.description ? <small className="text-gray-500 dark:text-gray-400">{row.description}</small> : null}
                         </div>
                       </TableCell>
 
@@ -678,8 +681,9 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <Label>Description</Label>
+                      <Label htmlFor="product-type-description">Description</Label>
                       <TextArea
+                        id="product-type-description"
                         value={form.description}
                         onChange={(value) =>
                           setForm((current) => ({ ...current, description: value }))
@@ -718,7 +722,7 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
                         }
                       />
                       {!form.inventory_tracking ? (
-                        <small>Reservation requires inventory tracking.</small>
+                        <small className="text-gray-500 dark:text-gray-400">Reservation requires inventory tracking.</small>
                       ) : null}
                     </div>
                   </div>
@@ -749,8 +753,9 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
                       }
                     />
                     <div>
-                      <Label>Default Unit</Label>
+                      <Label htmlFor="product-type-default-uom">Default Unit</Label>
                       <Select
+                        id="product-type-default-uom"
                         placeholder="Select default unit"
                         value={form.default_uom_id}
                         options={form.allowed_uoms.map((id) => {
@@ -773,15 +778,16 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
                   desc="Select the supported pricing engine. Pricing values do not belong in Product Type."
                 >
                   <div className="space-y-2">
-                    <Label>Pricing Model</Label>
+                    <Label htmlFor="product-type-pricing-model">Pricing Model</Label>
                     <Select
+                      id="product-type-pricing-model"
                       options={pricingModelOptions}
                       value={form.pricing_model}
                       onChange={(value) =>
                         setForm((current) => ({ ...current, pricing_model: value }))
                       }
                     />
-                    <small>{pricingDescriptions[form.pricing_model]}</small>
+                    <small className="text-gray-500 dark:text-gray-400">{pricingDescriptions[form.pricing_model]}</small>
                   </div>
                 </ComponentCard>
 
@@ -802,7 +808,7 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
                           }))
                         }
                       />
-                      <small>Requires family/base-product and color identity when enabled.</small>
+                      <small className="text-gray-500 dark:text-gray-400">Requires family/base-product and color identity when enabled.</small>
                     </div>
                     <Checkbox
                       id="product-type-qr-required"
@@ -821,7 +827,7 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
                           setForm((current) => ({ ...current, store_eligible: checked }))
                       }
                     />
-                      <small>Store eligibility does not publish a product automatically.</small>
+                      <small className="text-gray-500 dark:text-gray-400">Store eligibility does not publish a product automatically.</small>
                     </div>
                   </div>
                 </ComponentCard>
@@ -875,7 +881,7 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
                         setForm((current) => ({ ...current, allows_decimal: checked }))
                       }
                     />
-                    <small>
+                    <small className="text-gray-500 dark:text-gray-400">
                       Whole units suit Piece or Slab. Decimal units support fractional quantities such as
                       SQ_FT or LINEAR_FT.
                     </small>
