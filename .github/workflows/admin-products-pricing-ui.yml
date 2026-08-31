@@ -11,6 +11,8 @@ on:
       - "modulex-admin/src/components/products/TaxonomyManager.tsx"
       - "modulex-admin/src/components/pricing/**"
       - "modulex-admin/scripts/products-pricing-ui-contract.mjs"
+      - "modulex-admin/scripts/pricing-product-type-contract.mjs"
+      - "modulex-store/supabase/migrations/*pricing_product_type*.sql"
       - ".github/workflows/admin-products-pricing-ui.yml"
   pull_request:
     paths:
@@ -22,6 +24,8 @@ on:
       - "modulex-admin/src/components/products/TaxonomyManager.tsx"
       - "modulex-admin/src/components/pricing/**"
       - "modulex-admin/scripts/products-pricing-ui-contract.mjs"
+      - "modulex-admin/scripts/pricing-product-type-contract.mjs"
+      - "modulex-store/supabase/migrations/*pricing_product_type*.sql"
       - ".github/workflows/admin-products-pricing-ui.yml"
 
 permissions:
@@ -43,6 +47,8 @@ jobs:
       - run: npm ci
       - name: Products + Pricing UI contract
         run: node scripts/products-pricing-ui-contract.mjs
+      - name: Product Type pricing contract
+        run: node scripts/pricing-product-type-contract.mjs
       - name: Production surface regression
         run: npm run smoke:production-surface
       - name: RBAC regression
