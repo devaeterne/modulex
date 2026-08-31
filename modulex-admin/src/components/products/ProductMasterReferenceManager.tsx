@@ -375,6 +375,18 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
       : "Manage controlled units used by products and inventory.";
   const addLabel = kind === "product_types" ? "Add Product Type" : "Add Unit";
   const columnCount = kind === "product_types" ? 11 : 6;
+  const editorTitle =
+    kind === "product_types"
+      ? editing
+        ? "Edit Product Type"
+        : "Add Product Type"
+      : editing
+        ? "Edit Unit"
+        : "Add Unit";
+  const editorDescription =
+    kind === "product_types"
+      ? "Configure identity, inventory, units, pricing and product capabilities."
+      : "Define the controlled unit used by products and inventory.";
 
   return (
     <div className="space-y-6">
@@ -641,255 +653,263 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
       <Modal
         isOpen={isEditorOpen}
         onClose={closeEditor}
-        className="m-4 max-w-[960px]"
+        className="m-4 max-w-[960px] overflow-hidden"
       >
-        <div className="max-h-[88vh] overflow-y-auto p-4 sm:p-6">
-          <div className="space-y-5">
-            {error ? <Alert variant="error" title="Unable to save" message={error} /> : null}
+        <div className="flex max-h-[calc(100vh-2rem)] flex-col sm:max-h-[calc(100vh-3rem)]">
+          <div className="shrink-0 border-b border-gray-200 px-4 py-4 pr-14 dark:border-gray-800 sm:px-6 sm:py-5 sm:pr-20">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{editorTitle}</h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{editorDescription}</p>
+          </div>
 
-            {kind === "product_types" ? (
-              <>
-                <ComponentCard
-                  title={editing ? "Edit Product Type" : "Add Product Type"}
-                  desc="Set the canonical identity for this Product Type."
-                >
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <Label htmlFor="product-type-name">Name</Label>
-                      <Input
-                        id="product-type-name"
-                        value={form.name}
-                        onChange={(event) =>
-                          setForm((current) => ({ ...current, name: event.target.value }))
-                        }
-                        placeholder="Product Type name"
-                      />
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+            <div className="space-y-5">
+              {error ? <Alert variant="error" title="Unable to save" message={error} /> : null}
+
+              {kind === "product_types" ? (
+                <>
+                  <ComponentCard
+                    title="Identity"
+                    desc="Set the canonical identity for this Product Type."
+                  >
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="product-type-name">Name</Label>
+                        <Input
+                          id="product-type-name"
+                          value={form.name}
+                          onChange={(event) =>
+                            setForm((current) => ({ ...current, name: event.target.value }))
+                          }
+                          placeholder="Product Type name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="product-type-code">Code</Label>
+                        <Input
+                          id="product-type-code"
+                          value={form.code}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              code: event.target.value.toUpperCase(),
+                            }))
+                          }
+                          placeholder="CODE"
+                          hint="Codes are normalized to uppercase."
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label htmlFor="product-type-description">Description</Label>
+                        <TextArea
+                          id="product-type-description"
+                          value={form.description}
+                          onChange={(value) =>
+                            setForm((current) => ({ ...current, description: value }))
+                          }
+                          placeholder="Describe how this Product Type is used."
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor="product-type-code">Code</Label>
-                      <Input
-                        id="product-type-code"
-                        value={form.code}
-                        onChange={(event) =>
+                  </ComponentCard>
+
+                  <ComponentCard
+                    title="Inventory Behavior"
+                    desc="Control whether products of this type participate in inventory and reservations."
+                  >
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Checkbox
+                        id="product-type-inventory"
+                        label="Inventory Tracking"
+                        checked={form.inventory_tracking}
+                        onChange={(checked) =>
                           setForm((current) => ({
                             ...current,
-                            code: event.target.value.toUpperCase(),
+                            inventory_tracking: checked,
+                            reservable: checked ? current.reservable : false,
                           }))
                         }
-                        placeholder="CODE"
-                        hint="Codes are normalized to uppercase."
                       />
+                      <div className="space-y-2">
+                        <Checkbox
+                          id="product-type-reservable"
+                          label="Reservable"
+                          checked={form.reservable}
+                          disabled={!form.inventory_tracking}
+                          onChange={(checked) =>
+                            setForm((current) => ({ ...current, reservable: checked }))
+                          }
+                        />
+                        {!form.inventory_tracking ? (
+                          <small className="text-gray-500 dark:text-gray-400">Reservation requires inventory tracking.</small>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="md:col-span-2">
-                      <Label htmlFor="product-type-description">Description</Label>
-                      <TextArea
-                        id="product-type-description"
-                        value={form.description}
-                        onChange={(value) =>
-                          setForm((current) => ({ ...current, description: value }))
-                        }
-                        placeholder="Describe how this Product Type is used."
-                      />
-                    </div>
-                  </div>
-                </ComponentCard>
+                  </ComponentCard>
 
-                <ComponentCard
-                  title="Inventory Behavior"
-                  desc="Control whether products of this type participate in inventory and reservations."
-                >
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Checkbox
-                      id="product-type-inventory"
-                      label="Inventory Tracking"
-                      checked={form.inventory_tracking}
-                      onChange={(checked) =>
-                        setForm((current) => ({
-                          ...current,
-                          inventory_tracking: checked,
-                          reservable: checked ? current.reservable : false,
-                        }))
-                      }
-                    />
+                  <ComponentCard
+                    title="Units of Measure"
+                    desc="Choose the allowed units first, then select exactly one default unit."
+                  >
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <MultiSelect
+                        key={`${editing?.id ?? "new"}-${isEditorOpen ? "open" : "closed"}`}
+                        label="Allowed Units"
+                        options={selectableUoms.map((uom) => ({
+                          value: uom.id,
+                          text: `${uom.name} (${uom.code})${uom.is_active ? "" : " — Inactive"}`,
+                          selected: form.allowed_uoms.includes(uom.id),
+                        }))}
+                        defaultSelected={form.allowed_uoms}
+                        onChange={(selected) =>
+                          setForm((current) => ({
+                            ...current,
+                            allowed_uoms: selected,
+                            default_uom_id: selected.includes(current.default_uom_id)
+                              ? current.default_uom_id
+                              : "",
+                          }))
+                        }
+                      />
+                      <div>
+                        <Label htmlFor="product-type-default-uom">Default Unit</Label>
+                        <Select
+                          id="product-type-default-uom"
+                          placeholder="Select default unit"
+                          value={form.default_uom_id}
+                          options={form.allowed_uoms.map((id) => {
+                            const uom = uoms.find((item) => item.id === id);
+                            return {
+                              value: id,
+                              label: uom ? `${uom.name} (${uom.code})` : "Unknown unit",
+                            };
+                          })}
+                          onChange={(value) =>
+                            setForm((current) => ({ ...current, default_uom_id: value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                  </ComponentCard>
+
+                  <ComponentCard
+                    title="Pricing Behavior"
+                    desc="Select the supported pricing engine. Pricing values do not belong in Product Type."
+                  >
                     <div className="space-y-2">
-                      <Checkbox
-                        id="product-type-reservable"
-                        label="Reservable"
-                        checked={form.reservable}
-                        disabled={!form.inventory_tracking}
-                        onChange={(checked) =>
-                          setForm((current) => ({ ...current, reservable: checked }))
-                        }
-                      />
-                      {!form.inventory_tracking ? (
-                        <small className="text-gray-500 dark:text-gray-400">Reservation requires inventory tracking.</small>
-                      ) : null}
-                    </div>
-                  </div>
-                </ComponentCard>
-
-                <ComponentCard
-                  title="Units of Measure"
-                  desc="Choose the allowed units first, then select exactly one default unit."
-                >
-                  <div className="grid gap-4 lg:grid-cols-2">
-                    <MultiSelect
-                      key={`${editing?.id ?? "new"}-${isEditorOpen ? "open" : "closed"}`}
-                      label="Allowed Units"
-                      options={selectableUoms.map((uom) => ({
-                        value: uom.id,
-                        text: `${uom.name} (${uom.code})${uom.is_active ? "" : " — Inactive"}`,
-                        selected: form.allowed_uoms.includes(uom.id),
-                      }))}
-                      defaultSelected={form.allowed_uoms}
-                      onChange={(selected) =>
-                        setForm((current) => ({
-                          ...current,
-                          allowed_uoms: selected,
-                          default_uom_id: selected.includes(current.default_uom_id)
-                            ? current.default_uom_id
-                            : "",
-                        }))
-                      }
-                    />
-                    <div>
-                      <Label htmlFor="product-type-default-uom">Default Unit</Label>
+                      <Label htmlFor="product-type-pricing-model">Pricing Model</Label>
                       <Select
-                        id="product-type-default-uom"
-                        placeholder="Select default unit"
-                        value={form.default_uom_id}
-                        options={form.allowed_uoms.map((id) => {
-                          const uom = uoms.find((item) => item.id === id);
-                          return {
-                            value: id,
-                            label: uom ? `${uom.name} (${uom.code})` : "Unknown unit",
-                          };
-                        })}
+                        id="product-type-pricing-model"
+                        options={pricingModelOptions}
+                        value={form.pricing_model}
                         onChange={(value) =>
-                          setForm((current) => ({ ...current, default_uom_id: value }))
+                          setForm((current) => ({ ...current, pricing_model: value }))
                         }
                       />
+                      <small className="text-gray-500 dark:text-gray-400">{pricingDescriptions[form.pricing_model]}</small>
                     </div>
-                  </div>
-                </ComponentCard>
+                  </ComponentCard>
 
-                <ComponentCard
-                  title="Pricing Behavior"
-                  desc="Select the supported pricing engine. Pricing values do not belong in Product Type."
-                >
-                  <div className="space-y-2">
-                    <Label htmlFor="product-type-pricing-model">Pricing Model</Label>
-                    <Select
-                      id="product-type-pricing-model"
-                      options={pricingModelOptions}
-                      value={form.pricing_model}
-                      onChange={(value) =>
-                        setForm((current) => ({ ...current, pricing_model: value }))
-                      }
-                    />
-                    <small className="text-gray-500 dark:text-gray-400">{pricingDescriptions[form.pricing_model]}</small>
-                  </div>
-                </ComponentCard>
+                  <ComponentCard
+                    title="Product Behavior & Capabilities"
+                    desc="Configure identity, QR and Store eligibility without changing publication state."
+                  >
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Checkbox
+                          id="product-type-variant-identity"
+                          label="Requires Variant Identity"
+                          checked={form.requires_variant_identity}
+                          onChange={(checked) =>
+                            setForm((current) => ({
+                              ...current,
+                              requires_variant_identity: checked,
+                            }))
+                          }
+                        />
+                        <small className="text-gray-500 dark:text-gray-400">Requires family/base-product and color identity when enabled.</small>
+                      </div>
+                      <Checkbox
+                        id="product-type-qr-required"
+                        label="QR Required"
+                        checked={form.qr_required}
+                        onChange={(checked) =>
+                          setForm((current) => ({ ...current, qr_required: checked }))
+                        }
+                      />
+                      <div className="space-y-2">
+                        <Checkbox
+                          id="product-type-store-eligible"
+                          label="Store Eligible"
+                          checked={form.store_eligible}
+                          onChange={(checked) =>
+                            setForm((current) => ({ ...current, store_eligible: checked }))
+                        />
+                        <small className="text-gray-500 dark:text-gray-400">Store eligibility does not publish a product automatically.</small>
+                      </div>
+                    </div>
+                  </ComponentCard>
+                </>
+              ) : (
+                <>
+                  <ComponentCard
+                    title="Unit Details"
+                    desc="Define the controlled unit used by products and inventory."
+                  >
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="uom-name">Name</Label>
+                        <Input
+                          id="uom-name"
+                          value={form.name}
+                          onChange={(event) =>
+                            setForm((current) => ({ ...current, name: event.target.value }))
+                          }
+                          placeholder="Unit name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="uom-code">Code</Label>
+                        <Input
+                          id="uom-code"
+                          value={form.code}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              code: event.target.value.toUpperCase(),
+                            }))
+                          }
+                          placeholder="CODE"
+                          hint="Codes are normalized to uppercase."
+                        />
+                      </div>
+                    </div>
+                  </ComponentCard>
 
-                <ComponentCard
-                  title="Product Behavior & Capabilities"
-                  desc="Configure identity, QR and Store eligibility without changing publication state."
-                >
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <ComponentCard
+                    title="Quantity Behavior"
+                    desc="Choose whether this unit supports fractional quantities."
+                  >
                     <div className="space-y-2">
                       <Checkbox
-                        id="product-type-variant-identity"
-                        label="Requires Variant Identity"
-                        checked={form.requires_variant_identity}
+                        id="uom-allows-decimal"
+                        label="Allows Decimal Quantities"
+                        checked={form.allows_decimal}
                         onChange={(checked) =>
-                          setForm((current) => ({
-                            ...current,
-                            requires_variant_identity: checked,
-                          }))
+                          setForm((current) => ({ ...current, allows_decimal: checked }))
                         }
                       />
-                      <small className="text-gray-500 dark:text-gray-400">Requires family/base-product and color identity when enabled.</small>
+                      <small className="text-gray-500 dark:text-gray-400">
+                        Whole units suit Piece or Slab. Decimal units support fractional quantities such as
+                        SQ_FT or LINEAR_FT.
+                      </small>
                     </div>
-                    <Checkbox
-                      id="product-type-qr-required"
-                      label="QR Required"
-                      checked={form.qr_required}
-                      onChange={(checked) =>
-                        setForm((current) => ({ ...current, qr_required: checked }))
-                      }
-                    />
-                    <div className="space-y-2">
-                      <Checkbox
-                        id="product-type-store-eligible"
-                        label="Store Eligible"
-                        checked={form.store_eligible}
-                        onChange={(checked) =>
-                          setForm((current) => ({ ...current, store_eligible: checked }))
-                      }
-                    />
-                      <small className="text-gray-500 dark:text-gray-400">Store eligibility does not publish a product automatically.</small>
-                    </div>
-                  </div>
-                </ComponentCard>
-              </>
-            ) : (
-              <>
-                <ComponentCard
-                  title={editing ? "Edit Unit" : "Add Unit"}
-                  desc="Define the controlled unit used by products and inventory."
-                >
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <Label htmlFor="uom-name">Name</Label>
-                      <Input
-                        id="uom-name"
-                        value={form.name}
-                        onChange={(event) =>
-                          setForm((current) => ({ ...current, name: event.target.value }))
-                        }
-                        placeholder="Unit name"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="uom-code">Code</Label>
-                      <Input
-                        id="uom-code"
-                        value={form.code}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            code: event.target.value.toUpperCase(),
-                          }))
-                        }
-                        placeholder="CODE"
-                        hint="Codes are normalized to uppercase."
-                      />
-                    </div>
-                  </div>
-                </ComponentCard>
+                  </ComponentCard>
+                </>
+              )}
+            </div>
+          </div>
 
-                <ComponentCard
-                  title="Quantity Behavior"
-                  desc="Choose whether this unit supports fractional quantities."
-                >
-                  <div className="space-y-2">
-                    <Checkbox
-                      id="uom-allows-decimal"
-                      label="Allows Decimal Quantities"
-                      checked={form.allows_decimal}
-                      onChange={(checked) =>
-                        setForm((current) => ({ ...current, allows_decimal: checked }))
-                      }
-                    />
-                    <small className="text-gray-500 dark:text-gray-400">
-                      Whole units suit Piece or Slab. Decimal units support fractional quantities such as
-                      SQ_FT or LINEAR_FT.
-                    </small>
-                  </div>
-                </ComponentCard>
-              </>
-            )}
-
+          <div className="shrink-0 border-t border-gray-200 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <Button className="w-full sm:w-auto" variant="outline" disabled={saving} onClick={closeEditor}>
                 Cancel
