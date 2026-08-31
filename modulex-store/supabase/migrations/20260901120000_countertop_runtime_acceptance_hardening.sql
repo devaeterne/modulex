@@ -91,10 +91,14 @@ begin
   on conflict (order_item_id) do update set
     stone_product_id = excluded.stone_product_id, sink_product_id = excluded.sink_product_id, price_group_id = excluded.price_group_id, edge_profile_id = excluded.edge_profile_id, sqft = excluded.sqft, edge_linear_ft = excluded.edge_linear_ft, slab_quantity = excluded.slab_quantity, manual_price_per_sqft = excluded.manual_price_per_sqft, override_reason = excluded.override_reason, overridden_by = excluded.overridden_by, overridden_at = excluded.overridden_at, configuration = excluded.configuration, pricing_snapshot = excluded.pricing_snapshot, subtotal = excluded.subtotal, updated_at = now();
 
-  select coalesce(sum(line_total), 0), max(discount_amount), max(tax_rate), max(payment_commission_percent)
-  into v_order_subtotal, v_order_discount, v_tax_rate, v_commission_rate
+  select o.discount_amount, o.tax_rate, o.payment_commission_percent
+  into v_order_discount, v_tax_rate, v_commission_rate
+  from public.customer_orders o
+  where o.id = v_order_id
+  for update;
+  select coalesce(sum(i.line_total), 0)
+  into v_order_subtotal
   from public.customer_order_items i
-  join public.customer_orders o on o.id = i.order_id
   where i.order_id = v_order_id;
   if coalesce(v_order_discount, 0) > v_order_subtotal then raise exception 'Order discount cannot exceed subtotal.'; end if;
   v_taxable := greatest(v_order_subtotal - coalesce(v_order_discount, 0), 0);
