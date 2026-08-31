@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ComponentCard from "@/components/common/ComponentCard";
 
 const sections = [
   { title: "Company", description: "Company identity, logo, legal details, contact information and address.", href: "/settings/general/company", icon: "CO" },
@@ -12,16 +13,50 @@ const sections = [
 ] as const;
 
 export default function GeneralSettingsOverview() {
-  return <div className="space-y-5">
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6" aria-labelledby="general-settings-title">
-      <h1 id="general-settings-title" className="text-xl font-semibold text-gray-800 dark:text-white/90">General Settings</h1>
-      <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">Settings are grouped by purpose so company data, documents, tax rules, email and operational notifications can be managed without searching through one long page.</p>
-    </section>
+  return (
+    <div className="space-y-5">
+      <ComponentCard
+        title="General Settings"
+        desc="Settings are grouped by purpose so company data, documents, tax rules, email and operational notifications can be managed without searching through one long page."
+      >
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Choose a settings area below to review or update its configuration.
+        </p>
+      </ComponentCard>
 
-    <nav aria-label="General settings sections" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {sections.map((section) => <Link key={section.href} href={section.href} aria-label={`${section.title}: ${section.description}`} className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-theme-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-brand-800">
-        <div className="flex items-start gap-4"><span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xs font-semibold text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">{section.icon}</span><div className="min-w-0"><div className="flex items-center gap-2"><h2 className="font-semibold text-gray-800 dark:text-white/90">{section.title}</h2><span aria-hidden="true" className="text-gray-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500 dark:text-gray-600">→</span></div><p className="mt-1.5 text-sm leading-6 text-gray-500 dark:text-gray-400">{section.description}</p></div></div>
-      </Link>)}
-    </nav>
-  </div>;
+      <nav aria-label="General settings sections" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {sections.map((section) => (
+          <Link
+            key={section.href}
+            href={section.href}
+            aria-label={`${section.title}: ${section.description}`}
+            className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-theme-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-brand-800"
+          >
+            <div className="flex items-start gap-4">
+              <span
+                aria-hidden="true"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xs font-semibold text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+              >
+                {section.icon}
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-gray-800 dark:text-white/90">{section.title}</h2>
+                  <span
+                    aria-hidden="true"
+                    className="text-gray-300 transition group-hover:translate-x-0.5 group-hover:text-brand-500 dark:text-gray-600"
+                  >
+                    →
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                  {section.description}
+                </p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </nav>
+    </div>
+  );
 }
