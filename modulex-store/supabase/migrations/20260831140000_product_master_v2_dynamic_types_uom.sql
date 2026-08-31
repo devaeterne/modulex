@@ -131,6 +131,20 @@ $$;
 revoke all on function public.search_low_stock_page_v2(text,text,uuid,uuid,integer,integer,boolean) from public,anon;
 grant execute on function public.search_low_stock_page_v2(text,text,uuid,uuid,integer,integer,boolean) to authenticated;
 
+create or replace function public.get_low_stock_summary_v2(p_query text default '', p_view text default 'alerts', p_type_id uuid default null, p_uom_id uuid default null)
+returns jsonb language sql stable set search_path=public as $$
+  select jsonb_build_object(
+    'products',count(*),
+    'alerts',count(*) filter (where v.is_low_stock),
+    'out_of_stock',count(*) filter (where v.is_low_stock and v.total_available_quantity<=0),
+    'thresholds_set',count(*) filter (where v.min_stock_level>0),
+    'shortfall_by_uom',coalesce((select jsonb_object_agg(coalesce(u.code,'UNKNOWN'),shortfall) from (select p.uom_id,sum(greatest(v2.min_stock_level-v2.total_available_quantity,0)) shortfall from public.v_product_stock_summary v2 join public.products p on p.id=v2.product_id where v2.product_status='active'::product_status and v2.is_low_stock group by p.uom_id) s left join public.units_of_measure u on u.id=s.uom_id),'{}'::jsonb)
+  ) from public.v_product_stock_summary v join public.products p on p.id=v.product_id
+  where v.product_status='active'::product_status and (coalesce(p_view,'alerts')='all' or (p_view='alerts' and v.is_low_stock) or (p_view='unset' and v.min_stock_level=0)) and (p_type_id is null or p.product_type_id=p_type_id) and (p_uom_id is null or p.uom_id=p_uom_id) and (coalesce(trim(p_query),'')='' or concat_ws(' ',v.sku,v.barcode,v.product_name,v.brand,v.category) ilike '%'||trim(p_query)||'%');
+$$;
+revoke all on function public.get_low_stock_summary_v2(text,text,uuid,uuid) from public,anon;
+grant execute on function public.get_low_stock_summary_v2(text,text,uuid,uuid) to authenticated;
+
 create or replace function public.save_product_master_v2(p_product jsonb, p_stone_profile jsonb default null)
 returns uuid language plpgsql security invoker set search_path=pg_catalog,public as $$
 declare v_id uuid; v_old public.products; v_type public.product_types; v_uom public.units_of_measure;
