@@ -7,6 +7,7 @@ on:
       - "modulex-admin/src/layout/AppHeader.tsx"
       - "modulex-admin/src/layout/AppHeader.module.css"
       - "modulex-admin/src/components/header/NotificationDropdown.tsx"
+      - "modulex-admin/src/components/header/UserDropdown.tsx"
       - "modulex-admin/scripts/mobile-shell-ui-contract.mjs"
       - ".github/workflows/admin-mobile-shell-ui.yml"
   pull_request:
@@ -15,6 +16,7 @@ on:
       - "modulex-admin/src/layout/AppHeader.tsx"
       - "modulex-admin/src/layout/AppHeader.module.css"
       - "modulex-admin/src/components/header/NotificationDropdown.tsx"
+      - "modulex-admin/src/components/header/UserDropdown.tsx"
       - "modulex-admin/scripts/mobile-shell-ui-contract.mjs"
       - ".github/workflows/admin-mobile-shell-ui.yml"
 
