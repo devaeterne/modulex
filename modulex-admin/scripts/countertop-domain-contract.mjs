@@ -9,6 +9,8 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const sql = read("sql/countertop-stone-sink-domain.sql");
 const migration = read("../modulex-store/supabase/migrations/20260831130000_countertop_stone_sink_mvp.sql");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
+const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
+const orderDomain = read("src/lib/customers/order-domain.ts");
 const source = ts.transpileModule(read("src/lib/countertop/domain.ts"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020, baseUrl: "." } }).outputText;
 const validation = ts.transpileModule(read("src/lib/validation.ts"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
 const combined = source.replace('from "@/lib/validation"', `from "data:text/javascript,${encodeURIComponent(validation)}"`);
@@ -51,6 +53,14 @@ assert(!configurator.includes("bandId") && !configurator.includes("setBandId"), 
 assert(!configurator.includes('from("countertop_material_price_bands")'), "configurator must not independently query material price bands");
 assert(configurator.includes("material_price_band_code") && configurator.includes("countertop_material_price_bands(code,price_per_sqft)"), "selected stone profile must supply material band code and price");
 assert(configurator.includes("Select a stone to view its material price band."), "configurator must explain missing profile-derived material band");
+assert(!configurator.includes("Draft order item ID") && !configurator.includes("setOrderItemId"), "configurator must not expose editable order item UUID input");
+assert(configurator.includes("orderItemId?: string") && configurator.includes("p_order_item_id: orderItemId"), "configurator must accept only canonical internal order context for attach");
+assert(configurator.includes("Open a draft customer order to configure and attach a countertop."), "standalone configurator must guide users to a draft order for attachment");
+assert(orderDetail.includes("Configure Countertop") && orderDetail.includes("countertopItemsById.get(item.id)"), "draft order detail must pass the canonical item id to countertop configurator");
+assert(orderDetail.includes('order.status === "draft"') && orderDetail.includes("contextCanManageCountertop"), "countertop action must be draft-only and permission-gated");
+assert(orderDomain.includes("countertop_stone_product_profiles") && orderDomain.includes("eq(\"is_active\", true)"), "configure action must be limited to active countertop stone profile products");
+assert(orderDetail.includes("onAttached") && orderDetail.includes("void load()"), "successful countertop attach must refresh the order detail");
+assert(!orderDetail.includes("{item.id}</") && !orderDetail.includes("item.id}</"), "order item UUID must not be rendered in the order detail UI");
 assert(sql.includes("audit_countertop_reference_change") && sql.includes("countertop_profiles_audit") && sql.includes("changed_by"), "countertop reference mutations must use audit_logs actor mechanism");
 assert(refs.includes("toggleProfile(row)") && refs.includes("p_product_id: row.product_id") && refs.includes("p_is_active: !row.is_active"), "profile toggle must pass row values directly without stale state");
 assert(refs.includes("value={drafts.profile?.product_id") && refs.includes("value={drafts.profile?.stone_type_id") && refs.includes("value={drafts.profile?.material_price_band_id"), "profile edit selectors must hydrate selected values");

@@ -81,6 +81,14 @@ export type CustomerOrderItem = {
   line_subtotal: string | number; line_total: string | number; price_source: "price_group" | "manual"; created_at: string;
 };
 
+export type CountertopOrderContext = {
+  orderItemId: string;
+  orderNumber: string;
+  lineNo: number;
+  sku: string;
+  productName: string;
+};
+
 export type CustomerOrderStatusHistory = { id: string; order_id: string; from_status: CustomerOrderStatus | null; to_status: CustomerOrderStatus; note: string | null; changed_by: string | null; created_at: string; };
 
 export type CustomerOrderRevision = {
