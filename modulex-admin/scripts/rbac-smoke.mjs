@@ -180,7 +180,7 @@ check("Warehouse structure list mutations require warehouse.manage in the UI", (
       `${name} should guard every mutation handler with warehouse.manage`
     );
 
-    const conditionalMutationGroups = source.match(/\{canManage && \(/g) ?? [];
+    const conditionalMutationGroups = source.match(/\{canManage\s*(?:&&|\?)\s*\(/g) ?? [];
     assert.ok(
       conditionalMutationGroups.length >= 2,
       `${name} should hide add/edit/status/delete mutation controls for read-only roles`
