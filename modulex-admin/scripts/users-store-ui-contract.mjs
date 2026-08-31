@@ -32,4 +32,43 @@ expect(/\b(sm|md|lg|xl):/.test(sources) || sources.includes("overflow-x-auto"), 
 expect(/aria-|htmlFor=|role=|<label\b/.test(sources), "Users/Store surfaces need accessible labels/state");
 expect(/isLoading|loading|Loading/.test(sources) && /error|Error/.test(sources), "Users/Store surfaces need loading and error states");
 expect(!sources.includes('href="#"') && !sources.includes("javascript:void") && !sources.includes("TailAdmin"), "Users/Store surfaces must not ship dead/template UI");
+
+const users = read("src/components/users/UsersTable.tsx");
+for (const primitive of [
+  "ComponentCard",
+  "Label",
+  "Input",
+  "Select",
+  "Checkbox",
+  "Button",
+  "Badge",
+  "Alert",
+  "Modal",
+  "TableViewport",
+  "TableHeader",
+  "TableBody",
+  "TableRow",
+  "TableCell",
+]) {
+  expect(users.includes(primitive), `Users must compose the shared ${primitive} primitive`);
+}
+expect(
+  !/<(?:input|select|table|thead|tbody|tr|th|td)\b/.test(users),
+  "Users must not reimplement shared form/table primitives",
+);
+for (const id of ["users-search", "users-role-filter", "users-status-filter", "user-full-name", "user-email", "user-phone"]) {
+  expect(users.includes(`id="${id}"`), `${id} control id is missing`);
+  expect(users.includes(`htmlFor="${id}"`), `${id} label association is missing`);
+}
+expect(users.includes('closeOnEscape={false}'), "Users modal must preserve the previous no-Escape-close behavior");
+expect(users.includes('showCloseButton={false}'), "Users modal must use its local explicit close action so backdrop dismissal stays disabled");
+expect(users.includes("ignoreModalDismiss"), "Users shared Modal backdrop dismissal must remain a no-op");
+expect(users.includes("confirm(`Send password reset email"), "Password reset confirmation must remain intact");
+expect(users.includes("confirm(`${next ? \"Activate\" : \"Deactivate\"}"), "Activation confirmation must remain intact");
+expect(users.includes("confirm(`Permanently delete"), "Permanent-delete confirmation must remain intact");
+expect(users.includes('action: "set_password"'), "Set-password API action must remain intact");
+expect(users.includes('action: "send_reset"'), "Reset-email API action must remain intact");
+expect(users.includes('action: "set_active"'), "Activation API action must remain intact");
+expect(users.includes("protectedTarget") && users.includes("ownAccount"), "Protected-user and own-account guards must remain intact");
+
 console.log("users + store UI contract: ok");

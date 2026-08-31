@@ -1,9 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import { Modal } from "@/components/ui/modal";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableViewport,
+} from "@/components/ui/table";
+import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import type { UserRole } from "@/lib/supabase/profile";
-import { ROLE_LABELS } from "@/lib/auth/permissions";
 
 type UserRow = {
   id: string;
@@ -37,15 +54,6 @@ type UserForm = {
 };
 
 const ROLE_OPTIONS = Object.keys(ROLE_LABELS) as UserRole[];
-
-const inputClass =
-  "h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 transition-colors focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:disabled:bg-white/[0.03]";
-const buttonPrimary =
-  "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
-const buttonSecondary =
-  "inline-flex h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
-const buttonDanger =
-  "inline-flex h-9 items-center justify-center rounded-lg border border-error-200 bg-white px-3 text-xs font-medium text-error-600 transition hover:bg-error-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-error-500/30 dark:bg-gray-900 dark:text-error-400 dark:hover:bg-error-500/10";
 
 const emptyForm: UserForm = {
   fullName: "",
@@ -93,6 +101,10 @@ function canActorAssignRole(actor: Actor | null, role: UserRole) {
 
 function isElevatedRole(role: UserRole) {
   return role === "super_admin" || role === "admin";
+}
+
+function ignoreModalDismiss() {
+  // The previous Users modal did not close from backdrop clicks.
 }
 
 export default function UsersTable() {
@@ -256,7 +268,11 @@ export default function UsersTable() {
         }),
       });
       closeModal();
-      setSuccess(form.createMode === "invite" ? "Invitation sent and user created." : "User created with temporary password.");
+      setSuccess(
+        form.createMode === "invite"
+          ? "Invitation sent and user created."
+          : "User created with temporary password."
+      );
       await loadUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "User could not be created.");
@@ -356,7 +372,9 @@ export default function UsersTable() {
     setBusy(true);
     setError(null);
     try {
-      await authFetch(`/api/admin/users?user_id=${encodeURIComponent(user.id)}`, { method: "DELETE" });
+      await authFetch(`/api/admin/users?user_id=${encodeURIComponent(user.id)}`, {
+        method: "DELETE",
+      });
       setSuccess("User deleted.");
       await loadUsers();
     } catch (err) {
@@ -377,146 +395,389 @@ export default function UsersTable() {
         <Stat label="Finance" value={stats.finance} />
       </div>
 
-      {error && <Notice tone="error">{error}</Notice>}
-      {success && <Notice tone="success">{success}</Notice>}
+      {error ? <Alert variant="error" title="User management error" message={error} /> : null}
+      {success ? <Alert variant="success" title="User management updated" message={success} /> : null}
 
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="border-b border-gray-200 p-5 dark:border-gray-800">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <ComponentCard
+        title="Users & Access"
+        desc="Create accounts, combine operational roles and manage login access."
+      >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="grid flex-1 gap-3 md:grid-cols-3">
             <div>
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Users & Access</h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Create accounts, combine operational roles and manage login access.</p>
-            </div>
-            <button onClick={openCreate} className={buttonPrimary}>+ Add user</button>
-          </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <input className={inputClass} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email or phone" />
-            <select className={inputClass} value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as "all" | UserRole)}>
-              <option value="all">All roles</option>
-              {ROLE_OPTIONS.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
-            </select>
-            <select className={inputClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | "active" | "inactive")}>
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/[0.02]">
-              <tr>{["User", "Roles", "Status", "Last sign in", "Created", "Actions"].map((label) => <th key={label} className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {loading ? (
-                <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-500">Loading users...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-gray-500">No users found.</td></tr>
-              ) : filtered.map((user) => {
-                const roles = effectiveRoles(user);
-                const protectedTarget = roles.includes("super_admin") && !actorRoles(actor).includes("super_admin");
-                const ownAccount = user.id === actor?.id;
-                return (
-                  <tr key={user.id}>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">{initials(user)}</span>
-                        <div><p className="text-sm font-medium text-gray-800 dark:text-white/90">{user.full_name || "Unnamed user"}</p><p className="text-xs text-gray-500">{user.email || "No email"}</p>{user.phone && <p className="text-xs text-gray-400">{user.phone}</p>}</div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex max-w-xs flex-wrap gap-1.5">
-                        {roles.map((role) => (
-                          <span key={role} className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-white/[0.06] dark:text-gray-300">{ROLE_LABELS[role]}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${user.is_active ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400" : "bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"}`}>{user.is_active ? "Active" : "Inactive"}</span></td>
-                    <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(user.last_sign_in_at)}</td>
-                    <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{formatDate(user.created_at)}</td>
-                    <td className="px-5 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        <button disabled={busy || protectedTarget} onClick={() => openEdit(user)} className={buttonSecondary}>Edit</button>
-                        <button disabled={busy || protectedTarget} onClick={() => openPassword(user)} className={buttonSecondary}>Password</button>
-                        <button disabled={busy || protectedTarget} onClick={() => void sendReset(user)} className={buttonSecondary}>Reset</button>
-                        <button disabled={busy || protectedTarget || ownAccount} onClick={() => void toggleActive(user)} className={buttonSecondary}>{user.is_active ? "Deactivate" : "Activate"}</button>
-                        <button disabled={busy || protectedTarget || ownAccount} onClick={() => void deleteUser(user)} className={buttonDanger}>Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {modal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-900">
-            <div className="flex items-start justify-between gap-4">
-              <div><h3 className="text-lg font-semibold text-gray-900 dark:text-white">{modal === "create" ? "Add User" : modal === "edit" ? "Edit User" : "Set Temporary Password"}</h3>{selected && <p className="mt-1 text-sm text-gray-500">{selected.email}</p>}</div>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✕</button>
+              <Label htmlFor="users-search" className="sr-only">
+                Search users
+              </Label>
+              <Input
+                id="users-search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search name, email or phone"
+              />
             </div>
 
-            {modal === "password" ? (
-              <form onSubmit={submitPassword} className="mt-6 space-y-4">
-                <Field label="Temporary password"><input className={inputClass} type="password" minLength={8} required value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} /></Field>
-                <ModalActions busy={busy} onCancel={closeModal} submitLabel="Set password" />
-              </form>
-            ) : (
-              <form onSubmit={modal === "create" ? submitCreate : submitEdit} className="mt-6 space-y-4">
-                <Field label="Full name"><input className={inputClass} value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} /></Field>
-                <Field label="Email"><input className={inputClass} type="email" required value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></Field>
-                <Field label="Phone"><input className={inputClass} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} /></Field>
-                <Field label="Roles">
-                  <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {assignableRoles.map((role) => {
-                        const checked = form.roles.includes(role);
-                        return (
-                          <label key={role} className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition ${checked ? "border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-300" : "border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]"}`}>
-                            <input type="checkbox" checked={checked} onChange={() => toggleRole(role)} className="h-4 w-4 rounded border-gray-300" />
-                            <span>{ROLE_LABELS[role]}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    <p className="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">Operational role permissions are combined. Admin and Super Admin are exclusive full-access roles and cannot be combined with other roles.</p>
-                  </div>
-                </Field>
+            <div>
+              <Label htmlFor="users-role-filter" className="sr-only">
+                Filter users by role
+              </Label>
+              <Select
+                id="users-role-filter"
+                value={roleFilter}
+                options={[
+                  { value: "all", label: "All roles" },
+                  ...ROLE_OPTIONS.map((role) => ({ value: role, label: ROLE_LABELS[role] })),
+                ]}
+                onChange={(value) => setRoleFilter(value as "all" | UserRole)}
+              />
+            </div>
 
-                {modal === "create" && (
-                  <>
-                    <Field label="Account setup"><select className={inputClass} value={form.createMode} onChange={(event) => setForm((current) => ({ ...current, createMode: event.target.value as "invite" | "password" }))}><option value="invite">Send invitation email</option><option value="password">Create with temporary password</option></select></Field>
-                    {form.createMode === "password" && <Field label="Temporary password"><input className={inputClass} type="password" minLength={8} required value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} /></Field>}
-                  </>
+            <div>
+              <Label htmlFor="users-status-filter" className="sr-only">
+                Filter users by status
+              </Label>
+              <Select
+                id="users-status-filter"
+                value={statusFilter}
+                options={[
+                  { value: "all", label: "All statuses" },
+                  { value: "active", label: "Active" },
+                  { value: "inactive", label: "Inactive" },
+                ]}
+                onChange={(value) =>
+                  setStatusFilter(value as "all" | "active" | "inactive")
+                }
+              />
+            </div>
+          </div>
+
+          <Button className="w-full lg:w-auto" onClick={openCreate}>
+            + Add user
+          </Button>
+        </div>
+
+        <TableViewport>
+          <Table variant="admin" className="min-w-[1120px]">
+            <TableHeader variant="admin">
+              <TableRow>
+                {["User", "Roles", "Status", "Last sign in", "Created", "Actions"].map(
+                  (label) => (
+                    <TableCell key={label} isHeader variant="admin" className="text-left">
+                      {label}
+                    </TableCell>
+                  )
                 )}
+              </TableRow>
+            </TableHeader>
 
-                <ModalActions busy={busy} onCancel={closeModal} submitLabel={modal === "create" ? "Create user" : "Save changes"} />
-              </form>
-            )}
+            <TableBody variant="admin">
+              {loading ? (
+                <TableRow>
+                  <TableCell variant="admin" colSpan={6} className="py-12 text-center">
+                    Loading users...
+                  </TableCell>
+                </TableRow>
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell variant="admin" colSpan={6} className="py-12 text-center">
+                    No users found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((user) => {
+                  const roles = effectiveRoles(user);
+                  const protectedTarget =
+                    roles.includes("super_admin") && !actorRoles(actor).includes("super_admin");
+                  const ownAccount = user.id === actor?.id;
+
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell variant="admin" className="align-top">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
+                            {initials(user)}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-800 dark:text-white/90">
+                              {user.full_name || "Unnamed user"}
+                            </p>
+                            <p className="break-all text-xs text-gray-500 dark:text-gray-400">
+                              {user.email || "No email"}
+                            </p>
+                            {user.phone ? (
+                              <p className="text-xs text-gray-400 dark:text-gray-500">{user.phone}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell variant="admin" className="align-top">
+                        <div className="flex max-w-xs flex-wrap gap-1.5">
+                          {roles.map((role) => (
+                            <Badge key={role} color="light" size="sm">
+                              {ROLE_LABELS[role]}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+
+                      <TableCell variant="admin" className="align-top">
+                        <Badge color={user.is_active ? "success" : "light"} size="sm">
+                          {user.is_active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+
+                      <TableCell variant="admin" className="align-top text-gray-500 dark:text-gray-400">
+                        {formatDate(user.last_sign_in_at)}
+                      </TableCell>
+
+                      <TableCell variant="admin" className="align-top text-gray-500 dark:text-gray-400">
+                        {formatDate(user.created_at)}
+                      </TableCell>
+
+                      <TableCell variant="admin" className="align-top">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || protectedTarget}
+                            onClick={() => openEdit(user)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || protectedTarget}
+                            onClick={() => openPassword(user)}
+                          >
+                            Password
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || protectedTarget}
+                            onClick={() => void sendReset(user)}
+                          >
+                            Reset
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || protectedTarget || ownAccount}
+                            onClick={() => void toggleActive(user)}
+                          >
+                            {user.is_active ? "Deactivate" : "Activate"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={busy || protectedTarget || ownAccount}
+                            onClick={() => void deleteUser(user)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </TableViewport>
+      </ComponentCard>
+
+      <Modal
+        isOpen={modal !== null}
+        onClose={ignoreModalDismiss}
+        closeOnEscape={false}
+        showCloseButton={false}
+        className="m-4 max-w-xl"
+      >
+        <div className="p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-4 pr-1 dark:border-gray-800">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {modal === "create"
+                  ? "Add User"
+                  : modal === "edit"
+                    ? "Edit User"
+                    : "Set Temporary Password"}
+              </h3>
+              {selected ? (
+                <p className="mt-1 break-all text-sm text-gray-500 dark:text-gray-400">
+                  {selected.email}
+                </p>
+              ) : null}
+            </div>
+            <Button type="button" size="sm" variant="outline" onClick={closeModal}>
+              Close
+            </Button>
           </div>
+
+          {modal === "password" ? (
+            <form onSubmit={submitPassword} className="mt-5 space-y-4">
+              <div>
+                <Label htmlFor="user-temporary-password">Temporary password</Label>
+                <Input
+                  id="user-temporary-password"
+                  type="password"
+                  minLength={8}
+                  required
+                  value={form.password}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, password: event.target.value }))
+                  }
+                />
+              </div>
+              <ModalActions busy={busy} onCancel={closeModal} submitLabel="Set password" />
+            </form>
+          ) : modal ? (
+            <form
+              onSubmit={modal === "create" ? submitCreate : submitEdit}
+              className="mt-5 space-y-4"
+            >
+              <div>
+                <Label htmlFor="user-full-name">Full name</Label>
+                <Input
+                  id="user-full-name"
+                  value={form.fullName}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, fullName: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="user-email">Email</Label>
+                <Input
+                  id="user-email"
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, email: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="user-phone">Phone</Label>
+                <Input
+                  id="user-phone"
+                  value={form.phone}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, phone: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label>Roles</Label>
+                <div className="rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {assignableRoles.map((role) => (
+                      <div
+                        key={role}
+                        className={`rounded-lg border px-3 py-2.5 transition ${
+                          form.roles.includes(role)
+                            ? "border-brand-300 bg-brand-50 dark:border-brand-500/40 dark:bg-brand-500/10"
+                            : "border-gray-200 dark:border-gray-800"
+                        }`}
+                      >
+                        <Checkbox
+                          id={`user-role-${role}`}
+                          label={ROLE_LABELS[role]}
+                          checked={form.roles.includes(role)}
+                          onChange={() => toggleRole(role)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                    Operational role permissions are combined. Admin and Super Admin are exclusive
+                    full-access roles and cannot be combined with other roles.
+                  </p>
+                </div>
+              </div>
+
+              {modal === "create" ? (
+                <>
+                  <div>
+                    <Label htmlFor="user-create-mode">Account setup</Label>
+                    <Select
+                      id="user-create-mode"
+                      value={form.createMode}
+                      options={[
+                        { value: "invite", label: "Send invitation email" },
+                        { value: "password", label: "Create with temporary password" },
+                      ]}
+                      onChange={(value) =>
+                        setForm((current) => ({
+                          ...current,
+                          createMode: value as "invite" | "password",
+                        }))
+                      }
+                    />
+                  </div>
+
+                  {form.createMode === "password" ? (
+                    <div>
+                      <Label htmlFor="user-create-password">Temporary password</Label>
+                      <Input
+                        id="user-create-password"
+                        type="password"
+                        minLength={8}
+                        required
+                        value={form.password}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, password: event.target.value }))
+                        }
+                      />
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              <ModalActions
+                busy={busy}
+                onCancel={closeModal}
+                submitLabel={modal === "create" ? "Create user" : "Save changes"}
+              />
+            </form>
+          ) : null}
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]"><p className="text-sm text-gray-500 dark:text-gray-400">{label}</p><p className="mt-2 text-3xl font-semibold text-gray-800 dark:text-white/90">{value}</p></div>;
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
+      <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+      <p className="mt-2 text-3xl font-semibold text-gray-800 dark:text-white/90">{value}</p>
+    </div>
+  );
 }
 
-function Notice({ tone, children }: { tone: "error" | "success"; children: React.ReactNode }) {
-  return <div className={`rounded-xl border px-4 py-3 text-sm ${tone === "error" ? "border-error-200 bg-error-50 text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400" : "border-success-200 bg-success-50 text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400"}`}>{children}</div>;
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>{children}</label>;
-}
-
-function ModalActions({ busy, onCancel, submitLabel }: { busy: boolean; onCancel: () => void; submitLabel: string }) {
-  return <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={onCancel} className={buttonSecondary}>Cancel</button><button type="submit" disabled={busy} className={buttonPrimary}>{busy ? "Saving..." : submitLabel}</button></div>;
+function ModalActions({
+  busy,
+  onCancel,
+  submitLabel,
+}: {
+  busy: boolean;
+  onCancel: () => void;
+  submitLabel: string;
+}) {
+  return (
+    <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+      <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button type="submit" className="w-full sm:w-auto" disabled={busy}>
+        {busy ? "Saving..." : submitLabel}
+      </Button>
+    </div>
+  );
 }
