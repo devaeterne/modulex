@@ -39,7 +39,10 @@ export default function UserDropdown() {
   }, [profile]);
 
   const displayEmail = profile?.email ?? "";
-  const displayRole = profile?.role ? ROLE_LABELS[profile.role] : "User";
+  const displayRole = profile?.role
+    ? ROLE_LABELS[profile.role]
+    : "User";
+
   const initials = getInitials(displayName, displayEmail);
 
   useEffect(() => {
@@ -88,30 +91,82 @@ export default function UserDropdown() {
 
   return (
     <div className="relative">
+      {/* USER BUTTON */}
       <button
         type="button"
         onClick={toggleDropdown}
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        className="group flex items-center gap-3 rounded-xl px-2 py-1.5 text-left transition hover:bg-gray-50 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:hover:bg-white/[0.04]"
+        className="
+          group flex items-center gap-3
+          rounded-lg
+          px-2 py-1.5
+          text-left
+          transition-colors duration-200
+          hover:bg-gray-100
+          focus:outline-none
+          focus:ring-2
+          focus:ring-brand-500/20
+          dark:hover:bg-white/[0.05]
+        "
       >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-600 ring-1 ring-brand-100 dark:bg-brand-500/10 dark:text-brand-400 dark:ring-brand-500/20">
+        {/* AVATAR */}
+        <span
+          className="
+            flex h-10 w-10 shrink-0
+            items-center justify-center
+            rounded-full
+            bg-brand-50
+            text-sm font-semibold
+            text-brand-600
+            ring-1 ring-brand-100
+            transition-colors
+            dark:bg-brand-500/15
+            dark:text-brand-400
+            dark:ring-brand-500/20
+          "
+        >
           {initials}
         </span>
 
+        {/* USER INFO */}
         <span className="hidden min-w-0 sm:block">
-          <span className="block max-w-[150px] truncate text-sm font-medium text-gray-700 dark:text-gray-300">
+          <span
+            className="
+              block max-w-[150px] truncate
+              text-sm font-medium
+              text-gray-700
+              dark:text-gray-300
+            "
+          >
             {displayName}
           </span>
-          <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+
+          <span
+            className="
+              mt-0.5 block
+              max-w-[150px] truncate
+              text-xs
+              text-gray-500
+              dark:text-gray-400
+            "
+          >
             {displayRole}
           </span>
         </span>
 
+        {/* CHEVRON */}
         <svg
-          className={`hidden shrink-0 stroke-gray-500 transition-transform duration-200 dark:stroke-gray-400 sm:block ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`
+            hidden shrink-0
+            stroke-gray-500
+            transition-transform duration-200
+            group-hover:stroke-gray-700
+            dark:stroke-gray-400
+            dark:group-hover:stroke-gray-300
+            sm:block
+            ${isOpen ? "rotate-180" : ""}
+          `}
           width="18"
           height="18"
           viewBox="0 0 18 18"
@@ -128,45 +183,137 @@ export default function UserDropdown() {
         </svg>
       </button>
 
+      {/* DROPDOWN */}
       <Dropdown
         isOpen={isOpen}
         onClose={closeDropdown}
-        className="absolute right-0 mt-3 flex w-[280px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-2 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark"
+        className="
+          absolute right-0 z-50
+          mt-3
+          flex w-[290px] flex-col
+          overflow-hidden
+          rounded-2xl
+          border border-gray-200
+          bg-white
+          p-2
+          shadow-theme-lg
+          dark:border-gray-800
+          dark:bg-gray-dark
+        "
       >
-        <div className="rounded-xl bg-gray-50 px-3 py-3 dark:bg-white/[0.03]">
+        {/* PROFILE SUMMARY */}
+        <div
+          className="
+            rounded-xl
+            border border-gray-100
+            bg-gray-50
+            p-3
+            dark:border-gray-800
+            dark:bg-white/[0.03]
+          "
+        >
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-semibold text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+            <span
+              className="
+                flex h-11 w-11 shrink-0
+                items-center justify-center
+                rounded-full
+                bg-brand-50
+                text-sm font-semibold
+                text-brand-600
+                ring-1 ring-brand-100
+                dark:bg-brand-500/15
+                dark:text-brand-400
+                dark:ring-brand-500/20
+              "
+            >
               {initials}
             </span>
 
-            <div className="min-w-0">
-              <span className="block truncate text-sm font-medium text-gray-800 dark:text-white/90">
+            <div className="min-w-0 flex-1">
+              <span
+                className="
+                  block truncate
+                  text-sm font-semibold
+                  text-gray-800
+                  dark:text-white/90
+                "
+              >
                 {displayName}
               </span>
 
               {displayEmail && (
-                <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+                <span
+                  className="
+                    mt-0.5 block truncate
+                    text-xs
+                    text-gray-500
+                    dark:text-gray-400
+                  "
+                >
                   {displayEmail}
                 </span>
               )}
             </div>
           </div>
 
-          <span className="mt-3 inline-flex rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-            {displayRole}
-          </span>
+          {/* ROLE */}
+          <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-800">
+            <span
+              className="
+                inline-flex items-center
+                rounded-full
+                bg-brand-50
+                px-2.5 py-1
+                text-xs font-medium
+                text-brand-600
+                ring-1 ring-inset ring-brand-100
+                dark:bg-brand-500/10
+                dark:text-brand-400
+                dark:ring-brand-500/20
+              "
+            >
+              {displayRole}
+            </span>
+          </div>
         </div>
 
-        <ul className="mt-2 border-b border-gray-200 pb-2 dark:border-gray-800">
+        {/* MENU */}
+        <ul
+          className="
+            mt-2
+            border-b border-gray-200
+            pb-2
+            dark:border-gray-800
+          "
+        >
           <li>
             <DropdownItem
               onItemClick={closeDropdown}
               tag="a"
               href="/profile"
-              className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+              className="
+                group flex items-center gap-3
+                rounded-lg
+                px-3 py-2.5
+                text-sm font-medium
+                text-gray-700
+                transition-colors duration-150
+                hover:bg-gray-100
+                hover:text-gray-900
+                dark:text-gray-400
+                dark:hover:bg-white/[0.05]
+                dark:hover:text-gray-200
+              "
             >
               <svg
-                className="fill-gray-500 transition group-hover:fill-gray-700 dark:fill-gray-400 dark:group-hover:fill-gray-300"
+                className="
+                  fill-gray-500
+                  transition-colors
+                  group-hover:fill-gray-700
+                  dark:fill-gray-400
+                  dark:group-hover:fill-gray-300
+                "
                 width="20"
                 height="20"
                 viewBox="0 0 24 24"
@@ -179,19 +326,39 @@ export default function UserDropdown() {
                   d="M12 3.5C7.30558 3.5 3.5 7.30558 3.5 12C3.5 14.1526 4.3002 16.1184 5.61936 17.616C6.17279 15.3096 8.24852 13.5955 10.7246 13.5955H13.2746C15.7509 13.5955 17.8268 15.31 18.38 17.6167C19.6996 16.119 20.5 14.153 20.5 12C20.5 7.30558 16.6944 3.5 12 3.5ZM17.0246 18.8566V18.8455C17.0246 16.7744 15.3457 15.0955 13.2746 15.0955H10.7246C8.65354 15.0955 6.97461 16.7744 6.97461 18.8455V18.856C8.38223 19.8895 10.1198 20.5 12 20.5C13.8798 20.5 15.6171 19.8898 17.0246 18.8566ZM2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12ZM11.9991 7.25C10.8847 7.25 9.98126 8.15342 9.98126 9.26784C9.98126 10.3823 10.8847 11.2857 11.9991 11.2857C13.1135 11.2857 14.0169 10.3823 14.0169 9.26784C14.0169 8.15342 13.1135 7.25 11.9991 7.25ZM8.48126 9.26784C8.48126 7.32499 10.0563 5.75 11.9991 5.75C13.9419 5.75 15.5169 7.32499 15.5169 9.26784C15.5169 11.2107 13.9419 12.7857 11.9991 12.7857C10.0563 12.7857 8.48126 11.2107 8.48126 9.26784Z"
                 />
               </svg>
-              Profile
+
+              <span>Profile</span>
             </DropdownItem>
           </li>
         </ul>
 
+        {/* SIGN OUT */}
         <button
           type="button"
           onClick={handleSignOut}
           disabled={isSigningOut}
-          className="group mt-2 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-error-600 transition hover:bg-error-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-error-400 dark:hover:bg-error-500/10"
+          className="
+            group
+            mt-2 flex w-full items-center gap-3
+            rounded-lg
+            px-3 py-2.5
+            text-left
+            text-sm font-medium
+            text-error-600
+            transition-colors duration-150
+            hover:bg-error-50
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+            dark:text-error-400
+            dark:hover:bg-error-500/10
+          "
         >
           <svg
-            className="fill-current"
+            className="
+              fill-current
+              transition-transform duration-150
+              group-hover:translate-x-0.5
+            "
             width="20"
             height="20"
             viewBox="0 0 24 24"
@@ -205,7 +372,9 @@ export default function UserDropdown() {
             />
           </svg>
 
-          {isSigningOut ? "Signing out..." : "Sign out"}
+          <span>
+            {isSigningOut ? "Signing out..." : "Sign out"}
+          </span>
         </button>
       </Dropdown>
     </div>
