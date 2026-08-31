@@ -100,12 +100,27 @@ begin
   if v_uom.id is null or not v_uom.is_active then raise exception 'Unit of measure is inactive or invalid.'; end if;
   if not exists (select 1 from public.product_type_allowed_uoms a where a.product_type_id=v_type.id and a.uom_id=v_uom.id) then raise exception 'Unit of measure is not allowed for this product type.'; end if;
   new.unit := v_uom.code;
+  if v_type.code='SINK' then new.metadata := jsonb_set(coalesce(new.metadata,'{}'::jsonb),'{product_kind}','"sink"'::jsonb,true);
+  elsif lower(coalesce(new.metadata->>'product_kind',''))='sink' then new.metadata := new.metadata - 'product_kind'; end if;
   return new;
 end; $$;
 
 drop trigger if exists trg_products_validate_master_contract on public.products;
-create trigger trg_products_validate_master_contract before insert or update of product_type_id,uom_id,unit on public.products
+create trigger trg_products_validate_master_contract before insert or update of product_type_id,uom_id,unit,metadata on public.products
 for each row execute function private.validate_product_master_contract();
+
+create or replace function private.guard_product_master_reference_lifecycle() returns trigger
+language plpgsql security definer set search_path=pg_catalog,public as $$
+begin
+  if tg_table_name='product_types' and old.is_active and not new.is_active and exists (select 1 from public.products where product_type_id=old.id and status::text='active') then raise exception 'Product type used by active products cannot be deactivated.'; end if;
+  if tg_table_name='units_of_measure' and old.is_active and not new.is_active and exists (select 1 from public.products where uom_id=old.id and status::text='active') then raise exception 'Unit of measure used by active products cannot be deactivated.'; end if;
+  if tg_table_name='product_types' and new.default_uom_id is not null and not exists (select 1 from public.product_type_allowed_uoms where product_type_id=new.id and uom_id=new.default_uom_id) then raise exception 'Default UOM must be allowed for the product type.'; end if;
+  return new;
+end; $$;
+drop trigger if exists trg_product_types_reference_guard on public.product_types;
+create trigger trg_product_types_reference_guard before update on public.product_types for each row execute function private.guard_product_master_reference_lifecycle();
+drop trigger if exists trg_units_reference_guard on public.units_of_measure;
+create trigger trg_units_reference_guard before update on public.units_of_measure for each row execute function private.guard_product_master_reference_lifecycle();
 
 do $$ begin
   if not exists (select 1 from public.products where product_type_id is null or uom_id is null) then
@@ -143,3 +158,39 @@ begin
 end; $$;
 revoke all on function public.get_products_page_v2(text,uuid,uuid,text,text,uuid,uuid,text,text,integer,integer) from public,anon;
 grant execute on function public.get_products_page_v2(text,uuid,uuid,text,text,uuid,uuid,text,text,integer,integer) to authenticated;
+
+-- Full projection replacement: all list filters and lookup options are server-side.
+create or replace function public.get_products_page_v2(p_query text default null,p_type_id uuid default null,p_uom_id uuid default null,p_status text default null,p_qr_status text default null,p_brand_id uuid default null,p_category_id uuid default null,p_sort text default 'created_at',p_direction text default 'desc',p_page integer default 1,p_page_size integer default 25)
+returns jsonb language plpgsql security invoker set search_path=pg_catalog,public as $$
+declare v_offset integer:=greatest(p_page-1,0)*least(greatest(p_page_size,1),100); v_limit integer:=least(greatest(p_page_size,1),100); v_items jsonb; v_total integer;
+begin
+  with base as (
+    select p.id,p.sku,p.barcode,p.name,p.base_product_code,p.color_code,p.color_name,p.brand_id,p.category_id,p.status,p.unit,p.min_stock_level,p.qr_svg_path,p.created_at,
+      pt.id product_type_id,pt.code product_type_code,pt.name product_type_name,u.id uom_id,u.code uom_code,u.name uom_name,b.name brand,c.name category,st.name stone_type,mb.code material_price_band,
+      coalesce(sum(i.quantity),0) on_hand,coalesce(sum(i.reserved_quantity),0) reserved
+    from public.products p
+    left join public.product_types pt on pt.id=p.product_type_id
+    left join public.units_of_measure u on u.id=p.uom_id
+    left join public.product_brands b on b.id=p.brand_id
+    left join public.product_categories c on c.id=p.category_id
+    left join public.countertop_stone_product_profiles sp on sp.product_id=p.id and sp.is_active
+    left join public.countertop_stone_types st on st.id=sp.stone_type_id
+    left join public.countertop_material_price_bands mb on mb.id=sp.material_price_band_id
+    left join public.inventory i on i.product_id=p.id
+    where (p_status is null or p.status::text=p_status) and (p_type_id is null or p.product_type_id=p_type_id) and (p_uom_id is null or p.uom_id=p_uom_id) and (p_brand_id is null or p.brand_id=p_brand_id) and (p_category_id is null or p.category_id=p_category_id) and (p_qr_status is null or (p_qr_status='ready' and p.qr_svg_path is not null) or (p_qr_status='missing' and p.qr_svg_path is null)) and (nullif(btrim(p_query),'') is null or concat_ws(' ',p.sku,p.barcode,p.name,p.base_product_code,p.color_code,p.color_name,b.name,c.name,pt.code,pt.name,u.code,st.name,mb.code) ilike '%'||btrim(p_query)||'%')
+    group by p.id,pt.id,u.id,b.name,c.name,st.name,mb.code
+  ), counted as (select count(*) over() total_count,* from base), paged as (
+    select * from counted order by
+      case when p_sort='sku' and p_direction='asc' then sku end asc, case when p_sort='sku' and p_direction<>'asc' then sku end desc,
+      case when p_sort='name' and p_direction='asc' then name end asc, case when p_sort='name' and p_direction<>'asc' then name end desc,
+      case when p_sort='type' and p_direction='asc' then product_type_name end asc, case when p_sort='type' and p_direction<>'asc' then product_type_name end desc,
+      case when p_sort='brand' and p_direction='asc' then brand end asc, case when p_sort='brand' and p_direction<>'asc' then brand end desc,
+      case when p_sort='category' and p_direction='asc' then category end asc, case when p_sort='category' and p_direction<>'asc' then category end desc,
+      case when p_sort='stock' and p_direction='asc' then on_hand-reserved end asc, case when p_sort='stock' and p_direction<>'asc' then on_hand-reserved end desc,
+      case when p_sort='status' and p_direction='asc' then status::text end asc, case when p_sort='status' and p_direction<>'asc' then status::text end desc,
+      case when p_sort='created_at' and p_direction='asc' then created_at end asc, created_at desc, id
+    offset v_offset limit v_limit
+  )
+  select coalesce(jsonb_agg((to_jsonb(paged)-'total_count')||jsonb_build_object('available',on_hand-reserved,'qr_status',case when qr_svg_path is null then 'missing' else 'ready' end) order by created_at desc),'[]'::jsonb),coalesce(max(total_count),0) into v_items,v_total from paged;
+  return jsonb_build_object('items',v_items,'total_count',v_total,'page',p_page,'page_size',v_limit,'filters',jsonb_build_object('brands',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name) order by name),'[]'::jsonb) from public.product_brands where status='active'),'categories',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name) order by name),'[]'::jsonb) from public.product_categories where status='active'),'product_types',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'code',code) order by sort_order),'[]'::jsonb) from public.product_types where is_active),'uoms',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'name',name,'code',code) order by sort_order),'[]'::jsonb) from public.units_of_measure where is_active)));
+end; $$;

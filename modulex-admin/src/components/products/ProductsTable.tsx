@@ -13,6 +13,8 @@ type SortBy =
   | "name"
   | "brand"
   | "category"
+  | "type"
+  | "stock"
   | "min_stock"
   | "status"
   | "created_at";
@@ -60,6 +62,8 @@ type ProductsPagePayload = {
   filters: {
     brands: FilterOption[];
     categories: FilterOption[];
+    product_types?: FilterOption[];
+    uoms?: FilterOption[];
   };
 };
 
@@ -104,6 +108,10 @@ function reportProductError(context: string, error: unknown) {
   console.error(`[Product List] ${context}`, error);
 }
 
+function normalizeV2Product(item: Record<string, unknown>): Product {
+  return { product_id: String(item.id), sku: String(item.sku ?? ""), barcode: item.barcode as string | null, product_name: String(item.name ?? ""), base_product_code: String(item.base_product_code ?? ""), color_code: String(item.color_code ?? ""), color_name: item.color_name as string | null, brand_id: String(item.brand_id ?? ""), category_id: String(item.category_id ?? ""), brand: String(item.brand ?? ""), category: String(item.category ?? ""), unit: String(item.unit ?? ""), min_stock_level: Number(item.min_stock_level ?? 0), product_status: item.status as ProductStatus, created_at: String(item.created_at ?? ""), product_type_code: item.product_type_code as string | null, product_type_name: item.product_type_name as string | null, uom_code: item.uom_code as string | null, uom_name: item.uom_name as string | null, on_hand: item.on_hand as number | string, reserved: item.reserved as number | string, available: item.available as number | string, qr_status: item.qr_status as "ready" | "missing", stone_type: item.stone_type as string | null, material_price_band: item.material_price_band as string | null };
+}
+
 function lifecycleErrorMessage(error: RpcError) {
   const message = error.message ?? "";
   if (message.includes("on-hand or reserved stock remains")) {
@@ -142,6 +150,8 @@ export default function ProductsTable() {
   const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<FilterOption[]>([]);
   const [categories, setCategories] = useState<FilterOption[]>([]);
+  const [productTypes, setProductTypes] = useState<FilterOption[]>([]);
+  const [uoms, setUoms] = useState<FilterOption[]>([]);
 
   const [queryInput, setQueryInput] = useState("");
   const [query, setQuery] = useState("");
@@ -170,7 +180,7 @@ export default function ProductsTable() {
   const activeFilterCount = [query, statusFilter, brandFilter, categoryFilter, typeFilter, uomFilter, qrFilter].filter(Boolean).length;
   const columnCount = canManage ? 9 : 8;
 
-  const getRpcArgs = useCallback(
+  const getLegacyRpcArgs = useCallback(
     (page: number, requestedPageSize: number) => ({
       p_query: query,
       p_page: page,
@@ -178,13 +188,14 @@ export default function ProductsTable() {
       p_status: statusFilter || null,
       p_brand_id: brandFilter || null,
       p_category_id: categoryFilter || null,
-      p_type_id: typeFilter || null,
-      p_uom_id: uomFilter || null,
-      p_qr_status: qrFilter || null,
       p_sort_by: sortBy,
       p_sort_direction: sortDirection,
     }),
-    [query, statusFilter, brandFilter, categoryFilter, typeFilter, uomFilter, qrFilter, sortBy, sortDirection]
+    [query, statusFilter, brandFilter, categoryFilter, sortBy, sortDirection]
+  );
+  const getV2RpcArgs = useCallback(
+    (page: number, requestedPageSize: number) => ({ p_query: query, p_type_id: typeFilter || null, p_uom_id: uomFilter || null, p_status: statusFilter || null, p_qr_status: qrFilter || null, p_brand_id: brandFilter || null, p_category_id: categoryFilter || null, p_sort: sortBy, p_direction: sortDirection, p_page: page, p_page_size: requestedPageSize }),
+    [query, typeFilter, uomFilter, statusFilter, qrFilter, brandFilter, categoryFilter, sortBy, sortDirection]
   );
 
   const loadProducts = useCallback(
@@ -194,8 +205,8 @@ export default function ProductsTable() {
       if (!background) setIsLoading(true);
       setErrorMessage(null);
 
-      const legacyArgs = getRpcArgs(currentPage, pageSize);
-      let { data, error } = await supabase.rpc("get_products_page_v2", { p_query: query, p_type_id: typeFilter || null, p_uom_id: uomFilter || null, p_status: statusFilter || null, p_qr_status: qrFilter || null, p_brand_id: brandFilter || null, p_category_id: categoryFilter || null, p_sort: sortBy, p_direction: sortDirection, p_page: currentPage, p_page_size: pageSize });
+      const legacyArgs = getLegacyRpcArgs(currentPage, pageSize);
+      let { data, error } = await supabase.rpc("get_products_page_v2", getV2RpcArgs(currentPage, pageSize));
       const isV2 = !error;
       if (error) ({ data, error } = await supabase.rpc("get_products_page", legacyArgs));
 
@@ -215,7 +226,7 @@ export default function ProductsTable() {
 
       const rawPayload = data as (ProductsPagePayload & { items?: Array<Record<string, unknown>>; page_size?: number }) | null;
       const payload = isV2
-        ? { ...rawPayload, items: (rawPayload?.items ?? []).map((item) => { const source = item as unknown as Record<string, unknown>; return ({ product_id: String(source.id), sku: String(source.sku ?? ""), barcode: source.barcode as string | null, product_name: String(source.name ?? ""), base_product_code: "", color_code: "", color_name: null, brand_id: "", category_id: "", brand: String(source.brand ?? ""), category: String(source.category ?? ""), unit: String(source.unit ?? ""), min_stock_level: Number(source.min_stock_level ?? 0), product_status: source.status as ProductStatus, created_at: String(source.created_at ?? ""), product_type_code: source.product_type_code as string | null, product_type_name: source.product_type_name as string | null, uom_code: source.uom_code as string | null, uom_name: source.uom_name as string | null, on_hand: source.on_hand as number | string, reserved: source.reserved as number | string, available: source.available as number | string, qr_status: source.qr_status as "ready" | "missing" }); }) }
+        ? { ...rawPayload, items: (rawPayload?.items ?? []).map((item) => normalizeV2Product(item as unknown as Record<string, unknown>)) }
         : rawPayload;
       const nextTotalPages = Math.max(1, Math.ceil(Number(payload?.total_count ?? 0) / pageSize));
       if (currentPage > nextTotalPages) {
@@ -227,11 +238,13 @@ export default function ProductsTable() {
       setProducts(payload?.items ?? []);
       setBrands(payload?.filters?.brands ?? []);
       setCategories(payload?.filters?.categories ?? []);
+      setProductTypes(payload?.filters?.product_types ?? []);
+      setUoms(payload?.filters?.uoms ?? []);
       setTotalCount(Number(payload?.total_count ?? 0));
       setTotalPages(nextTotalPages);
       if (!background) setIsLoading(false);
     },
-    [currentPage, pageSize, getRpcArgs]
+    [currentPage, pageSize, getLegacyRpcArgs, getV2RpcArgs]
   );
 
   useEffect(() => {
@@ -369,14 +382,12 @@ export default function ProductsTable() {
       const exported: Product[] = [];
 
       while (exported.length < expectedTotal) {
-        const { data, error } = await supabase.rpc(
-          "get_products_page",
-          getRpcArgs(exportPage, EXPORT_PAGE_SIZE)
-        );
+        let { data, error } = await supabase.rpc("get_products_page_v2", getV2RpcArgs(exportPage, EXPORT_PAGE_SIZE));
+        if (error) ({ data, error } = await supabase.rpc("get_products_page", getLegacyRpcArgs(exportPage, EXPORT_PAGE_SIZE)));
         if (error) throw error;
 
-        const payload = data as ProductsPagePayload | null;
-        const rows = payload?.items ?? [];
+        const payload = data as ProductsPagePayload | { items?: Array<Record<string, unknown>>; total_count?: number } | null;
+        const rows = (payload?.items ?? []).map((row) => "id" in row ? normalizeV2Product(row) : row as Product);
         expectedTotal = Number(payload?.total_count ?? 0);
         exported.push(...rows);
 
@@ -393,13 +404,15 @@ export default function ProductsTable() {
         "SKU",
         "Barcode",
         "Product Name",
-        "Base Product Code",
-        "Color Code",
-        "Color Name",
+        "Type",
         "Brand",
         "Category",
-        "Unit",
-        "Minimum Stock",
+        "Variant / Stone",
+        "UOM",
+        "On Hand",
+        "Reserved",
+        "Available",
+        "QR",
         "Status",
       ];
       const lines = exported.map((product) =>
@@ -407,13 +420,15 @@ export default function ProductsTable() {
           product.sku,
           product.barcode,
           product.product_name,
-          product.base_product_code,
-          product.color_code,
-          product.color_name,
+          product.product_type_name || product.product_type_code,
           product.brand,
           product.category,
-          product.unit,
-          product.min_stock_level,
+          product.product_type_code === "STONE" ? `${product.stone_type || "Stone"} · ${product.material_price_band || ""}` : `${product.base_product_code} · ${product.color_name || product.color_code}`,
+          product.uom_name || product.uom_code || product.unit,
+          product.on_hand,
+          product.reserved,
+          product.available,
+          product.qr_status,
           product.product_status,
         ]
           .map(csvCell)
@@ -497,7 +512,7 @@ export default function ProductsTable() {
         </div>
 
         <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
             <div className="space-y-1.5">
               <label htmlFor="product-status-filter" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
               <select
@@ -549,6 +564,18 @@ export default function ProductsTable() {
             </div>
 
             <div className="space-y-1.5">
+              <label htmlFor="product-type-filter" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Product Type</label>
+              <select id="product-type-filter" value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value); resetToFirstPage(); }} className={controlClass}><option value="">All Types</option>{productTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="product-uom-filter" className="block text-xs font-medium text-gray-500 dark:text-gray-400">UOM</label>
+              <select id="product-uom-filter" value={uomFilter} onChange={(event) => { setUomFilter(event.target.value); resetToFirstPage(); }} className={controlClass}><option value="">All UOMs</option>{uoms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="product-qr-filter" className="block text-xs font-medium text-gray-500 dark:text-gray-400">QR</label>
+              <select id="product-qr-filter" value={qrFilter} onChange={(event) => { setQrFilter(event.target.value); resetToFirstPage(); }} className={controlClass}><option value="">All QR</option><option value="ready">Ready</option><option value="missing">Missing</option></select>
+            </div>
+            <div className="space-y-1.5">
               <label htmlFor="product-sort-by" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Sort by</label>
               <select
                 id="product-sort-by"
@@ -563,6 +590,8 @@ export default function ProductsTable() {
                 <option value="name">Product Name</option>
                 <option value="brand">Brand</option>
                 <option value="category">Category</option>
+                <option value="type">Type</option>
+                <option value="stock">Stock</option>
                 <option value="min_stock">Min Stock</option>
                 <option value="status">Status</option>
                 <option value="created_at">Created Date</option>
