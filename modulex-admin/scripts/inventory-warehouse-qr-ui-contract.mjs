@@ -43,6 +43,33 @@ for (const surface of surfaces) {
   expect(!source.includes('href="#"') && !source.includes("javascript:void") && !source.includes("TailAdmin"), `${surface.route} must not ship dead/template controls`);
 }
 
+const inventoryTable = read("src/components/inventory/InventoryTable.tsx");
+const sharedSelect = read("src/components/form/Select.tsx");
+for (const primitive of [
+  "ComponentCard",
+  "Input",
+  "Label",
+  "Select",
+  "Alert",
+  "Badge",
+  "Button",
+  "TableViewport",
+  "TableHeader",
+  "TableBody",
+  "TableRow",
+  "TableCell",
+]) {
+  expect(inventoryTable.includes(primitive), `Inventory UI must compose shared ${primitive} primitives`);
+}
+expect(!/<(?:input|select|table|thead|tbody|tr|th|td|button)\b/.test(inventoryTable), "Inventory UI must not reimplement shared form, button, or table primitives");
+expect(inventoryTable.includes('<Table variant="admin"'), "Inventory must use the shared admin table variant");
+expect(inventoryTable.includes("<TableViewport"), "Inventory must use the shared responsive table viewport");
+expect(inventoryTable.includes('supabase.rpc("search_stock_page"'), "Inventory must preserve the server-side stock search RPC");
+expect(inventoryTable.includes('mode = "overview"') && inventoryTable.includes('mode === "shelf"'), "Inventory must preserve overview and shelf modes");
+expect(inventoryTable.includes('href="/scan"'), "Shelf inventory must preserve Scan QR / Barcode navigation");
+expect(sharedSelect.includes("disabled?: boolean"), "Shared Select must support disabled inventory filter states");
+expect(sharedSelect.includes("disabled={disabled}"), "Shared Select must forward disabled state to the native select");
+
 const warehouseTable = read("src/components/warehouses/WarehousesTable.tsx");
 const warehouseForm = read("src/components/warehouses/WarehouseForm.tsx");
 const sharedTable = read("src/components/ui/table/index.tsx");
