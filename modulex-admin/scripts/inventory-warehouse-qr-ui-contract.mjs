@@ -64,6 +64,7 @@ for (const primitive of [
 expect(!/<(?:input|select|table|thead|tbody|tr|th|td|button)\b/.test(inventoryTable), "Inventory UI must not reimplement shared form, button, or table primitives");
 expect(inventoryTable.includes('<Table variant="admin"'), "Inventory must use the shared admin table variant");
 expect(inventoryTable.includes("<TableViewport"), "Inventory must use the shared responsive table viewport");
+expect(inventoryTable.includes('className="w-full min-w-[1040px]"'), "Inventory table must fill the available card width while retaining its mobile minimum width");
 expect(inventoryTable.includes('supabase.rpc("search_stock_page"'), "Inventory must preserve the server-side stock search RPC");
 expect(inventoryTable.includes('mode = "overview"') && inventoryTable.includes('mode === "shelf"'), "Inventory must preserve overview and shelf modes");
 expect(inventoryTable.includes('href="/scan"'), "Shelf inventory must preserve Scan QR / Barcode navigation");
