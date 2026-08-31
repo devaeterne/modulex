@@ -18,7 +18,7 @@ begin
   end if;
   v_record_id := nullif(v_record_text, '')::uuid;
   insert into public.audit_logs(table_name, record_id, action, old_data, new_data, changed_by)
-  values (tg_table_name, v_record_id, lower(tg_op), v_old, v_new, auth.uid());
+  values (tg_table_name, v_record_id, lower(tg_op)::public.audit_action, v_old, v_new, auth.uid());
   return coalesce(new, old);
 end;
 $$;
