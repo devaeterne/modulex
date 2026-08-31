@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
@@ -145,6 +146,7 @@ function getPageNumbers(currentPage: number, totalPages: number) {
 
 export default function ProductsTable() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const requestIdRef = useRef(0);
 
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -161,6 +163,12 @@ export default function ProductsTable() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [uomFilter, setUomFilter] = useState("");
+  useEffect(() => {
+    setTypeFilter(searchParams.get("type") ?? "");
+    setUomFilter(searchParams.get("uom") ?? "");
+    setBrandFilter(searchParams.get("brand") ?? "");
+    setCategoryFilter(searchParams.get("category") ?? "");
+  }, [searchParams]);
   const [qrFilter, setQrFilter] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("sku");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");

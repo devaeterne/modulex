@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 
 type TaxonomyStatus = "active" | "inactive";
@@ -9,6 +10,7 @@ type TaxonomyRow = {
   name: string;
   status: TaxonomyStatus;
   updated_at: string;
+  product_count?: number;
 };
 
 type TaxonomyManagerProps = {
@@ -79,7 +81,7 @@ export default function TaxonomyManager({ entityLabel, entityLabelPlural, tableN
     setErrorMessage(null);
     const { data, error } = await supabase
       .from(tableName)
-      .select("id,name,status,updated_at")
+      .select("id,name,status,updated_at,products(count)")
       .order("name", { ascending: true });
 
     if (error) {
@@ -87,7 +89,7 @@ export default function TaxonomyManager({ entityLabel, entityLabelPlural, tableN
       setRows([]);
       setErrorMessage(`${entityLabelPlural} are temporarily unavailable. Please try again.`);
     } else {
-      setRows((data ?? []) as TaxonomyRow[]);
+      setRows(((data ?? []) as unknown as Array<TaxonomyRow & { products?: { count: number }[] }>).map((row) => ({ ...row, product_count: row.products?.[0]?.count ?? 0 })));
     }
     setIsLoading(false);
   }, [entityLabelPlural, tableName]);
@@ -243,14 +245,14 @@ export default function TaxonomyManager({ entityLabel, entityLabelPlural, tableN
                 <thead className="bg-gray-50 dark:bg-gray-900/40">
                   <tr>
                     <th scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">{entityLabel}</th>
-                    <th scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Status</th>
+                    <th scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Products</th><th scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Status</th>
                     <th scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Updated</th>
                     <th scope="col" className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-transparent">
                   {filteredRows.length === 0 ? (
-                    <tr><td colSpan={4} className="px-5 py-8 text-center text-sm text-gray-500">No {entityLabelPlural.toLowerCase()} match the current search.</td></tr>
+                    <tr><td colSpan={5} className="px-5 py-8 text-center text-sm text-gray-500">No {entityLabelPlural.toLowerCase()} match the current search.</td></tr>
                   ) : filteredRows.map((row) => (
                     <tr key={row.id}>
                       <td className="px-5 py-4">
@@ -261,7 +263,7 @@ export default function TaxonomyManager({ entityLabel, entityLabelPlural, tableN
                           </>
                         ) : <span className="text-sm font-medium text-gray-800 dark:text-white/90">{row.name}</span>}
                       </td>
-                      <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${row.status === "active" ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400" : "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400"}`}>{row.status === "active" ? "Active" : "Inactive"}</span></td>
+                      <td className="px-5 py-4"><Link className="text-brand-600" href={`/products?${tableName === "product_brands" ? "brand" : "category"}=${row.id}`}>{row.product_count ?? 0}</Link></td><td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${row.status === "active" ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400" : "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400"}`}>{row.status === "active" ? "Active" : "Inactive"}</span></td>
                       <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{new Date(row.updated_at).toLocaleDateString()}</td>
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-2">
