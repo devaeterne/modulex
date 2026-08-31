@@ -249,7 +249,7 @@ begin
   end if;
 end;
 $$;
-revoke all on function private.reserve_customer_order_item_stock(uuid)
+revoke all on function private.reserve_customer_order_item_stock(uuid) from public, anon, authenticated;
 create or replace function public.upsert_countertop_reference(p_kind text,p_id uuid default null,p_name text default null,p_code text default null,p_price numeric default null,p_pricing_method text default null,p_product_id uuid default null,p_stone_type_id uuid default null,p_material_price_band_id uuid default null,p_vendor_name text default null,p_source_ref text default null,p_is_active boolean default true) returns uuid language sql security invoker set search_path = '' as $$ select private.upsert_countertop_reference($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12); $$;
 revoke all on function public.upsert_countertop_reference(text,uuid,text,text,numeric,text,uuid,uuid,uuid,text,text,boolean) from public, anon; grant execute on function public.upsert_countertop_reference(text,uuid,text,text,numeric,text,uuid,uuid,uuid,text,text,boolean) to authenticated;
 create or replace function public.attach_countertop_configuration(p_order_item_id uuid,p_stone_product_id uuid,p_price_group_id uuid,p_sqft numeric,p_edge_profile_id uuid default null,p_edge_linear_ft numeric default 0,p_sink_product_id uuid default null,p_services jsonb default '[]'::jsonb,p_configuration jsonb default '{}'::jsonb,p_manual_material_price numeric default null,p_slab_quantity numeric default 1,p_override_reason text default null) returns uuid language sql security invoker set search_path = '' as $$ select private.attach_countertop_configuration($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12); $$;

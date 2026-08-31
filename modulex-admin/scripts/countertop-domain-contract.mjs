@@ -10,12 +10,18 @@ const sql = read("sql/countertop-stone-sink-domain.sql");
 const migration = read("../modulex-store/supabase/migrations/20260831130000_countertop_stone_sink_mvp.sql");
 const revisionMigration = read("../modulex-store/supabase/migrations/20260901090000_customer_order_revision_identity.sql");
 const securityMigration = read("../modulex-store/supabase/migrations/20260901110000_countertop_security_fk_hardening.sql");
+const portalMigration = read("../modulex-store/supabase/migrations/20260901100000_countertop_portal_safe_projection.sql");
 const lifecycleSql = read("sql/customer-order-lifecycle-editability.sql");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
 const orderDomain = read("src/lib/customers/order-domain.ts");
 const orderEditingSql = read("sql/customer-order-editing.sql");
 const editOrder = read("src/components/customers/EditCustomerOrder.tsx");
+for (const [name, text] of [["countertop MVP", migration], ["revision identity", revisionMigration], ["portal projection", portalMigration], ["security hardening", securityMigration]]) {
+  assert((text.match(/\$\$/g) || []).length % 2 === 0, `${name} migration has unterminated dollar-quoted SQL`);
+  assert(!/revoke\s+all\s+on\s+function[^;]*\)\s*\n\s*(create|drop|grant|revoke)/i.test(text), `${name} migration has a concatenated or incomplete REVOKE statement`);
+  for (const line of text.split("\n").filter((line) => /^\s*revoke\b/i.test(line))) assert(/;\s*$/.test(line), `${name} migration has a REVOKE without a terminating semicolon`);
+}
 const source = ts.transpileModule(read("src/lib/countertop/domain.ts"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020, baseUrl: "." } }).outputText;
 const validation = ts.transpileModule(read("src/lib/validation.ts"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
 const combined = source.replace('from "@/lib/validation"', `from "data:text/javascript,${encodeURIComponent(validation)}"`);
