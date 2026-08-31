@@ -347,10 +347,7 @@ export default function WarehousesTable() {
                             size="sm"
                             variant="outline"
                             disabled={isActionLoading}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleToggleStatus(warehouse);
-                            }}
+                            onClick={() => void handleToggleStatus(warehouse)}
                           >
                             {warehouse.is_active ? "Deactivate" : "Activate"}
                           </Button>
