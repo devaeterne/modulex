@@ -46,6 +46,8 @@ const navItems: NavItem[] = [
     name: "Products",
     subItems: [
       { name: "Product List", path: "/products", permission: "products.view", exact: true },
+      { name: "Product Types", path: "/products/types", permission: "products.manage" },
+      { name: "Units of Measure", path: "/products/uom", permission: "products.manage" },
       { name: "Low Stock", path: "/low-stock", permission: "inventory.view" },
       { name: "Brands", path: "/brands", permission: "products.manage" },
       { name: "Categories", path: "/categories", permission: "products.manage" },

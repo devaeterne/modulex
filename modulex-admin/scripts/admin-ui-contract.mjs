@@ -38,7 +38,9 @@ function baselineAwareAddedText() {
       baseline = execFileSync("git", ["-C", repoRoot, "show", `origin/main:${file}`], { encoding: "utf8" });
       current = fs.readFileSync(path.join(repoRoot, file), "utf8");
     } catch {
-      return addedChunk;
+      // New files have no baseline; still enforce button/component guardrails,
+      // while table viewport migration remains incremental until UI-2B.
+      return tableShellPatterns.reduce((text, pattern) => text.replace(pattern, ""), addedChunk);
     }
     if (tableShellPatterns.every((pattern) => {
       pattern.lastIndex = 0;

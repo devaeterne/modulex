@@ -58,7 +58,7 @@ expect(
 );
 expect(
   form.includes("Base product code is required.") && form.includes("Color code is required."),
-  "ProductForm must require family/color identifiers"
+  "ProductForm must preserve family/color validation for variant-identity product types"
 );
 
 expect(
@@ -77,8 +77,11 @@ expect(
   table.includes("while") && table.includes("total_count"),
   "Product CSV export must exhaust deterministic pages to the exact total"
 );
-for (const column of ["Base Product Code", "Color Code", "Color Name"]) {
-  expect(table.includes(column), `Product CSV/list contract must include ${column}`);
+for (const field of ["base_product_code", "color_code", "color_name"]) {
+  expect(table.includes(field), `Product List V2 must preserve canonical ${field} data`);
+}
+for (const column of ["Type", "Variant / Stone", "UOM", "On Hand", "Reserved", "Available", "QR", "Status"]) {
+  expect(table.includes(`"${column}"`), `Product CSV/list V2 contract must include ${column}`);
 }
 
 expect(

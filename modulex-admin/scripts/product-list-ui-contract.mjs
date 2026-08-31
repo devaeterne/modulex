@@ -74,9 +74,11 @@ expect(
   table.includes("focus-visible:ring-2"),
   "Product List interactive controls need visible keyboard focus states"
 );
+const productTableClass = table.match(/<table className="([^"]+)"/)?.[1] ?? "";
+const productTableMinWidth = Number(productTableClass.match(/min-w-\[(\d+)px\]/)?.[1] ?? 0);
 expect(
-  table.includes("min-w-[1080px]"),
-  "Product table needs an explicit responsive minimum width"
+  productTableClass.includes("w-full") && productTableMinWidth >= 1080,
+  "Product table needs full-width layout with an explicit responsive minimum width"
 );
 expect(
   table.includes('className="flex flex-col gap-2 sm:flex-row"'),
