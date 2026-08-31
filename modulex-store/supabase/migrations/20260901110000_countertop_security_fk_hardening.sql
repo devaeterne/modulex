@@ -45,6 +45,7 @@ drop trigger if exists countertop_material_bands_audit on public.countertop_mate
 drop trigger if exists countertop_edges_audit on public.countertop_edge_profiles; create trigger countertop_edges_audit after insert or update or delete on public.countertop_edge_profiles for each row execute function private.audit_countertop_reference_change();
 drop trigger if exists countertop_services_audit on public.countertop_services; create trigger countertop_services_audit after insert or update or delete on public.countertop_services for each row execute function private.audit_countertop_reference_change();
 drop trigger if exists countertop_profiles_audit on public.countertop_stone_product_profiles; create trigger countertop_profiles_audit after insert or update or delete on public.countertop_stone_product_profiles for each row execute function private.audit_countertop_reference_change();
+drop function if exists public.audit_countertop_reference_change();
 revoke all on function private.audit_countertop_reference_change() from public, anon, authenticated;
 
 create index if not exists countertop_stone_profiles_material_band_idx on public.countertop_stone_product_profiles(material_price_band_id);
