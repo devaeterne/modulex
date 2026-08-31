@@ -88,6 +88,7 @@ export type CreateCustomerOrderInput = {
 };
 
 type UpdateOrderItemInput = {
+  id?: string;
   productId: string;
   quantity: string | number;
   unitPrice: string | number;
@@ -426,6 +427,7 @@ export async function updateCustomerOrder(input: UpdateCustomerOrderInput): Prom
   const { data, error } = await supabase.rpc("update_customer_order", {
     p_order_id: input.orderId,
     p_items: input.items.map((item) => ({
+      ...(item.id ? { id: item.id } : {}),
       product_id: item.productId,
       quantity: numeric(item.quantity),
       unit_price: numeric(item.unitPrice),

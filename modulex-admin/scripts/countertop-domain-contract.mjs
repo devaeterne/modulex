@@ -8,9 +8,12 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 
 const sql = read("sql/countertop-stone-sink-domain.sql");
 const migration = read("../modulex-store/supabase/migrations/20260831130000_countertop_stone_sink_mvp.sql");
+const revisionMigration = read("../modulex-store/supabase/migrations/20260901090000_customer_order_revision_identity.sql");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
 const orderDomain = read("src/lib/customers/order-domain.ts");
+const orderEditingSql = read("sql/customer-order-editing.sql");
+const editOrder = read("src/components/customers/EditCustomerOrder.tsx");
 const source = ts.transpileModule(read("src/lib/countertop/domain.ts"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020, baseUrl: "." } }).outputText;
 const validation = ts.transpileModule(read("src/lib/validation.ts"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
 const combined = source.replace('from "@/lib/validation"', `from "data:text/javascript,${encodeURIComponent(validation)}"`);
@@ -61,6 +64,13 @@ assert(orderDetail.includes('order.status === "draft"') && orderDetail.includes(
 assert(orderDomain.includes("countertop_stone_product_profiles") && orderDomain.includes("eq(\"is_active\", true)"), "configure action must be limited to active countertop stone profile products");
 assert(orderDetail.includes("onAttached") && orderDetail.includes("void load()"), "successful countertop attach must refresh the order detail");
 assert(!orderDetail.includes("{item.id}</") && !orderDetail.includes("item.id}</"), "order item UUID must not be rendered in the order detail UI");
+assert(orderEditingSql.includes("v_item_id := nullif(v_item->>'id','')::uuid") && orderEditingSql.includes("v_seen_ids"), "order revisions must accept stable existing item identity");
+assert(!orderEditingSql.includes("delete from public.customer_order_items where order_id = p_order_id"), "order revisions must not bulk-delete every order item");
+assert(orderEditingSql.includes("Configured countertop lines must be changed") && orderEditingSql.includes("Configured countertop lines cannot be removed"), "configured countertop lines must be protected from generic revision mutations");
+assert(orderEditingSql.includes("Order item does not belong to this order") && orderEditingSql.includes("Duplicate order item id"), "revision item ownership and duplicate identity must fail closed");
+assert(revisionMigration.includes("v_item_id := nullif(v_item->>'id','')::uuid") && !revisionMigration.includes("delete from public.customer_order_items where order_id = p_order_id"), "pending revision migration must preserve stable item identity without bulk delete");
+assert(orderDomain.includes("...(item.id ? { id: item.id } : {})"), "order domain must pass existing item identity to the revision RPC");
+assert(editOrder.includes("type DraftItem = { id?: string") && editOrder.includes("id: item.id"), "edit order UI must retain existing item identity internally");
 assert(sql.includes("audit_countertop_reference_change") && sql.includes("countertop_profiles_audit") && sql.includes("changed_by"), "countertop reference mutations must use audit_logs actor mechanism");
 assert(refs.includes("toggleProfile(row)") && refs.includes("p_product_id: row.product_id") && refs.includes("p_is_active: !row.is_active"), "profile toggle must pass row values directly without stale state");
 assert(refs.includes("value={drafts.profile?.product_id") && refs.includes("value={drafts.profile?.stone_type_id") && refs.includes("value={drafts.profile?.material_price_band_id"), "profile edit selectors must hydrate selected values");

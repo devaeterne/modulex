@@ -17,7 +17,7 @@ import type { Customer, CustomerAddress, CustomerOrder, OrderFulfillmentType, Pa
 
 type Product = OrderPickerProduct;
 type PriceRow = OrderPriceRow;
-type DraftItem = { product_id: string; quantity: string; unit_price: string; discount_percent: string };
+type DraftItem = { id?: string; product_id: string; quantity: string; unit_price: string; discount_percent: string };
 type TaxRule = OrderTaxRule;
 
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
@@ -81,6 +81,7 @@ export default function EditCustomerOrder() {
         setProducts(context.products as Product[]);
         setTaxRules(context.taxRules);
         setItems(context.items.map((item) => ({
+          id: item.id,
           product_id: item.product_id ?? "",
           quantity: String(item.quantity),
           unit_price: String(item.unit_price),
@@ -224,6 +225,7 @@ export default function EditCustomerOrder() {
       const revision = await updateCustomerOrder({
         orderId: order.id,
         items: items.map((item) => ({
+          id: item.id,
           productId: item.product_id,
           quantity: item.quantity,
           unitPrice: item.unit_price,
