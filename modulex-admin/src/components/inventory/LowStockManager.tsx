@@ -125,12 +125,13 @@ export default function LowStockManager() {
     setErrorMessage(null);
     setRetryAction(null);
 
-    const [{ data, error: loadError }, { data: summaryData }] = await Promise.all([supabase.rpc("search_low_stock_page_v2", {
+    const [{ data, error: loadError }, { data: summaryData, error: summaryError }] = await Promise.all([supabase.rpc("search_low_stock_page_v2", {
       p_query: query, p_view: view, p_type_id: typeId || null, p_uom_id: uomId || null,
       p_offset: (currentPage - 1) * pageSize, p_limit: pageSize, p_export_all: false,
     }), supabase.rpc("get_low_stock_summary_v2", { p_query: query, p_view: view, p_type_id: typeId || null, p_uom_id: uomId || null })]);
     const nextRows = (data ?? []) as StockRow[];
-    setServerSummary(summaryData as typeof serverSummary);
+    if (summaryError) { setServerSummary(null); setErrorMessage("Low-stock summary is temporarily unavailable. Please retry."); setRetryAction({ type: "load" }); }
+    else setServerSummary(summaryData as typeof serverSummary);
     setTotalCount(numberValue(nextRows[0]?.total_count));
 
     if (loadError) {
@@ -174,14 +175,7 @@ export default function LowStockManager() {
 
   const summary = useMemo(() => {
     if (serverSummary) return { products: serverSummary.products, alerts: serverSummary.alerts, outOfStock: serverSummary.out_of_stock, thresholdsSet: serverSummary.thresholds_set, shortfallByUnit: serverSummary.shortfall_by_uom };
-    const alerts = rows.filter((row) => row.is_low_stock);
-    return {
-      products: rows.length,
-      alerts: alerts.length,
-      outOfStock: alerts.filter((row) => numberValue(row.total_available_quantity) <= 0).length,
-      thresholdsSet: rows.filter((row) => numberValue(row.min_stock_level) > 0).length,
-      shortfallByUnit: alerts.reduce<Record<string, number>>((acc, row) => { const unit = row.unit || "Unknown"; acc[unit] = (acc[unit] ?? 0) + Math.max(numberValue(row.min_stock_level) - numberValue(row.total_available_quantity), 0); return acc; }, {}),
-    };
+    return { products: 0, alerts: 0, outOfStock: 0, thresholdsSet: 0, shortfallByUnit: {} };
   }, [rows, serverSummary]);
 
   const filteredRows = rows;

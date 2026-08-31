@@ -133,14 +133,9 @@ grant execute on function public.search_low_stock_page_v2(text,text,uuid,uuid,in
 
 create or replace function public.get_low_stock_summary_v2(p_query text default '', p_view text default 'alerts', p_type_id uuid default null, p_uom_id uuid default null)
 returns jsonb language sql stable set search_path=public as $$
-  select jsonb_build_object(
-    'products',count(*),
-    'alerts',count(*) filter (where v.is_low_stock),
-    'out_of_stock',count(*) filter (where v.is_low_stock and v.total_available_quantity<=0),
-    'thresholds_set',count(*) filter (where v.min_stock_level>0),
-    'shortfall_by_uom',coalesce((select jsonb_object_agg(coalesce(u.code,'UNKNOWN'),shortfall) from (select p.uom_id,sum(greatest(v2.min_stock_level-v2.total_available_quantity,0)) shortfall from public.v_product_stock_summary v2 join public.products p on p.id=v2.product_id where v2.product_status='active'::product_status and v2.is_low_stock group by p.uom_id) s left join public.units_of_measure u on u.id=s.uom_id),'{}'::jsonb)
-  ) from public.v_product_stock_summary v join public.products p on p.id=v.product_id
-  where v.product_status='active'::product_status and (coalesce(p_view,'alerts')='all' or (p_view='alerts' and v.is_low_stock) or (p_view='unset' and v.min_stock_level=0)) and (p_type_id is null or p.product_type_id=p_type_id) and (p_uom_id is null or p.uom_id=p_uom_id) and (coalesce(trim(p_query),'')='' or concat_ws(' ',v.sku,v.barcode,v.product_name,v.brand,v.category) ilike '%'||trim(p_query)||'%');
+  with filtered as (select v.*,p.uom_id,coalesce(u.code,'UNKNOWN') uom_code from public.v_product_stock_summary v join public.products p on p.id=v.product_id left join public.units_of_measure u on u.id=p.uom_id where v.product_status='active'::product_status and (coalesce(p_view,'alerts')='all' or (p_view='alerts' and v.is_low_stock) or (p_view='unset' and v.min_stock_level=0)) and (p_type_id is null or p.product_type_id=p_type_id) and (p_uom_id is null or p.uom_id=p_uom_id) and (coalesce(trim(p_query),'')='' or concat_ws(' ',v.sku,v.barcode,v.product_name,v.brand,v.category) ilike '%'||trim(p_query)||'%')),
+  grouped as (select uom_code,sum(greatest(min_stock_level-total_available_quantity,0)) shortfall from filtered where is_low_stock group by uom_code)
+  select jsonb_build_object('products',count(*),'alerts',count(*) filter (where is_low_stock),'out_of_stock',count(*) filter (where is_low_stock and total_available_quantity<=0),'thresholds_set',count(*) filter (where min_stock_level>0),'shortfall_by_uom',coalesce((select jsonb_object_agg(uom_code,shortfall) from grouped),'{}'::jsonb)) from filtered;
 $$;
 revoke all on function public.get_low_stock_summary_v2(text,text,uuid,uuid) from public,anon;
 grant execute on function public.get_low_stock_summary_v2(text,text,uuid,uuid) to authenticated;
@@ -185,7 +180,7 @@ create or replace function private.guard_product_master_reference_lifecycle() re
 language plpgsql security definer set search_path=pg_catalog,public as $$
 begin
   if tg_table_name='product_types' and old.is_active and not new.is_active and exists (select 1 from public.products where product_type_id=old.id and status::text='active') then raise exception 'Product type used by active products cannot be deactivated.'; end if;
-  if tg_table_name='units_of_measure' and old.is_active and not new.is_active and exists (select 1 from public.products where uom_id=old.id and status::text='active') then raise exception 'Unit of measure used by active products cannot be deactivated.'; end if;
+  if tg_table_name='units_of_measure' and old.is_active and not new.is_active and (exists (select 1 from public.products where uom_id=old.id and status::text='active') or exists (select 1 from public.product_type_allowed_uoms a join public.product_types t on t.id=a.product_type_id where a.uom_id=old.id and t.is_active)) then raise exception 'Unit of measure is referenced by active products or product types.'; end if;
   if tg_table_name='product_types' and new.default_uom_id is not null and not exists (select 1 from public.product_type_allowed_uoms where product_type_id=new.id and uom_id=new.default_uom_id) then raise exception 'Default UOM must be allowed for the product type.'; end if;
   return new;
 end; $$;
@@ -201,6 +196,33 @@ begin
 end; $$;
 drop trigger if exists trg_product_type_uom_relation_guard on public.product_type_allowed_uoms;
 create trigger trg_product_type_uom_relation_guard before update or delete on public.product_type_allowed_uoms for each row execute function private.guard_product_type_uom_relation();
+drop trigger if exists trg_product_type_uom_relation_guard on public.product_type_allowed_uoms;
+create unique index if not exists product_type_one_default_uom_idx on public.product_type_allowed_uoms(product_type_id) where is_default;
+
+create or replace function public.save_product_type_v2(
+  p_id uuid default null, p_code text default null, p_name text default null, p_description text default null,
+  p_default_uom_id uuid default null, p_allowed_uom_ids uuid[] default '{}', p_inventory_tracking boolean default true,
+  p_reservable boolean default true, p_requires_variant_identity boolean default true, p_pricing_model text default 'none',
+  p_qr_required boolean default false, p_store_eligible boolean default false, p_is_active boolean default true
+) returns uuid language plpgsql security invoker set search_path=pg_catalog,public as $$
+declare v_id uuid:=coalesce(p_id,gen_random_uuid()); v_uom uuid; v_old public.product_types;
+begin
+  if not public.current_user_has_any_role(array['super_admin','admin']) then raise exception 'Product management permission required.'; end if;
+  if nullif(btrim(coalesce(p_code,'')),'') is null or nullif(btrim(coalesce(p_name,'')),'') is null then raise exception 'Product type name and code are required.'; end if;
+  if p_pricing_model not in ('price_group','countertop_material_band','none') then raise exception 'Unsupported pricing model.'; end if;
+  if p_default_uom_id is null or not (p_default_uom_id = any(p_allowed_uom_ids)) then raise exception 'Default UOM must be allowed.'; end if;
+  foreach v_uom in array p_allowed_uom_ids loop if not exists(select 1 from public.units_of_measure where id=v_uom and is_active) then raise exception 'Allowed UOM is inactive or invalid.'; end if; end loop;
+  select * into v_old from public.product_types where id=v_id for update;
+  if v_old.id is not null and exists(select 1 from public.products where product_type_id=v_id and uom_id <> all(p_allowed_uom_ids)) then raise exception 'Cannot remove a UOM used by products of this type.'; end if;
+  insert into public.product_types(id,code,name,description,default_uom_id,inventory_tracking,reservable,requires_variant_identity,pricing_model,qr_required,store_eligible,is_active)
+  values(v_id,upper(btrim(p_code)),btrim(p_name),nullif(btrim(p_description),''),p_default_uom_id,p_inventory_tracking,p_reservable,p_requires_variant_identity,p_pricing_model,p_qr_required,p_store_eligible,p_is_active)
+  on conflict(id) do update set code=excluded.code,name=excluded.name,description=excluded.description,default_uom_id=excluded.default_uom_id,inventory_tracking=excluded.inventory_tracking,reservable=excluded.reservable,requires_variant_identity=excluded.requires_variant_identity,pricing_model=excluded.pricing_model,qr_required=excluded.qr_required,store_eligible=excluded.store_eligible,is_active=excluded.is_active,updated_at=now();
+  delete from public.product_type_allowed_uoms where product_type_id=v_id;
+  insert into public.product_type_allowed_uoms(product_type_id,uom_id,is_default) select v_id,x,x=p_default_uom_id from unnest(p_allowed_uom_ids) x;
+  return v_id;
+end; $$;
+revoke all on function public.save_product_type_v2(uuid,text,text,text,uuid,uuid[],boolean,boolean,boolean,text,boolean,boolean,boolean) from public,anon;
+grant execute on function public.save_product_type_v2(uuid,text,text,text,uuid,uuid[],boolean,boolean,boolean,text,boolean,boolean,boolean) to authenticated;
 
 do $$ begin
   if not exists (select 1 from public.products where product_type_id is null or uom_id is null) then

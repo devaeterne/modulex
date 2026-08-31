@@ -318,6 +318,7 @@ export default function ProductsTable() {
     setTypeFilter(""); setUomFilter(""); setQrFilter("");
     setSortBy("sku");
     setSortDirection("asc");
+    router.replace("/products");
     resetToFirstPage();
   }
 
