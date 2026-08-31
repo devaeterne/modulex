@@ -27,9 +27,13 @@ for (const sharedPrimitive of [
   /<Modal/,
   /<Input/,
   /<Select/,
+  /<MultiSelect/,
   /<Checkbox/,
   /<Badge/,
+  /<Alert/,
+  /<TableViewport/,
   /<Table/,
+  /variant="admin"/,
 ]) {
   assert.match(manager, sharedPrimitive, "Product Type/UOM UI must compose shared Admin UI primitives");
 }
