@@ -1,9 +1,13 @@
 # Modulex Store Roadmap
 
-Last reviewed: 2026-08-30
+Last reviewed: 2026-08-31
 Main baseline: `d41f7c19ce81016b6a1a05166d0a4089104bfe52`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 Current Granite migration status: **GC-5, GC-6, GC-7 and GC-8A are production-accepted. GC-8A live acceptance is recorded after PR #169 / merge commit `d41f7c19ce81016b6a1a05166d0a4089104bfe52`; managed public chrome, portal coexistence and technical SEO are verified live. GC-8B — accessibility + performance acceptance — is the active next package.**
+
+## Countertop / Stone / Sink cross-roadmap completion
+
+- [x] Customer and Dealer Portal order projections include the sanitized historical countertop snapshot. Production acceptance passed customer/dealer isolation and commercial-only fields; inventory, cost, margin, vendor, override-audit, raw snapshot, and configuration internals remain excluded.
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
 
