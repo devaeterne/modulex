@@ -45,6 +45,7 @@ for (const surface of surfaces) {
 
 const warehouseTable = read("src/components/warehouses/WarehousesTable.tsx");
 const warehouseForm = read("src/components/warehouses/WarehouseForm.tsx");
+const sharedTable = read("src/components/ui/table/index.tsx");
 const warehouseUi = `${warehouseTable}\n${warehouseForm}`;
 
 for (const primitive of [
@@ -70,6 +71,9 @@ expect(!warehouseUi.includes("function CustomSelect"), "Warehouse form must not 
 expect(!/<(?:input|textarea|table|thead|tbody|tr|th|td|button)\b/.test(warehouseUi), "Warehouse domain UI must not reimplement shared form, button, or table primitives");
 expect(warehouseTable.includes('<Table variant="admin"'), "Warehouse directory must use the shared admin table variant");
 expect(warehouseTable.includes("<TableViewport>"), "Warehouse directory must use the shared responsive table viewport");
+expect(warehouseTable.includes("onDoubleClick={canManage ?"), "Warehouse directory must preserve permission-gated double-click editing");
+expect(sharedTable.includes("onDoubleClick?: React.MouseEventHandler<HTMLTableRowElement>"), "Shared TableRow must support native double-click behavior used by warehouse rows");
+expect(sharedTable.includes("title?: string"), "Shared TableRow must support native row title text");
 expect(warehouseForm.includes('htmlFor="warehouse-code"') && warehouseForm.includes('id="warehouse-code"'), "Warehouse code label must remain associated with its input");
 expect(warehouseForm.includes('htmlFor="warehouse-type"') && warehouseForm.includes('id="warehouse-type"'), "Warehouse type label must remain associated with its select");
 
