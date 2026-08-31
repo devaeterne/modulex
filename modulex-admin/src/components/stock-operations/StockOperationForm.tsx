@@ -1,16 +1,45 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
+import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 
 type OperationType = "stock_in" | "stock_out" | "transfer" | "reserve" | "release";
 type ProductOption = { id: string; sku: string; name: string; barcode: string | null };
-type LocationOption = { location_id: string; warehouse_id: string; warehouse_code: string; location_code: string; location_name: string; zone_code: string | null; qr_code: string | null };
+type LocationOption = {
+  location_id: string;
+  warehouse_id: string;
+  warehouse_code: string;
+  location_code: string;
+  location_name: string;
+  zone_code: string | null;
+  qr_code: string | null;
+};
 type ProductStockLocation = {
-  inventory_id: string; product_id: string; sku: string; product_name: string; warehouse_id: string; warehouse_code: string;
-  warehouse_name: string; zone_id: string | null; zone_code: string | null; zone_name: string | null; location_id: string;
-  location_code: string; location_name: string; qr_code: string | null; quantity: number; reserved_quantity: number;
-  available_quantity: number; stock_status: string;
+  inventory_id: string;
+  product_id: string;
+  sku: string;
+  product_name: string;
+  warehouse_id: string;
+  warehouse_code: string;
+  warehouse_name: string;
+  zone_id: string | null;
+  zone_code: string | null;
+  zone_name: string | null;
+  location_id: string;
+  location_code: string;
+  location_name: string;
+  qr_code: string | null;
+  quantity: number;
+  reserved_quantity: number;
+  available_quantity: number;
+  stock_status: string;
 };
 
 type PendingIdempotency = { signature: string; key: string };
@@ -24,9 +53,8 @@ const operationOptions: { value: OperationType; label: string; description: stri
 ];
 
 const numberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
-const formatNumber = (value: number | string | null | undefined) => numberFormatter.format(Number(value ?? 0));
-const controlClass = "h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90";
-const labelClass = "mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400";
+const formatNumber = (value: number | string | null | undefined) =>
+  numberFormatter.format(Number(value ?? 0));
 
 export default function StockOperationForm() {
   const [operationType, setOperationType] = useState<OperationType>("stock_in");
@@ -47,19 +75,35 @@ export default function StockOperationForm() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const idempotencyRef = useRef<PendingIdempotency | null>(null);
 
-  const selectedOperation = useMemo(() => operationOptions.find((item) => item.value === operationType), [operationType]);
-  const selectedProduct = useMemo(() => products.find((product) => product.id === productId), [products, productId]);
+  const selectedOperation = useMemo(
+    () => operationOptions.find((item) => item.value === operationType),
+    [operationType],
+  );
+  const selectedProduct = useMemo(
+    () => products.find((product) => product.id === productId),
+    [products, productId],
+  );
   const showSourceLocation = ["stock_out", "transfer", "reserve", "release"].includes(operationType);
   const showTargetLocation = operationType === "stock_in" || operationType === "transfer";
 
   const filteredSourceLocations = useMemo(() => {
-    if (operationType === "release") return productStockLocations.filter((item) => Number(item.reserved_quantity) > 0);
-    if (["stock_out", "transfer", "reserve"].includes(operationType)) return productStockLocations.filter((item) => Number(item.available_quantity) > 0);
+    if (operationType === "release") {
+      return productStockLocations.filter((item) => Number(item.reserved_quantity) > 0);
+    }
+    if (["stock_out", "transfer", "reserve"].includes(operationType)) {
+      return productStockLocations.filter((item) => Number(item.available_quantity) > 0);
+    }
     return [];
   }, [operationType, productStockLocations]);
 
-  const sourceStockLocation = useMemo(() => filteredSourceLocations.find((item) => item.location_id === sourceLocationId), [filteredSourceLocations, sourceLocationId]);
-  const targetLocation = useMemo(() => locations.find((item) => item.location_id === targetLocationId), [locations, targetLocationId]);
+  const sourceStockLocation = useMemo(
+    () => filteredSourceLocations.find((item) => item.location_id === sourceLocationId),
+    [filteredSourceLocations, sourceLocationId],
+  );
+  const targetLocation = useMemo(
+    () => locations.find((item) => item.location_id === targetLocationId),
+    [locations, targetLocationId],
+  );
 
   function getIdempotencyKey(rpcName: string, payload: Record<string, unknown>) {
     const signature = JSON.stringify([rpcName, payload]);
@@ -69,37 +113,63 @@ export default function StockOperationForm() {
     return idempotencyRef.current.key;
   }
 
-  const loadProductStockLocations = useCallback(async (currentProductId: string) => {
-    if (!currentProductId) {
-      setProductStockLocations([]);
-      setSourceLocationId("");
-      return;
-    }
-    const product = products.find((item) => item.id === currentProductId);
-    if (!product) return;
+  const loadProductStockLocations = useCallback(
+    async (currentProductId: string) => {
+      if (!currentProductId) {
+        setProductStockLocations([]);
+        setSourceLocationId("");
+        return;
+      }
 
-    setIsLoadingProductLocations(true);
-    const { data, error } = await supabase.rpc("search_stock", { p_query: product.sku, p_limit: 100 });
-    if (error) {
-      console.error("Failed to load stock operation locations", error);
-      setErrorMessage("Product stock locations could not be loaded. Try selecting the product again.");
-      setProductStockLocations([]);
-      setSourceLocationId("");
+      const product = products.find((item) => item.id === currentProductId);
+      if (!product) return;
+
+      setIsLoadingProductLocations(true);
+      const { data, error } = await supabase.rpc("search_stock", {
+        p_query: product.sku,
+        p_limit: 100,
+      });
+
+      if (error) {
+        console.error("Failed to load stock operation locations", error);
+        setErrorMessage("Product stock locations could not be loaded. Try selecting the product again.");
+        setProductStockLocations([]);
+        setSourceLocationId("");
+        setIsLoadingProductLocations(false);
+        return;
+      }
+
+      setProductStockLocations(
+        ((data as ProductStockLocation[]) ?? []).filter(
+          (item) => item.product_id === currentProductId && Number(item.quantity) > 0,
+        ),
+      );
       setIsLoadingProductLocations(false);
-      return;
-    }
-    setProductStockLocations(((data as ProductStockLocation[]) ?? []).filter((item) => item.product_id === currentProductId && Number(item.quantity) > 0));
-    setIsLoadingProductLocations(false);
-  }, [products]);
+    },
+    [products],
+  );
 
   useEffect(() => {
     async function loadOptions() {
       setIsLoadingOptions(true);
       setErrorMessage(null);
+
       const [productsResult, locationsResult] = await Promise.all([
-        supabase.from("products").select("id, sku, name, barcode").eq("status", "active").order("sku", { ascending: true }),
-        supabase.from("v_location_stock_summary").select("location_id, warehouse_id, warehouse_code, location_code, location_name, zone_code, qr_code").eq("is_active", true).order("warehouse_code", { ascending: true }).order("location_code", { ascending: true }),
+        supabase
+          .from("products")
+          .select("id, sku, name, barcode")
+          .eq("status", "active")
+          .order("sku", { ascending: true }),
+        supabase
+          .from("v_location_stock_summary")
+          .select(
+            "location_id, warehouse_id, warehouse_code, location_code, location_name, zone_code, qr_code",
+          )
+          .eq("is_active", true)
+          .order("warehouse_code", { ascending: true })
+          .order("location_code", { ascending: true }),
       ]);
+
       const loadError = productsResult.error ?? locationsResult.error;
       if (loadError) {
         console.error("Failed to load stock operation options", loadError);
@@ -107,67 +177,169 @@ export default function StockOperationForm() {
         setIsLoadingOptions(false);
         return;
       }
+
       setProducts((productsResult.data as ProductOption[]) ?? []);
       setLocations((locationsResult.data as LocationOption[]) ?? []);
       setIsLoadingOptions(false);
     }
+
     void loadOptions();
   }, []);
 
-  useEffect(() => { void loadProductStockLocations(productId); }, [productId, loadProductStockLocations]);
   useEffect(() => {
-    if (sourceLocationId && !filteredSourceLocations.some((item) => item.location_id === sourceLocationId)) setSourceLocationId("");
+    void loadProductStockLocations(productId);
+  }, [productId, loadProductStockLocations]);
+
+  useEffect(() => {
+    if (
+      sourceLocationId &&
+      !filteredSourceLocations.some((item) => item.location_id === sourceLocationId)
+    ) {
+      setSourceLocationId("");
+    }
   }, [filteredSourceLocations, sourceLocationId]);
 
-  function resetMessages() { setSuccessMessage(null); setErrorMessage(null); }
-  function changeOperation(next: OperationType) { setOperationType(next); setSourceLocationId(""); setTargetLocationId(""); resetMessages(); }
-  function changeProduct(next: string) { setProductId(next); setSourceLocationId(""); setTargetLocationId(""); resetMessages(); }
+  function resetMessages() {
+    setSuccessMessage(null);
+    setErrorMessage(null);
+  }
+
+  function changeOperation(next: OperationType) {
+    setOperationType(next);
+    setSourceLocationId("");
+    setTargetLocationId("");
+    resetMessages();
+  }
+
+  function changeProduct(next: string) {
+    setProductId(next);
+    setSourceLocationId("");
+    setTargetLocationId("");
+    resetMessages();
+  }
 
   function sourcePlaceholder() {
     if (!productId) return "Select product first";
     if (isLoadingProductLocations) return "Loading product locations...";
-    if (filteredSourceLocations.length === 0) return operationType === "release" ? "No reserved stock found for this product" : "No available stock location found for this product";
+    if (filteredSourceLocations.length === 0) {
+      return operationType === "release"
+        ? "No reserved stock found for this product"
+        : "No available stock location found for this product";
+    }
     return "Select source location";
   }
 
   function validate() {
     if (!productId) return "Product is required.";
+
     const numericQuantity = Number(quantity);
-    if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) return "Quantity must be greater than zero.";
-    if (operationType === "stock_in") return targetLocationId ? null : "Target location is required.";
+    if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) {
+      return "Quantity must be greater than zero.";
+    }
+
+    if (operationType === "stock_in") {
+      return targetLocationId ? null : "Target location is required.";
+    }
     if (!sourceLocationId) return "Source location is required.";
     if (!sourceStockLocation) return "Selected source location is not valid for this operation.";
+
     if (operationType === "transfer") {
       if (!targetLocationId) return "Target location is required.";
-      if (sourceLocationId === targetLocationId) return "Source and target locations cannot be the same.";
+      if (sourceLocationId === targetLocationId) {
+        return "Source and target locations cannot be the same.";
+      }
     }
-    if (["stock_out", "transfer", "reserve"].includes(operationType) && Number(sourceStockLocation.available_quantity) < numericQuantity) return `Insufficient available stock. Available: ${formatNumber(sourceStockLocation.available_quantity)}`;
-    if (operationType === "release" && Number(sourceStockLocation.reserved_quantity) < numericQuantity) return `Release quantity cannot be greater than reserved quantity. Reserved: ${formatNumber(sourceStockLocation.reserved_quantity)}`;
+
+    if (
+      ["stock_out", "transfer", "reserve"].includes(operationType) &&
+      Number(sourceStockLocation.available_quantity) < numericQuantity
+    ) {
+      return `Insufficient available stock. Available: ${formatNumber(sourceStockLocation.available_quantity)}`;
+    }
+
+    if (
+      operationType === "release" &&
+      Number(sourceStockLocation.reserved_quantity) < numericQuantity
+    ) {
+      return `Release quantity cannot be greater than reserved quantity. Reserved: ${formatNumber(sourceStockLocation.reserved_quantity)}`;
+    }
+
     return null;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     resetMessages();
+
     const validationError = validate();
-    if (validationError) { setErrorMessage(validationError); return; }
+    if (validationError) {
+      setErrorMessage(validationError);
+      return;
+    }
+
     const numericQuantity = Number(quantity);
     setIsSubmitting(true);
 
     let result: { data: unknown; error: { message: string } | null } | undefined;
+
     if (operationType === "stock_in" && targetLocation) {
       const rpcName = "stock_in_idempotent";
-      const payload = { p_product_id: productId, p_warehouse_id: targetLocation.warehouse_id, p_location_id: targetLocation.location_id, p_quantity: numericQuantity, p_reference_no: referenceNo.trim() || null, p_reason: reason.trim() || "Stock in from admin panel", p_notes: notes.trim() || null };
-      result = await supabase.rpc(rpcName, { ...payload, p_idempotency_key: getIdempotencyKey(rpcName, payload) });
+      const payload = {
+        p_product_id: productId,
+        p_warehouse_id: targetLocation.warehouse_id,
+        p_location_id: targetLocation.location_id,
+        p_quantity: numericQuantity,
+        p_reference_no: referenceNo.trim() || null,
+        p_reason: reason.trim() || "Stock in from admin panel",
+        p_notes: notes.trim() || null,
+      };
+      result = await supabase.rpc(rpcName, {
+        ...payload,
+        p_idempotency_key: getIdempotencyKey(rpcName, payload),
+      });
     } else if (operationType === "transfer" && sourceStockLocation && targetLocation) {
       const rpcName = "stock_transfer_idempotent";
-      const payload = { p_product_id: productId, p_from_warehouse_id: sourceStockLocation.warehouse_id, p_from_location_id: sourceStockLocation.location_id, p_to_warehouse_id: targetLocation.warehouse_id, p_to_location_id: targetLocation.location_id, p_quantity: numericQuantity, p_reference_no: referenceNo.trim() || null, p_reason: reason.trim() || "Transfer from admin panel", p_notes: notes.trim() || null };
-      result = await supabase.rpc(rpcName, { ...payload, p_idempotency_key: getIdempotencyKey(rpcName, payload) });
+      const payload = {
+        p_product_id: productId,
+        p_from_warehouse_id: sourceStockLocation.warehouse_id,
+        p_from_location_id: sourceStockLocation.location_id,
+        p_to_warehouse_id: targetLocation.warehouse_id,
+        p_to_location_id: targetLocation.location_id,
+        p_quantity: numericQuantity,
+        p_reference_no: referenceNo.trim() || null,
+        p_reason: reason.trim() || "Transfer from admin panel",
+        p_notes: notes.trim() || null,
+      };
+      result = await supabase.rpc(rpcName, {
+        ...payload,
+        p_idempotency_key: getIdempotencyKey(rpcName, payload),
+      });
     } else if (sourceStockLocation) {
-      const rpcName = operationType === "stock_out" ? "stock_out_idempotent" : operationType === "reserve" ? "reserve_stock_idempotent" : "release_stock_idempotent";
-      const fallbackReason = operationType === "stock_out" ? "Stock out from admin panel" : operationType === "reserve" ? "Reservation from admin panel" : "Reservation release from admin panel";
-      const payload = { p_product_id: productId, p_warehouse_id: sourceStockLocation.warehouse_id, p_location_id: sourceStockLocation.location_id, p_quantity: numericQuantity, p_reference_no: referenceNo.trim() || null, p_reason: reason.trim() || fallbackReason, p_notes: notes.trim() || null };
-      result = await supabase.rpc(rpcName, { ...payload, p_idempotency_key: getIdempotencyKey(rpcName, payload) });
+      const rpcName =
+        operationType === "stock_out"
+          ? "stock_out_idempotent"
+          : operationType === "reserve"
+            ? "reserve_stock_idempotent"
+            : "release_stock_idempotent";
+      const fallbackReason =
+        operationType === "stock_out"
+          ? "Stock out from admin panel"
+          : operationType === "reserve"
+            ? "Reservation from admin panel"
+            : "Reservation release from admin panel";
+      const payload = {
+        p_product_id: productId,
+        p_warehouse_id: sourceStockLocation.warehouse_id,
+        p_location_id: sourceStockLocation.location_id,
+        p_quantity: numericQuantity,
+        p_reference_no: referenceNo.trim() || null,
+        p_reason: reason.trim() || fallbackReason,
+        p_notes: notes.trim() || null,
+      };
+      result = await supabase.rpc(rpcName, {
+        ...payload,
+        p_idempotency_key: getIdempotencyKey(rpcName, payload),
+      });
     }
 
     if (!result) {
@@ -175,6 +347,7 @@ export default function StockOperationForm() {
       setIsSubmitting(false);
       return;
     }
+
     if (result.error) {
       console.error("Stock operation failed", result.error);
       setErrorMessage("The stock operation could not be completed. Review the values and try again.");
@@ -184,38 +357,213 @@ export default function StockOperationForm() {
 
     idempotencyRef.current = null;
     setSuccessMessage("Stock operation completed successfully.");
-    setReferenceNo(""); setReason(""); setNotes(""); setQuantity("1");
+    setReferenceNo("");
+    setReason("");
+    setNotes("");
+    setQuantity("1");
     await loadProductStockLocations(productId);
     setIsSubmitting(false);
   }
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-      <form onSubmit={handleSubmit} aria-labelledby="stock-operation-title" aria-busy={isSubmitting || isLoadingOptions} className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-8">
-        <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-          <h3 id="stock-operation-title" className="text-lg font-semibold text-gray-800 dark:text-white/90">Run Stock Operation</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Add, remove, transfer, reserve, or release stock using protected, retry-safe inventory operations.</p>
-        </div>
-        {errorMessage && <div role="alert" className="m-5 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
-        {successMessage && <div role="status" aria-live="polite" className="m-5 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">{successMessage}</div>}
+      <form
+        onSubmit={handleSubmit}
+        aria-label="Run Stock Operation"
+        aria-busy={isSubmitting || isLoadingOptions}
+        className="xl:col-span-8"
+      >
+        <ComponentCard
+          title="Run Stock Operation"
+          desc="Add, remove, transfer, reserve, or release stock using protected, retry-safe inventory operations."
+        >
+          {errorMessage ? (
+            <div role="alert">
+              <Alert variant="error" title="Stock operation unavailable" message={errorMessage} />
+            </div>
+          ) : null}
 
-        <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
-          <div className="md:col-span-2"><label htmlFor="stock-operation-type" className={labelClass}>Operation Type</label><select id="stock-operation-type" value={operationType} onChange={(event) => changeOperation(event.target.value as OperationType)} className={controlClass}>{operationOptions.map((operation) => <option key={operation.value} value={operation.value}>{operation.label}</option>)}</select><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{selectedOperation?.description}</p></div>
-          <div className="md:col-span-2"><label htmlFor="stock-operation-product" className={labelClass}>Product <span aria-hidden="true" className="text-error-500">*</span></label><select id="stock-operation-product" value={productId} onChange={(event) => changeProduct(event.target.value)} disabled={isLoadingOptions} required className={controlClass}><option value="">Select product</option>{products.map((product) => <option key={product.id} value={product.id}>{product.sku} - {product.name}</option>)}</select></div>
-          {showSourceLocation && <div className={operationType === "transfer" ? "" : "md:col-span-2"}><label htmlFor="stock-operation-source" className={labelClass}>Source Location <span aria-hidden="true" className="text-error-500">*</span></label><select id="stock-operation-source" value={sourceLocationId} onChange={(event) => setSourceLocationId(event.target.value)} disabled={isLoadingOptions || isLoadingProductLocations || !productId || filteredSourceLocations.length === 0} required className={controlClass}><option value="">{sourcePlaceholder()}</option>{filteredSourceLocations.map((location) => <option key={location.location_id} value={location.location_id}>{location.warehouse_code} / {location.location_code} - {location.location_name} | On Hand: {formatNumber(location.quantity)} | Available: {formatNumber(location.available_quantity)} | Reserved: {formatNumber(location.reserved_quantity)}</option>)}</select></div>}
-          {showTargetLocation && <div className={operationType === "transfer" ? "" : "md:col-span-2"}><label htmlFor="stock-operation-target" className={labelClass}>Target Location <span aria-hidden="true" className="text-error-500">*</span></label><select id="stock-operation-target" value={targetLocationId} onChange={(event) => setTargetLocationId(event.target.value)} disabled={isLoadingOptions} required className={controlClass}><option value="">Select target location</option>{locations.map((location) => <option key={location.location_id} value={location.location_id}>{location.warehouse_code} / {location.location_code} - {location.location_name}</option>)}</select></div>}
-          <div><label htmlFor="stock-operation-quantity" className={labelClass}>Quantity <span aria-hidden="true" className="text-error-500">*</span></label><input id="stock-operation-quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} type="number" min="0.01" step="0.01" required className={controlClass} /></div>
-          <div><label htmlFor="stock-operation-reference" className={labelClass}>Reference No</label><input id="stock-operation-reference" value={referenceNo} onChange={(event) => setReferenceNo(event.target.value)} type="text" placeholder="OP-0001" className={controlClass} /></div>
-          <div className="md:col-span-2"><label htmlFor="stock-operation-reason" className={labelClass}>Reason</label><input id="stock-operation-reason" value={reason} onChange={(event) => setReason(event.target.value)} type="text" placeholder="Optional operation reason" className={controlClass} /></div>
-          <div className="md:col-span-2"><label htmlFor="stock-operation-notes" className={labelClass}>Notes</label><textarea id="stock-operation-notes" value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} placeholder="Optional notes" className={controlClass.replace("h-11 ", "")} /></div>
-        </div>
-        <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800"><button type="submit" disabled={isSubmitting || isLoadingOptions} className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? "Processing..." : "Run Operation"}</button></div>
+          {successMessage ? (
+            <div role="status" aria-live="polite">
+              <Alert variant="success" title="Operation completed" message={successMessage} />
+            </div>
+          ) : null}
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <Label htmlFor="stock-operation-type">Operation Type</Label>
+              <Select
+                id="stock-operation-type"
+                value={operationType}
+                onChange={(value) => changeOperation(value as OperationType)}
+                options={operationOptions.map((operation) => ({
+                  value: operation.value,
+                  label: operation.label,
+                }))}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {selectedOperation?.description}
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
+              <Label htmlFor="stock-operation-product">
+                Product <span aria-hidden="true" className="text-error-500">*</span>
+              </Label>
+              <Select
+                id="stock-operation-product"
+                value={productId}
+                onChange={changeProduct}
+                disabled={isLoadingOptions}
+                required
+                allowEmpty
+                placeholder="Select product"
+                options={products.map((product) => ({
+                  value: product.id,
+                  label: `${product.sku} - ${product.name}`,
+                }))}
+              />
+            </div>
+
+            {showSourceLocation ? (
+              <div className={operationType === "transfer" ? "" : "md:col-span-2"}>
+                <Label htmlFor="stock-operation-source">
+                  Source Location <span aria-hidden="true" className="text-error-500">*</span>
+                </Label>
+                <Select
+                  id="stock-operation-source"
+                  value={sourceLocationId}
+                  onChange={setSourceLocationId}
+                  disabled={
+                    isLoadingOptions ||
+                    isLoadingProductLocations ||
+                    !productId ||
+                    filteredSourceLocations.length === 0
+                  }
+                  required
+                  allowEmpty
+                  placeholder={sourcePlaceholder()}
+                  options={filteredSourceLocations.map((location) => ({
+                    value: location.location_id,
+                    label: `${location.warehouse_code} / ${location.location_code} - ${location.location_name} | On Hand: ${formatNumber(location.quantity)} | Available: ${formatNumber(location.available_quantity)} | Reserved: ${formatNumber(location.reserved_quantity)}`,
+                  }))}
+                />
+              </div>
+            ) : null}
+
+            {showTargetLocation ? (
+              <div className={operationType === "transfer" ? "" : "md:col-span-2"}>
+                <Label htmlFor="stock-operation-target">
+                  Target Location <span aria-hidden="true" className="text-error-500">*</span>
+                </Label>
+                <Select
+                  id="stock-operation-target"
+                  value={targetLocationId}
+                  onChange={setTargetLocationId}
+                  disabled={isLoadingOptions}
+                  required
+                  allowEmpty
+                  placeholder="Select target location"
+                  options={locations.map((location) => ({
+                    value: location.location_id,
+                    label: `${location.warehouse_code} / ${location.location_code} - ${location.location_name}`,
+                  }))}
+                />
+              </div>
+            ) : null}
+
+            <div>
+              <Label htmlFor="stock-operation-quantity">
+                Quantity <span aria-hidden="true" className="text-error-500">*</span>
+              </Label>
+              <Input
+                id="stock-operation-quantity"
+                value={quantity}
+                onChange={(event) => setQuantity(event.target.value)}
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="stock-operation-reference">Reference No</Label>
+              <Input
+                id="stock-operation-reference"
+                value={referenceNo}
+                onChange={(event) => setReferenceNo(event.target.value)}
+                type="text"
+                placeholder="OP-0001"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <Label htmlFor="stock-operation-reason">Reason</Label>
+              <Input
+                id="stock-operation-reason"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                type="text"
+                placeholder="Optional operation reason"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <Label htmlFor="stock-operation-notes">Notes</Label>
+              <TextArea
+                id="stock-operation-notes"
+                value={notes}
+                onChange={setNotes}
+                rows={4}
+                placeholder="Optional notes"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button type="submit" disabled={isSubmitting || isLoadingOptions}>
+              {isSubmitting ? "Processing..." : "Run Operation"}
+            </Button>
+          </div>
+        </ComponentCard>
       </form>
 
-      <aside aria-label="Stock operation guide" className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-4">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Operation Guide</h3><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Choose the operation type and fill the required fields.</p>
-        {selectedProduct && <div className="mt-5 rounded-xl border border-brand-100 bg-brand-50 p-4 dark:border-brand-500/20 dark:bg-brand-500/10"><p className="text-sm font-medium text-brand-700 dark:text-brand-300">Selected Product</p><p className="mt-1 text-xs text-brand-600 dark:text-brand-400">{selectedProduct.sku} - {selectedProduct.name}</p>{showSourceLocation && <p className="mt-2 text-xs text-brand-600 dark:text-brand-400">Available source locations: {filteredSourceLocations.length}</p>}</div>}
-        <div className="mt-5 space-y-4">{operationOptions.map((operation) => <div key={operation.value} className="rounded-xl border border-gray-100 p-4 dark:border-gray-800"><p className="text-sm font-medium text-gray-800 dark:text-white/90">{operation.label}</p><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{operation.description}</p></div>)}</div>
+      <aside aria-label="Stock operation guide" className="xl:col-span-4">
+        <ComponentCard
+          title="Operation Guide"
+          desc="Choose the operation type and fill the required fields."
+        >
+          {selectedProduct ? (
+            <div className="rounded-xl border border-brand-100 bg-brand-50 p-4 dark:border-brand-500/20 dark:bg-brand-500/10">
+              <p className="text-sm font-medium text-brand-700 dark:text-brand-300">Selected Product</p>
+              <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">
+                {selectedProduct.sku} - {selectedProduct.name}
+              </p>
+              {showSourceLocation ? (
+                <p className="mt-2 text-xs text-brand-600 dark:text-brand-400">
+                  Available source locations: {filteredSourceLocations.length}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="space-y-4">
+            {operationOptions.map((operation) => (
+              <div
+                key={operation.value}
+                className="rounded-xl border border-gray-100 p-4 dark:border-gray-800"
+              >
+                <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                  {operation.label}
+                </p>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {operation.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </ComponentCard>
       </aside>
     </div>
   );
