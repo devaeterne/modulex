@@ -34,6 +34,16 @@ type Product = {
   min_stock_level: number;
   product_status: ProductStatus;
   created_at: string;
+  product_type_code?: string | null;
+  product_type_name?: string | null;
+  uom_code?: string | null;
+  uom_name?: string | null;
+  on_hand?: number | string;
+  reserved?: number | string;
+  available?: number | string;
+  qr_status?: "ready" | "missing";
+  stone_type?: string | null;
+  material_price_band?: string | null;
 };
 
 type FilterOption = {
@@ -138,6 +148,9 @@ export default function ProductsTable() {
   const [statusFilter, setStatusFilter] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [uomFilter, setUomFilter] = useState("");
+  const [qrFilter, setQrFilter] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("sku");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
@@ -154,8 +167,8 @@ export default function ProductsTable() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const canManage = hasPermission(profile?.roles, "products.manage");
-  const activeFilterCount = [query, statusFilter, brandFilter, categoryFilter].filter(Boolean).length;
-  const columnCount = canManage ? 8 : 7;
+  const activeFilterCount = [query, statusFilter, brandFilter, categoryFilter, typeFilter, uomFilter, qrFilter].filter(Boolean).length;
+  const columnCount = canManage ? 9 : 8;
 
   const getRpcArgs = useCallback(
     (page: number, requestedPageSize: number) => ({
@@ -165,10 +178,13 @@ export default function ProductsTable() {
       p_status: statusFilter || null,
       p_brand_id: brandFilter || null,
       p_category_id: categoryFilter || null,
+      p_type_id: typeFilter || null,
+      p_uom_id: uomFilter || null,
+      p_qr_status: qrFilter || null,
       p_sort_by: sortBy,
       p_sort_direction: sortDirection,
     }),
-    [query, statusFilter, brandFilter, categoryFilter, sortBy, sortDirection]
+    [query, statusFilter, brandFilter, categoryFilter, typeFilter, uomFilter, qrFilter, sortBy, sortDirection]
   );
 
   const loadProducts = useCallback(
@@ -178,10 +194,10 @@ export default function ProductsTable() {
       if (!background) setIsLoading(true);
       setErrorMessage(null);
 
-      const { data, error } = await supabase.rpc(
-        "get_products_page",
-        getRpcArgs(currentPage, pageSize)
-      );
+      const legacyArgs = getRpcArgs(currentPage, pageSize);
+      let { data, error } = await supabase.rpc("get_products_page_v2", { p_query: query, p_type_id: typeFilter || null, p_uom_id: uomFilter || null, p_status: statusFilter || null, p_qr_status: qrFilter || null, p_brand_id: brandFilter || null, p_category_id: categoryFilter || null, p_sort: sortBy, p_direction: sortDirection, p_page: currentPage, p_page_size: pageSize });
+      const isV2 = !error;
+      if (error) ({ data, error } = await supabase.rpc("get_products_page", legacyArgs));
 
       if (requestId !== requestIdRef.current) return;
 
@@ -197,8 +213,11 @@ export default function ProductsTable() {
         return;
       }
 
-      const payload = data as ProductsPagePayload | null;
-      const nextTotalPages = Math.max(1, Number(payload?.total_pages ?? 1));
+      const rawPayload = data as (ProductsPagePayload & { items?: Array<Record<string, unknown>>; page_size?: number }) | null;
+      const payload = isV2
+        ? { ...rawPayload, items: (rawPayload?.items ?? []).map((item) => { const source = item as unknown as Record<string, unknown>; return ({ product_id: String(source.id), sku: String(source.sku ?? ""), barcode: source.barcode as string | null, product_name: String(source.name ?? ""), base_product_code: "", color_code: "", color_name: null, brand_id: "", category_id: "", brand: String(source.brand ?? ""), category: String(source.category ?? ""), unit: String(source.unit ?? ""), min_stock_level: Number(source.min_stock_level ?? 0), product_status: source.status as ProductStatus, created_at: String(source.created_at ?? ""), product_type_code: source.product_type_code as string | null, product_type_name: source.product_type_name as string | null, uom_code: source.uom_code as string | null, uom_name: source.uom_name as string | null, on_hand: source.on_hand as number | string, reserved: source.reserved as number | string, available: source.available as number | string, qr_status: source.qr_status as "ready" | "missing" }); }) }
+        : rawPayload;
+      const nextTotalPages = Math.max(1, Math.ceil(Number(payload?.total_count ?? 0) / pageSize));
       if (currentPage > nextTotalPages) {
         setCurrentPage(nextTotalPages);
         if (!background) setIsLoading(false);
@@ -274,6 +293,7 @@ export default function ProductsTable() {
     setStatusFilter("");
     setBrandFilter("");
     setCategoryFilter("");
+    setTypeFilter(""); setUomFilter(""); setQrFilter("");
     setSortBy("sku");
     setSortDirection("asc");
     resetToFirstPage();
@@ -613,10 +633,10 @@ export default function ProductsTable() {
         ) : null}
 
         <div className="overflow-x-auto">
-          <table className="min-w-[1080px] divide-y divide-gray-100 dark:divide-gray-800">
+          <table className="w-full min-w-[1280px] divide-y divide-gray-100 dark:divide-gray-800">
             <thead className="bg-gray-50 dark:bg-white/[0.02]">
               <tr>
-                {["SKU", "Product", "Barcode", "Brand", "Category", "Min Stock", "Status"].map((label) => (
+                {["Product", "Type", "Brand / Category", "Variant / Stone", "UOM", "On Hand / Reserved / Available", "QR", "Status"].map((label) => (
                   <th key={label} scope="col" className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>
                 ))}
                 {canManage ? <th scope="col" className="px-5 py-3 text-right text-xs font-medium uppercase text-gray-500 dark:text-gray-400">Actions</th> : null}
@@ -634,21 +654,22 @@ export default function ProductsTable() {
                   const isArchived = product.product_status === "archived";
                   return (
                     <tr key={product.product_id} className="transition hover:bg-gray-50 dark:hover:bg-white/[0.03]">
-                      <td className="px-5 py-4 text-sm font-medium text-gray-800 dark:text-white/90">{product.sku}</td>
                       <td className="px-5 py-4">
                         <p className="text-sm font-medium text-gray-800 dark:text-white/90">{product.product_name}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Family: {product.base_product_code} · Color: {product.color_name || product.color_code} ({product.color_code}) · Unit: {product.unit}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</p>
                       </td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.barcode || "—"}</td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.brand || "—"}</td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.category || "—"}</td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{formatNumber(Number(product.min_stock_level))}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.product_type_name || product.product_type_code || "—"}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.brand || "—"}<br />{product.category || "—"}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.product_type_code === "STONE" ? `${product.stone_type || "Stone"} · ${product.material_price_band || "—"}` : `${product.base_product_code || "—"} · ${product.color_name || product.color_code || "—"}`}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.uom_name || product.uom_code || product.unit}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.on_hand == null ? "—" : `${formatNumber(Number(product.on_hand))} / ${formatNumber(Number(product.reserved))} / ${formatNumber(Number(product.available))}`}</td>
+                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">{product.qr_status || "missing"}</td>
                       <td className="px-5 py-4">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(product.product_status)}`}>{formatStatus(product.product_status)}</span>
                       </td>
                       {canManage ? (
                         <td className="px-5 py-4">
-                          <div className="flex min-w-[330px] items-center justify-end gap-2">
+                          <div className="flex min-w-0 items-center justify-end gap-2">
                             <Link href={`/products/${product.product_id}/edit`} className={`rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}>Edit</Link>
                             <button
                               type="button"
