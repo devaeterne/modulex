@@ -221,8 +221,7 @@ export default function StockMovementsTable() {
     return reversalKeyRef.current.key;
   }
 
-  async function handleReverse(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function handleReverse() {
     if (!selectedMovement || !canReverse) return;
 
     const reason = reversalReason.trim();
@@ -482,7 +481,7 @@ export default function StockMovementsTable() {
               </div>
 
               {modalMode === "reverse" ? (
-                <form id="movement-reversal-form" onSubmit={handleReverse} className="mt-6 space-y-4">
+                <div className="mt-6 space-y-4">
                   {reversalError ? (
                     <div role="alert">
                       <Alert variant="error" title="Correction could not be posted" message={reversalError} />
@@ -526,7 +525,7 @@ export default function StockMovementsTable() {
                       placeholder="Optional correction notes"
                     />
                   </div>
-                </form>
+                </div>
               ) : null}
             </div>
 
@@ -540,7 +539,7 @@ export default function StockMovementsTable() {
                 </Button>
               ) : null}
               {modalMode === "reverse" ? (
-                <Button type="submit" disabled={isReversing} className="bg-error-500 hover:bg-error-600" form="movement-reversal-form" as="button">
+                <Button type="button" disabled={isReversing} onClick={() => void handleReverse()}>
                   {isReversing ? "Posting Correction..." : "Post Correction"}
                 </Button>
               ) : null}
