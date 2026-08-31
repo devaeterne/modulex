@@ -107,5 +107,10 @@
       "react": "^16.8.0 || ^17 || ^18 || ^19",
       "react-dom": "^16.8.0 || ^17 || ^18 || ^19"
     }
+  },
+  "allowScripts": {
+    "sharp@0.34.5": true,
+    "sharp@0.35.4": true,
+    "unrs-resolver@1.11.1": true
   }
 }
