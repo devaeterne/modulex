@@ -17,6 +17,30 @@ assert.match(form, /Product Type/);
 assert.match(form, /Unit of Measure/);
 assert.match(form, /Stone Type/);
 assert.match(form, /Material Price Band/);
+for (const sharedPrimitive of [
+  /ComponentCard/,
+  /<Label/,
+  /<Input/,
+  /<Select/,
+  /<TextArea/,
+  /<Alert/,
+  /<Badge/,
+  /<Button/,
+]) {
+  assert.match(form, sharedPrimitive, "Product create/edit must compose shared Admin UI primitives");
+}
+for (const sectionTitle of [
+  "Product Identity",
+  "Classification & Units",
+  "Inventory & Lifecycle",
+  "Description",
+]) {
+  assert.match(form, new RegExp(sectionTitle), `Product form must expose the ${sectionTitle} section`);
+}
+assert.doesNotMatch(form, /function CustomSelect/, "Product create/edit must use the shared Select primitive");
+assert.doesNotMatch(form, /<input\b/, "Product create/edit must not create route-local native inputs");
+assert.doesNotMatch(form, /<select\b/, "Product create/edit must not create route-local native selects");
+assert.doesNotMatch(form, /<textarea\b/, "Product create/edit must not create route-local native textareas");
 assert.match(manager, /Product Type/);
 assert.match(manager, /Units of Measure/);
 assert.match(manager, /Quantity Type/);

@@ -2,9 +2,16 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { parseDbDecimal } from "@/lib/validation";
-import Button from "@/components/ui/button/Button";
 
 type ProductStatus = "active" | "inactive" | "archived";
 
@@ -68,14 +75,6 @@ type DropdownOption = {
 type ProductFormProps = {
   mode: "create" | "edit";
   productId?: string;
-};
-
-type CustomSelectProps = {
-  label: string;
-  value: string;
-  placeholder: string;
-  options: DropdownOption[];
-  onChange: (value: string) => void;
 };
 
 type ProductWriteError = {
@@ -148,78 +147,6 @@ function productWriteErrorMessage(error: ProductWriteError) {
   return "We couldn’t save the product. Review the master data and try again.";
 }
 
-function CustomSelect({
-  label,
-  value,
-  placeholder,
-  options,
-  onChange,
-}: CustomSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectedOption = options.find((option) => option.value === value);
-
-  return (
-    <div className="relative">
-      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-        {label}
-      </label>
-
-      <button
-        type="button"
-        onClick={() => setIsOpen((current) => !current)}
-        className="flex h-11 w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-left text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-      >
-        <span className={selectedOption ? "" : "text-gray-400"}>
-          {selectedOption?.label || placeholder}
-        </span>
-        <span className="ml-3 text-gray-500 dark:text-gray-400">▾</span>
-      </button>
-
-      {isOpen ? (
-        <>
-          <button
-            type="button"
-            aria-label="Close dropdown"
-            className="fixed inset-0 z-30 cursor-default"
-            onClick={() => setIsOpen(false)}
-          />
-
-          <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-60 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-800 dark:bg-gray-900">
-            {options.length === 0 ? (
-              <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                No options found.
-              </div>
-            ) : (
-              options.map((option) => {
-                const isSelected = option.value === value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      onChange(option.value);
-                      setIsOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${
-                      isSelected
-                        ? "bg-brand-500 text-white"
-                        : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    <span>{option.label}</span>
-                    {isSelected ? <span>✓</span> : null}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
 export default function ProductForm({ mode, productId }: ProductFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -228,11 +155,22 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
   const [values, setValues] = useState<ProductFormValues>(initialValues);
   const [brandOptions, setBrandOptions] = useState<SelectOption[]>([]);
   const [categoryOptions, setCategoryOptions] = useState<SelectOption[]>([]);
-  const [productTypeOptions, setProductTypeOptions] = useState<(SelectOption & { code: string; default_uom_id: string | null; pricing_model: string; requires_variant_identity: boolean })[]>([]);
-  const [uomOptions, setUomOptions] = useState<(SelectOption & { code: string; allows_decimal: boolean })[]>([]);
+  const [productTypeOptions, setProductTypeOptions] = useState<
+    (SelectOption & {
+      code: string;
+      default_uom_id: string | null;
+      pricing_model: string;
+      requires_variant_identity: boolean;
+    })[]
+  >([]);
+  const [uomOptions, setUomOptions] = useState<
+    (SelectOption & { code: string; allows_decimal: boolean })[]
+  >([]);
   const [allowedUoms, setAllowedUoms] = useState<Record<string, string[]>>({});
   const [stoneTypeOptions, setStoneTypeOptions] = useState<SelectOption[]>([]);
-  const [materialBandOptions, setMaterialBandOptions] = useState<(SelectOption & { code: string; price_per_sqft: number | string })[]>([]);
+  const [materialBandOptions, setMaterialBandOptions] = useState<
+    (SelectOption & { code: string; price_per_sqft: number | string })[]
+  >([]);
   const [isLoading, setIsLoading] = useState(mode === "edit" || Boolean(duplicateFrom));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -243,10 +181,25 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     () => brandOptions.map((brand) => ({ value: brand.id, label: brand.name })),
     [brandOptions]
   );
-
   const categoryDropdownOptions = useMemo(
     () => categoryOptions.map((category) => ({ value: category.id, label: category.name })),
     [categoryOptions]
+  );
+  const productTypeDropdownOptions = useMemo(
+    () => productTypeOptions.map((type) => ({ value: type.id, label: type.name })),
+    [productTypeOptions]
+  );
+  const stoneTypeDropdownOptions = useMemo(
+    () => stoneTypeOptions.map((item) => ({ value: item.id, label: item.name })),
+    [stoneTypeOptions]
+  );
+  const materialBandDropdownOptions = useMemo(
+    () =>
+      materialBandOptions.map((item) => ({
+        value: item.id,
+        label: `${item.code} — $${Number(item.price_per_sqft).toFixed(2)} / sq ft`,
+      })),
+    [materialBandOptions]
   );
 
   const statusDropdownOptions: DropdownOption[] =
@@ -279,10 +232,26 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
           .select("id, name")
           .eq("status", "active")
           .order("name", { ascending: true }),
-        supabase.from("product_types").select("id,name,code,default_uom_id,pricing_model,requires_variant_identity").eq("is_active", true).order("sort_order"),
-        supabase.from("units_of_measure").select("id,name,code,allows_decimal").eq("is_active", true).order("sort_order"),
-        supabase.from("countertop_stone_types").select("id,name").eq("is_active", true).order("name"),
-        supabase.from("countertop_material_price_bands").select("id,code,price_per_sqft").eq("is_active", true).order("sort_order"),
+        supabase
+          .from("product_types")
+          .select("id,name,code,default_uom_id,pricing_model,requires_variant_identity")
+          .eq("is_active", true)
+          .order("sort_order"),
+        supabase
+          .from("units_of_measure")
+          .select("id,name,code,allows_decimal")
+          .eq("is_active", true)
+          .order("sort_order"),
+        supabase
+          .from("countertop_stone_types")
+          .select("id,name")
+          .eq("is_active", true)
+          .order("name"),
+        supabase
+          .from("countertop_material_price_bands")
+          .select("id,code,price_per_sqft")
+          .eq("is_active", true)
+          .order("sort_order"),
         supabase.from("product_type_allowed_uoms").select("product_type_id,uom_id"),
       ]);
 
@@ -296,14 +265,27 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       setCategoryOptions(loadedCategories);
       setProductTypeOptions((types ?? []) as typeof productTypeOptions);
       setUomOptions((uoms ?? []) as typeof uomOptions);
-      setAllowedUoms((allowed ?? []).reduce<Record<string, string[]>>((acc, row) => { (acc[row.product_type_id] ??= []).push(row.uom_id); return acc; }, {}));
+      setAllowedUoms(
+        (allowed ?? []).reduce<Record<string, string[]>>((acc, row) => {
+          (acc[row.product_type_id] ??= []).push(row.uom_id);
+          return acc;
+        }, {})
+      );
       setStoneTypeOptions((stoneTypes ?? []) as SelectOption[]);
-      setMaterialBandOptions((bands ?? []).map((row) => ({ id: row.id, name: row.code, code: row.code, price_per_sqft: row.price_per_sqft })) as typeof materialBandOptions);
+      setMaterialBandOptions(
+        (bands ?? []).map((row) => ({
+          id: row.id,
+          name: row.code,
+          code: row.code,
+          price_per_sqft: row.price_per_sqft,
+        })) as typeof materialBandOptions
+      );
       setValues((current) => ({
         ...current,
         brand_id: current.brand_id,
         category_id: current.category_id,
-        product_type_id: current.product_type_id || (types?.find((type) => type.code === "STANDARD")?.id ?? ""),
+        product_type_id:
+          current.product_type_id || (types?.find((type) => type.code === "STANDARD")?.id ?? ""),
       }));
     }
 
@@ -315,13 +297,34 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     return uomOptions.filter((uom) => ids.includes(uom.id));
   }, [allowedUoms, uomOptions, values.product_type_id]);
 
+  const allowedUomDropdownOptions = useMemo(
+    () =>
+      allowedUomOptions.map((uom) => ({
+        value: uom.id,
+        label: `${uom.name} (${uom.code})`,
+      })),
+    [allowedUomOptions]
+  );
+
+  const selectedProductType = useMemo(
+    () => productTypeOptions.find((type) => type.id === values.product_type_id),
+    [productTypeOptions, values.product_type_id]
+  );
+
   useEffect(() => {
     if (!values.product_type_id) return;
     const allowed = allowedUoms[values.product_type_id] ?? [];
     if (values.uom_id && allowed.includes(values.uom_id)) return;
     const type = productTypeOptions.find((item) => item.id === values.product_type_id);
-    const next = type?.default_uom_id && allowed.includes(type.default_uom_id) ? type.default_uom_id : allowed[0] ?? "";
-    setValues((current) => ({ ...current, uom_id: next, unit: uomOptions.find((item) => item.id === next)?.code.toLowerCase() ?? current.unit }));
+    const next =
+      type?.default_uom_id && allowed.includes(type.default_uom_id)
+        ? type.default_uom_id
+        : allowed[0] ?? "";
+    setValues((current) => ({
+      ...current,
+      uom_id: next,
+      unit: uomOptions.find((item) => item.id === next)?.code.toLowerCase() ?? current.unit,
+    }));
   }, [allowedUoms, productTypeOptions, uomOptions, values.product_type_id, values.uom_id]);
 
   useEffect(() => {
@@ -341,7 +344,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
 
       if (error) {
         console.error("Failed to load product:", error);
-        setErrorMessage("Product data could not be loaded. Please return to the product list and try again.");
+        setErrorMessage(
+          "Product data could not be loaded. Please return to the product list and try again."
+        );
         setIsLoading(false);
         return;
       }
@@ -361,8 +366,8 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
         color_code: isDuplicate ? "" : product.color_code ?? "",
         color_name: isDuplicate ? "" : product.color_name ?? "",
         unit: product.unit ?? "piece",
-        product_type_id: (product as ProductRow & { product_type_id?: string }).product_type_id ?? current.product_type_id,
-        uom_id: (product as ProductRow & { uom_id?: string }).uom_id ?? current.uom_id,
+        product_type_id: product.product_type_id ?? current.product_type_id,
+        uom_id: product.uom_id ?? current.uom_id,
         min_stock_level: String(product.min_stock_level ?? 0),
         status: isDuplicate ? "active" : product.status,
         qr_value: isDuplicate ? "" : product.qr_value ?? "",
@@ -371,8 +376,21 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
         qr_generated_at: isDuplicate ? "" : product.qr_generated_at ?? "",
       }));
 
-      const { data: profile } = await supabase.from("countertop_stone_product_profiles").select("stone_type_id,material_price_band_id,vendor_name,source_ref").eq("product_id", sourceProductId).maybeSingle();
-      if (profile) setValues((current) => ({ ...current, stone_type_id: profile.stone_type_id, material_price_band_id: profile.material_price_band_id, vendor_name: profile.vendor_name ?? "", source_ref: profile.source_ref ?? "" }));
+      const { data: profile } = await supabase
+        .from("countertop_stone_product_profiles")
+        .select("stone_type_id,material_price_band_id,vendor_name,source_ref")
+        .eq("product_id", sourceProductId)
+        .maybeSingle();
+
+      if (profile) {
+        setValues((current) => ({
+          ...current,
+          stone_type_id: profile.stone_type_id,
+          material_price_band_id: profile.material_price_band_id,
+          vendor_name: profile.vendor_name ?? "",
+          source_ref: profile.source_ref ?? "",
+        }));
+      }
 
       setIsLoading(false);
     }
@@ -384,13 +402,55 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     setValues((current) => ({ ...current, [field]: value }));
   }
 
-  async function generateQr(productId: string, force = false) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return { ok: false, message: "Your session has expired. Sign in again before generating the QR code." };
-    const response = await fetch("/api/admin/products/qr", { method: "POST", headers: { "content-type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ product_id: productId, force }) });
-    const body = await response.json().catch(() => ({})) as { error?: string; qr_value?: string; qr_svg_path?: string; qr_svg_url?: string; qr_generated_at?: string };
-    if (!response.ok) return { ok: false, message: response.status === 401 ? "Your session has expired. Sign in again before generating the QR code." : response.status === 403 ? "You do not have permission to generate product QR codes." : body.error || "Product was saved, but the QR file could not be generated. Retry QR." };
-    setValues((current) => ({ ...current, qr_value: body.qr_value ?? current.sku, qr_svg_path: body.qr_svg_path ?? current.qr_svg_path, qr_svg_url: body.qr_svg_url ?? current.qr_svg_url, qr_generated_at: body.qr_generated_at ?? current.qr_generated_at }));
+  async function generateQr(productIdForQr: string, force = false) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      return {
+        ok: false,
+        message: "Your session has expired. Sign in again before generating the QR code.",
+      };
+    }
+
+    const response = await fetch("/api/admin/products/qr", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ product_id: productIdForQr, force }),
+    });
+
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      qr_value?: string;
+      qr_svg_path?: string;
+      qr_svg_url?: string;
+      qr_generated_at?: string;
+    };
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        message:
+          response.status === 401
+            ? "Your session has expired. Sign in again before generating the QR code."
+            : response.status === 403
+              ? "You do not have permission to generate product QR codes."
+              : body.error || "Product was saved, but the QR file could not be generated. Retry QR.",
+      };
+    }
+
+    setValues((current) => ({
+      ...current,
+      qr_value: body.qr_value ?? current.sku,
+      qr_svg_path: body.qr_svg_path ?? current.qr_svg_path,
+      qr_svg_url: body.qr_svg_url ?? current.qr_svg_url,
+      qr_generated_at: body.qr_generated_at ?? current.qr_generated_at,
+    }));
+
     return { ok: true, message: "QR code generated." };
   }
 
@@ -399,13 +459,21 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     if (!values.name.trim()) return "Product name is required.";
     if (!values.brand_id) return "Brand is required.";
     if (!values.category_id) return "Category is required.";
-    const selectedType = productTypeOptions.find((type) => type.id === values.product_type_id);
-    if (selectedType?.requires_variant_identity && !values.base_product_code.trim()) return "Base product code is required.";
-    if (selectedType?.requires_variant_identity && !values.color_code.trim()) return "Color code is required.";
+    if (selectedProductType?.requires_variant_identity && !values.base_product_code.trim()) {
+      return "Base product code is required.";
+    }
+    if (selectedProductType?.requires_variant_identity && !values.color_code.trim()) {
+      return "Color code is required.";
+    }
     if (!values.unit.trim()) return "Unit is required.";
     if (!values.product_type_id) return "Product type is required.";
     if (!values.uom_id) return "Unit of measure is required.";
-    if (selectedType?.pricing_model === "countertop_material_band" && (!values.stone_type_id || !values.material_price_band_id)) return "Stone type and material price band are required for countertop material products.";
+    if (
+      selectedProductType?.pricing_model === "countertop_material_band" &&
+      (!values.stone_type_id || !values.material_price_band_id)
+    ) {
+      return "Stone type and material price band are required for countertop material products.";
+    }
 
     const minStock = parseDbDecimal(values.min_stock_level, {
       precision: 12,
@@ -438,6 +506,7 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       min: 0,
       allowNull: false,
     });
+
     if (minStock.error || minStock.value === null) {
       setErrorMessage(`Minimum stock level: ${minStock.error ?? "A value is required."}`);
       setIsSubmitting(false);
@@ -451,11 +520,9 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       description: values.description.trim() || null,
       brand_id: values.brand_id,
       category_id: values.category_id,
-      // Legacy columns remain NOT NULL; standalone types receive deterministic neutral mirrors.
       base_product_code: values.base_product_code.trim() || values.sku.trim(),
       color_code: values.color_code.trim() || "DEFAULT",
       color_name: values.color_name.trim() || null,
-      // Compatibility mirrors; DB trigger remains authoritative.
       brand: selectedBrand?.name ?? null,
       category: selectedCategory?.name ?? null,
       unit: values.unit.trim(),
@@ -465,10 +532,17 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
       status: values.status,
     };
 
-    const selectedTypeForSave = productTypeOptions.find((type) => type.id === values.product_type_id);
     const { data: savedId, error: resultError } = await supabase.rpc("save_product_master_v2", {
       p_product: { ...payload, id: mode === "edit" ? productId : null },
-      p_stone_profile: selectedTypeForSave?.pricing_model === "countertop_material_band" ? { stone_type_id: values.stone_type_id, material_price_band_id: values.material_price_band_id, vendor_name: values.vendor_name.trim() || null, source_ref: values.source_ref.trim() || null } : null,
+      p_stone_profile:
+        selectedProductType?.pricing_model === "countertop_material_band"
+          ? {
+              stone_type_id: values.stone_type_id,
+              material_price_band_id: values.material_price_band_id,
+              vendor_name: values.vendor_name.trim() || null,
+              source_ref: values.source_ref.trim() || null,
+            }
+          : null,
     });
 
     if (resultError) {
@@ -493,26 +567,8 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
     router.refresh();
   }
 
-  if (isLoading) {
-    return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex min-h-[240px] items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">Loading product...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const title =
-    mode === "edit"
-      ? "Edit Product"
-      : duplicateFrom
-        ? "Duplicate Product"
-        : "Create Product";
-
+    mode === "edit" ? "Edit Product" : duplicateFrom ? "Duplicate Product" : "Create Product";
   const description =
     mode === "edit"
       ? "Update canonical product master data."
@@ -520,240 +576,369 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
         ? "Create a new color variant from an existing product family."
         : "Create a new product variant record.";
 
+  if (isLoading) {
+    return (
+      <ComponentCard title={title} desc={description}>
+        <Alert
+          variant="info"
+          title="Loading product"
+          message="Canonical product master data is being loaded."
+        />
+      </ComponentCard>
+    );
+  }
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
-    >
-      <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{title}</h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <ComponentCard title={title} desc={description}>
+        <div className="flex flex-wrap gap-2">
+          <Badge color={values.status === "active" ? "success" : values.status === "archived" ? "dark" : "light"} size="sm">
+            {values.status === "active" ? "Active" : values.status === "archived" ? "Archived" : "Inactive"}
+          </Badge>
+          {selectedProductType ? (
+            <Badge color="primary" size="sm">
+              {selectedProductType.name}
+            </Badge>
+          ) : null}
+          {values.uom_id ? (
+            <Badge color="light" size="sm">
+              {uomOptions.find((uom) => uom.id === values.uom_id)?.code ?? "UOM"}
+            </Badge>
+          ) : null}
+        </div>
+      </ComponentCard>
 
       {errorMessage ? (
-        <div className="m-5 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
-          {errorMessage}
-        </div>
+        <Alert variant="error" title="Unable to save product" message={errorMessage} />
       ) : null}
 
-      <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            SKU <span className="text-error-500">*</span>
-          </label>
-          <input
-            value={values.sku}
-            onChange={(event) => updateField("sku", event.target.value)}
-            type="text"
-            placeholder="NB-B30"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Barcode</label>
-          <input
-            value={values.barcode}
-            onChange={(event) => updateField("barcode", event.target.value)}
-            type="text"
-            placeholder="860000000001"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Product Name <span className="text-error-500">*</span>
-          </label>
-          <input
-            value={values.name}
-            onChange={(event) => updateField("name", event.target.value)}
-            type="text"
-            placeholder="Product name"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Base Product Code <span className="text-error-500">*</span>
-          </label>
-          <input
-            value={values.base_product_code}
-            onChange={(event) => updateField("base_product_code", event.target.value)}
-            type="text"
-            placeholder="B30"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Variants sharing this code must use the same brand and category.
-          </p>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Color Code <span className="text-error-500">*</span>
-          </label>
-          <input
-            value={values.color_code}
-            onChange={(event) => updateField("color_code", event.target.value)}
-            type="text"
-            placeholder="NB"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Color Name</label>
-          <input
-            value={values.color_name}
-            onChange={(event) => updateField("color_name", event.target.value)}
-            type="text"
-            placeholder="Navy Blue"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
-        </div>
-
-        <CustomSelect
-          label="Brand *"
-          value={values.brand_id}
-          placeholder="Select brand"
-          options={brandDropdownOptions}
-          onChange={(value) => updateField("brand_id", value)}
-        />
-
-        <CustomSelect
-          label="Category *"
-          value={values.category_id}
-          placeholder="Select category"
-          options={categoryDropdownOptions}
-          onChange={(value) => updateField("category_id", value)}
-        />
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Product Type *</label>
-          <select value={values.product_type_id} onChange={(event) => {
-            const nextType = productTypeOptions.find((type) => type.id === event.target.value);
-            updateField("product_type_id", event.target.value);
-            if (nextType?.default_uom_id) updateField("uom_id", nextType.default_uom_id);
-          }} className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90">
-            <option value="">Select product type...</option>
-            {productTypeOptions.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Unit of Measure <span className="text-error-500">*</span>
-          </label>
-          <select value={values.uom_id} onChange={(event) => { const uom = uomOptions.find((item) => item.id === event.target.value); updateField("uom_id", event.target.value); if (uom) updateField("unit", uom.code.toLowerCase()); }} className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90">
-            <option value="">Select unit...</option>
-            {allowedUomOptions.map((uom) => <option key={uom.id} value={uom.id}>{uom.name} ({uom.code})</option>)}
-          </select>
-        </div>
-
-        {productTypeOptions.find((type) => type.id === values.product_type_id)?.pricing_model === "countertop_material_band" ? (
-          <div className="md:col-span-2 grid grid-cols-1 gap-5 rounded-xl border border-gray-200 p-4 dark:border-gray-800 md:grid-cols-2">
-            <div><label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Stone Type *</label><select value={values.stone_type_id} onChange={(event) => updateField("stone_type_id", event.target.value)} className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"><option value="">Select stone type...</option>{stoneTypeOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-            <div><label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Material Price Band *</label><select value={values.material_price_band_id} onChange={(event) => updateField("material_price_band_id", event.target.value)} className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"><option value="">Select material band...</option>{materialBandOptions.map((item) => <option key={item.id} value={item.id}>{item.code} — ${Number(item.price_per_sqft).toFixed(2)} / sq ft</option>)}</select></div>
-            <div><label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Vendor</label><input value={values.vendor_name} onChange={(event) => updateField("vendor_name", event.target.value)} className="h-11 w-full rounded-lg border border-gray-200 px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90" /></div>
-            <div><label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Source</label><input value={values.source_ref} onChange={(event) => updateField("source_ref", event.target.value)} className="h-11 w-full rounded-lg border border-gray-200 px-4 text-sm dark:border-gray-800 dark:bg-gray-900 dark:text-white/90" /></div>
+      <ComponentCard
+        title="Product Identity"
+        desc="Maintain the canonical SKU, product name and variant identity used across orders and inventory."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <Label htmlFor="product-sku">SKU *</Label>
+            <Input
+              id="product-sku"
+              value={values.sku}
+              onChange={(event) => updateField("sku", event.target.value)}
+              placeholder="NB-B30"
+              required
+            />
           </div>
-        ) : null}
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Minimum Stock Level</label>
-          <input
-            value={values.min_stock_level}
-            onChange={(event) => updateField("min_stock_level", event.target.value)}
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="0"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
+          <div>
+            <Label htmlFor="product-barcode">Barcode</Label>
+            <Input
+              id="product-barcode"
+              value={values.barcode}
+              onChange={(event) => updateField("barcode", event.target.value)}
+              placeholder="860000000001"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="product-name">Product Name *</Label>
+            <Input
+              id="product-name"
+              value={values.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              placeholder="Product name"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="base-product-code">Base Product Code</Label>
+            <Input
+              id="base-product-code"
+              value={values.base_product_code}
+              onChange={(event) => updateField("base_product_code", event.target.value)}
+              placeholder="B30"
+              hint={
+                selectedProductType?.requires_variant_identity
+                  ? "Required for this Product Type. Variants sharing the code must use the same brand and category."
+                  : "Used when this Product Type participates in family/variant identity."
+              }
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="color-code">Color Code</Label>
+            <Input
+              id="color-code"
+              value={values.color_code}
+              onChange={(event) => updateField("color_code", event.target.value)}
+              placeholder="NB"
+              hint={
+                selectedProductType?.requires_variant_identity
+                  ? "Required for this Product Type."
+                  : "Optional for standalone product types."
+              }
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <Label htmlFor="color-name">Color Name</Label>
+            <Input
+              id="color-name"
+              value={values.color_name}
+              onChange={(event) => updateField("color_name", event.target.value)}
+              placeholder="Navy Blue"
+            />
+          </div>
         </div>
+      </ComponentCard>
 
-        <CustomSelect
-          label="Status"
-          value={values.status}
-          placeholder="Select status"
-          options={statusDropdownOptions}
-          onChange={(value) => updateField("status", value as ProductStatus)}
-        />
+      <ComponentCard
+        title="Classification & Units"
+        desc="Assign canonical taxonomy, Product Type and one allowed Unit of Measure."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <Label>Brand *</Label>
+            <Select
+              placeholder="Select brand"
+              value={values.brand_id}
+              options={brandDropdownOptions}
+              onChange={(value) => updateField("brand_id", value)}
+            />
+          </div>
 
-        <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Description</label>
-          <textarea
+          <div>
+            <Label>Category *</Label>
+            <Select
+              placeholder="Select category"
+              value={values.category_id}
+              options={categoryDropdownOptions}
+              onChange={(value) => updateField("category_id", value)}
+            />
+          </div>
+
+          <div>
+            <Label>Product Type *</Label>
+            <Select
+              placeholder="Select product type"
+              value={values.product_type_id}
+              options={productTypeDropdownOptions}
+              onChange={(value) => {
+                const nextType = productTypeOptions.find((type) => type.id === value);
+                setValues((current) => ({
+                  ...current,
+                  product_type_id: value,
+                  uom_id: nextType?.default_uom_id ?? current.uom_id,
+                }));
+              }}
+            />
+          </div>
+
+          <div>
+            <Label>Unit of Measure *</Label>
+            <Select
+              placeholder="Select unit"
+              value={values.uom_id}
+              options={allowedUomDropdownOptions}
+              onChange={(value) => {
+                const uom = uomOptions.find((item) => item.id === value);
+                setValues((current) => ({
+                  ...current,
+                  uom_id: value,
+                  unit: uom?.code.toLowerCase() ?? current.unit,
+                }));
+              }}
+            />
+          </div>
+        </div>
+      </ComponentCard>
+
+      {selectedProductType?.pricing_model === "countertop_material_band" ? (
+        <ComponentCard
+          title="Countertop Material"
+          desc="Connect this Stone product to the controlled material type and price band masters."
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label>Stone Type *</Label>
+              <Select
+                placeholder="Select stone type"
+                value={values.stone_type_id}
+                options={stoneTypeDropdownOptions}
+                onChange={(value) => updateField("stone_type_id", value)}
+              />
+            </div>
+
+            <div>
+              <Label>Material Price Band *</Label>
+              <Select
+                placeholder="Select material band"
+                value={values.material_price_band_id}
+                options={materialBandDropdownOptions}
+                onChange={(value) => updateField("material_price_band_id", value)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="stone-vendor">Vendor</Label>
+              <Input
+                id="stone-vendor"
+                value={values.vendor_name}
+                onChange={(event) => updateField("vendor_name", event.target.value)}
+                placeholder="Vendor name"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="stone-source">Source</Label>
+              <Input
+                id="stone-source"
+                value={values.source_ref}
+                onChange={(event) => updateField("source_ref", event.target.value)}
+                placeholder="Source reference"
+              />
+            </div>
+          </div>
+        </ComponentCard>
+      ) : null}
+
+      <ComponentCard
+        title="Inventory & Lifecycle"
+        desc="Configure the low-stock threshold and product lifecycle state."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <Label htmlFor="minimum-stock">Minimum Stock Level</Label>
+            <Input
+              id="minimum-stock"
+              value={values.min_stock_level}
+              onChange={(event) => updateField("min_stock_level", event.target.value)}
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0"
+              hint="Low-stock reporting compares Available quantity to this threshold."
+            />
+          </div>
+
+          <div>
+            <Label>Status</Label>
+            <Select
+              placeholder="Select status"
+              value={values.status}
+              options={statusDropdownOptions}
+              onChange={(value) => updateField("status", value as ProductStatus)}
+            />
+          </div>
+        </div>
+      </ComponentCard>
+
+      <ComponentCard
+        title="Description"
+        desc="Add operator-facing product context without changing classification or pricing behavior."
+      >
+        <div>
+          <Label>Description</Label>
+          <TextArea
             value={values.description}
-            onChange={(event) => updateField("description", event.target.value)}
+            onChange={(value) => updateField("description", value)}
             rows={4}
             placeholder="Product description"
-            className="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
           />
         </div>
-      </div>
+      </ComponentCard>
 
       {mode === "edit" ? (
-        <div className="px-5 pb-5">
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
-            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">Product QR Code</h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400">This QR code is linked to this product SKU.</p>
+        <ComponentCard
+          title="Product QR Code"
+          desc="The canonical QR payload remains the current SKU and is generated through the protected Admin API."
+        >
+          <div className="grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-center">
+            {values.qr_svg_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={values.qr_svg_url}
+                alt={`${values.sku} QR code`}
+                className="h-40 w-40 object-contain"
+              />
+            ) : (
+              <Alert
+                variant="info"
+                title="QR pending"
+                message="QR SVG has not been generated for this product yet."
+              />
+            )}
+
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Badge color={values.qr_svg_url ? "success" : "warning"} size="sm">
+                  {values.qr_svg_url ? "QR Ready" : "QR Pending"}
+                </Badge>
+                <Badge color="light" size="sm">
+                  {values.qr_value || values.sku}
+                </Badge>
               </div>
 
-              {values.qr_svg_url ? (
-                <a
-                  href={values.qr_svg_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs font-medium text-brand-500 hover:text-brand-600"
-                >
-                  Open SVG
-                </a>
-              ) : null}
-            </div>
+              <dl className="grid gap-3">
+                <div>
+                  <dt>SVG Path</dt>
+                  <dd className="break-all">{values.qr_svg_path || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Generated At</dt>
+                  <dd>
+                    {values.qr_generated_at
+                      ? new Date(values.qr_generated_at).toLocaleString("en-US")
+                      : "—"}
+                  </dd>
+                </div>
+              </dl>
 
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="flex h-40 w-40 items-center justify-center rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white">
+              <div className="flex flex-wrap gap-3">
                 {values.qr_svg_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={values.qr_svg_url}
-                    alt={`${values.sku} QR code`}
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <span className="text-center text-xs text-gray-400">QR SVG not generated yet.</span>
-                )}
-              </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => window.open(values.qr_svg_url, "_blank", "noopener,noreferrer")}
+                  >
+                    Open SVG
+                  </Button>
+                ) : null}
 
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">QR Value:</span>{" "}
-                  <span className="font-medium text-gray-800 dark:text-white/90">{values.qr_value || values.sku}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">SVG Path:</span>{" "}
-                  <span className="break-all font-medium text-gray-800 dark:text-white/90">{values.qr_svg_path || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500 dark:text-gray-400">Generated At:</span>{" "}
-                  <span className="font-medium text-gray-800 dark:text-white/90">
-                    {values.qr_generated_at ? new Date(values.qr_generated_at).toLocaleString("en-US") : "-"}
-                  </span>
-                </div>
-                {mode === "edit" && productId ? <Button size="sm" disabled={isSubmitting} onClick={async () => { setIsSubmitting(true); const result = await generateQr(productId, true); if (!result.ok) setErrorMessage(result.message); else setErrorMessage(null); setIsSubmitting(false); }}>Regenerate QR</Button> : null}
+                {productId ? (
+                  <Button
+                    size="sm"
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={async () => {
+                      setIsSubmitting(true);
+                      const result = await generateQr(productId, true);
+                      setErrorMessage(result.ok ? null : result.message);
+                      setIsSubmitting(false);
+                    }}
+                  >
+                    Regenerate QR
+                  </Button>
+                ) : null}
               </div>
             </div>
           </div>
-        </div>
+        </ComponentCard>
       ) : null}
 
-      <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800">
-        <Button variant="outline" onClick={() => router.push("/products")}>Cancel</Button>
-        <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Product"}</Button>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button
+          className="w-full sm:w-auto"
+          variant="outline"
+          type="button"
+          disabled={isSubmitting}
+          onClick={() => router.push("/products")}
+        >
+          Cancel
+        </Button>
+        <Button className="w-full sm:w-auto" type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Product"}
+        </Button>
       </div>
     </form>
   );
