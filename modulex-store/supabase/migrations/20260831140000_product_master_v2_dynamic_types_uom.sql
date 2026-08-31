@@ -193,6 +193,14 @@ drop trigger if exists trg_product_types_reference_guard on public.product_types
 create trigger trg_product_types_reference_guard before update on public.product_types for each row execute function private.guard_product_master_reference_lifecycle();
 drop trigger if exists trg_units_reference_guard on public.units_of_measure;
 create trigger trg_units_reference_guard before update on public.units_of_measure for each row execute function private.guard_product_master_reference_lifecycle();
+create or replace function private.guard_product_type_uom_relation() returns trigger language plpgsql security definer set search_path=pg_catalog,public as $$
+begin
+  if tg_op='DELETE' and old.is_default then raise exception 'Default UOM cannot be removed from a product type.'; end if;
+  if tg_op='UPDATE' and old.is_default and not new.is_default then raise exception 'A product type must retain its default UOM.'; end if;
+  return coalesce(new,old);
+end; $$;
+drop trigger if exists trg_product_type_uom_relation_guard on public.product_type_allowed_uoms;
+create trigger trg_product_type_uom_relation_guard before update or delete on public.product_type_allowed_uoms for each row execute function private.guard_product_type_uom_relation();
 
 do $$ begin
   if not exists (select 1 from public.products where product_type_id is null or uom_id is null) then
