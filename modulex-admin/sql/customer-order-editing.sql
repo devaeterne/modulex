@@ -80,6 +80,8 @@ declare
   v_item_count integer := 0;
   v_item_id uuid;
   v_seen_ids uuid[] := '{}'::uuid[];
+  v_retained_ids uuid[] := '{}'::uuid[];
+  v_line_offset integer;
   v_existing public.customer_order_items%rowtype;
   v_is_configured boolean;
 begin
@@ -132,6 +134,39 @@ begin
     if v_shipping_snapshot is null then raise exception 'Shipping address does not belong to this customer.'; end if;
   end if;
 
+  -- Validate every incoming line and configured-line omission before any line mutation.
+  for v_item in select value from jsonb_array_elements(p_items)
+  loop
+    v_item_id := nullif(v_item->>'id','')::uuid;
+    if v_item_id is not null then
+      if v_item_id = any(v_seen_ids) then raise exception 'Duplicate order item id in revision.'; end if;
+      v_seen_ids := array_append(v_seen_ids, v_item_id);
+      v_retained_ids := array_append(v_retained_ids, v_item_id);
+      select * into v_existing from public.customer_order_items where id = v_item_id and order_id = p_order_id for update;
+      if v_existing.id is null then raise exception 'Order item does not belong to this order.'; end if;
+      v_is_configured := exists(select 1 from public.countertop_configurations where order_item_id = v_item_id);
+      if v_is_configured and (v_existing.product_id is distinct from nullif(v_item->>'product_id','')::uuid or v_existing.quantity is distinct from coalesce((v_item->>'quantity')::numeric,0) or v_existing.unit_price is distinct from coalesce((v_item->>'unit_price')::numeric,-1) or v_existing.discount_percent is distinct from coalesce((v_item->>'discount_percent')::numeric,0)) then
+        raise exception 'Configured countertop lines must be changed in the countertop configurator.';
+      end if;
+    end if;
+    v_product_id := nullif(v_item->>'product_id','')::uuid;
+    v_quantity := coalesce((v_item->>'quantity')::numeric, 0);
+    v_unit_price := coalesce((v_item->>'unit_price')::numeric, -1);
+    v_discount_percent := coalesce((v_item->>'discount_percent')::numeric, 0);
+    if v_product_id is null then raise exception 'Product is required for every line.'; end if;
+    if v_quantity <= 0 then raise exception 'Quantity must be greater than zero.'; end if;
+    if v_unit_price < 0 then raise exception 'Unit price cannot be negative.'; end if;
+    if v_discount_percent < 0 or v_discount_percent > 100 then raise exception 'Line discount must be between 0 and 100.'; end if;
+    select p.sku into v_sku from public.products p where p.id = v_product_id and p.status <> 'archived';
+    if v_sku is null then raise exception 'Product does not exist or is archived.'; end if;
+  end loop;
+  for v_existing in select * from public.customer_order_items where order_id = p_order_id for update loop
+    if not (v_existing.id = any(v_retained_ids)) and exists(select 1 from public.countertop_configurations where order_item_id = v_existing.id) then
+      raise exception 'Configured countertop lines cannot be removed in a generic revision.';
+    end if;
+  end loop;
+  v_seen_ids := '{}'::uuid[];
+
   select coalesce(max(revision_number), 0) + 1 into v_revision_number
   from public.customer_order_revisions where order_id = p_order_id;
 
@@ -143,6 +178,18 @@ begin
     to_jsonb(v_order),
     coalesce((select jsonb_agg(to_jsonb(i) order by i.line_no) from public.customer_order_items i where i.order_id = p_order_id), '[]'::jsonb)
   );
+
+  -- Remove only ordinary lines omitted by the validated revision, then move retained
+  -- rows out of the unique line-number range before assigning final positions.
+  delete from public.customer_order_items i
+  where i.order_id = p_order_id
+    and not (i.id = any(v_retained_ids))
+    and not exists(select 1 from public.countertop_configurations c where c.order_item_id = i.id);
+  select coalesce(max(line_no), 0) + jsonb_array_length(p_items) + 1000 into v_line_offset
+  from public.customer_order_items where order_id = p_order_id;
+  update public.customer_order_items
+  set line_no = line_no + v_line_offset
+  where order_id = p_order_id and id = any(v_retained_ids);
 
   for v_item in select value from jsonb_array_elements(p_items)
   loop
@@ -202,13 +249,6 @@ begin
 
     v_subtotal := v_subtotal + v_line_total;
     v_item_count := v_item_count + 1;
-  end loop;
-
-  for v_existing in select * from public.customer_order_items where order_id = p_order_id for update loop
-    if not (v_existing.id = any(v_seen_ids)) and exists(select 1 from public.countertop_configurations where order_item_id = v_existing.id) then
-      raise exception 'Configured countertop lines cannot be removed in a generic revision.';
-    end if;
-    if not (v_existing.id = any(v_seen_ids)) then delete from public.customer_order_items where id = v_existing.id; end if;
   end loop;
 
   if p_order_discount_amount > v_subtotal then raise exception 'Order discount cannot exceed subtotal.'; end if;
