@@ -6,16 +6,53 @@ import path from "node:path";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 
-const [dashboard, header, sidebar, adminLayout] = await Promise.all([
+const [dashboard, header, sidebar, adminLayout, packageJsonText] = await Promise.all([
   readFile(path.join(root, "src/components/dashboard/ModulexDashboard.tsx"), "utf8"),
   readFile(path.join(root, "src/layout/AppHeader.tsx"), "utf8"),
   readFile(path.join(root, "src/layout/AppSidebar.tsx"), "utf8"),
   readFile(path.join(root, "src/app/(admin)/layout.tsx"), "utf8"),
+  readFile(path.join(root, "package.json"), "utf8"),
 ]);
+
+const packageJson = JSON.parse(packageJsonText);
+
+for (const primitive of [
+  "ComponentCard",
+  "Alert",
+  "Button",
+  "TableViewport",
+  "TableHeader",
+  "TableBody",
+  "TableRow",
+  "TableCell",
+]) {
+  assert.match(
+    dashboard,
+    new RegExp(`\\b${primitive}\\b`),
+    `Dashboard must compose the shared ${primitive} primitive`,
+  );
+}
+
+assert.doesNotMatch(
+  dashboard,
+  /<(?:button|table|thead|tbody|tr|th|td)\b/,
+  "Dashboard must not reimplement shared button or table primitives",
+);
+
+assert.match(
+  packageJson.scripts?.["smoke:dashboard-ui"] ?? "",
+  /dashboard-shell-ui-contract\.mjs/,
+  "Dashboard UI contract must be available through the package smoke convention",
+);
+assert.match(
+  packageJson.scripts?.smoke ?? "",
+  /npm run smoke:dashboard-ui/,
+  "Dashboard UI contract must run in the normal Admin smoke chain",
+);
 
 assert.match(
   dashboard,
-  /overflow-x-auto[\s\S]{0,300}<table className="min-w-\[720px\]/,
+  /<TableViewport>[\s\S]{0,300}<Table variant="admin" className="min-w-\[720px\]/,
   "Dashboard recent movements table must scroll horizontally on narrow screens and keep a readable minimum width",
 );
 

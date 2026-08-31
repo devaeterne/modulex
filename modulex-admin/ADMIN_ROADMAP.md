@@ -1,10 +1,15 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-08-31
-Main baseline: `82cc94508c7845d0dd50cd8e4ae9ff0e855db965`
+Last reviewed: 2026-09-01
+Main baseline: `f3996f6a519cc819dfc903e73102e7700373d192`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
 Current Admin next action: **Product Master UX v2 implementation and acceptance; preserve the closed A3.1/A3.2/A3.3 and Countertop / Stone / Sink contracts.**
+
+## Admin UI standardization program
+
+- [x] Standardize the production Dashboard with shared TailAdmin cards, alerts, buttons, and admin table primitives without changing KPI/RPC, retry, or role-filtering behavior.
+  - `smoke:dashboard-ui` is wired into the normal Admin smoke chain; Dashboard UI, Admin UI, production-surface, RBAC, TypeScript, lint, production build, and diff-check passed locally.
 
 ## Product Master UX v2
 
