@@ -43,4 +43,34 @@ for (const surface of surfaces) {
   expect(!source.includes('href="#"') && !source.includes("javascript:void") && !source.includes("TailAdmin"), `${surface.route} must not ship dead/template controls`);
 }
 
+const warehouseTable = read("src/components/warehouses/WarehousesTable.tsx");
+const warehouseForm = read("src/components/warehouses/WarehouseForm.tsx");
+const warehouseUi = `${warehouseTable}\n${warehouseForm}`;
+
+for (const primitive of [
+  "ComponentCard",
+  "Input",
+  "Label",
+  "Select",
+  "TextArea",
+  "Checkbox",
+  "Alert",
+  "Badge",
+  "Button",
+  "TableViewport",
+  "TableHeader",
+  "TableBody",
+  "TableRow",
+  "TableCell",
+]) {
+  expect(warehouseUi.includes(primitive), `Warehouse UI must compose shared ${primitive} primitives`);
+}
+
+expect(!warehouseUi.includes("function CustomSelect"), "Warehouse form must not ship a route-local select implementation");
+expect(!/<(?:input|textarea|table|thead|tbody|tr|th|td|button)\b/.test(warehouseUi), "Warehouse domain UI must not reimplement shared form, button, or table primitives");
+expect(warehouseTable.includes('<Table variant="admin"'), "Warehouse directory must use the shared admin table variant");
+expect(warehouseTable.includes("<TableViewport>"), "Warehouse directory must use the shared responsive table viewport");
+expect(warehouseForm.includes('htmlFor="warehouse-code"') && warehouseForm.includes('id="warehouse-code"'), "Warehouse code label must remain associated with its input");
+expect(warehouseForm.includes('htmlFor="warehouse-type"') && warehouseForm.includes('id="warehouse-type"'), "Warehouse type label must remain associated with its select");
+
 console.log("inventory + warehouse + QR UI contract: ok");
