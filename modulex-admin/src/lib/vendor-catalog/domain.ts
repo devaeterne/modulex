@@ -82,7 +82,10 @@ function normalizedAssets(product: NormalizedVendorProduct) {
     );
 }
 
-function normalizedProductSnapshot(product: NormalizedVendorProduct) {
+function normalizedProductSnapshot(
+  product: NormalizedVendorProduct,
+  options: { includeDiscoveryScope: boolean }
+) {
   return {
     vendorCode: product.vendorCode,
     externalId: product.externalId,
@@ -92,8 +95,12 @@ function normalizedProductSnapshot(product: NormalizedVendorProduct) {
     productUrl: product.productUrl,
     vendorPriceReference: product.vendorPriceReference,
     vendorCurrency: product.vendorCurrency,
-    vendorCategoryKey: product.vendorCategoryKey,
-    vendorCategoryLabel: product.vendorCategoryLabel,
+    ...(options.includeDiscoveryScope
+      ? {
+          vendorCategoryKey: product.vendorCategoryKey,
+          vendorCategoryLabel: product.vendorCategoryLabel,
+        }
+      : {}),
     familyKey: product.familyKey,
     variantCode: product.variantCode,
     variantLabel: product.variantLabel,
@@ -102,11 +109,15 @@ function normalizedProductSnapshot(product: NormalizedVendorProduct) {
 }
 
 export function stableDiscoveryHash(product: NormalizedVendorProduct) {
-  return hashSnapshot(normalizedProductSnapshot(product));
+  return hashSnapshot(
+    normalizedProductSnapshot(product, { includeDiscoveryScope: false })
+  );
 }
 
 export function stableProductHash(product: NormalizedVendorProduct) {
-  return hashSnapshot(normalizedProductSnapshot(product));
+  return hashSnapshot(
+    normalizedProductSnapshot(product, { includeDiscoveryScope: true })
+  );
 }
 
 export function classifyVendorProduct(
