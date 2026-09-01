@@ -206,8 +206,8 @@ for (const primitive of ["ComponentCard", "Label", "Select", "Input", "Alert", "
   expect(qrLabels.includes(primitive), `QR Labels UI must compose shared ${primitive} primitives`);
 }
 expect(!/<(?:input|select|button)\b/.test(qrLabels), "QR Labels screen UI must not reimplement shared input, select, or button primitives");
-expect(qrLabels.includes('.from("zones")') && qrLabels.includes('.eq("is_active", true)'), "QR Labels must keep active zone loading");
-expect(qrLabels.includes('.from("locations")'), "QR Labels must keep active location loading");
+expect(/\.from\("zones"\)(?:(?!\.from\("locations"\))[\s\S])*?\.eq\("is_active", true\)/.test(qrLabels), "QR Labels must keep active-only zone loading on the zones query");
+expect(/\.from\("locations"\)[\s\S]{0,900}?\.eq\("is_active", true\)/.test(qrLabels), "QR Labels must keep active-only location loading on the locations query");
 expect(qrLabels.includes('location.qr_code?.startsWith("LOC-")'), "QR Labels must preserve canonical location QR-code compatibility behavior");
 expect(qrLabels.includes("buildZoneQrPayload") && qrLabels.includes("buildLocationQrPayload"), "QR Labels must preserve canonical QR payload generation");
 expect(qrLabels.includes('window.addEventListener("afterprint"'), "QR Labels must preserve after-print cleanup");
