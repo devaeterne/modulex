@@ -15,11 +15,13 @@ import {
   TableHeader,
   TableRow,
   TableViewport,
+  TableStateRow,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
 
+const TABLE_COLUMN_COUNT = 7;
 type WarehouseType = "sellable" | "non_sellable";
 
 type WarehouseRow = {
@@ -227,7 +229,7 @@ export default function WarehousesTable() {
       ) : null}
 
       <TableViewport>
-        <Table variant="admin" className="min-w-[1080px]">
+        <Table variant="admin" minWidth="wide">
           <TableHeader variant="admin">
             <TableRow>
               {["Warehouse", "Type", "QR", "Structure", "Status", "Updated"].map((label) => (
@@ -243,17 +245,13 @@ export default function WarehousesTable() {
 
           <TableBody variant="admin">
             {isLoading ? (
-              <TableRow>
-                <TableCell variant="admin" colSpan={7} className="py-8 text-center">
+              <TableStateRow colSpan={TABLE_COLUMN_COUNT}>
                   Loading warehouses...
-                </TableCell>
-              </TableRow>
+                </TableStateRow>
             ) : filteredWarehouses.length === 0 ? (
-              <TableRow>
-                <TableCell variant="admin" colSpan={7} className="py-8 text-center">
+              <TableStateRow colSpan={TABLE_COLUMN_COUNT}>
                   No warehouses found.
-                </TableCell>
-              </TableRow>
+                </TableStateRow>
             ) : (
               filteredWarehouses.map((warehouse) => {
                 const isActionLoading = actionLoadingId === warehouse.id;

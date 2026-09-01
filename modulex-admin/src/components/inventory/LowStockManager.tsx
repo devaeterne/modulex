@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
   TableViewport,
+  TableStateRow,
 } from "@/components/ui/table";
 import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
@@ -53,6 +54,7 @@ type RetryAction =
 
 type BadgeColor = "primary" | "success" | "error" | "warning" | "info" | "light";
 
+const TABLE_COLUMN_COUNT = 9;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const RPC_PAGE_SIZE = 100;
 
@@ -485,7 +487,7 @@ export default function LowStockManager() {
         </div>
 
         <TableViewport>
-          <Table variant="admin" className="w-full min-w-[1120px]">
+          <Table variant="admin" minWidth="wide">
             <caption className="sr-only">Low stock products and minimum thresholds</caption>
             <TableHeader variant="admin">
               <TableRow>
@@ -518,19 +520,15 @@ export default function LowStockManager() {
 
             <TableBody variant="admin">
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={9} variant="admin" className="py-10 text-center">
-                    <span role="status">Loading stock thresholds...</span>
-                  </TableCell>
-                </TableRow>
+                <TableStateRow colSpan={TABLE_COLUMN_COUNT}>
+                  <span role="status">Loading stock thresholds...</span>
+                </TableStateRow>
               ) : paginatedRows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} variant="admin" className="py-10 text-center">
-                    {view === "alerts"
+                <TableStateRow colSpan={TABLE_COLUMN_COUNT}>
+                  {view === "alerts"
                       ? "No low-stock alerts right now."
                       : "No products match the current filters."}
-                  </TableCell>
-                </TableRow>
+                </TableStateRow>
               ) : (
                 paginatedRows.map((row) => {
                   const state = stockState(row);
