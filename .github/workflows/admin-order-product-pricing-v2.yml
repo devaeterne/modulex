@@ -1,0 +1,61 @@
+name: Admin Order Product Pricing v2
+
+on:
+  pull_request:
+    paths:
+      - "modulex-admin/src/components/customers/**"
+      - "modulex-admin/src/lib/customers/**"
+      - "modulex-admin/sql/customer-order-*.sql"
+      - "modulex-admin/scripts/order-product-pricing-v2-contract.mjs"
+      - "modulex-store/supabase/migrations/*order_product_pricing_v2*.sql"
+      - "modulex-admin/ADMIN_ROADMAP.md"
+      - ".github/workflows/admin-order-product-pricing-v2.yml"
+  push:
+    paths:
+      - "modulex-admin/src/components/customers/**"
+      - "modulex-admin/src/lib/customers/**"
+      - "modulex-admin/sql/customer-order-*.sql"
+      - "modulex-admin/scripts/order-product-pricing-v2-contract.mjs"
+      - "modulex-store/supabase/migrations/*order_product_pricing_v2*.sql"
+      - "modulex-admin/ADMIN_ROADMAP.md"
+      - ".github/workflows/admin-order-product-pricing-v2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  order-product-pricing-v2:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: Order Product Type pricing contract
+        run: node scripts/order-product-pricing-v2-contract.mjs
+      - name: Order domain regression
+        run: npm run smoke:order-domain
+      - name: Order lifecycle regression
+        run: npm run smoke:order-lifecycle
+      - name: Price Group / Dealer regression
+        run: npm run smoke:a3-3-pricing
+      - name: Inventory reservation / movement regression
+        run: npm run smoke:a2-inventory-movements
+      - name: Countertop calculate / attach regression
+        run: npm run smoke:countertop-domain
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Admin UI Foundation regression
+        run: npm run smoke:admin-ui
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
