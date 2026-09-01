@@ -2,8 +2,6 @@
 
 Status: `[~]` implementation + final-HEAD CI verification complete in PR #216. Production acceptance is intentionally not marked complete.
 
-Final verified HEAD: `874787a57e2a543397a2ad2e55e7fa982b5ebe3d`.
-
 ## Architecture contract
 
 - `customer_orders` / `customer_order_items` remain the canonical Order aggregate.
