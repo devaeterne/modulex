@@ -20,6 +20,9 @@ assert(configurator.includes("canCalculate"), "CountertopConfigurator must track
 assert(/disabled=\{!canCalculate\}/.test(configurator), "Calculate price must be disabled until required fields are complete");
 assert(configurator.includes("Inherited from the saved order"), "Countertop price group must be explained as inherited from the saved order");
 assert(configurator.includes("dark:text-gray-300"), "Countertop field labels must be readable in dark mode");
+assert(configurator.includes("products(id,name,sku,status)"), "Stone discovery must read Product lifecycle status");
+assert(configurator.includes('x.products?.status === "active"'), "Inactive Stone products must not appear in Order configuration");
+assert(configurator.includes('.eq("available_for_orders", true).eq("internal_only", false)'), "Countertop pricing context must only expose order-eligible commercial price groups");
 
 assert(fs.existsSync(path.join(root, catalogRoutePath)), "Countertop Catalog route must exist");
 assert(fs.existsSync(path.join(root, catalogManagerPath)), "Countertop Catalog manager must exist");
@@ -36,6 +39,7 @@ assert(catalogManager.includes("Add Stone"), "Countertop Catalog must expose Add
 assert(catalogManager.includes("Add Sink"), "Countertop Catalog must expose Add Sink");
 assert(catalogManager.includes('rpc("save_countertop_catalog_product"'), "Countertop Catalog must use the atomic catalog RPC");
 assert(catalogManager.includes('available_for_orders'), "Sink pricing must load order-eligible commercial price groups");
+assert(catalogManager.includes('internal_only'), "Sink pricing must exclude internal-only price groups");
 assert(catalogManager.includes("Material Price Band"), "Stone catalog must expose Material Price Band");
 assert(catalogManager.includes("Stone Type"), "Stone catalog must expose Stone Type");
 assert(catalogManager.includes("Sink prices"), "Sink catalog must expose per-price-group prices");
@@ -44,5 +48,7 @@ assert(catalogSql.includes("create or replace function private.save_countertop_c
 assert(catalogSql.includes("create or replace function public.save_countertop_catalog_product"), "Catalog migration must expose a public wrapper");
 assert(catalogSql.includes("public.save_product_master_v2"), "Catalog RPC must reuse Product Master v2 validation");
 assert(catalogSql.includes("public.set_product_prices_bulk"), "Catalog RPC must reuse canonical append-safe product pricing");
+assert(catalogSql.includes("Countertop catalog management requires admin permission"), "Catalog RPC must fail closed for non-admin callers");
+assert(catalogSql.includes("each active order price group exactly once"), "Sink pricing must fail closed unless every commercial order price group is priced exactly once");
 
 console.log("Order countertop context contract: PASS");
