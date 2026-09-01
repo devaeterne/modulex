@@ -14,21 +14,7 @@ const modalPath = "src/components/customers/ManualServiceLineModal.tsx";
 const detailsPath = "src/components/customers/ServiceLineDetails.tsx";
 
 assertExists(migrationPath, "repo must contain the manual Service order-line migration");
-assertExists(modalPath, "manual Service entry must use one shared modal component");
-assertExists(detailsPath, "manual Service detail must use one shared historical line-detail component");
-
 const migration = read(migrationPath);
-const modal = read(modalPath);
-const serviceDetails = read(detailsPath);
-const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
-const editOrder = read("src/components/customers/EditCustomerOrder.tsx");
-const picker = read("src/components/customers/OrderProductPicker.tsx");
-const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
-const orderPrint = read("src/components/customers/CustomerOrderPrint.tsx");
-const invoiceDetail = read("src/components/customers/CustomerInvoiceDetail.tsx");
-const invoicePrint = read("src/components/customers/CustomerInvoicePrint.tsx");
-const orderDomain = read("src/lib/customers/order-domain.ts");
-const types = read("src/lib/customers/types.ts");
 
 for (const token of [
   "manual_service",
@@ -65,6 +51,21 @@ assert(/new\.price_source\s*:?=\s*'manual'/i.test(migration), "manual Service pr
 assert(/pricing_model_snapshot\s*=\s*'manual_service'|pricing_model_snapshot\s*<>\s*'manual_service'/i.test(migration), "inventory functions must identify manual_service from the saved pricing snapshot");
 assert(/customer_invoice_items[\s\S]*line_note/i.test(migration) && /customer_order_items[\s\S]*line_note/i.test(migration), "invoice creation must copy the historical Service line_note from order to invoice");
 assert(/item\s*->>\s*'line_note'/i.test(migration), "canonical order JSON parsing must preserve Service line_note");
+
+assertExists(modalPath, "manual Service entry must use one shared modal component");
+assertExists(detailsPath, "manual Service detail must use one shared historical line-detail component");
+
+const modal = read(modalPath);
+const serviceDetails = read(detailsPath);
+const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
+const editOrder = read("src/components/customers/EditCustomerOrder.tsx");
+const picker = read("src/components/customers/OrderProductPicker.tsx");
+const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
+const orderPrint = read("src/components/customers/CustomerOrderPrint.tsx");
+const invoiceDetail = read("src/components/customers/CustomerInvoiceDetail.tsx");
+const invoicePrint = read("src/components/customers/CustomerInvoicePrint.tsx");
+const orderDomain = read("src/lib/customers/order-domain.ts");
+const types = read("src/lib/customers/types.ts");
 
 for (const source of [newOrder, editOrder]) {
   assert(source.includes("PlusIcon"), "New/Edit Order actions must use the shared PlusIcon SVG");
