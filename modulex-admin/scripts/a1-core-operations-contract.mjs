@@ -18,17 +18,21 @@ const confirmationPatchPath = "sql/a1-order-confirmation-validation.sql";
 const legacyCompatibilityPath = "sql/a1-order-legacy-progression-compatibility.sql";
 const fulfillmentCompatibilityPath = "sql/a1-fulfillment-order-status-compatibility.sql";
 const productLifecyclePath = "sql/a1-order-product-lifecycle-compatibility.sql";
+const orderPricingMigrationPath = "../modulex-store/supabase/migrations/20260901130000_order_product_pricing_routing.sql";
 assert.equal(exists(sqlPath), true, "A1 core operations hardening SQL contract must exist");
 assert.equal(exists(confirmationPatchPath), true, "A1 order confirmation validation patch must exist");
 assert.equal(exists(legacyCompatibilityPath), true, "A1 legacy order progression compatibility patch must exist");
 assert.equal(exists(fulfillmentCompatibilityPath), true, "A1 fulfillment/order compatibility patch must exist");
 assert.equal(exists(productLifecyclePath), true, "A1 order product lifecycle compatibility patch must exist");
+assert.equal(exists(orderPricingMigrationPath), true, "Order Product Type pricing routing migration must exist");
 
 const sql = read(sqlPath);
 const confirmationPatch = read(confirmationPatchPath);
 const legacyCompatibility = read(legacyCompatibilityPath);
 const fulfillmentCompatibility = read(fulfillmentCompatibilityPath);
 const productLifecycle = read(productLifecyclePath);
+const orderPricing = read(orderPricingMigrationPath);
+const orderPicker = read("src/components/customers/OrderProductPicker.tsx");
 const shipmentDetail = read("src/components/customers/CustomerShipmentDetailRBAC.tsx");
 const installationDetail = read("src/components/customers/CustomerInstallationDetail.tsx");
 const permissions = read("src/lib/auth/permissions.ts");
@@ -50,6 +54,29 @@ assert.match(legacyCompatibility, /update of\s+price_group_id,\s*payment_method_
 assert.doesNotMatch(legacyCompatibility, /update of[^\n]+\bstatus\b/i, "legacy confirmed orders must not be revalidated only because their status advances");
 assert.match(productLifecycle, /p\.status\s*<>\s*'active'/i, "order confirmation must reject inactive or archived products");
 assert.match(productLifecycle, /active products/i, "product lifecycle rejection must explain the active-product requirement");
+
+// Orders v2: Product Type selects pricing route; UOM is measure-only; all money is DB-authoritative.
+assert.match(orderPricing, /product_type_code_snapshot/i, "order lines must snapshot Product Type semantics");
+assert.match(orderPricing, /uom_code_snapshot/i, "order lines must snapshot UOM semantics");
+assert.match(orderPricing, /pricing_model_snapshot/i, "order lines must snapshot pricing route semantics");
+assert.match(orderPricing, /pricing_model\s*=\s*'price_group'/i, "Price Group products must have an explicit routing branch");
+assert.match(orderPricing, /product_prices/i, "Price Group pricing must reuse canonical product_prices");
+assert.match(orderPricing, /pricing_model\s*=\s*'countertop_material_band'/i, "Stone must have an explicit Countertop Material Band routing branch");
+assert.match(orderPricing, /canonical Countertop workspace/i, "ordinary Stone pricing must fail closed with an actionable route");
+assert.match(orderPricing, /pricing_model\s*=\s*'none'/i, "No Commercial Pricing must fail closed at DB boundary");
+assert.match(orderPricing, /Client-provided unit_price is ignored/i, "client unit-price tampering must be ignored");
+assert.match(orderPricing, /reconcile_customer_order_totals_from_lines/i, "order header totals must be reconciled from authoritative line snapshots");
+assert.match(orderPricing, /modulex\.countertop_attach/i, "only the canonical countertop attach flow may update Stone pricing lines");
+assert.match(orderPricing, /countertop_reservation_quantity/i, "countertop slab reservation quantity must remain canonical");
+assert.match(orderPicker, /Product Type/, "Create/Edit product picker must expose Product Type");
+assert.match(orderPicker, /UOM/, "Create/Edit product picker must expose UOM");
+assert.match(orderPicker, /Pricing Route/, "Create/Edit product picker must expose a friendly pricing route");
+assert.match(orderPicker, /Price Group/, "Price Group label must be friendly");
+assert.match(orderPicker, /Countertop Material Band/, "Countertop pricing label must be friendly");
+assert.match(orderPicker, /No Commercial Pricing/, "none pricing label must be friendly");
+assert.match(orderPicker, /@\/components\/ui\/button\/Button/, "Order picker must use shared Button primitive");
+assert.match(orderPicker, /@\/components\/form\/Select/, "Order picker must use shared Select primitive");
+assert.match(orderPicker, /TableViewport/, "Order picker must use shared table primitives");
 
 // Shipments: strict warehouse flow, no backwards jumps or order-state regression.
 assert.match(sql, /customer_shipment_status_transition_allowed/i, "shipment transition helper must exist");
@@ -84,8 +111,8 @@ assert.match(installationDetail, /in_progress[\s\S]{0,260}completed/i, "in-progr
 // Invoice/payment boundary: active internal roles, no new portal invoice/payment surface.
 assert.match(permissions, /"invoices\.manage"/, "Admin permission model must retain invoice mutation permission");
 assert.match(permissions, /finance:[\s\S]*"invoices\.manage"/, "Finance must retain invoice management permission");
-assert.doesNotMatch(sql + confirmationPatch + legacyCompatibility + fulfillmentCompatibility + productLifecycle, /get_store_portal_(?:invoice|payment)/i, "A1 must not add portal invoice/payment RPCs");
-assert.doesNotMatch(sql + confirmationPatch + legacyCompatibility + fulfillmentCompatibility + productLifecycle, /create\s+table[\s\S]{0,80}(?:payment_transactions|customer_payments|payment_ledger)/i, "standalone payment ledger remains deferred");
+assert.doesNotMatch(sql + confirmationPatch + legacyCompatibility + fulfillmentCompatibility + productLifecycle + orderPricing, /get_store_portal_(?:invoice|payment)/i, "A1 must not add portal invoice/payment RPCs");
+assert.doesNotMatch(sql + confirmationPatch + legacyCompatibility + fulfillmentCompatibility + productLifecycle + orderPricing, /create\s+table[\s\S]{0,80}(?:payment_transactions|customer_payments|payment_ledger)/i, "standalone payment ledger remains deferred");
 
 // Existing Store contracts are the cross-roadmap proof that portal data is intentionally narrower.
 assert.match(storePortalContract, /unit_price\|subtotal\|tax_amount\|total_amount\|grand_total\|payment_commission_amount\|internal_notes/i, "Store order contract must guard financial/internal fields");
