@@ -28,8 +28,12 @@ function bearerToken(request: Request) {
 }
 
 function isCronSecret(token: string) {
-  const secret = process.env.CRON_SECRET ?? process.env.VENDOR_CATALOG_SYNC_SECRET;
-  return Boolean(secret && token && secureEquals(token, secret));
+  if (!token) return false;
+  const secrets = [
+    process.env.CRON_SECRET,
+    process.env.VENDOR_CATALOG_SYNC_SECRET,
+  ].filter((secret): secret is string => Boolean(secret));
+  return secrets.some((secret) => secureEquals(token, secret));
 }
 
 async function authorizeAdminSession(token: string) {
