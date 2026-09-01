@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
+const exists = (path) => existsSync(resolve(root, path));
 
 const domain = read("src/lib/vendor-catalog/domain.ts");
 const adapters = read("src/lib/vendor-catalog/adapters.ts");
@@ -139,5 +140,55 @@ assert.match(docs, /Modulex selling price/i);
 assert.match(docs, /store-media/i);
 assert.match(docs, /external image/i);
 assert.match(docs, /How to add a vendor/i);
+
+// Review v3 RED contract: scoped discovery, durable check snapshots, family grouping,
+// mapping-driven approval and server-side review pagination.
+assert.match(domain, /VendorCatalogCategory/);
+assert.match(domain, /VendorCatalogDiscoveryScope/);
+assert.match(domain, /familyKey/);
+assert.match(domain, /variantCode/);
+assert.match(domain, /variantLabel/);
+assert.match(domain, /listCategories\?/);
+assert.match(adapters, /listCategories/);
+assert.match(adapters, /collections\.json/);
+assert.match(adapters, /collections\/.*products\.json/);
+assert.match(adapters, /category=/);
+assert.match(adapters, /KARRAN_COLOR/);
+assert.match(sync, /VendorCatalogDiscoveryScope/);
+assert.match(sync, /vendor_category_key/);
+assert.match(sync, /family_key/);
+assert.match(sync, /sync_mode/);
+
+assert.equal(exists("src/lib/vendor-catalog/check.ts"), true, "check service is required");
+assert.equal(exists("src/lib/vendor-catalog/mappings.ts"), true, "mapping service is required");
+assert.equal(exists("src/app/api/vendor-catalog/check/route.ts"), true, "check route is required");
+assert.equal(
+  exists("src/app/api/vendor-catalog/category-mappings/route.ts"),
+  true,
+  "category mapping route is required"
+);
+assert.equal(exists("sql/vendor-catalog-sync-family-v3.sql"), true, "family v3 SQL is required");
+assert.equal(
+  exists("../modulex-store/supabase/migrations/20260902093000_vendor_catalog_sync_family_v3.sql"),
+  true,
+  "family v3 deployable migration is required"
+);
+
+assert.match(approve, /CATEGORY_MAPPING_REQUIRED/);
+assert.doesNotMatch(approve, /resolveSinkMasters/);
+assert.match(approve, /family_key/);
+assert.match(approve, /variant_code/);
+assert.match(approve, /color_code/);
+assert.match(page, /PAGE_SIZE_OPTIONS/);
+assert.match(page, /count:\s*"exact"/);
+assert.match(page, /\.range\(/);
+assert.match(page, /Check Updates/);
+assert.match(page, /Sync New \+ Updated/);
+assert.match(page, /Complete Import/);
+assert.match(page, /Edit Product/);
+assert.match(page, /Edit Store Product/);
+assert.match(page, /Linked \/ Unlinked|Linked status/);
+assert.match(page, /family_key/);
+assert.match(page, /vendor_category_key/);
 
 console.log("vendor catalog sync contract: ok");
