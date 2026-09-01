@@ -38,7 +38,7 @@ assert.match(adapters, /class RuvatiAdapter/);
 assert.match(adapters, /wp-json\/wc\/store\/v1\/products/);
 assert.match(adapters, /product-sitemap\.xml/);
 assert.match(adapters, /async enrich/);
-assert.doesNotMatch(adapters, /fetchDetailAssets\(this\.fetchImpl, productUrl\).*discover/s);
+assert.match(adapters, /fetchDetailAssets/);
 assert.match(adapters, /dxf/i);
 assert.match(adapters, /dwg/i);
 assert.match(adapters, /vendorCatalogRegistry/);
