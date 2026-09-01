@@ -2,8 +2,16 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase/client";
 import { QRCodeSVG } from "qrcode.react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import { supabase } from "@/lib/supabase/client";
 
 type WarehouseType = "sellable" | "non_sellable";
 
@@ -40,12 +48,6 @@ type ZoneFormProps = {
   initialWarehouseId?: string;
 };
 
-type WarehouseSelectProps = {
-  value: string;
-  options: WarehouseOption[];
-  onChange: (value: string) => void;
-};
-
 const initialValues: ZoneFormValues = {
   warehouse_id: "",
   code: "",
@@ -55,242 +57,53 @@ const initialValues: ZoneFormValues = {
 };
 
 function normalizeZoneCode(value: string) {
-  return value
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^A-Z0-9-_]/g, "");
+  return value.trim().toUpperCase().replace(/\s+/g, "-").replace(/[^A-Z0-9-_]/g, "");
 }
 
 function normalizeWarehouseCode(value: string) {
-  return value
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^A-Z0-9-_]/g, "");
+  return value.trim().toUpperCase().replace(/\s+/g, "-").replace(/[^A-Z0-9-_]/g, "");
 }
 
-function buildZoneQrCode(
-  warehouseCode: string,
-  zoneCode: string
-) {
-  const normalizedWarehouseCode =
-    normalizeWarehouseCode(warehouseCode);
-
-  const normalizedZoneCode =
-    normalizeZoneCode(zoneCode);
-
-  if (!normalizedWarehouseCode || !normalizedZoneCode) {
-    return "";
-  }
-
+function buildZoneQrCode(warehouseCode: string, zoneCode: string) {
+  const normalizedWarehouseCode = normalizeWarehouseCode(warehouseCode);
+  const normalizedZoneCode = normalizeZoneCode(zoneCode);
+  if (!normalizedWarehouseCode || !normalizedZoneCode) return "";
   return `ZONE-${normalizedWarehouseCode}-${normalizedZoneCode}`;
 }
 
-function buildZoneQrPayload(
-  warehouseCode: string,
-  zoneCode: string
-) {
-  const normalizedWarehouseCode =
-    normalizeWarehouseCode(warehouseCode);
-
-  const normalizedZoneCode =
-    normalizeZoneCode(zoneCode);
-
-  if (!normalizedWarehouseCode || !normalizedZoneCode) {
-    return "";
-  }
-
+function buildZoneQrPayload(warehouseCode: string, zoneCode: string) {
+  const normalizedWarehouseCode = normalizeWarehouseCode(warehouseCode);
+  const normalizedZoneCode = normalizeZoneCode(zoneCode);
+  if (!normalizedWarehouseCode || !normalizedZoneCode) return "";
   return `ZONE|${normalizedWarehouseCode}|${normalizedZoneCode}`;
 }
 
 function formatWarehouseType(type: WarehouseType) {
-  switch (type) {
-    case "sellable":
-      return "Sellable";
-
-    case "non_sellable":
-      return "Non-sellable";
-
-    default:
-      return type;
-  }
+  return type === "sellable" ? "Sellable" : "Non-sellable";
 }
 
-function warehouseTypeClass(type: WarehouseType) {
-  switch (type) {
-    case "sellable":
-      return "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400";
-
-    case "non_sellable":
-      return "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400";
-
-    default:
-      return "bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400";
-  }
-}
-
-function WarehouseSelect({
-  value,
-  options,
-  onChange,
-}: WarehouseSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const selectedWarehouse = options.find(
-    (option) => option.id === value
-  );
-
-  return (
-    <div className="relative">
-      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-        Warehouse <span className="text-error-500">*</span>
-      </label>
-
-      <button
-        type="button"
-        onClick={() => setIsOpen((current) => !current)}
-        className="flex min-h-11 w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-left text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-      >
-        {selectedWarehouse ? (
-          <span className="flex items-center gap-2">
-            <span className="font-medium">
-              {selectedWarehouse.code}
-            </span>
-
-            <span className="text-gray-500 dark:text-gray-400">
-              {selectedWarehouse.name}
-            </span>
-          </span>
-        ) : (
-          <span className="text-gray-400">
-            Select warehouse
-          </span>
-        )}
-
-        <span className="ml-3 text-gray-500 dark:text-gray-400">
-          ▾
-        </span>
-      </button>
-
-      {isOpen && (
-        <>
-          <button
-            type="button"
-            aria-label="Close warehouse dropdown"
-            className="fixed inset-0 z-30 cursor-default"
-            onClick={() => setIsOpen(false)}
-          />
-
-          <div className="absolute left-0 right-0 top-full z-40 mt-2 max-h-80 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg dark:border-gray-800 dark:bg-gray-900">
-            {options.map((warehouse) => {
-              const isSelected = warehouse.id === value;
-
-              return (
-                <button
-                  key={warehouse.id}
-                  type="button"
-                  onClick={() => {
-                    onChange(warehouse.id);
-                    setIsOpen(false);
-                  }}
-                  className={`flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-left ${isSelected
-                    ? "bg-brand-500 text-white"
-                    : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.06]"
-                    }`}
-                >
-                  <span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">
-                        {warehouse.code}
-                      </span>
-
-                      {!warehouse.is_active && (
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${isSelected
-                            ? "bg-white/15 text-white"
-                            : "bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
-                            }`}
-                        >
-                          Inactive
-                        </span>
-                      )}
-                    </span>
-
-                    <span
-                      className={`mt-0.5 block text-xs ${isSelected
-                        ? "text-white/80"
-                        : "text-gray-500 dark:text-gray-400"
-                        }`}
-                    >
-                      {warehouse.name} ·{" "}
-                      {formatWarehouseType(
-                        warehouse.warehouse_type
-                      )}
-                    </span>
-                  </span>
-
-                  {isSelected && <span>✓</span>}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-export default function ZoneForm({
-  mode,
-  zoneId,
-  initialWarehouseId,
-}: ZoneFormProps) {
+export default function ZoneForm({ mode, zoneId, initialWarehouseId }: ZoneFormProps) {
   const router = useRouter();
-
-  const [values, setValues] =
-    useState<ZoneFormValues>(initialValues);
-
-  const [warehouses, setWarehouses] =
-    useState<WarehouseOption[]>([]);
-
-  const [originalQrPayload, setOriginalQrPayload] =
-    useState<string | null>(null);
-
-  const [isLoading, setIsLoading] =
-    useState(true);
-
-  const [isSubmitting, setIsSubmitting] =
-    useState(false);
-
-  const [errorMessage, setErrorMessage] =
-    useState<string | null>(null);
+  const [values, setValues] = useState<ZoneFormValues>(initialValues);
+  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
+  const [originalQrPayload, setOriginalQrPayload] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const selectedWarehouse = useMemo(
-    () =>
-      warehouses.find(
-        (warehouse) =>
-          warehouse.id === values.warehouse_id
-      ) ?? null,
-    [warehouses, values.warehouse_id]
+    () => warehouses.find((warehouse) => warehouse.id === values.warehouse_id) ?? null,
+    [warehouses, values.warehouse_id],
   );
 
   const generatedQrCode = useMemo(
-    () =>
-      buildZoneQrCode(
-        selectedWarehouse?.code ?? "",
-        values.code
-      ),
-    [selectedWarehouse, values.code]
+    () => buildZoneQrCode(selectedWarehouse?.code ?? "", values.code),
+    [selectedWarehouse, values.code],
   );
 
   const generatedQrPayload = useMemo(
-    () =>
-      buildZoneQrPayload(
-        selectedWarehouse?.code ?? "",
-        values.code
-      ),
-    [selectedWarehouse, values.code]
+    () => buildZoneQrPayload(selectedWarehouse?.code ?? "", values.code),
+    [selectedWarehouse, values.code],
   );
 
   useEffect(() => {
@@ -298,17 +111,10 @@ export default function ZoneForm({
       setIsLoading(true);
       setErrorMessage(null);
 
-      const {
-        data: warehouseData,
-        error: warehouseError,
-      } = await supabase
+      const { data: warehouseData, error: warehouseError } = await supabase
         .from("warehouses")
-        .select(
-          "id, code, name, warehouse_type, is_active"
-        )
-        .order("code", {
-          ascending: true,
-        });
+        .select("id, code, name, warehouse_type, is_active")
+        .order("code", { ascending: true });
 
       if (warehouseError) {
         setErrorMessage(warehouseError.message);
@@ -316,26 +122,15 @@ export default function ZoneForm({
         return;
       }
 
-      const loadedWarehouses =
-        (warehouseData as WarehouseOption[]) ?? [];
-
+      const loadedWarehouses = (warehouseData as WarehouseOption[]) ?? [];
       setWarehouses(loadedWarehouses);
 
       if (mode === "create") {
         const requestedWarehouse =
-          initialWarehouseId &&
-            loadedWarehouses.some(
-              (warehouse) =>
-                warehouse.id === initialWarehouseId
-            )
+          initialWarehouseId && loadedWarehouses.some((warehouse) => warehouse.id === initialWarehouseId)
             ? initialWarehouseId
             : "";
-
-        setValues({
-          ...initialValues,
-          warehouse_id: requestedWarehouse,
-        });
-
+        setValues({ ...initialValues, warehouse_id: requestedWarehouse });
         setOriginalQrPayload(null);
         setIsLoading(false);
         return;
@@ -347,14 +142,9 @@ export default function ZoneForm({
         return;
       }
 
-      const {
-        data: zoneData,
-        error: zoneError,
-      } = await supabase
+      const { data: zoneData, error: zoneError } = await supabase
         .from("zones")
-        .select(
-          "id, warehouse_id, code, name, description, is_active, qr_code, qr_payload"
-        )
+        .select("id, warehouse_id, code, name, description, is_active, qr_code, qr_payload")
         .eq("id", zoneId)
         .single();
 
@@ -365,7 +155,6 @@ export default function ZoneForm({
       }
 
       const zone = zoneData as ZoneRow;
-
       setValues({
         warehouse_id: zone.warehouse_id ?? "",
         code: zone.code ?? "",
@@ -373,103 +162,50 @@ export default function ZoneForm({
         description: zone.description ?? "",
         is_active: zone.is_active ?? true,
       });
-
       setOriginalQrPayload(zone.qr_payload ?? null);
-
       setIsLoading(false);
     }
 
-    loadFormData();
-  }, [
-    mode,
-    zoneId,
-    initialWarehouseId,
-  ]);
+    void loadFormData();
+  }, [mode, zoneId, initialWarehouseId]);
 
-  function updateField(
-    field: keyof ZoneFormValues,
-    value: string | boolean
-  ) {
+  function updateField(field: keyof ZoneFormValues, value: string | boolean) {
     setValues((current) => {
-      const nextValues = {
-        ...current,
-        [field]: value,
-      };
-
-      if (
-        field === "code" &&
-        typeof value === "string"
-      ) {
-        nextValues.code =
-          normalizeZoneCode(value);
+      const nextValues = { ...current, [field]: value } as ZoneFormValues;
+      if (field === "code" && typeof value === "string") {
+        nextValues.code = normalizeZoneCode(value);
       }
-
       return nextValues;
     });
   }
 
   function validateForm() {
-    if (!values.warehouse_id) {
-      return "Warehouse is required.";
-    }
-
-    if (!values.code.trim()) {
-      return "Zone code is required.";
-    }
-
-    if (!values.name.trim()) {
-      return "Zone name is required.";
-    }
-
-    if (!selectedWarehouse) {
-      return "Selected warehouse is invalid.";
-    }
-
-    if (!generatedQrCode || !generatedQrPayload) {
-      return "Zone QR identity could not be generated.";
-    }
-
+    if (!values.warehouse_id) return "Warehouse is required.";
+    if (!values.code.trim()) return "Zone code is required.";
+    if (!values.name.trim()) return "Zone name is required.";
+    if (!selectedWarehouse) return "Selected warehouse is invalid.";
+    if (!generatedQrCode || !generatedQrPayload) return "Zone QR identity could not be generated.";
     return null;
   }
 
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    const validationError =
-      validateForm();
-
+    const validationError = validateForm();
     if (validationError) {
       setErrorMessage(validationError);
       return;
     }
-
     if (!selectedWarehouse) {
-      setErrorMessage(
-        "Selected warehouse could not be found."
-      );
+      setErrorMessage("Selected warehouse could not be found.");
       return;
     }
 
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    const normalizedCode =
-      normalizeZoneCode(values.code);
-
-    const nextQrCode =
-      buildZoneQrCode(
-        selectedWarehouse.code,
-        normalizedCode
-      );
-
-    const nextQrPayload =
-      buildZoneQrPayload(
-        selectedWarehouse.code,
-        normalizedCode
-      );
-
+    const normalizedCode = normalizeZoneCode(values.code);
+    const nextQrCode = buildZoneQrCode(selectedWarehouse.code, normalizedCode);
+    const nextQrPayload = buildZoneQrPayload(selectedWarehouse.code, normalizedCode);
     const payload: {
       warehouse_id: string;
       code: string;
@@ -485,38 +221,27 @@ export default function ZoneForm({
       warehouse_id: values.warehouse_id,
       code: normalizedCode,
       name: values.name.trim(),
-      description:
-        values.description.trim() || null,
+      description: values.description.trim() || null,
       is_active: values.is_active,
       qr_code: nextQrCode,
       qr_payload: nextQrPayload,
     };
 
-    if (
-      mode === "edit" &&
-      originalQrPayload !== nextQrPayload
-    ) {
+    if (mode === "edit" && originalQrPayload !== nextQrPayload) {
       payload.qr_svg_path = null;
       payload.qr_svg_url = null;
       payload.qr_generated_at = null;
     }
 
     if (mode === "edit" && zoneId) {
-      const { error } = await supabase
-        .from("zones")
-        .update(payload)
-        .eq("id", zoneId);
-
+      const { error } = await supabase.from("zones").update(payload).eq("id", zoneId);
       if (error) {
         setErrorMessage(error.message);
         setIsSubmitting(false);
         return;
       }
     } else {
-      const { error } = await supabase
-        .from("zones")
-        .insert(payload);
-
+      const { error } = await supabase.from("zones").insert(payload);
       if (error) {
         setErrorMessage(error.message);
         setIsSubmitting(false);
@@ -524,327 +249,163 @@ export default function ZoneForm({
       }
     }
 
-    router.push(
-      `/zones?warehouse=${values.warehouse_id}`
-    );
-
+    router.push(`/zones?warehouse=${values.warehouse_id}`);
     router.refresh();
   }
 
   function handleCancel() {
-    if (values.warehouse_id) {
-      router.push(
-        `/zones?warehouse=${values.warehouse_id}`
-      );
-      return;
-    }
-
-    router.push("/zones");
+    router.push(values.warehouse_id ? `/zones?warehouse=${values.warehouse_id}` : "/zones");
   }
 
-  if (isLoading) {
-    return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex min-h-[240px] items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
-
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Loading zone...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const title =
-    mode === "edit"
-      ? "Edit Zone"
-      : "Create Zone";
-
-  const formDescription =
+  const title = mode === "edit" ? "Edit Zone" : "Create Zone";
+  const description =
     mode === "edit"
       ? "Update zone master data, warehouse assignment, status, and QR identity."
       : "Create a warehouse zone for QR-based inventory operations.";
 
+  if (isLoading) {
+    return (
+      <ComponentCard title={title} desc={description}>
+        <Alert variant="info" title="Loading zone" message="Zone data and warehouse options are being loaded." />
+      </ComponentCard>
+    );
+  }
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
-    >
-      <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          {title}
-        </h3>
+    <ComponentCard title={title} desc={description}>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {errorMessage ? (
+          <Alert variant="error" title="Unable to save zone" message={errorMessage} />
+        ) : null}
 
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {formDescription}
-        </p>
-      </div>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <div>
+            <Label htmlFor="zone-warehouse">
+              Warehouse <span className="text-error-500">*</span>
+            </Label>
+            <Select
+              id="zone-warehouse"
+              value={values.warehouse_id}
+              allowEmpty
+              placeholder="Select warehouse"
+              options={warehouses.map((warehouse) => ({
+                value: warehouse.id,
+                label: `${warehouse.code} — ${warehouse.name} · ${formatWarehouseType(warehouse.warehouse_type)}${warehouse.is_active ? "" : " · Inactive"}`,
+              }))}
+              onChange={(value) => updateField("warehouse_id", value)}
+            />
+          </div>
 
-      {errorMessage && (
-        <div className="m-5 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
-          {errorMessage}
-        </div>
-      )}
+          <div>
+            <Label htmlFor="zone-code">
+              Zone Code <span className="text-error-500">*</span>
+            </Label>
+            <Input
+              id="zone-code"
+              value={values.code}
+              onChange={(event) => updateField("code", event.target.value)}
+              placeholder="A"
+              hint="Zone codes are scoped to the selected warehouse. Example: A, B, C."
+            />
+          </div>
 
-      <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
-        <WarehouseSelect
-          value={values.warehouse_id}
-          options={warehouses}
-          onChange={(value) =>
-            updateField(
-              "warehouse_id",
-              value
-            )
-          }
-        />
+          <div>
+            <Label htmlFor="zone-name">
+              Zone Name <span className="text-error-500">*</span>
+            </Label>
+            <Input
+              id="zone-name"
+              value={values.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              placeholder="Fast Moving Zone"
+            />
+          </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Zone Code{" "}
-            <span className="text-error-500">
-              *
-            </span>
-          </label>
+          <div>
+            <Label htmlFor="zone-status">Status</Label>
+            <Select
+              id="zone-status"
+              value={values.is_active ? "active" : "inactive"}
+              options={[
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+              ]}
+              onChange={(value) => updateField("is_active", value === "active")}
+            />
+          </div>
 
-          <input
-            value={values.code}
-            onChange={(event) =>
-              updateField(
-                "code",
-                event.target.value
-              )
-            }
-            type="text"
-            placeholder="A"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
+          <div className="md:col-span-2">
+            <Label htmlFor="zone-description">Description</Label>
+            <TextArea
+              id="zone-description"
+              value={values.description}
+              onChange={(value) => updateField("description", value)}
+              rows={4}
+              placeholder="Zone description"
+            />
+          </div>
 
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Zone codes are scoped to the
-            selected warehouse. Example: A,
-            B, C.
-          </p>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Zone Name{" "}
-            <span className="text-error-500">
-              *
-            </span>
-          </label>
-
-          <input
-            value={values.name}
-            onChange={(event) =>
-              updateField(
-                "name",
-                event.target.value
-              )
-            }
-            type="text"
-            placeholder="Fast Moving Zone"
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Status
-          </label>
-
-          <button
-            type="button"
-            onClick={() =>
-              updateField(
-                "is_active",
-                !values.is_active
-              )
-            }
-            className={`flex h-11 w-full items-center justify-between rounded-lg border px-4 py-2.5 text-left text-sm font-medium ${values.is_active
-              ? "border-success-200 bg-success-50 text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400"
-              : "border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400"
-              }`}
+          <ComponentCard
+            className="md:col-span-2"
+            title="QR Identity"
+            desc="QR values are generated automatically from the warehouse code and zone code."
           >
-            <span>
-              {values.is_active
-                ? "Active"
-                : "Inactive"}
-            </span>
-
-            <span>
-              {values.is_active
-                ? "Enabled"
-                : "Disabled"}
-            </span>
-          </button>
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Description
-          </label>
-
-          <textarea
-            value={values.description}
-            onChange={(event) =>
-              updateField(
-                "description",
-                event.target.value
-              )
-            }
-            rows={4}
-            placeholder="Zone description"
-            className="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                  QR Identity
-                </h4>
-
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  QR values are generated
-                  automatically from the
-                  warehouse code and zone code.
-                </p>
-              </div>
-
-              {selectedWarehouse && (
-                <span
-                  className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-medium ${warehouseTypeClass(
-                    selectedWarehouse.warehouse_type
-                  )}`}
-                >
-                  {formatWarehouseType(
-                    selectedWarehouse.warehouse_type
-                  )}{" "}
-                  Warehouse
-                </span>
-              )}
-            </div>
-
-            <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-center">
-              <div className="shrink-0">
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700">
-                  {generatedQrPayload ? (
-                    <QRCodeSVG
-                      value={generatedQrPayload}
-                      size={160}
-                      level="M"
-                      includeMargin={false}
-                    />
-                  ) : (
-                    <div className="flex h-[160px] w-[160px] items-center justify-center rounded-xl bg-gray-50 text-sm text-gray-400 dark:bg-white/[0.03]">
-                      QR Preview
-                    </div>
-                  )}
-                </div>
-
-                {generatedQrCode && (
-                  <p className="mt-2 text-center font-mono text-xs font-semibold text-gray-600 dark:text-gray-400">
-                    {generatedQrCode}
-                  </p>
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+              <div className="shrink-0 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                {generatedQrPayload ? (
+                  <QRCodeSVG value={generatedQrPayload} size={160} level="M" includeMargin={false} />
+                ) : (
+                  <div className="flex h-[160px] w-[160px] items-center justify-center rounded-xl bg-gray-50 text-sm text-gray-400 dark:bg-white/[0.03]">
+                    QR Preview
+                  </div>
                 )}
               </div>
 
               <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                    QR Code
-                  </p>
-
+                <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">QR Code</p>
                   <p className="mt-2 break-all font-mono text-sm font-semibold text-gray-800 dark:text-white/90">
                     {generatedQrCode || "-"}
                   </p>
-
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    Human-readable zone identifier.
-                  </p>
                 </div>
-
-                <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                    QR Payload
-                  </p>
-
+                <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">QR Payload</p>
                   <p className="mt-2 break-all font-mono text-sm font-semibold text-gray-800 dark:text-white/90">
                     {generatedQrPayload || "-"}
                   </p>
-
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    This value is encoded inside the QR code and used by the scanner.
-                  </p>
                 </div>
-
-                {selectedWarehouse && values.code && (
-                  <div className="rounded-lg border border-gray-200 bg-white p-4 md:col-span-2 dark:border-gray-800 dark:bg-gray-900">
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                      Zone Path
-                    </p>
-
-                    <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-white/90">
-                      <span>{selectedWarehouse.code}</span>
-
-                      <span className="text-gray-400">/</span>
-
-                      <span>{normalizeZoneCode(values.code)}</span>
+                {selectedWarehouse ? (
+                  <div className="md:col-span-2 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge color={selectedWarehouse.warehouse_type === "sellable" ? "success" : "warning"} size="sm">
+                        {formatWarehouseType(selectedWarehouse.warehouse_type)} Warehouse
+                      </Badge>
+                      <Badge color={values.is_active ? "success" : "light"} size="sm">
+                        {values.is_active ? "Active" : "Inactive"}
+                      </Badge>
                     </div>
-
-                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      {selectedWarehouse.name} →{" "}
-                      {values.name.trim() || "Zone"}
+                    <p className="mt-3 text-sm font-medium text-gray-800 dark:text-white/90">
+                      {selectedWarehouse.code} / {normalizeZoneCode(values.code) || "-"}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {selectedWarehouse.name} → {values.name.trim() || "Zone"}
                     </p>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
-
-            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-              Example: warehouse MAIN +
-              zone A generates{" "}
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                ZONE-MAIN-A
-              </span>{" "}
-              and{" "}
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                ZONE|MAIN|A
-              </span>
-              .
-            </p>
-          </div>
+          </ComponentCard>
         </div>
-      </div>
 
-      <div className="flex flex-col-reverse gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          onClick={handleCancel}
-          disabled={isSubmitting}
-          className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-200 px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-        >
-          Cancel
-        </button>
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-5 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isSubmitting
-            ? "Saving..."
-            : mode === "edit"
-              ? "Save Changes"
-              : "Create Zone"}
-        </button>
-      </div>
-    </form>
+        <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-5 dark:border-gray-800 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" className="w-full sm:w-auto" disabled={isSubmitting} onClick={handleCancel}>
+            Cancel
+          </Button>
+          <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
+            {isSubmitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Zone"}
+          </Button>
+        </div>
+      </form>
+    </ComponentCard>
   );
 }
