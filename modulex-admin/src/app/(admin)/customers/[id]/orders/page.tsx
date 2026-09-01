@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import CustomerOrdersList from "@/components/customers/CustomerOrdersList";
+import OrderPricingSemanticsPanel from "@/components/customers/OrderPricingSemanticsPanel";
 
 export const metadata: Metadata = {
   title: "Customer Orders | Modulex Admin",
@@ -13,6 +14,7 @@ export default async function CustomerOrdersPage({ params }: { params: Promise<{
     <div>
       <PageBreadcrumb pageTitle="Customer Orders" />
       <CustomerOrdersList customerId={id} />
+      <OrderPricingSemanticsPanel customerId={id} />
     </div>
   );
 }
