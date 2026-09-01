@@ -17,7 +17,6 @@ function assert(condition, message) {
 }
 
 assert(fs.existsSync(domainPath), "A1.2B must define src/lib/customers/order-domain.ts");
-
 const domain = fs.readFileSync(domainPath, "utf8");
 
 for (const exportedName of [
@@ -29,25 +28,15 @@ for (const exportedName of [
   "updateCustomerOrder",
   "setCustomerOrderStatus",
 ]) {
-  assert(
-    new RegExp(`export\\s+(?:async\\s+)?function\\s+${exportedName}\\b`).test(domain),
-    `order domain adapter must export ${exportedName}`
-  );
+  assert(new RegExp(`export\\s+(?:(?:const\\s+${exportedName}\\b)|(?:async\\s+)?function\\s+${exportedName}\\b)`).test(domain), `order domain adapter must export ${exportedName}`);
 }
 
-for (const [name, source] of [
-  ["NewCustomerOrder", newOrder],
-  ["EditCustomerOrder", editOrder],
-  ["CustomerOrderDetail", detailOrder],
-]) {
-  assert(
-    source.includes('from "@/lib/customers/order-domain"'),
-    `${name} must consume the shared order domain adapter`
-  );
+for (const [name, source] of [["NewCustomerOrder", newOrder], ["EditCustomerOrder", editOrder], ["CustomerOrderDetail", detailOrder]]) {
+  assert(source.includes('from "@/lib/customers/order-domain"'), `${name} must consume the shared order domain adapter`);
 }
 
-assert(!newOrder.includes('.rpc("create_customer_order"'), "create UI must not call create_customer_order directly");
-assert(!editOrder.includes('.rpc("update_customer_order"'), "edit UI must not call update_customer_order directly");
+assert(!newOrder.includes('.rpc("create_customer_order'), "create UI must not call order create RPCs directly");
+assert(!editOrder.includes('.rpc("update_customer_order'), "edit UI must not call order update RPCs directly");
 assert(!detailOrder.includes('.rpc("set_customer_order_status"'), "detail UI must not call set_customer_order_status directly");
 
 assert(!newOrder.includes('.from("customers")'), "create UI customer reads must be centralized in the order domain adapter");
@@ -60,11 +49,12 @@ assert(!detailOrder.includes('.from("customer_orders")'), "detail UI order reads
 assert(!detailOrder.includes('.from("customer_order_items")'), "detail UI item reads must be centralized in the order domain adapter");
 assert(!detailOrder.includes('.from("customer_order_status_history")'), "detail UI history reads must be centralized in the order domain adapter");
 
-assert(domain.includes('.rpc("create_customer_order"'), "order domain adapter must retain create_customer_order as the create boundary");
-assert(domain.includes('.rpc("update_customer_order"'), "order domain adapter must retain update_customer_order as the edit boundary");
+assert(domain.includes('.rpc("create_customer_order_v2"'), "order domain adapter must use the server-authoritative Product Type create boundary");
+assert(domain.includes('.rpc("update_customer_order_v2"'), "order domain adapter must use the server-authoritative Product Type edit boundary");
 assert(domain.includes('.rpc("set_customer_order_status"'), "order domain adapter must retain set_customer_order_status as the status boundary");
 assert(domain.includes("getCurrentProfile"), "order domain adapter must enforce profile-aware access");
 assert(domain.includes("hasPermission"), "order domain adapter must preserve permission-based order detail access");
+assert(!domain.includes("unit_price: numeric(item.unitPrice)"), "generic order revision must not forward a caller-controlled unit price");
 
 assert(pkg.scripts?.["smoke:order-domain"] === "node scripts/order-domain-contract.mjs", "package.json must expose smoke:order-domain");
 assert(pkg.scripts?.smoke?.includes("smoke:order-domain"), "main Admin smoke chain must include smoke:order-domain");
