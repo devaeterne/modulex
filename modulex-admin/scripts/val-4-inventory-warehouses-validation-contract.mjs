@@ -33,7 +33,7 @@ assert(/document\.getElementById\(firstInvalidField\)\?\.focus\(\)/.test(stockOp
 assert(/id="stock-operation-product"[\s\S]*error=\{Boolean\(fieldErrors\.productId\)\}/.test(stockOperationForm), "Product selection must expose invalid state");
 assert(/id="stock-operation-quantity"[\s\S]*error=\{Boolean\(fieldErrors\.quantity\)\}/.test(stockOperationForm), "Quantity must expose invalid state and inline feedback");
 assert(/p_quantity:\s*validatedQuantity/.test(stockOperationForm), "RPC payloads must use the normalized validated quantity");
-assert(/setErrorMessage\(result\.error\.message \|\|/.test(stockOperationForm), "Stock RPC errors must preserve the server message when available");
+assert(/setErrorMessage\(\s*result\.error\.message \|\|/.test(stockOperationForm), "Stock RPC errors must preserve the server message when available");
 assert(/stock_in_idempotent/.test(stockOperationForm) && /stock_transfer_idempotent/.test(stockOperationForm) && /stock_out_idempotent/.test(stockOperationForm) && /reserve_stock_idempotent/.test(stockOperationForm) && /release_stock_idempotent/.test(stockOperationForm), "Existing idempotent stock RPC boundaries must remain intact");
 assert(!/\.insert\(|\.update\(|\.delete\(/.test(inventoryTable), "Inventory overview must remain read-only; mutations belong to protected stock operations");
 
