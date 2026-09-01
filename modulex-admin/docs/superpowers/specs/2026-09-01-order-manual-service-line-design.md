@@ -1,18 +1,20 @@
 # Order Manual Service Line — Design
 
 Date: 2026-09-01
-Status: Proposed / user-approved in chat; awaiting written-spec review before implementation
+Status: Approved
 Scope: Modulex Admin customer order + invoice flow
 
 ## Goal
 
 Add a first-class manual Service line to customer orders without pretending that the service has a Price Group price or stock. The operator must enter a detailed service description and a manual amount. The same historical description must remain visible on the order and on any invoice created from that order.
 
-The Products card actions become:
+The Products card actions become compact semantic actions with a shared SVG plus icon:
 
-- Add Countertop
-- Add Cabinet
-- Add Service
+- `+ Countertop`
+- `+ Cabinet`
+- `+ Service`
+
+The plus sign must come from the shared icon system/SVG component, not from a literal text `+` glyph.
 
 ## Chosen approach
 
@@ -100,19 +102,19 @@ The order-item reservation/release triggers must explicitly skip `manual_service
 
 ### Products card actions
 
-Replace the current two-action presentation with:
+Replace the current two-action presentation with compact buttons whose visible labels omit the word `Add` and use a shared SVG plus icon:
 
-- `Add Countertop`
-- `Add Cabinet`
-- `Add Service`
+- `+ Countertop`
+- `+ Cabinet`
+- `+ Service`
 
-`Add Countertop` keeps the current Countertop configurator workflow.
+`Countertop` keeps the current Countertop configurator workflow.
 
-`Add Cabinet` is the current ordinary product workflow, presented as the Cabinet action. It must exclude Product Types `STONE`, `SINK`, and `SERVICE`. Sink selection remains part of the Countertop workflow and is not exposed through Add Cabinet.
+`Cabinet` is the current ordinary product workflow, presented as the Cabinet action. It must exclude Product Types `STONE`, `SINK`, and `SERVICE`. Sink selection remains part of the Countertop workflow and is not exposed through Cabinet.
 
-### Add Service interaction
+### Service interaction
 
-`Add Service` opens a shared-primitive modal/form with exactly the required business inputs:
+`Service` opens a shared-primitive modal/form with exactly the required business inputs:
 
 - **Service Detail*** — multiline text, required.
 - **Service Price*** — manual amount in the order currency, required, numeric, >= 0. In the current Cabinet deployment this is displayed as USD.
@@ -183,8 +185,8 @@ Existing orders/invoices require no backfill because their `line_note` is legiti
 
 TDD must cover at least:
 
-- Service UI contract: Products actions are Countertop / Cabinet / Service and new UI uses shared primitives.
-- Add Cabinet excludes `STONE`, `SINK`, and `SERVICE` Product Types.
+- Service UI contract: Products actions are SVG-plus `Countertop` / `Cabinet` / `Service` and new UI uses shared primitives.
+- Cabinet excludes `STONE`, `SINK`, and `SERVICE` Product Types.
 - Service form rejects missing detail.
 - Service form rejects missing/negative amount.
 - Server rejects blank `line_note` for `manual_service` even if UI is bypassed.
