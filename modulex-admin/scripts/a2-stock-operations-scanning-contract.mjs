@@ -82,16 +82,23 @@ expectIncludes(scanPanel, [
 expectIncludes(qrLabels, [
   "QRCodeSVG",
   'type BulkPrintMode =',
-  '| "a4"',
-  '| "label"',
   "window.print()",
   'kind: "single-label"',
   'kind: "single-a4"',
+  'kind: "bulk"',
   '"50x30"',
   '"60x40"',
   '"70x50"',
-  "grid grid-cols-1 gap-5 p-5 md:grid-cols-2 xl:grid-cols-4",
+  "md:grid-cols-2 xl:grid-cols-4",
   "grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3",
+  "ComponentCard",
+  "Label",
+  "Select",
+  "Input",
+  "Button",
+], "QRLabelsGrid");
+expectCompactIncludes(qrLabels, [
+  'type BulkPrintMode = "a4" | "label"',
 ], "QRLabelsGrid");
 
 expectIncludes(a22Contract, [
