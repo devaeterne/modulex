@@ -69,7 +69,7 @@ for spec in SPECS:
     )
 
     state_pattern = re.compile(
-        rf"<TableRow>\s*<TableCell\s+colSpan=\{{{spec['columns']}\}}\s+variant=\"admin\"\s+className=\"[^\"]*\">\s*(.*?)\s*</TableCell>\s*</TableRow>",
+        rf"<TableRow>\s*<TableCell\b(?=[^>]*\bcolSpan=\{{{spec['columns']}\}})(?=[^>]*\bvariant=\"admin\")[^>]*>\s*(.*?)\s*</TableCell>\s*</TableRow>",
         re.S,
     )
 
