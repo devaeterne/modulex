@@ -1,0 +1,86 @@
+name: Admin VAL-4 Roadmap Reconcile Once
+
+on:
+  push:
+    paths:
+      - ".github/workflows/admin-val4-roadmap-reconcile-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Reconcile roadmap and smoke entry
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          roadmap_path = Path("modulex-admin/ADMIN_ROADMAP.md")
+          text = roadmap_path.read_text()
+          text = text.replace(
+              "Main baseline: `3671c66929e79dae9f27b0f0029c0db45dd0519b`",
+              "Main baseline: `1a7de5f932ab4707a1fc3d887c9d65bdb2bc1958`",
+              1,
+          )
+          old_next = "Current Admin next action: **Pricing UI v2 / Product Type pricing routing is in review in PR #206. Preserve the closed A3.3 price-group/effective-date/audit/Dealer no-fallback contract; production migration, exact-SHA deploy, authenticated route smoke and advisor acceptance remain pending.**"
+          new_next = "Current Admin next action: **VAL-4 — Inventory / Warehouses / Stock Operations validation hardening is active in PR #224. Orders Product Pricing V2 remains parallel in draft PR #217 and is intentionally untouched; VAL-3 is deferred until that Orders work is reconciled. Pricing UI v2 PR #206 is merged, its production migration is present, and the exact merge-SHA Admin deployment is READY; this session does not re-claim signed-in pricing acceptance that was not independently reproduced.**"
+          text = text.replace(old_next, new_next, 1)
+          text = text.replace(
+              "- [~] UI-2A responsive shell foundation is implemented in PR #184; merge/deploy acceptance remains pending.\n- [ ] UI-2B shared table viewport/shell standardization.\n- [ ] UI-2C shared component variants, semantic tokens, dark mode, and accessibility normalization.\n- [ ] UI-2D route-level consistency cleanup after shared primitives are ready.\n- [ ] UI-2E final Admin UI regression and production acceptance.",
+              "- [x] UI-2A Responsive Shell foundation.\n- [x] UI-2B shared Data Table System standardization.\n- [x] UI-2C Theme / Design Tokens, dark mode, and accessibility normalization.\n- [x] UI-2D Full Route Regression.\n- [x] UI-2E Resolution Matrix production closeout through PR #223 / merge `ef48dc50029347829fd1d519c449ed38f8b87969`; supported matrix: 360, 390, 768, 1024, 1280, 1366, 1440, 1536, 1920, 2560 with the runtime mobile/desktop boundary at 1024px.",
+              1,
+          )
+          text = text.replace(
+              "- [ ] VAL-4 — Inventory / Warehouses / Stock Operations.",
+              "- [~] VAL-4 — Inventory + Warehouses + Stock Operations.\n  - PR #224 hardens warehouse and stock-operation field validation against the production DB/RPC contract without changing Orders/Customers, inventory mutation authority, or business data. Production acceptance remains pending until merge/deploy.",
+              1,
+          )
+          marker = "# Next Action\n"
+          if marker not in text:
+              raise SystemExit("Next Action marker missing")
+          prefix = text.split(marker, 1)[0]
+          next_action = """# Next Action
+
+Primary near-term independent Admin work is **VAL-4 — Inventory + Warehouses + Stock Operations validation hardening in draft PR #224**. **Orders Product Pricing V2 remains active in parallel draft PR #217 and must not be duplicated or modified from this workstream.**
+
+1. Complete PR #224 RED → GREEN validation, A2.1/A2.2/A2.3 regressions, typecheck, lint, and production build without production business-data mutation.
+2. Keep VAL-4 `[~]` until merge/deploy and signed-in production acceptance; do not mark production completion from branch CI alone.
+3. Keep VAL-3 deferred while #217 is active because Customers/Orders validation overlaps that branch.
+4. Pricing UI v2 PR #206 is already merged; production contains its routing migration and the exact merge-SHA Admin deployment is READY. Do not repeat or invent pricing behavior; independently close any remaining signed-in acceptance evidence when that workstream is revisited.
+5. Countertop remains the next large domain after Orders Product Pricing V2 is fully reconciled; production B1–R22 material bands are canonical, so do not write an 8-band replacement migration.
+
+**Cross-roadmap coordination:** this VAL-4 package changes Admin-only validation behavior and does not change Store public projections, so no functional `STORE_ROADMAP.md` status mutation is required.
+
+**Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so #217 and any newer merges are preserved rather than overwritten.
+"""
+          roadmap_path.write_text(prefix + next_action)
+
+          package_path = Path("modulex-admin/package.json")
+          package = package_path.read_text()
+          package = package.replace(
+              "npm run smoke:val-2-products-pricing && npm run smoke:pricing-product-types",
+              "npm run smoke:val-2-products-pricing && npm run smoke:val-4-inventory-validation && npm run smoke:pricing-product-types",
+              1,
+          )
+          package = package.replace(
+              '    "smoke:val-2-products-pricing": "node scripts/val-2-products-pricing-validation-contract.mjs",\n',
+              '    "smoke:val-2-products-pricing": "node scripts/val-2-products-pricing-validation-contract.mjs",\n    "smoke:val-4-inventory-validation": "node scripts/val-4-inventory-warehouses-validation-contract.mjs",\n',
+              1,
+          )
+          package_path.write_text(package)
+          PY
+      - name: Commit reconciliation
+        run: |
+          if git diff --quiet -- modulex-admin/ADMIN_ROADMAP.md modulex-admin/package.json; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin/ADMIN_ROADMAP.md modulex-admin/package.json
+          git commit -m "docs(admin): reconcile VAL-4 execution-time status"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
