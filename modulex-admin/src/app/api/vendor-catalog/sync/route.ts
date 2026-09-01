@@ -155,11 +155,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    body = undefined;
-  }
-  return handle(request, body, true);
+  // Admin-triggered sync intentionally runs every registered adapter so future
+  // vendors are picked up without changing this UI action.
+  return handle(request, undefined, true);
 }
