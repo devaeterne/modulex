@@ -20,7 +20,6 @@ for (const token of [
   "public.create_and_attach_countertop_order_item",
   "p_request_id uuid",
   "pg_advisory_xact_lock",
-  "o.status <> 'draft'",
   "current_user_has_any_role(array['super_admin','admin','sales'])",
   "private.countertop_order_pricing_gate",
   "perform private.attach_countertop_configuration",
@@ -28,6 +27,7 @@ for (const token of [
   "private.countertop_order_item_initiations",
 ]) assert(initiationMigration.includes(token), `secure countertop initiation contract missing: ${token}`);
 
+assert(/v_order\.status\s*<>\s*'draft'/i.test(initiationMigration), "countertop initiation must reject non-draft orders");
 assert(/security definer\s+set search_path\s*=\s*pg_catalog\s*,\s*public/i.test(initiationMigration), "private countertop initiation must pin a safe search_path");
 assert(initiationMigration.includes("revoke all on function public.create_and_attach_countertop_order_item") && initiationMigration.includes("from public, anon"), "public/anon execute must be revoked from countertop initiation");
 assert(initiationMigration.includes("grant execute on function public.create_and_attach_countertop_order_item") && initiationMigration.includes("to authenticated"), "authenticated browser access must go through the reviewed public wrapper");
