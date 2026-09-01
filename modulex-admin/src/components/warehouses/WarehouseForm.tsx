@@ -27,6 +27,12 @@ type WarehouseFormValues = {
   qr_payload: string;
 };
 
+type WarehouseFieldErrors = {
+  code?: string;
+  name?: string;
+  warehouse_type?: string;
+};
+
 type WarehouseRow = {
   id: string;
   code: string;
@@ -110,6 +116,7 @@ export default function WarehouseForm({
   const router = useRouter();
 
   const [values, setValues] = useState<WarehouseFormValues>(initialValues);
+  const [fieldErrors, setFieldErrors] = useState<WarehouseFieldErrors>({});
   const [isLoading, setIsLoading] = useState(mode === "edit");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -171,6 +178,15 @@ export default function WarehouseForm({
     loadWarehouse();
   }, [mode, warehouseId]);
 
+  function clearFieldError(field: keyof WarehouseFieldErrors) {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
   function updateField(field: keyof WarehouseFormValues, value: string | boolean) {
     setValues((current) => {
       const nextValues = {
@@ -188,26 +204,40 @@ export default function WarehouseForm({
 
       return nextValues;
     });
+
+    if (field === "code" || field === "name" || field === "warehouse_type") {
+      clearFieldError(field);
+    }
   }
 
   function validateForm() {
-    if (!values.code.trim()) return "Warehouse code is required.";
-    if (!values.name.trim()) return "Warehouse name is required.";
+    const errors: WarehouseFieldErrors = {};
+
+    if (!values.code.trim()) errors.code = "Warehouse code is required.";
+    if (!values.name.trim()) errors.name = "Warehouse name is required.";
 
     if (!["sellable", "non_sellable"].includes(values.warehouse_type)) {
-      return "Warehouse type is invalid.";
+      errors.warehouse_type = "Warehouse type is invalid.";
     }
 
-    return null;
+    return errors;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const validationError = validateForm();
+    const validationErrors = validateForm();
+    setFieldErrors(validationErrors);
 
-    if (validationError) {
-      setErrorMessage(validationError);
+    const firstInvalidField = [
+      validationErrors.code ? "warehouse-code" : null,
+      validationErrors.name ? "warehouse-name" : null,
+      validationErrors.warehouse_type ? "warehouse-type" : null,
+    ].find((field): field is string => Boolean(field));
+
+    if (firstInvalidField) {
+      setErrorMessage("Review the highlighted warehouse fields and try again.");
+      requestAnimationFrame(() => document.getElementById(firstInvalidField)?.focus());
       return;
     }
 
@@ -270,46 +300,69 @@ export default function WarehouseForm({
 
   return (
     <ComponentCard title={title} desc={description}>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {errorMessage ? (
-          <Alert variant="error" title="Unable to save warehouse" message={errorMessage} />
+          <div role="alert">
+            <Alert variant="error" title="Unable to save warehouse" message={errorMessage} />
+          </div>
         ) : null}
 
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
           <div>
             <Label htmlFor="warehouse-code">
-              Warehouse Code <span className="text-error-500">*</span>
+              Warehouse Code <span aria-hidden="true" className="text-error-500">*</span>
             </Label>
             <Input
               id="warehouse-code"
               value={values.code}
               onChange={(event) => updateField("code", event.target.value)}
               placeholder="MAIN"
-              hint="Example: MAIN, RETURN, DEFECT. This code is used inside QR payloads."
+              required
+              error={Boolean(fieldErrors.code)}
+              hint={
+                fieldErrors.code ??
+                "Example: MAIN, RETURN, DEFECT. This code is used inside QR payloads."
+              }
             />
           </div>
 
           <div>
             <Label htmlFor="warehouse-name">
-              Warehouse Name <span className="text-error-500">*</span>
+              Warehouse Name <span aria-hidden="true" className="text-error-500">*</span>
             </Label>
             <Input
               id="warehouse-name"
               value={values.name}
               onChange={(event) => updateField("name", event.target.value)}
               placeholder="Main Warehouse"
+              required
+              error={Boolean(fieldErrors.name)}
+              hint={fieldErrors.name}
             />
           </div>
 
           <div>
-            <Label htmlFor="warehouse-type">Warehouse Type</Label>
+            <Label htmlFor="warehouse-type">
+              Warehouse Type <span aria-hidden="true" className="text-error-500">*</span>
+            </Label>
             <Select
               id="warehouse-type"
               value={values.warehouse_type}
               options={warehouseTypeOptions.map(({ value, label }) => ({ value, label }))}
               onChange={(value) => updateField("warehouse_type", value as WarehouseType)}
+              required
+              error={Boolean(fieldErrors.warehouse_type)}
+              ariaDescribedBy={fieldErrors.warehouse_type ? "warehouse-type-error" : undefined}
             />
-            {selectedWarehouseType?.description ? (
+            {fieldErrors.warehouse_type ? (
+              <p
+                id="warehouse-type-error"
+                role="alert"
+                className="mt-1.5 text-xs text-error-600 dark:text-error-300"
+              >
+                {fieldErrors.warehouse_type}
+              </p>
+            ) : selectedWarehouseType?.description ? (
               <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                 {selectedWarehouseType.description}
               </p>

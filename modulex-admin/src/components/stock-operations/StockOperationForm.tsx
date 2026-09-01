@@ -9,6 +9,7 @@ import TextArea from "@/components/form/input/TextArea";
 import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
+import { parseDbDecimal } from "@/lib/validation";
 
 type OperationType = "stock_in" | "stock_out" | "transfer" | "reserve" | "release";
 type ProductOption = { id: string; sku: string; name: string; barcode: string | null };
@@ -43,6 +44,18 @@ type ProductStockLocation = {
 };
 
 type PendingIdempotency = { signature: string; key: string };
+type StockOperationFieldErrors = {
+  productId?: string;
+  sourceLocationId?: string;
+  targetLocationId?: string;
+  quantity?: string;
+};
+type StockValidationResult = {
+  errors: StockOperationFieldErrors;
+  validatedQuantity: string | null;
+};
+
+const STOCK_QUANTITY_DECIMAL = { precision: 12, scale: 2, min: 0.01, allowNull: false };
 
 const operationOptions: { value: OperationType; label: string; description: string }[] = [
   { value: "stock_in", label: "Stock In", description: "Add quantity to a selected shelf location." },
@@ -68,6 +81,7 @@ export default function StockOperationForm() {
   const [referenceNo, setReferenceNo] = useState("");
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<StockOperationFieldErrors>({});
   const [isLoadingOptions, setIsLoadingOptions] = useState(true);
   const [isLoadingProductLocations, setIsLoadingProductLocations] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -204,10 +218,20 @@ export default function StockOperationForm() {
     setErrorMessage(null);
   }
 
+  function clearFieldError(field: keyof StockOperationFieldErrors) {
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+  }
+
   function changeOperation(next: OperationType) {
     setOperationType(next);
     setSourceLocationId("");
     setTargetLocationId("");
+    setFieldErrors({});
     resetMessages();
   }
 
@@ -215,6 +239,25 @@ export default function StockOperationForm() {
     setProductId(next);
     setSourceLocationId("");
     setTargetLocationId("");
+    setFieldErrors({});
+    resetMessages();
+  }
+
+  function changeSourceLocation(next: string) {
+    setSourceLocationId(next);
+    clearFieldError("sourceLocationId");
+    resetMessages();
+  }
+
+  function changeTargetLocation(next: string) {
+    setTargetLocationId(next);
+    clearFieldError("targetLocationId");
+    resetMessages();
+  }
+
+  function changeQuantity(next: string) {
+    setQuantity(next);
+    clearFieldError("quantity");
     resetMessages();
   }
 
@@ -229,55 +272,84 @@ export default function StockOperationForm() {
     return "Select source location";
   }
 
-  function validate() {
-    if (!productId) return "Product is required.";
+  function validate(): StockValidationResult {
+    const errors: StockOperationFieldErrors = {};
+    const parsedQuantity = parseDbDecimal(quantity, STOCK_QUANTITY_DECIMAL);
+    const validatedQuantity = parsedQuantity.error ? null : parsedQuantity.value;
 
-    const numericQuantity = Number(quantity);
-    if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) {
-      return "Quantity must be greater than zero.";
+    if (!productId) errors.productId = "Product is required.";
+    if (!validatedQuantity) {
+      errors.quantity = parsedQuantity.error ?? "Quantity is required.";
     }
 
-    if (operationType === "stock_in") {
-      return targetLocationId ? null : "Target location is required.";
+    if (showSourceLocation) {
+      if (!sourceLocationId) {
+        errors.sourceLocationId = "Source location is required.";
+      } else if (!sourceStockLocation) {
+        errors.sourceLocationId = "Selected source location is not valid for this operation.";
+      }
     }
-    if (!sourceLocationId) return "Source location is required.";
-    if (!sourceStockLocation) return "Selected source location is not valid for this operation.";
 
-    if (operationType === "transfer") {
-      if (!targetLocationId) return "Target location is required.";
-      if (sourceLocationId === targetLocationId) {
-        return "Source and target locations cannot be the same.";
+    if (showTargetLocation) {
+      if (!targetLocationId) {
+        errors.targetLocationId = "Target location is required.";
+      } else if (!targetLocation) {
+        errors.targetLocationId = "Selected target location is not active or available.";
       }
     }
 
     if (
-      ["stock_out", "transfer", "reserve"].includes(operationType) &&
-      Number(sourceStockLocation.available_quantity) < numericQuantity
+      operationType === "transfer" &&
+      sourceLocationId &&
+      targetLocationId &&
+      sourceLocationId === targetLocationId
     ) {
-      return `Insufficient available stock. Available: ${formatNumber(sourceStockLocation.available_quantity)}`;
+      errors.targetLocationId = "Source and target locations cannot be the same.";
     }
 
-    if (
-      operationType === "release" &&
-      Number(sourceStockLocation.reserved_quantity) < numericQuantity
-    ) {
-      return `Release quantity cannot be greater than reserved quantity. Reserved: ${formatNumber(sourceStockLocation.reserved_quantity)}`;
+    if (validatedQuantity && sourceStockLocation) {
+      const numericQuantity = Number(validatedQuantity);
+
+      if (
+        ["stock_out", "transfer", "reserve"].includes(operationType) &&
+        Number(sourceStockLocation.available_quantity) < numericQuantity
+      ) {
+        errors.quantity = `Insufficient available stock. Available: ${formatNumber(sourceStockLocation.available_quantity)}`;
+      }
+
+      if (
+        operationType === "release" &&
+        Number(sourceStockLocation.reserved_quantity) < numericQuantity
+      ) {
+        errors.quantity = `Release quantity cannot be greater than reserved quantity. Reserved: ${formatNumber(sourceStockLocation.reserved_quantity)}`;
+      }
     }
 
-    return null;
+    return { errors, validatedQuantity };
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     resetMessages();
 
-    const validationError = validate();
-    if (validationError) {
-      setErrorMessage(validationError);
+    const { errors: validationErrors, validatedQuantity } = validate();
+    setFieldErrors(validationErrors);
+
+    const firstInvalidField = [
+      validationErrors.productId ? "stock-operation-product" : null,
+      validationErrors.sourceLocationId ? "stock-operation-source" : null,
+      validationErrors.targetLocationId ? "stock-operation-target" : null,
+      validationErrors.quantity ? "stock-operation-quantity" : null,
+    ].find((field): field is string => Boolean(field));
+
+    if (firstInvalidField || !validatedQuantity) {
+      setErrorMessage("Review the highlighted stock operation fields and try again.");
+      if (firstInvalidField) {
+        requestAnimationFrame(() => document.getElementById(firstInvalidField)?.focus());
+      }
       return;
     }
 
-    const numericQuantity = Number(quantity);
     setIsSubmitting(true);
 
     let result: { data: unknown; error: { message: string } | null } | undefined;
@@ -288,7 +360,7 @@ export default function StockOperationForm() {
         p_product_id: productId,
         p_warehouse_id: targetLocation.warehouse_id,
         p_location_id: targetLocation.location_id,
-        p_quantity: numericQuantity,
+        p_quantity: validatedQuantity,
         p_reference_no: referenceNo.trim() || null,
         p_reason: reason.trim() || "Stock in from admin panel",
         p_notes: notes.trim() || null,
@@ -305,7 +377,7 @@ export default function StockOperationForm() {
         p_from_location_id: sourceStockLocation.location_id,
         p_to_warehouse_id: targetLocation.warehouse_id,
         p_to_location_id: targetLocation.location_id,
-        p_quantity: numericQuantity,
+        p_quantity: validatedQuantity,
         p_reference_no: referenceNo.trim() || null,
         p_reason: reason.trim() || "Transfer from admin panel",
         p_notes: notes.trim() || null,
@@ -331,7 +403,7 @@ export default function StockOperationForm() {
         p_product_id: productId,
         p_warehouse_id: sourceStockLocation.warehouse_id,
         p_location_id: sourceStockLocation.location_id,
-        p_quantity: numericQuantity,
+        p_quantity: validatedQuantity,
         p_reference_no: referenceNo.trim() || null,
         p_reason: reason.trim() || fallbackReason,
         p_notes: notes.trim() || null,
@@ -350,12 +422,16 @@ export default function StockOperationForm() {
 
     if (result.error) {
       console.error("Stock operation failed", result.error);
-      setErrorMessage("The stock operation could not be completed. Review the values and try again.");
+      setErrorMessage(
+        result.error.message ||
+          "The stock operation could not be completed. Review the values and try again.",
+      );
       setIsSubmitting(false);
       return;
     }
 
     idempotencyRef.current = null;
+    setFieldErrors({});
     setSuccessMessage("Stock operation completed successfully.");
     setReferenceNo("");
     setReason("");
@@ -372,6 +448,7 @@ export default function StockOperationForm() {
         aria-label="Run Stock Operation"
         aria-busy={isSubmitting || isLoadingOptions}
         className="xl:col-span-8"
+        noValidate
       >
         <ComponentCard
           title="Run Stock Operation"
@@ -418,11 +495,22 @@ export default function StockOperationForm() {
                 required
                 allowEmpty
                 placeholder="Select product"
+                error={Boolean(fieldErrors.productId)}
+                ariaDescribedBy={fieldErrors.productId ? "stock-operation-product-error" : undefined}
                 options={products.map((product) => ({
                   value: product.id,
                   label: `${product.sku} - ${product.name}`,
                 }))}
               />
+              {fieldErrors.productId ? (
+                <p
+                  id="stock-operation-product-error"
+                  role="alert"
+                  className="mt-1.5 text-xs text-error-600 dark:text-error-300"
+                >
+                  {fieldErrors.productId}
+                </p>
+              ) : null}
             </div>
 
             {showSourceLocation ? (
@@ -433,7 +521,7 @@ export default function StockOperationForm() {
                 <Select
                   id="stock-operation-source"
                   value={sourceLocationId}
-                  onChange={setSourceLocationId}
+                  onChange={changeSourceLocation}
                   disabled={
                     isLoadingOptions ||
                     isLoadingProductLocations ||
@@ -443,11 +531,24 @@ export default function StockOperationForm() {
                   required
                   allowEmpty
                   placeholder={sourcePlaceholder()}
+                  error={Boolean(fieldErrors.sourceLocationId)}
+                  ariaDescribedBy={
+                    fieldErrors.sourceLocationId ? "stock-operation-source-error" : undefined
+                  }
                   options={filteredSourceLocations.map((location) => ({
                     value: location.location_id,
                     label: `${location.warehouse_code} / ${location.location_code} - ${location.location_name} | On Hand: ${formatNumber(location.quantity)} | Available: ${formatNumber(location.available_quantity)} | Reserved: ${formatNumber(location.reserved_quantity)}`,
                   }))}
                 />
+                {fieldErrors.sourceLocationId ? (
+                  <p
+                    id="stock-operation-source-error"
+                    role="alert"
+                    className="mt-1.5 text-xs text-error-600 dark:text-error-300"
+                  >
+                    {fieldErrors.sourceLocationId}
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
@@ -459,16 +560,29 @@ export default function StockOperationForm() {
                 <Select
                   id="stock-operation-target"
                   value={targetLocationId}
-                  onChange={setTargetLocationId}
+                  onChange={changeTargetLocation}
                   disabled={isLoadingOptions}
                   required
                   allowEmpty
                   placeholder="Select target location"
+                  error={Boolean(fieldErrors.targetLocationId)}
+                  ariaDescribedBy={
+                    fieldErrors.targetLocationId ? "stock-operation-target-error" : undefined
+                  }
                   options={locations.map((location) => ({
                     value: location.location_id,
                     label: `${location.warehouse_code} / ${location.location_code} - ${location.location_name}`,
                   }))}
                 />
+                {fieldErrors.targetLocationId ? (
+                  <p
+                    id="stock-operation-target-error"
+                    role="alert"
+                    className="mt-1.5 text-xs text-error-600 dark:text-error-300"
+                  >
+                    {fieldErrors.targetLocationId}
+                  </p>
+                ) : null}
               </div>
             ) : null}
 
@@ -479,11 +593,13 @@ export default function StockOperationForm() {
               <Input
                 id="stock-operation-quantity"
                 value={quantity}
-                onChange={(event) => setQuantity(event.target.value)}
+                onChange={(event) => changeQuantity(event.target.value)}
                 type="number"
                 min="0.01"
                 step="0.01"
                 required
+                error={Boolean(fieldErrors.quantity)}
+                hint={fieldErrors.quantity}
               />
             </div>
 

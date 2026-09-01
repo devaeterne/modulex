@@ -24,6 +24,7 @@ interface SelectProps {
   value?: string;
   disabled?: boolean;
   required?: boolean;
+  error?: boolean;
   ariaLabel?: string;
   ariaDescribedBy?: string;
 }
@@ -41,6 +42,7 @@ const Select: React.FC<SelectProps> = ({
   value,
   disabled = false,
   required = false,
+  error = false,
   ariaLabel,
   ariaDescribedBy,
 }) => {
@@ -55,7 +57,9 @@ const Select: React.FC<SelectProps> = ({
 
   const stateClass = disabled
     ? ADMIN_FIELD_STATES.disabled
-    : ADMIN_FIELD_STATES.default;
+    : error
+      ? ADMIN_FIELD_STATES.error
+      : ADMIN_FIELD_STATES.default;
 
   return (
     <select
@@ -69,6 +73,7 @@ const Select: React.FC<SelectProps> = ({
       required={required}
       aria-label={ariaLabel}
       aria-describedby={ariaDescribedBy}
+      aria-invalid={error || undefined}
       data-placeholder={effectiveValue ? undefined : "true"}
     >
       <option
