@@ -45,8 +45,8 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
         supabase.from("countertop_stone_types").select("id,name").eq("is_active", true).order("name"),
         supabase.from("countertop_edge_profiles").select("id,name").eq("is_active", true).order("name"),
         supabase.from("products").select("id,name,sku").eq("status", "active").contains("metadata", { product_kind: "sink" }).order("name"),
-        supabase.from("countertop_stone_product_profiles").select("product_id,stone_type_id,products(id,name,sku),countertop_material_price_bands(code,price_per_sqft)").eq("is_active", true),
-        supabase.from("price_groups").select("id,name").eq("is_active", true).order("name"),
+        supabase.from("countertop_stone_product_profiles").select("product_id,stone_type_id,products(id,name,sku,status),countertop_material_price_bands(code,price_per_sqft)").eq("is_active", true),
+        supabase.from("price_groups").select("id,name,available_for_orders,internal_only").eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
       ]);
       const svc = await supabase.from("countertop_services").select("id,name,pricing_method,unit_price").eq("is_active", true).order("name");
 
@@ -67,7 +67,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
       setSinks((s.data ?? []).map((x) => ({ value: x.id, label: `${x.name} (${x.sku})` })));
       setPriceGroups((pg.data ?? []).map((x) => ({ value: x.id, label: x.name })));
       setPriceGroupId(contextOrderId ? (orderPricing.data?.price_group_id ?? "") : (pg.data?.[0]?.id ?? ""));
-      setStones((p.data ?? []).map((x: any) => ({ id: x.product_id, name: x.products?.name ?? "", sku: x.products?.sku, stone_type_id: x.stone_type_id, material_price_band_code: x.countertop_material_price_bands?.code, price_per_sqft: x.countertop_material_price_bands?.price_per_sqft })));
+      setStones((p.data ?? []).filter((x: any) => x.products?.status === "active").map((x: any) => ({ id: x.product_id, name: x.products?.name ?? "", sku: x.products?.sku, stone_type_id: x.stone_type_id, material_price_band_code: x.countertop_material_price_bands?.code, price_per_sqft: x.countertop_material_price_bands?.price_per_sqft })));
       setServices((svc.data ?? []).map((x) => ({ ...x, quantity: "1" })));
       setLoading(false);
     })();
