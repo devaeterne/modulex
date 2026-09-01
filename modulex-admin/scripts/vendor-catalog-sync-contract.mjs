@@ -12,6 +12,8 @@ const route = read("src/app/api/vendor-catalog/sync/route.ts");
 const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
 const sql = read("sql/vendor-catalog-sync.sql");
 const migration = read("../modulex-store/supabase/migrations/20260901223000_vendor_catalog_sync.sql");
+const hardening = read("sql/vendor-catalog-sync-hardening.sql");
+const hardeningMigration = read("../modulex-store/supabase/migrations/20260901223500_vendor_catalog_sync_hardening.sql");
 const docs = read("docs/VENDOR_CATALOG_SYNC.md");
 
 assert.match(domain, /NEW/);
@@ -56,6 +58,16 @@ assert.match(sql, /review_status/);
 assert.match(sql, /Modulex selling price greater than zero/i);
 assert.match(sql, /join public\.product_prices/i);
 assert.equal(migration.trim(), sql.trim(), "Deployable migration must mirror canonical vendor SQL");
+
+assert.match(hardening, /to service_role/i);
+assert.match(hardening, /pp\.is_active\s*=\s*true/i);
+assert.match(hardening, /pp\.amount\s*>\s*0/i);
+assert.match(hardening, /pp\.valid_from\s*<=\s*now\(\)/i);
+assert.equal(
+  hardeningMigration.trim(),
+  hardening.trim(),
+  "Deployable hardening migration must mirror canonical vendor hardening SQL"
+);
 
 assert.match(docs, /never auto-publishes/i);
 assert.match(docs, /Modulex selling price/i);
