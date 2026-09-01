@@ -1,6 +1,7 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { isAdminMobileViewport } from "@/components/ui/responsive/adminViewport";
 
 type SidebarContextType = {
   isExpanded: boolean;
@@ -39,7 +40,7 @@ export const SidebarProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 1024;
+      const mobile = isAdminMobileViewport(window.innerWidth);
       setIsMobile(mobile);
       if (!mobile) {
         setIsMobileOpen(false);

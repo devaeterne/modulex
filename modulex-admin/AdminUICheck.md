@@ -18,37 +18,45 @@ This file tracks the Admin UI audit in sidebar order. A package is fully complet
 
 The original 01–64 audit remains historical evidence. Audit v2 covers cross-cutting issues discovered after later Admin feature work and nested-route growth.
 
-### [~] UI-2A — Admin Shell & Responsive Foundation
+### [x] UI-2A — Admin Shell & Responsive Foundation
 
 - [x] Admin content flex item can shrink with `min-w-0` while preserving 290px expanded and 90px collapsed sidebar offsets.
-- [x] Removed the global 1536px content cap so data-heavy pages can use the available viewport; individual surfaces retain responsibility for their own intentional width constraints.
-- [x] Admin shell workflow now runs when `(admin)/layout.tsx` changes.
+- [x] Removed the global 1536px content cap so data-heavy pages can use the available viewport; individual surfaces retain responsibility for intentional width constraints.
+- [x] Admin shell workflow runs when `(admin)/layout.tsx` changes.
 - [x] TDD RED: Actions run `33332911142` failed on the missing responsive shell width contract.
 - [x] GREEN: Actions run `33332954949` passed shell contract, production-surface, RBAC, lint, and production build.
-- [~] Merge and production deploy (pending for PR #184).
+- [x] PR #184 merged; behavior is present in the verified current production deployment lineage.
 
-### [ ] UI-2B — Data Table System
+### [x] UI-2B — Data Table System
 
-- [ ] Add a shared table viewport/shell contract for readable minimum widths and contained horizontal overflow.
-- [ ] Remove ad-hoc table width behavior where it conflicts with the shared contract.
-- [ ] Reduce header/body/loading/empty column-count drift risk and cover representative tables with regression contracts.
+- [x] Shared `TableViewport` contains intentional horizontal overflow with `min-w-0`, `max-w-full`, and `overflow-x-auto`.
+- [x] Shared table minimum-width presets cover standard, wide, and extra-wide admin data surfaces.
+- [x] Shared `TableStateRow` reduces loading/empty/header/body column-count drift risk.
+- [x] PR #220 merged and production deployment verified.
 
-### [ ] UI-2C — Theme & Design Tokens
+### [x] UI-2C — Theme & Design Tokens
 
-- [ ] Normalize shared button, badge/status, input, dropdown, modal, checkbox/switch, card, and dark-mode behavior.
-- [ ] Remove known low-contrast dark-mode text paths and feature-local semantic status drift.
-- [ ] Close foundational keyboard/ARIA gaps in reusable controls before route-by-route cleanup.
+- [x] Shared button, badge/status, input, dropdown, modal, checkbox/switch, card, focus, and dark-mode behavior normalized.
+- [x] Shared semantic status tones and foundational keyboard/ARIA behavior are regression-bound through the Admin UI Foundation workflow.
+- [x] PR #221 merged; behavior is present in the verified current production deployment lineage.
 
-### [ ] UI-2D — Full Route Regression
+### [x] UI-2D — Full Route Regression
 
-- [ ] Re-audit current sidebar routes plus nested new/edit/detail/print routes added after the original 01–64 audit.
-- [ ] Include newer Store Cabinet Content and Reviews surfaces and re-regress Product Master, Users/Access, auth, and Store publishing changes landed after the original audit.
+- [x] Re-audited all 69 sidebar routes against real app routes.
+- [x] Inventoried and regression-covered 23 nested new/edit/detail/print-style routes plus auth surfaces.
+- [x] Closed post-audit Product Types, Units of Measure, Material Bands, Store Cabinet Content, and Store Reviews surfaces.
+- [x] Re-regressed Product Master, Users/Access, auth, Store publishing, RBAC, typecheck, lint, and production build.
+- [x] PR #222 merged at `b9174eb836f9f8125897e92ad616000fc2ffbc0d` and Vercel production deployment is READY on the same SHA.
 
-### [ ] UI-2E — Resolution Matrix
+### [~] UI-2E — Resolution Matrix
 
-- [ ] Verify 360, 390, 768, 1024, 1280, 1366, 1440, 1536, 1920, and 2560 widths where applicable.
-- [ ] Verify sidebar expanded/collapsed, light/dark, loading/empty/populated, and modal/dropdown states.
-- [ ] Confirm no page-level horizontal overflow; only intentional table/media viewports may scroll horizontally.
+- [x] Resolution contract defines 360, 390, 768, 1024, 1280, 1366, 1440, 1536, 1920, and 2560 widths.
+- [x] Runtime Admin desktop/mobile boundary is centralized at Tailwind `lg` = 1024px and shared by SidebarContext/AppHeader.
+- [x] Shell expanded/collapsed/mobile offsets, notification dropdown mobile/tablet/desktop positioning, modal containment, user dropdown minimum-width safety, and table overflow containment are regression-bound.
+- [x] Light/dark, sidebar expanded/collapsed or mobile open/closed, loading/empty/populated, and modal/dropdown state expectations are documented in `ADMIN_UI_GUIDE.md`.
+- [x] TDD RED: Admin UI Foundation run `33488434252` failed specifically because the shared resolution matrix did not yet exist.
+- [ ] GREEN: resolution contract + full route/RBAC/typecheck/lint/build verification for PR #223.
+- [ ] Merge and production deploy for PR #223.
 
 ## Completed
 
