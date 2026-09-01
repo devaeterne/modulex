@@ -2,9 +2,10 @@ import "server-only";
 
 import {
   classifyVendorProduct,
-  stableProductHash,
+  stableDiscoveryHash,
   type NormalizedVendorProduct,
   type VendorCatalogAdapter,
+  type VendorCatalogChangeState,
   type VendorCatalogReviewStatus,
 } from "@/lib/vendor-catalog/domain";
 import {
@@ -20,6 +21,24 @@ type SyncCounts = {
   failed: number;
 };
 
+type ExistingItem = {
+  id: string;
+  external_id: string;
+  snapshot_hash: string;
+  discovery_hash: string | null;
+  review_status: VendorCatalogReviewStatus;
+  details_refreshed_at: string | null;
+};
+
+type PreparedProduct = {
+  product: NormalizedVendorProduct;
+  discoveryHash: string;
+  snapshotHash: string;
+  changeState: VendorCatalogChangeState;
+  reviewStatus: VendorCatalogReviewStatus;
+  detailsRefreshedAt: string | null;
+};
+
 export type VendorCatalogSyncResult = {
   runId: string;
   vendorCode: string;
@@ -32,102 +51,58 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-async function persistProduct(
-  runId: string,
-  product: NormalizedVendorProduct,
-  counts: SyncCounts
-) {
-  const hash = stableProductHash(product);
-  const { data: existing, error: existingError } = await supabaseAdmin
-    .from("vendor_catalog_items")
-    .select("id, snapshot_hash, review_status")
-    .eq("vendor_code", product.vendorCode)
-    .eq("external_id", product.externalId)
-    .maybeSingle();
+function chunk<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
 
-  if (existingError) throw existingError;
+async function loadExistingItems(vendorCode: string) {
+  const rows: ExistingItem[] = [];
+  const pageSize = 500;
 
-  const changeState = classifyVendorProduct(existing?.snapshot_hash, hash);
-  const previousReviewStatus = (existing?.review_status ?? "PENDING") as VendorCatalogReviewStatus;
-  const reviewStatus: VendorCatalogReviewStatus =
-    changeState === "UNCHANGED" ? previousReviewStatus : "PENDING";
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabaseAdmin
+      .from("vendor_catalog_items")
+      .select("id,external_id,snapshot_hash,discovery_hash,review_status,details_refreshed_at")
+      .eq("vendor_code", vendorCode)
+      .range(from, from + pageSize - 1);
 
-  const { data: item, error: itemError } = await supabaseAdmin
-    .from("vendor_catalog_items")
-    .upsert(
-      {
-        vendor_code: product.vendorCode,
-        external_id: product.externalId,
-        sku: product.sku,
-        title: product.title,
-        description: product.description,
-        product_url: product.productUrl,
-        vendor_price_reference: product.vendorPriceReference,
-        vendor_currency: product.vendorCurrency,
-        snapshot_hash: hash,
-        change_state: changeState,
-        review_status: reviewStatus,
-        last_seen_run_id: runId,
-        source_payload: product.sourcePayload,
-        last_seen_at: new Date().toISOString(),
-      },
-      { onConflict: "vendor_code,external_id" }
-    )
-    .select("id")
-    .single();
-
-  if (itemError || !item) throw itemError ?? new Error("Vendor item upsert returned no row.");
-
-  const { error: snapshotError } = await supabaseAdmin
-    .from("vendor_catalog_snapshots")
-    .insert({
-      run_id: runId,
-      item_id: item.id,
-      snapshot_hash: hash,
-      change_state: changeState,
-      normalized_payload: {
-        vendorCode: product.vendorCode,
-        externalId: product.externalId,
-        sku: product.sku,
-        title: product.title,
-        description: product.description,
-        productUrl: product.productUrl,
-        vendorPriceReference: product.vendorPriceReference,
-        vendorCurrency: product.vendorCurrency,
-        assets: product.assets,
-      },
-      source_payload: product.sourcePayload,
-    });
-
-  if (snapshotError) throw snapshotError;
-
-  if (changeState !== "UNCHANGED") {
-    const { error: deleteAssetsError } = await supabaseAdmin
-      .from("vendor_catalog_assets")
-      .delete()
-      .eq("item_id", item.id);
-    if (deleteAssetsError) throw deleteAssetsError;
-
-    if (product.assets.length > 0) {
-      const { error: assetError } = await supabaseAdmin
-        .from("vendor_catalog_assets")
-        .insert(
-          product.assets.map((asset, sortOrder) => ({
-            item_id: item.id,
-            kind: asset.kind,
-            url: asset.url,
-            label: asset.label ?? null,
-            file_type: asset.fileType ?? null,
-            sort_order: sortOrder,
-          }))
-        );
-      if (assetError) throw assetError;
-    }
+    if (error) throw error;
+    const batch = (data ?? []) as ExistingItem[];
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
   }
 
-  if (changeState === "NEW") counts.created += 1;
-  else if (changeState === "UPDATED") counts.updated += 1;
-  else counts.unchanged += 1;
+  return new Map(rows.map((row) => [row.external_id, row]));
+}
+
+function prepareProducts(
+  products: NormalizedVendorProduct[],
+  existingByExternalId: Map<string, ExistingItem>
+) {
+  return products.map<PreparedProduct>((product) => {
+    const existing = existingByExternalId.get(product.externalId);
+    const discoveryHash = stableDiscoveryHash(product);
+    const changeState = classifyVendorProduct(existing?.discovery_hash, discoveryHash);
+    const reviewStatus: VendorCatalogReviewStatus =
+      changeState === "UNCHANGED" ? existing?.review_status ?? "PENDING" : "PENDING";
+
+    return {
+      product,
+      discoveryHash,
+      snapshotHash:
+        changeState === "UNCHANGED" && existing?.snapshot_hash
+          ? existing.snapshot_hash
+          : discoveryHash,
+      changeState,
+      reviewStatus,
+      detailsRefreshedAt:
+        changeState === "UNCHANGED" ? existing?.details_refreshed_at ?? null : null,
+    };
+  });
 }
 
 export async function runVendorCatalogSync(
@@ -159,16 +134,118 @@ export async function runVendorCatalogSync(
   if (runError || !run) throw runError ?? new Error("Vendor sync run could not be created.");
 
   try {
-    const products = await adapter.discover();
+    const [products, existingByExternalId] = await Promise.all([
+      adapter.discover(),
+      loadExistingItems(adapter.vendorCode),
+    ]);
     counts.discovered = products.length;
 
-    for (const product of products) {
-      try {
-        await persistProduct(run.id, product, counts);
-      } catch (error) {
-        counts.failed += 1;
-        errors.push({ externalId: product.externalId, message: errorMessage(error) });
+    const prepared = prepareProducts(products, existingByExternalId);
+    const persistedIds = new Map<string, string>();
+    const now = new Date().toISOString();
+
+    for (const batch of chunk(prepared, 100)) {
+      const { data, error } = await supabaseAdmin
+        .from("vendor_catalog_items")
+        .upsert(
+          batch.map((entry) => ({
+            vendor_code: entry.product.vendorCode,
+            external_id: entry.product.externalId,
+            sku: entry.product.sku,
+            title: entry.product.title,
+            description: entry.product.description,
+            product_url: entry.product.productUrl,
+            vendor_price_reference: entry.product.vendorPriceReference,
+            vendor_currency: entry.product.vendorCurrency,
+            snapshot_hash: entry.snapshotHash,
+            discovery_hash: entry.discoveryHash,
+            change_state: entry.changeState,
+            review_status: entry.reviewStatus,
+            last_seen_run_id: run.id,
+            source_payload: entry.product.sourcePayload,
+            last_seen_at: now,
+            details_refreshed_at: entry.detailsRefreshedAt,
+          })),
+          { onConflict: "vendor_code,external_id" }
+        )
+        .select("id,external_id");
+
+      if (error) {
+        for (const entry of batch) {
+          counts.failed += 1;
+          errors.push({ externalId: entry.product.externalId, message: error.message });
+        }
+        continue;
       }
+
+      for (const row of data ?? []) {
+        persistedIds.set(row.external_id, row.id);
+      }
+    }
+
+    const persisted = prepared.filter((entry) => persistedIds.has(entry.product.externalId));
+    const changed = persisted.filter((entry) => entry.changeState !== "UNCHANGED");
+
+    for (const itemIdBatch of chunk(
+      changed.map((entry) => persistedIds.get(entry.product.externalId)!).filter(Boolean),
+      100
+    )) {
+      if (itemIdBatch.length === 0) continue;
+      const { error } = await supabaseAdmin
+        .from("vendor_catalog_assets")
+        .delete()
+        .in("item_id", itemIdBatch);
+      if (error) throw error;
+    }
+
+    const assetRows = changed.flatMap((entry) => {
+      const itemId = persistedIds.get(entry.product.externalId);
+      if (!itemId) return [];
+      return entry.product.assets.map((asset, sortOrder) => ({
+        item_id: itemId,
+        kind: asset.kind,
+        url: asset.url,
+        label: asset.label ?? null,
+        file_type: asset.fileType ?? null,
+        sort_order: sortOrder,
+      }));
+    });
+
+    for (const assetBatch of chunk(assetRows, 500)) {
+      if (assetBatch.length === 0) continue;
+      const { error } = await supabaseAdmin.from("vendor_catalog_assets").insert(assetBatch);
+      if (error) throw error;
+    }
+
+    const snapshotRows = persisted.map((entry) => ({
+      run_id: run.id,
+      item_id: persistedIds.get(entry.product.externalId)!,
+      snapshot_hash: entry.snapshotHash,
+      change_state: entry.changeState,
+      normalized_payload: {
+        vendorCode: entry.product.vendorCode,
+        externalId: entry.product.externalId,
+        sku: entry.product.sku,
+        title: entry.product.title,
+        description: entry.product.description,
+        productUrl: entry.product.productUrl,
+        vendorPriceReference: entry.product.vendorPriceReference,
+        vendorCurrency: entry.product.vendorCurrency,
+        assets: entry.product.assets,
+      },
+      source_payload: entry.product.sourcePayload,
+    }));
+
+    for (const snapshotBatch of chunk(snapshotRows, 250)) {
+      if (snapshotBatch.length === 0) continue;
+      const { error } = await supabaseAdmin.from("vendor_catalog_snapshots").insert(snapshotBatch);
+      if (error) throw error;
+    }
+
+    for (const entry of persisted) {
+      if (entry.changeState === "NEW") counts.created += 1;
+      else if (entry.changeState === "UPDATED") counts.updated += 1;
+      else counts.unchanged += 1;
     }
 
     const status = counts.failed > 0 ? "FAILED" : "SUCCEEDED";

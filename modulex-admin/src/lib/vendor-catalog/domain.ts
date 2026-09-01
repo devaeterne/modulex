@@ -27,6 +27,7 @@ export type NormalizedVendorProduct = {
 export interface VendorCatalogAdapter {
   readonly vendorCode: string;
   discover(): Promise<NormalizedVendorProduct[]>;
+  enrich?(product: NormalizedVendorProduct): Promise<NormalizedVendorProduct>;
 }
 
 function canonicalize(value: unknown): unknown {
@@ -45,8 +46,27 @@ function canonicalize(value: unknown): unknown {
   return value;
 }
 
-export function stableProductHash(product: NormalizedVendorProduct) {
-  const snapshot = {
+function hashSnapshot(snapshot: unknown) {
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalize(snapshot)))
+    .digest("hex");
+}
+
+function normalizedAssets(product: NormalizedVendorProduct) {
+  return [...product.assets]
+    .map((asset) => ({
+      kind: asset.kind,
+      url: asset.url,
+      label: asset.label ?? null,
+      fileType: asset.fileType ?? null,
+    }))
+    .sort((left, right) =>
+      `${left.kind}:${left.url}`.localeCompare(`${right.kind}:${right.url}`)
+    );
+}
+
+export function stableDiscoveryHash(product: NormalizedVendorProduct) {
+  return hashSnapshot({
     vendorCode: product.vendorCode,
     externalId: product.externalId,
     sku: product.sku,
@@ -55,21 +75,22 @@ export function stableProductHash(product: NormalizedVendorProduct) {
     productUrl: product.productUrl,
     vendorPriceReference: product.vendorPriceReference,
     vendorCurrency: product.vendorCurrency,
-    assets: [...product.assets]
-      .map((asset) => ({
-        kind: asset.kind,
-        url: asset.url,
-        label: asset.label ?? null,
-        fileType: asset.fileType ?? null,
-      }))
-      .sort((left, right) =>
-        `${left.kind}:${left.url}`.localeCompare(`${right.kind}:${right.url}`)
-      ),
-  };
+    assets: normalizedAssets(product),
+  });
+}
 
-  return createHash("sha256")
-    .update(JSON.stringify(canonicalize(snapshot)))
-    .digest("hex");
+export function stableProductHash(product: NormalizedVendorProduct) {
+  return hashSnapshot({
+    vendorCode: product.vendorCode,
+    externalId: product.externalId,
+    sku: product.sku,
+    title: product.title,
+    description: product.description,
+    productUrl: product.productUrl,
+    vendorPriceReference: product.vendorPriceReference,
+    vendorCurrency: product.vendorCurrency,
+    assets: normalizedAssets(product),
+  });
 }
 
 export function classifyVendorProduct(

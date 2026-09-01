@@ -8,7 +8,11 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 const domain = read("src/lib/vendor-catalog/domain.ts");
 const adapters = read("src/lib/vendor-catalog/adapters.ts");
 const sync = read("src/lib/vendor-catalog/sync.ts");
+const auth = read("src/lib/vendor-catalog/auth.ts");
+const approve = read("src/lib/vendor-catalog/approve.ts");
 const route = read("src/app/api/vendor-catalog/sync/route.ts");
+const vendorsRoute = read("src/app/api/vendor-catalog/vendors/route.ts");
+const approveRoute = read("src/app/api/vendor-catalog/items/[itemId]/approve/route.ts");
 const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
 const sidebar = read("src/layout/AppSidebar.tsx");
 const vercel = read("vercel.json");
@@ -16,12 +20,16 @@ const sql = read("sql/vendor-catalog-sync.sql");
 const migration = read("../modulex-store/supabase/migrations/20260901223000_vendor_catalog_sync.sql");
 const hardening = read("sql/vendor-catalog-sync-hardening.sql");
 const hardeningMigration = read("../modulex-store/supabase/migrations/20260901223500_vendor_catalog_sync_hardening.sql");
+const reviewV2 = read("sql/vendor-catalog-sync-review-v2.sql");
+const reviewV2Migration = read("../modulex-store/supabase/migrations/20260902001500_vendor_catalog_sync_review_v2.sql");
 const docs = read("docs/VENDOR_CATALOG_SYNC.md");
 
 assert.match(domain, /NEW/);
 assert.match(domain, /UPDATED/);
 assert.match(domain, /UNCHANGED/);
 assert.match(domain, /stableProductHash/);
+assert.match(domain, /stableDiscoveryHash/);
+assert.match(domain, /enrich\?/);
 assert.match(domain, /modulexPrice > 0/);
 
 assert.match(adapters, /class KarranAdapter/);
@@ -29,6 +37,8 @@ assert.match(adapters, /products\.json/);
 assert.match(adapters, /class RuvatiAdapter/);
 assert.match(adapters, /wp-json\/wc\/store\/v1\/products/);
 assert.match(adapters, /product-sitemap\.xml/);
+assert.match(adapters, /async enrich/);
+assert.match(adapters, /fetchDetailAssets/);
 assert.match(adapters, /dxf/i);
 assert.match(adapters, /dwg/i);
 assert.match(adapters, /vendorCatalogRegistry/);
@@ -37,24 +47,49 @@ assert.match(sync, /vendor_catalog_runs/);
 assert.match(sync, /vendor_catalog_items/);
 assert.match(sync, /vendor_catalog_snapshots/);
 assert.match(sync, /vendor_catalog_assets/);
+assert.match(sync, /discovery_hash/);
+assert.match(sync, /chunk/);
+assert.doesNotMatch(sync, /\.enrich\(/);
 assert.doesNotMatch(sync, /store.*publish/i);
 
-assert.match(route, /VENDOR_CATALOG_SYNC_SECRET/);
-assert.match(route, /CRON_SECRET/);
-assert.match(route, /timingSafeEqual/);
-assert.match(route, /authorizeAdminSession/);
-assert.match(route, /supabaseAdmin\.auth\.getUser/);
-assert.match(route, /super_admin/);
+assert.match(auth, /timingSafeEqual/);
+assert.match(auth, /VENDOR_CATALOG_SYNC_SECRET/);
+assert.match(auth, /CRON_SECRET/);
+assert.match(auth, /supabaseAdmin\.auth\.getUser/);
+assert.match(auth, /super_admin/);
+
+assert.match(route, /requestedVendors/);
+assert.match(route, /request\.json/);
 assert.match(route, /Object\.keys\(vendorCatalogRegistry\)/);
 assert.match(route, /runVendorCatalogSync/);
 assert.match(route, /autoPublished:\s*false/);
+assert.match(vendorsRoute, /Object\.keys\(vendorCatalogRegistry\)/);
+
+assert.match(approve, /sharp/);
+assert.match(approve, /store-media/);
+assert.match(approve, /webp/i);
+assert.match(approve, /1400/);
+assert.match(approve, /save_product_master_v2/);
+assert.match(approve, /store_product_content/);
+assert.match(approve, /store_product_media/);
+assert.match(approve, /storage_bucket/);
+assert.match(approve, /storage_path/);
+assert.match(approve, /review_status:\s*"APPROVED"/);
+assert.match(approveRoute, /approveVendorCatalogItem/);
+assert.match(approveRoute, /authorizeVendorCatalogAdmin/);
 
 assert.match(page, /Vendor Import Review/);
 assert.match(page, /vendor_catalog_items/);
-assert.match(page, /Run Vendor Sync/);
+assert.match(page, /VENDOR_CATALOG_SELECT/);
+assert.doesNotMatch(page, /\.join\(","\)/);
+assert.match(page, /Run .* Sync/);
 assert.match(page, /Synced \/ Unchanged/);
 assert.match(page, /\.in\("change_state", changeStates\)/);
 assert.match(page, /\["NEW", "UPDATED"\]/);
+assert.match(page, /selectedVendor/);
+assert.match(page, /@\/components\/form\/Select/);
+assert.match(page, /image_url/);
+assert.match(page, /\/approve/);
 assert.match(page, /PENDING/);
 assert.match(page, /APPROVED/);
 assert.match(page, /IGNORED/);
@@ -87,8 +122,22 @@ assert.equal(
   "Deployable hardening migration must mirror canonical vendor hardening SQL"
 );
 
+assert.match(reviewV2, /discovery_hash/);
+assert.match(reviewV2, /details_refreshed_at/);
+assert.match(reviewV2, /storage_bucket/);
+assert.match(reviewV2, /storage_path/);
+assert.match(reviewV2, /storage_sha256/);
+assert.match(reviewV2, /storage_bytes/);
+assert.equal(
+  reviewV2Migration.trim(),
+  reviewV2.trim(),
+  "Deployable vendor review v2 migration must mirror canonical SQL"
+);
+
 assert.match(docs, /never auto-publishes/i);
 assert.match(docs, /Modulex selling price/i);
+assert.match(docs, /store-media/i);
+assert.match(docs, /external image/i);
 assert.match(docs, /How to add a vendor/i);
 
 console.log("vendor catalog sync contract: ok");
