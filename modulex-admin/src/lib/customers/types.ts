@@ -83,12 +83,36 @@ export type CustomerOrderItem = {
   line_subtotal: string | number; line_total: string | number; price_source: "price_group" | "manual"; created_at: string;
 };
 
+export type CountertopLineServiceSummary = {
+  name: string;
+  quantity: number;
+};
+
+export type CountertopLineSummary = {
+  orderItemId: string;
+  stoneName: string | null;
+  stoneSku: string | null;
+  stoneType: string | null;
+  sqft: number | null;
+  materialPriceBand: string | null;
+  pricePerSqft: number | null;
+  edgeName: string | null;
+  edgeLinearFt: number | null;
+  sinkName: string | null;
+  sinkSku: string | null;
+  services: CountertopLineServiceSummary[];
+  manualOverrideApplied: boolean;
+  manualOverridePricePerSqft: number | null;
+  manualOverrideReason: string | null;
+};
+
 export type CountertopOrderContext = {
   orderItemId: string;
   orderNumber: string;
   lineNo: number;
   sku: string;
   productName: string;
+  summary?: CountertopLineSummary;
 };
 
 export type CustomerOrderStatusHistory = { id: string; order_id: string; from_status: CustomerOrderStatus | null; to_status: CustomerOrderStatus; note: string | null; changed_by: string | null; created_at: string; };
