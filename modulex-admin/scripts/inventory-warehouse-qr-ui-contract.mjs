@@ -94,6 +94,19 @@ expect(stockMovements.includes('.order("created_at", { ascending: false })'), "S
 expect(stockMovements.includes(".limit(100)"), "Stock Movements must preserve the 100-row history limit");
 expect(stockMovements.includes("Refresh stock movement history"), "Stock Movements must preserve an accessible refresh label");
 
+const stockOperations = read("src/components/stock-operations/StockOperationForm.tsx");
+for (const primitive of ["ComponentCard", "Label", "Select", "Input", "TextArea", "Alert", "Button"]) {
+  expect(stockOperations.includes(primitive), `Stock Operations UI must compose shared ${primitive} primitives`);
+}
+expect(!/<(?:input|select|textarea|button)\b/.test(stockOperations), "Stock Operations UI must not reimplement shared form or button primitives");
+expect(sharedSelect.includes("required?: boolean"), "Shared Select must support native required validation used by Stock Operations");
+expect(sharedSelect.includes("required={required}"), "Shared Select must forward required state to the native select");
+for (const rpcName of ["stock_in_idempotent", "stock_out_idempotent", "stock_transfer_idempotent", "reserve_stock_idempotent", "release_stock_idempotent"]) {
+  expect(stockOperations.includes(rpcName), `Stock Operations must preserve ${rpcName}`);
+}
+expect(stockOperations.includes("getIdempotencyKey"), "Stock Operations must preserve idempotency key generation");
+expect(stockOperations.includes('supabase.rpc("search_stock"'), "Stock Operations must preserve product stock location lookup");
+
 const warehouseTable = read("src/components/warehouses/WarehousesTable.tsx");
 const warehouseForm = read("src/components/warehouses/WarehouseForm.tsx");
 const sharedTable = read("src/components/ui/table/index.tsx");
@@ -128,4 +141,4 @@ expect(sharedTable.includes("title?: string"), "Shared TableRow must support nat
 expect(warehouseForm.includes('htmlFor="warehouse-code"') && warehouseForm.includes('id="warehouse-code"'), "Warehouse code label must remain associated with its input");
 expect(warehouseForm.includes('htmlFor="warehouse-type"') && warehouseForm.includes('id="warehouse-type"'), "Warehouse type label must remain associated with its select");
 
-console.log("inventory + stock movements + warehouse + QR UI contract: ok");
+console.log("inventory + stock movements + stock operations + warehouse + QR UI contract: ok");
