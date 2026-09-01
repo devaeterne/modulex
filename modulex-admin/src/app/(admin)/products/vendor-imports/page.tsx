@@ -22,7 +22,30 @@ type VendorCatalogItem = {
   last_seen_at: string;
 };
 
+type SyncResult = {
+  vendorCode: string;
+  status: "SUCCEEDED" | "FAILED";
+  counts: {
+    discovered: number;
+    created: number;
+    updated: number;
+    unchanged: number;
+    failed: number;
+  };
+};
+
+type SyncResponse = {
+  status?: "SUCCEEDED" | "PARTIAL_FAILURE";
+  results?: SyncResult[];
+  error?: string;
+};
+
 const REVIEW_STATUSES: ReviewStatus[] = ["PENDING", "APPROVED", "IGNORED"];
+const CHANGE_FILTERS: Array<{ state: ChangeState; label: string }> = [
+  { state: "NEW", label: "New" },
+  { state: "UPDATED", label: "Updated" },
+  { state: "UNCHANGED", label: "Synced / Unchanged" },
+];
 
 function formatPrice(item: VendorCatalogItem) {
   if (item.vendor_price_reference === null) return "—";
@@ -45,14 +68,23 @@ function badgeClass(state: ChangeState) {
 
 export default function VendorImportsPage() {
   const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("PENDING");
+  const [changeStates, setChangeStates] = useState<ChangeState[]>(["NEW", "UPDATED"]);
   const [items, setItems] = useState<VendorCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
     setError(null);
+
+    if (changeStates.length === 0) {
+      setItems([]);
+      setLoading(false);
+      return;
+    }
 
     const { data, error: queryError } = await supabase
       .from("vendor_catalog_items")
@@ -60,6 +92,7 @@ export default function VendorImportsPage() {
         "id,vendor_code,external_id,sku,title,product_url,vendor_price_reference,vendor_currency,change_state,review_status,canonical_product_id,last_seen_at"
       )
       .eq("review_status", reviewStatus)
+      .in("change_state", changeStates)
       .order("last_seen_at", { ascending: false })
       .limit(100);
 
@@ -70,7 +103,7 @@ export default function VendorImportsPage() {
       setItems((data ?? []) as VendorCatalogItem[]);
     }
     setLoading(false);
-  }, [reviewStatus]);
+  }, [changeStates, reviewStatus]);
 
   useEffect(() => {
     void loadItems();
@@ -80,6 +113,66 @@ export default function VendorImportsPage() {
     () => (reviewStatus === "PENDING" ? items.length : null),
     [items.length, reviewStatus]
   );
+
+  function toggleChangeState(state: ChangeState) {
+    setChangeStates((current) =>
+      current.includes(state)
+        ? current.filter((item) => item !== state)
+        : [...current, state]
+    );
+  }
+
+  async function runVendorSync() {
+    setSyncing(true);
+    setError(null);
+    setSyncMessage(null);
+
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.access_token) {
+        throw new Error("Your admin session could not be verified. Please sign in again.");
+      }
+
+      const response = await fetch("/api/vendor-catalog/sync", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${session.access_token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ vendors: ["karran", "ruvati"] }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as SyncResponse;
+      if (!response.ok) {
+        throw new Error(payload.error || `Vendor sync failed with HTTP ${response.status}.`);
+      }
+
+      const results = payload.results ?? [];
+      const totals = results.reduce(
+        (sum, result) => ({
+          discovered: sum.discovered + result.counts.discovered,
+          created: sum.created + result.counts.created,
+          updated: sum.updated + result.counts.updated,
+          unchanged: sum.unchanged + result.counts.unchanged,
+          failed: sum.failed + result.counts.failed,
+        }),
+        { discovered: 0, created: 0, updated: 0, unchanged: 0, failed: 0 }
+      );
+
+      setSyncMessage(
+        `Sync complete: ${totals.discovered} discovered, ${totals.created} new, ${totals.updated} updated, ${totals.unchanged} unchanged, ${totals.failed} failed.`
+      );
+      await loadItems();
+    } catch (syncError) {
+      setError(syncError instanceof Error ? syncError.message : String(syncError));
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function setStatus(itemId: string, nextStatus: ReviewStatus) {
     setUpdatingId(itemId);
@@ -102,11 +195,21 @@ export default function VendorImportsPage() {
     <div className="space-y-6">
       <PageBreadcrumb pageTitle="Vendor Import Review" />
 
-      <div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Vendor Import Review</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Review vendor catalog discoveries before linking them to canonical Modulex products.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Vendor Import Review</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Review vendor catalog discoveries before linking them to canonical Modulex products.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void runVendorSync()}
+          disabled={syncing}
+          className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {syncing ? "Running Vendor Sync…" : "Run Vendor Sync"}
+        </button>
       </div>
 
       <div className="rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-900/10 dark:text-warning-200">
@@ -114,27 +217,53 @@ export default function VendorImportsPage() {
         Store publication still requires a Modulex selling price greater than zero.
       </div>
 
+      {syncMessage ? (
+        <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm text-success-800 dark:border-success-900/50 dark:bg-success-900/10 dark:text-success-200">
+          {syncMessage}
+        </div>
+      ) : null}
+
       <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 p-4 dark:border-gray-800">
-          <div className="flex flex-wrap gap-2" aria-label="Review status filters">
-            {REVIEW_STATUSES.map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setReviewStatus(status)}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                  reviewStatus === status
-                    ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
-                    : "border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.04]"
-                }`}
-              >
-                {status}
-              </button>
-            ))}
+        <div className="border-b border-gray-200 p-4 dark:border-gray-800">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap gap-2" aria-label="Review status filters">
+              {REVIEW_STATUSES.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => setReviewStatus(status)}
+                  className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                    reviewStatus === status
+                      ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                      : "border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">
+              {pendingCount === null ? `${items.length} records` : `${pendingCount} pending records`} · latest 100 matches
+            </p>
           </div>
-          <p className="text-xs text-gray-500">
-            {pendingCount === null ? `${items.length} records` : `${pendingCount} pending records`}
-          </p>
+
+          <fieldset className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+            <legend className="sr-only">Catalog change filters</legend>
+            {CHANGE_FILTERS.map(({ state, label }) => (
+              <label
+                key={state}
+                className="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={changeStates.includes(state)}
+                  onChange={() => toggleChangeState(state)}
+                  className="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </fieldset>
         </div>
 
         {error ? (
@@ -145,9 +274,13 @@ export default function VendorImportsPage() {
 
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-500">Loading vendor imports…</div>
+        ) : changeStates.length === 0 ? (
+          <div className="p-8 text-center text-sm text-gray-500">
+            Select at least one catalog state to show vendor imports.
+          </div>
         ) : items.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-500">
-            No {reviewStatus.toLowerCase()} vendor imports.
+            No matching {reviewStatus.toLowerCase()} vendor imports.
           </div>
         ) : (
           <div className="overflow-x-auto">
