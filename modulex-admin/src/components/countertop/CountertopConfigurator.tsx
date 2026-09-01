@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
+import SummaryRow from "@/components/common/SummaryRow";
+import FormHint from "@/components/form/FormHint";
 import Label from "@/components/form/Label";
 import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
@@ -45,6 +47,19 @@ type CountertopPriceResult = {
   attached?: boolean;
   order_item_id?: string;
 };
+type ExistingConfiguration = {
+  stone_product_id: string;
+  sink_product_id: string | null;
+  price_group_id: string;
+  sqft: string | number;
+  edge_profile_id: string | null;
+  edge_linear_ft: string | number;
+  slab_quantity: string | number;
+  manual_price_per_sqft: string | number | null;
+  override_reason: string | null;
+  configuration: unknown;
+  pricing_snapshot: unknown;
+};
 type CountertopConfiguratorProps = {
   orderId?: string;
   orderItemId?: string;
@@ -58,22 +73,43 @@ function money(value: string | number | undefined) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(Number.isFinite(amount) ? amount : 0);
 }
 
-function Field({ label, required = false, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function Field({ label, required = false, hint, children }: { label: string; required?: boolean; hint?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <Label>{label}{required ? " *" : ""}</Label>
       {children}
+      {hint ? <FormHint>{hint}</FormHint> : null}
     </div>
   );
 }
 
-function SummaryRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-1">
-      <span className="text-sm">{label}</span>
-      <span className={strong ? "text-lg font-semibold" : "text-sm font-medium"}>{value}</span>
-    </div>
-  );
+function priceResultFromSnapshot(value: unknown, orderItemId: string): CountertopPriceResult | null {
+  const snapshot = asRecord(value);
+  if (Object.keys(snapshot).length === 0) return null;
+  const totals = asRecord(snapshot.totals);
+  return {
+    ...(snapshot as CountertopPriceResult),
+    subtotal: snapshot.subtotal as string | number | undefined ?? totals.subtotal as string | number | undefined,
+    material_subtotal: snapshot.material_subtotal as string | number | undefined ?? totals.material_subtotal as string | number | undefined,
+    edge_subtotal: snapshot.edge_subtotal as string | number | undefined ?? totals.edge_subtotal as string | number | undefined,
+    sink_subtotal: snapshot.sink_subtotal as string | number | undefined ?? totals.sink_subtotal as string | number | undefined,
+    services_subtotal: snapshot.services_subtotal as string | number | undefined ?? totals.services_subtotal as string | number | undefined,
+    attached: true,
+    order_item_id: orderItemId,
+  };
 }
 
 export default function CountertopConfigurator({ orderId, orderItemId, orderContext, onAttached, onClose }: CountertopConfiguratorProps = {}) {
@@ -117,21 +153,23 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
         ? await supabase.from("customer_order_items").select("order_id").eq("id", orderItemId).maybeSingle()
         : { data: null, error: null };
       const contextOrderId = orderId ?? orderItemContext.data?.order_id ?? null;
-      const orderPricing = contextOrderId
-        ? await supabase.from("customer_orders").select("price_group_id").eq("id", contextOrderId).maybeSingle()
-        : { data: null, error: null };
+      const [orderPricing, existingConfigurationResult] = await Promise.all([
+        contextOrderId
+          ? supabase.from("customer_orders").select("price_group_id").eq("id", contextOrderId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        orderItemId
+          ? supabase.from("countertop_configurations").select("stone_product_id,sink_product_id,price_group_id,sqft,edge_profile_id,edge_linear_ft,slab_quantity,manual_price_per_sqft,override_reason,configuration,pricing_snapshot").eq("order_item_id", orderItemId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
 
       if (!mounted) return;
-      if ([typeResult, edgeResult, sinkResult, profileResult, priceGroupResult, serviceResult].some((entry) => entry.error) || orderItemContext.error || orderPricing.error) {
-        setError("Countertop reference data could not be loaded.");
-      }
+      const referenceError = [typeResult, edgeResult, sinkResult, profileResult, priceGroupResult, serviceResult].find((entry) => entry.error)?.error
+        ?? orderItemContext.error
+        ?? orderPricing.error
+        ?? existingConfigurationResult.error;
+      if (referenceError) setError(errorMessage(referenceError, "Countertop reference data could not be loaded."));
 
-      setTypes((typeResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
-      setEdges((edgeResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
-      setSinks((sinkResult.data ?? []).map((row) => ({ value: row.id, label: `${row.name} (${row.sku})` })));
-      setPriceGroups((priceGroupResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
-      setPriceGroupId(contextOrderId ? (orderPricing.data?.price_group_id ?? "") : (priceGroupResult.data?.[0]?.id ?? ""));
-      setStones((profileResult.data ?? []).flatMap((row) => {
+      const mappedStones = (profileResult.data ?? []).flatMap((row) => {
         const product = Array.isArray(row.products) ? row.products[0] : row.products;
         const band = Array.isArray(row.countertop_material_price_bands) ? row.countertop_material_price_bands[0] : row.countertop_material_price_bands;
         if (!product || product.status !== "active") return [];
@@ -143,8 +181,42 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
           material_price_band_code: band?.code ?? undefined,
           price_per_sqft: band?.price_per_sqft === undefined || band?.price_per_sqft === null ? undefined : String(band.price_per_sqft),
         }];
+      });
+      const baseServices = (serviceResult.data ?? []).map((row) => ({ ...row, unit_price: String(row.unit_price), quantity: "1", selected: false }));
+      const existing = existingConfigurationResult.data as ExistingConfiguration | null;
+      const savedSnapshot = asRecord(existing?.pricing_snapshot);
+      const savedServiceRows = Array.isArray(savedSnapshot.services) ? savedSnapshot.services : [];
+      const savedServiceMap = new Map(savedServiceRows.flatMap((entry) => {
+        const service = asRecord(entry);
+        const id = typeof service.service_id === "string" ? service.service_id : null;
+        return id ? [[id, String(service.quantity ?? "1")]] : [];
       }));
-      setServices((serviceResult.data ?? []).map((row) => ({ ...row, unit_price: String(row.unit_price), quantity: "1", selected: false })));
+
+      setTypes((typeResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
+      setEdges((edgeResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
+      setSinks((sinkResult.data ?? []).map((row) => ({ value: row.id, label: `${row.name} (${row.sku})` })));
+      setPriceGroups((priceGroupResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
+      setStones(mappedStones);
+      setServices(baseServices.map((service) => savedServiceMap.has(service.id)
+        ? { ...service, selected: true, quantity: savedServiceMap.get(service.id) ?? "1" }
+        : service));
+
+      if (existing) {
+        const savedStone = mappedStones.find((stone) => stone.id === existing.stone_product_id);
+        setStoneProductId(existing.stone_product_id);
+        setStoneTypeId(savedStone?.stone_type_id ?? "");
+        setPriceGroupId(existing.price_group_id || orderPricing.data?.price_group_id || "");
+        setSqft(String(existing.sqft));
+        setEdgeId(existing.edge_profile_id ?? "");
+        setEdgeLinearFt(String(existing.edge_linear_ft ?? 0));
+        setSinkId(existing.sink_product_id ?? "");
+        setSlabQuantity(String(existing.slab_quantity ?? 1));
+        setManualPrice(existing.manual_price_per_sqft === null ? "" : String(existing.manual_price_per_sqft));
+        setOverrideReason(existing.override_reason ?? "");
+        setResult(priceResultFromSnapshot(existing.pricing_snapshot, orderItemId ?? ""));
+      } else {
+        setPriceGroupId(contextOrderId ? (orderPricing.data?.price_group_id ?? "") : (priceGroupResult.data?.[0]?.id ?? ""));
+      }
       setLoading(false);
     })();
     return () => { mounted = false; };
@@ -175,7 +247,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
       p_services: selectedServices(),
       p_manual_material_price: manualPrice || null,
     });
-    if (pricingError) return setError("Unable to calculate countertop pricing.");
+    if (pricingError) return setError(errorMessage(pricingError, "Unable to calculate countertop pricing."));
     setResult(data as CountertopPriceResult);
   }
 
@@ -203,7 +275,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
       : await supabase.rpc("create_and_attach_countertop_order_item", { ...common, p_order_id: orderId, p_request_id: initiationRequestId });
     setSaving(false);
 
-    if (response.error) return setError(orderItemId ? "Unable to attach countertop configuration." : "Unable to add countertop to this draft order.");
+    if (response.error) return setError(errorMessage(response.error, orderItemId ? "Unable to attach countertop configuration." : "Unable to add countertop to this draft order."));
     const attachedItemId = String(response.data ?? orderItemId ?? "");
     setResult((current) => current ? { ...current, attached: true, order_item_id: attachedItemId } : current);
     if (!orderItemId) setInitiationRequestId(crypto.randomUUID());
@@ -211,7 +283,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
   }
 
   if (loading) {
-    return <ComponentCard title="Countertop configurator" desc="Loading managed Countertop references…"><p className="text-sm">Loading countertop references…</p></ComponentCard>;
+    return <ComponentCard title="Countertop configurator" desc="Loading managed Countertop references…"><FormHint>Loading countertop references…</FormHint></ComponentCard>;
   }
 
   return (
@@ -227,13 +299,13 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
                   {(orderContext.sku || orderContext.productName) ? <span>{orderContext.sku} · {orderContext.productName}</span> : null}
                 </div>
               ) : null}
-              {!orderItemId && !orderId ? <p className="text-sm">Open a draft customer order to configure and attach a countertop.</p> : null}
+              {!orderItemId && !orderId ? <FormHint>Open a draft customer order to configure and attach a countertop.</FormHint> : null}
             </div>
             {onClose ? <Button variant="outline" onClick={onClose}>Close</Button> : null}
           </div>
 
           {error ? <Alert variant="error" title="Countertop action failed" message={error} /> : null}
-          {result?.attached ? <Alert variant="success" title="Countertop added" message="The calculated countertop snapshot is attached to the Draft order." /> : null}
+          {result?.attached ? <Alert variant="success" title="Countertop saved" message="The Countertop snapshot is attached to the Draft order. Saved selections are restored when this line is reopened." /> : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Stone type">
@@ -242,10 +314,8 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
             <Field label="Stone" required>
               <Select options={filteredStones.map((row) => ({ value: row.id, label: `${row.name} (${row.sku})` }))} value={stoneProductId} placeholder="Select Stone" onChange={(value) => { setStoneProductId(value); setResult(null); }} required />
             </Field>
-            <Field label="Material price band">
-              <div className="flex min-h-11 items-center gap-2 text-sm">
-                {selectedStone ? <Badge color="info">{selectedStone.material_price_band_code} · {money(selectedStone.price_per_sqft)} / sq ft</Badge> : <span>Select a stone to view its material price band.</span>}
-              </div>
+            <Field label="Material price band" hint={!selectedStone ? "Select a stone to view its material price band." : undefined}>
+              {selectedStone ? <Badge color="info">{selectedStone.material_price_band_code} · {money(selectedStone.price_per_sqft)} / sq ft</Badge> : null}
             </Field>
             <Field label="Square feet" required>
               <Input type="number" step="0.0001" min="0.0001" value={sqft} onChange={(event) => { setSqft(event.target.value); setResult(null); }} />
@@ -262,9 +332,8 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
             <Field label="Sink (optional)">
               <Select options={sinks} value={sinkId} placeholder="No sink" allowEmpty onChange={(value) => { setSinkId(value); setResult(null); }} />
             </Field>
-            <Field label="Commercial price group">
+            <Field label="Commercial price group" hint={hasOrderPricingContext ? "Inherited from the saved order." : "Select the pricing context for this countertop."}>
               <Select options={priceGroups} value={priceGroupId} onChange={(value) => { setPriceGroupId(value); setResult(null); }} disabled={hasOrderPricingContext} />
-              <p className="mt-1.5 text-xs">{hasOrderPricingContext ? "Inherited from the saved order." : "Select the pricing context for this countertop."}</p>
             </Field>
             <Field label="Manual $/sq ft (optional)">
               <Input inputMode="decimal" value={manualPrice} onChange={(event) => { setManualPrice(event.target.value); setResult(null); }} />
@@ -276,7 +345,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
 
           <div className="space-y-3">
             <h3 className="text-sm font-semibold">Additional services</h3>
-            {services.length === 0 ? <p className="text-sm">No active services.</p> : null}
+            {services.length === 0 ? <FormHint>No active services.</FormHint> : null}
             {services.map((service) => (
               <div key={service.id} className="flex flex-wrap items-center gap-3">
                 <div className="min-w-64 flex-1">
@@ -306,7 +375,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
             <Button onClick={calculate} disabled={!canCalculate}>Calculate price</Button>
             {(orderItemId || orderId) ? (
               <Button variant="outline" onClick={attach} disabled={saving || !result}>
-                {saving ? "Attaching…" : orderItemId ? "Attach draft snapshot" : "Add to draft order"}
+                {saving ? "Saving…" : orderItemId ? "Save Countertop" : "Add to draft order"}
               </Button>
             ) : null}
           </div>
@@ -329,9 +398,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
               <SummaryRow label="Sink" value={money(result.sink_subtotal)} />
               <SummaryRow label="Services" value={money(result.services_subtotal)} />
             </div>
-            <div className="border-t pt-3">
-              <SummaryRow label="Total" value={money(result.subtotal)} strong />
-            </div>
+            <SummaryRow label="Total" value={money(result.subtotal)} strong divider />
           </div>
         </ComponentCard>
       ) : null}
