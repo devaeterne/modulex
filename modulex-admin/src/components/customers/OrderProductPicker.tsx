@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import Button from "@/components/ui/button/Button";
 
 export type OrderPickerProduct = {
   id: string;
@@ -98,7 +99,7 @@ export default function OrderProductPicker({ isOpen, onClose, products, selected
             </div>
             <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)} className={controlClass}><option value="">All Brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</select>
             <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className={controlClass}><option value="">All Categories</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-            <button type="button" onClick={clearFilters} disabled={activeFilterCount === 0} className="h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.04]">Clear{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</button>
+            <Button variant="outline" size="sm" onClick={clearFilters} disabled={activeFilterCount === 0}>Clear{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</Button>
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
@@ -119,13 +120,13 @@ export default function OrderProductPicker({ isOpen, onClose, products, selected
                   <td className="min-w-[180px] px-4 py-3 text-sm text-gray-600 dark:text-gray-300"><div>{pricingLabel(product)}</div>{reason && <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{reason}</div>}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-800 dark:text-white/90">{hasPrice ? money(priceMap.get(product.id) ?? 0, currencyCode) : "—"}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{selectedQuantity > 0 ? selectedQuantity : "—"}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right"><button type="button" disabled={isDisabled} onClick={() => onAdd(product)} className="inline-flex h-9 items-center justify-center rounded-lg bg-brand-500 px-3 text-xs font-semibold text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 dark:disabled:bg-gray-800 dark:disabled:text-gray-500" title={isDisabled ? reason ?? undefined : undefined}>{selectedQuantity > 0 ? "Add +1" : "Add"}</button></td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right"><Button size="sm" disabled={isDisabled} onClick={() => onAdd(product)}>{selectedQuantity > 0 ? "Add +1" : "Add"}</Button></td>
                 </tr>;
               })}
             </tbody>
           </table>
         </div>
-        <div className="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6"><p className="text-sm text-gray-500 dark:text-gray-400">{filteredProducts.length} product{filteredProducts.length === 1 ? "" : "s"} shown • {totalSelectedQuantity} item{totalSelectedQuantity === 1 ? "" : "s"} in order</p><button type="button" onClick={onClose} className="inline-flex h-10 items-center justify-center rounded-lg bg-gray-900 px-5 text-sm font-medium text-white transition hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200">Done</button></div>
+        <div className="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6"><p className="text-sm text-gray-500 dark:text-gray-400">{filteredProducts.length} product{filteredProducts.length === 1 ? "" : "s"} shown • {totalSelectedQuantity} item{totalSelectedQuantity === 1 ? "" : "s"} in order</p><Button onClick={onClose}>Done</Button></div>
       </div>
     </Modal>
   );
