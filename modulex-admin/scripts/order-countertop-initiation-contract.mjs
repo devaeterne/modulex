@@ -14,8 +14,10 @@ const initiationMigration = read(initiationMigrationPath);
 const draftShellMigration = read(draftShellMigrationPath);
 const pricingV2 = read("../modulex-store/supabase/migrations/20260901130000_order_product_pricing_v2.sql");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
+const lineDetails = read("src/components/customers/CountertopLineDetails.tsx");
 const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
 const editOrder = read("src/components/customers/EditCustomerOrder.tsx");
+const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
 const picker = read("src/components/customers/OrderProductPicker.tsx");
 const orderDomain = read("src/lib/customers/order-domain.ts");
 
@@ -55,6 +57,12 @@ assert(newOrder.includes("CountertopConfigurator") && newOrder.includes("counter
 assert(newOrder.includes("FormHint") && newOrder.includes("SummaryRow"), "New Order must use shared dark-mode-safe helper and summary primitives");
 assert(!newOrder.includes('<h1 className="text-2xl font-semibold">New Order</h1>'), "New Order must not recreate a duplicate route-local page heading");
 assert(newOrder.includes('"message" in error') && newOrder.includes("errorMessage(error"), "New Order must surface Supabase/RPC error messages instead of hiding them behind a generic fallback");
+
+assert(orderDomain.includes('.from("countertop_configurations")') && orderDomain.includes("pricing_snapshot"), "Order views must read the historical Countertop pricing snapshot rather than live catalog labels");
+assert(orderDomain.includes('hasPermission(profile.role, "orders.manage")'), "Countertop order actions must be governed by orders.manage");
+for (const token of ["Edge:", "Sink:", "Services:", "FormHint", "Badge"]) assert(lineDetails.includes(token), `Countertop line detail component missing: ${token}`);
+assert(editOrder.includes("CountertopLineDetails"), "Edit Order must show Countertop selections beneath the Stone line");
+assert(orderDetail.includes("CountertopLineDetails"), "Order Detail must show Countertop selections beneath the Stone line");
 
 for (const token of [
   "create or replace function private.create_customer_order_core",
