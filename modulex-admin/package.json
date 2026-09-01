@@ -25,7 +25,7 @@
     "smoke:order-domain": "node scripts/order-domain-contract.mjs",
     "smoke:order-product-pricing-v2": "node scripts/order-product-pricing-v2-contract.mjs",
     "smoke:order-lifecycle": "node scripts/order-lifecycle-editability-contract.mjs",
-    "smoke:a1-core-operations": "node scripts/a1-core-operations-contract.mjs",
+    "smoke:a1-core-operations": "node scripts/a1-core-operations-contract.mjs && node scripts/order-product-pricing-v2-contract.mjs",
     "smoke:a2-warehouse-integrity": "node scripts/a2-warehouse-location-integrity-contract.mjs",
     "smoke:a2-inventory-movements": "node scripts/a2-inventory-movements-contract.mjs",
     "smoke:a2-low-stock-reporting": "node scripts/a2-low-stock-reporting-contract.mjs",
