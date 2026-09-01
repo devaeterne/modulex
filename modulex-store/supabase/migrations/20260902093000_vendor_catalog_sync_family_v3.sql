@@ -98,6 +98,30 @@ create index if not exists idx_vendor_catalog_checks_vendor_created
 create index if not exists idx_vendor_catalog_check_items_check_state
   on public.vendor_catalog_check_items (check_id, change_state, external_id);
 
+/* Approval is a server mutation. Authenticated reviewers may still move rows
+ * between PENDING and IGNORED, but they cannot set APPROVED or rewrite the
+ * canonical product link directly through PostgREST.
+ */
+create or replace function private.guard_vendor_catalog_approval()
+returns trigger
+language plpgsql
+set search_path = pg_catalog, public
+as $$
+begin
+  if new.review_status = 'APPROVED'
+     and new.review_status is distinct from old.review_status
+     and coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'Vendor catalog approval must use the server approval workflow';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_vendor_catalog_items_approval_guard on public.vendor_catalog_items;
+create trigger trg_vendor_catalog_items_approval_guard
+before update on public.vendor_catalog_items
+for each row execute function private.guard_vendor_catalog_approval();
+
 alter table public.vendor_catalog_category_mappings enable row level security;
 alter table public.vendor_catalog_checks enable row level security;
 alter table public.vendor_catalog_check_items enable row level security;
@@ -105,6 +129,8 @@ alter table public.vendor_catalog_check_items enable row level security;
 revoke all on public.vendor_catalog_category_mappings from anon, authenticated;
 revoke all on public.vendor_catalog_checks from anon, authenticated;
 revoke all on public.vendor_catalog_check_items from anon, authenticated;
+revoke update (review_status, canonical_product_id) on public.vendor_catalog_items from authenticated;
+grant update (review_status) on public.vendor_catalog_items to authenticated;
 
 grant select on public.vendor_catalog_category_mappings to authenticated;
 grant select on public.vendor_catalog_checks to authenticated;
@@ -147,3 +173,5 @@ using (
       and p.role in ('super_admin','admin')
   )
 );
+
+revoke all on function private.guard_vendor_catalog_approval() from public, anon, authenticated;
