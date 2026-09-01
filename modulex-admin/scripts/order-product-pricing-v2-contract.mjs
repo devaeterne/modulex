@@ -40,6 +40,13 @@ assert(picker.includes("pricingModelLabel") && picker.includes("uom_name"), "pro
 assert(createOrder.includes("countertop_material_band") && createOrder.includes("/pricing/countertop"), "create UI must guide Stone to the canonical Countertop workspace");
 assert(editOrder.includes("pricing_model") && detail.includes("pricingModelLabel"), "edit/detail UI must expose pricing route metadata");
 
+// UI boundary: Price Group money is server-authoritative and must not be manually editable in Edit Order.
+assert(editOrder.includes("Server Price"), "Edit Order must label canonical Price Group money as Server Price");
+assert(!/<input[^>]+value=\{item\.unit_price\}[^>]+onChange=/s.test(editOrder), "Edit Order must not expose an editable unit_price input");
+assert(!editOrder.includes("useGroupPrice("), "Edit Order must not expose a manual Group Price copy action");
+assert(/unitPrice:\s*String\(priceMap\.get\(item\.product_id\)\s*\?\?\s*0\)/.test(editOrder), "Edit Order submit payload must use canonical priceMap money");
+assert(/const price = Math\.max\(0, priceMap\.get\(item\.product_id\) \?\? 0\)/.test(editOrder), "Edit Order preview totals must use canonical priceMap money");
+
 // Hardening: semantic identity is immutable unless product identity actually changes.
 for (const snapshot of ["product_type_code_snapshot", "product_type_name_snapshot", "uom_code_snapshot", "uom_name_snapshot", "pricing_model_snapshot"]) {
   assert(migration.includes(snapshot), `immutable semantic snapshot missing: ${snapshot}`);
