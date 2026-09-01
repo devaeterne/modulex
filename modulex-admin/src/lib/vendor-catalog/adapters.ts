@@ -3,6 +3,8 @@ import type {
   VendorAsset,
   VendorAssetKind,
   VendorCatalogAdapter,
+  VendorCatalogCategory,
+  VendorCatalogDiscoveryScope,
 } from "@/lib/vendor-catalog/domain";
 
 type FetchLike = typeof fetch;
@@ -13,6 +15,20 @@ type AdapterOptions = {
 };
 
 const DOCUMENT_EXTENSIONS = ["pdf", "dxf", "dwg", "step", "stp", "zip"] as const;
+
+export const KARRAN_COLOR_SUFFIXES = {
+  BL: "Black",
+  WH: "White",
+  GR: "Grey",
+  BI: "Bisque",
+  BR: "Brown",
+  CN: "Concrete",
+  BU: "Blue",
+  RD: "Red",
+  OR: "Orange",
+  GN: "Green",
+  YL: "Yellow",
+} as const;
 
 function stripHtml(value: string | null | undefined) {
   if (!value) return null;
@@ -95,6 +111,39 @@ function normalizePrice(value: unknown, minorUnit = 0) {
   return minorUnit > 0 ? numeric / 10 ** minorUnit : numeric;
 }
 
+function fallbackFamilyKey(vendorCode: string, externalId: string, sku: string | null) {
+  const normalizedSku = sku?.trim().toUpperCase();
+  return normalizedSku || `${vendorCode.toUpperCase()}:${externalId}`;
+}
+
+function inferKarranFamily(
+  externalId: string,
+  sku: string | null,
+  title: string
+): { familyKey: string; variantCode: string | null; variantLabel: string | null } {
+  const normalizedSku = sku?.trim().toUpperCase();
+  if (!normalizedSku) {
+    return {
+      familyKey: fallbackFamilyKey("karran", externalId, sku),
+      variantCode: null,
+      variantLabel: null,
+    };
+  }
+
+  const titleLower = title.toLowerCase();
+  for (const [code, label] of Object.entries(KARRAN_COLOR_SUFFIXES)) {
+    const pattern = new RegExp(`(?:[-_]?${code})$`, "i");
+    if (!pattern.test(normalizedSku)) continue;
+    if (!titleLower.includes(label.toLowerCase())) continue;
+
+    const familyKey = normalizedSku.replace(pattern, "").replace(/[-_]+$/, "");
+    if (!familyKey) break;
+    return { familyKey, variantCode: code, variantLabel: label };
+  }
+
+  return { familyKey: normalizedSku, variantCode: null, variantLabel: null };
+}
+
 type ShopifyProduct = {
   id: number | string;
   title?: string;
@@ -109,6 +158,13 @@ type ShopifyProduct = {
   }>;
 };
 
+type ShopifyCollection = {
+  id: number | string;
+  title?: string;
+  handle?: string;
+  products_count?: number | null;
+};
+
 export class KarranAdapter implements VendorCatalogAdapter {
   readonly vendorCode = "karran";
   private readonly baseUrl: string;
@@ -119,11 +175,48 @@ export class KarranAdapter implements VendorCatalogAdapter {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  async discover(): Promise<NormalizedVendorProduct[]> {
-    const products: ShopifyProduct[] = [];
+  async listCategories(): Promise<VendorCatalogCategory[]> {
+    const categories: VendorCatalogCategory[] = [];
 
     for (let page = 1; page <= 100; page += 1) {
-      const url = `${this.baseUrl}/products.json?limit=250&page=${page}`;
+      const response = await this.fetchImpl(
+        `${this.baseUrl}/collections.json?limit=250&page=${page}`,
+        { headers: { accept: "application/json" }, cache: "no-store" }
+      );
+      if (!response.ok) {
+        throw new Error(`Karran collection request failed (${response.status})`);
+      }
+
+      const payload = (await response.json()) as { collections?: ShopifyCollection[] };
+      const batch = payload.collections ?? [];
+      for (const collection of batch) {
+        const key = collection.handle?.trim();
+        if (!key) continue;
+        categories.push({
+          key,
+          label: collection.title?.trim() || key,
+          productCount:
+            collection.products_count === null || collection.products_count === undefined
+              ? null
+              : Number(collection.products_count),
+        });
+      }
+      if (batch.length < 250) break;
+    }
+
+    return categories.sort((left, right) => left.label.localeCompare(right.label));
+  }
+
+  async discover(scope: VendorCatalogDiscoveryScope = {}): Promise<NormalizedVendorProduct[]> {
+    const products: ShopifyProduct[] = [];
+    const categoryKey = scope.categoryKey?.trim() || null;
+    const categoryLabel = scope.categoryLabel?.trim() || categoryKey;
+
+    for (let page = 1; page <= 100; page += 1) {
+      const path = categoryKey
+        ? `/collections/${encodeURIComponent(categoryKey)}/products.json`
+        : "/products.json";
+      const url = `${this.baseUrl}${path}?limit=250&page=${page}`;
       const response = await this.fetchImpl(url, {
         headers: { accept: "application/json" },
         cache: "no-store",
@@ -154,18 +247,27 @@ export class KarranAdapter implements VendorCatalogAdapter {
         : [{ id: product.id, sku: null, title: null, price: null }];
 
       for (const variant of variants) {
+        const externalId = `${product.id}:${variant.id}`;
+        const title =
+          variant.title && variant.title !== "Default Title"
+            ? `${product.title ?? "Untitled product"} — ${variant.title}`
+            : product.title ?? "Untitled product";
+        const family = inferKarranFamily(externalId, variant.sku?.trim() || null, title);
+
         normalized.push({
           vendorCode: this.vendorCode,
-          externalId: `${product.id}:${variant.id}`,
+          externalId,
           sku: variant.sku?.trim() || null,
-          title:
-            variant.title && variant.title !== "Default Title"
-              ? `${product.title ?? "Untitled product"} — ${variant.title}`
-              : product.title ?? "Untitled product",
+          title,
           description: stripHtml(product.body_html),
           productUrl,
           vendorPriceReference: normalizePrice(variant.price),
           vendorCurrency: "USD",
+          vendorCategoryKey: categoryKey,
+          vendorCategoryLabel: categoryLabel,
+          familyKey: family.familyKey,
+          variantCode: family.variantCode,
+          variantLabel: family.variantLabel,
           assets: images,
           sourcePayload: { product, variant },
         });
@@ -194,6 +296,14 @@ type WooProduct = {
     currency_minor_unit?: number | null;
   };
   images?: Array<{ src?: string; alt?: string | null }>;
+  categories?: Array<{ id?: number | string; name?: string; slug?: string }>;
+};
+
+type WooCategory = {
+  id: number | string;
+  name?: string;
+  slug?: string;
+  count?: number | null;
 };
 
 function extractSitemapUrls(xml: string) {
@@ -220,9 +330,41 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
-  async discover(): Promise<NormalizedVendorProduct[]> {
-    const products = await this.discoverFromStoreApi();
+  async listCategories(): Promise<VendorCatalogCategory[]> {
+    const categories: VendorCatalogCategory[] = [];
+
+    for (let page = 1; page <= 100; page += 1) {
+      const response = await this.fetchImpl(
+        `${this.baseUrl}/wp-json/wc/store/v1/products/categories?per_page=100&page=${page}&hide_empty=true`,
+        { headers: { accept: "application/json" }, cache: "no-store" }
+      );
+      if (!response.ok) {
+        throw new Error(`Ruvati category request failed (${response.status})`);
+      }
+      const batch = (await response.json()) as WooCategory[];
+      for (const category of batch) {
+        const key = category.slug?.trim() || String(category.id);
+        categories.push({
+          key,
+          label: category.name?.trim() || key,
+          productCount:
+            category.count === null || category.count === undefined
+              ? null
+              : Number(category.count),
+        });
+      }
+      if (batch.length < 100) break;
+    }
+
+    return categories.sort((left, right) => left.label.localeCompare(right.label));
+  }
+
+  async discover(scope: VendorCatalogDiscoveryScope = {}): Promise<NormalizedVendorProduct[]> {
+    const products = await this.discoverFromStoreApi(scope);
     if (products) return products;
+    if (scope.categoryKey) {
+      throw new Error("Ruvati category-scoped discovery requires the WooCommerce Store API.");
+    }
     return this.discoverFromSitemap();
   }
 
@@ -231,11 +373,15 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
     return { ...product, assets: mergeAssets(product.assets, detailAssets) };
   }
 
-  private async discoverFromStoreApi(): Promise<NormalizedVendorProduct[] | null> {
+  private async discoverFromStoreApi(
+    scope: VendorCatalogDiscoveryScope
+  ): Promise<NormalizedVendorProduct[] | null> {
     const products: WooProduct[] = [];
 
     for (let page = 1; page <= 100; page += 1) {
-      const url = `${this.baseUrl}/wp-json/wc/store/v1/products?per_page=100&page=${page}`;
+      const params = new URLSearchParams({ per_page: "100", page: String(page) });
+      if (scope.categoryKey) params.set("category", scope.categoryKey);
+      const url = `${this.baseUrl}/wp-json/wc/store/v1/products?${params.toString()}`;
       let response: Response;
       try {
         response = await this.fetchImpl(url, {
@@ -243,35 +389,49 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
           cache: "no-store",
         });
       } catch {
-        return page === 1 ? null : this.normalizeWooProducts(products);
+        return page === 1 ? null : this.normalizeWooProducts(products, scope);
       }
 
-      if (!response.ok) return page === 1 ? null : this.normalizeWooProducts(products);
+      if (!response.ok) return page === 1 ? null : this.normalizeWooProducts(products, scope);
       const batch = (await response.json()) as WooProduct[];
       products.push(...batch);
       if (batch.length < 100) break;
     }
 
-    return this.normalizeWooProducts(products);
+    return this.normalizeWooProducts(products, scope);
   }
 
-  private normalizeWooProducts(products: WooProduct[]) {
+  private normalizeWooProducts(
+    products: WooProduct[],
+    scope: VendorCatalogDiscoveryScope
+  ) {
     return products.map<NormalizedVendorProduct>((product) => {
       const productUrl = product.permalink ?? `${this.baseUrl}/?p=${product.id}`;
       const images: VendorAsset[] = (product.images ?? [])
         .filter((image): image is { src: string; alt?: string | null } => Boolean(image.src))
         .map((image) => ({ kind: "image", url: image.src, label: image.alt ?? null, fileType: null }));
       const minorUnit = product.prices?.currency_minor_unit ?? 0;
+      const firstCategory = product.categories?.[0];
+      const categoryKey = scope.categoryKey?.trim() || firstCategory?.slug?.trim() || null;
+      const categoryLabel =
+        scope.categoryLabel?.trim() || firstCategory?.name?.trim() || categoryKey;
+      const externalId = String(product.id);
+      const sku = product.sku?.trim() || null;
 
       return {
         vendorCode: this.vendorCode,
-        externalId: String(product.id),
-        sku: product.sku?.trim() || null,
+        externalId,
+        sku,
         title: product.name ?? "Untitled product",
         description: stripHtml(product.description ?? product.short_description),
         productUrl,
         vendorPriceReference: normalizePrice(product.prices?.price, minorUnit),
         vendorCurrency: product.prices?.currency_code ?? "USD",
+        vendorCategoryKey: categoryKey,
+        vendorCategoryLabel: categoryLabel,
+        familyKey: fallbackFamilyKey(this.vendorCode, externalId, sku),
+        variantCode: null,
+        variantLabel: null,
         assets: images,
         sourcePayload: product,
       };
@@ -290,15 +450,21 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
 
     return extractSitemapUrls(await response.text()).map((productUrl) => {
       const slug = new URL(productUrl).pathname.split("/").filter(Boolean).at(-1) ?? productUrl;
+      const externalId = `sitemap:${slug}`;
       return {
         vendorCode: this.vendorCode,
-        externalId: `sitemap:${slug}`,
+        externalId,
         sku: null,
         title: titleFromSlug(slug),
         description: null,
         productUrl,
         vendorPriceReference: null,
         vendorCurrency: null,
+        vendorCategoryKey: null,
+        vendorCategoryLabel: null,
+        familyKey: fallbackFamilyKey(this.vendorCode, externalId, null),
+        variantCode: null,
+        variantLabel: null,
         assets: [],
         sourcePayload: { source: "product-sitemap.xml", productUrl },
       } satisfies NormalizedVendorProduct;
