@@ -40,6 +40,7 @@ export default function UserDropdown() {
   }, [profile]);
 
   const displayEmail = profile?.email ?? "";
+
   const displayRole = profile?.role
     ? ROLE_LABELS[profile.role]
     : "User";
@@ -160,11 +161,11 @@ export default function UserDropdown() {
         <svg
           className={`
             hidden shrink-0
-            stroke-gray-500
-            transition-transform duration-200
-            group-hover:stroke-gray-700
-            dark:stroke-gray-400
-            dark:group-hover:stroke-gray-300
+            text-gray-500
+            transition-all duration-200
+            group-hover:text-gray-700
+            dark:text-gray-400
+            dark:group-hover:text-gray-300
             sm:block
             ${isOpen ? "rotate-180" : ""}
           `}
