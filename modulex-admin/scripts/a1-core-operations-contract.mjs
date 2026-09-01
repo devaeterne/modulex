@@ -59,7 +59,7 @@ assert.match(productLifecycle, /active products/i, "product lifecycle rejection 
 assert.match(orderPricing, /product_type_code_snapshot/i, "order lines must snapshot Product Type semantics");
 assert.match(orderPricing, /uom_code_snapshot/i, "order lines must snapshot UOM semantics");
 assert.match(orderPricing, /pricing_model_snapshot/i, "order lines must snapshot pricing route semantics");
-assert.match(orderPricing, /pricing_model\s*=\s*'price_group'/i, "Price Group products must have an explicit routing branch");
+assert.match(orderPricing, /pricing_model\s*<>\s*'price_group'/i, "all non-Price-Group routes must fail closed after explicit supported branches");
 assert.match(orderPricing, /product_prices/i, "Price Group pricing must reuse canonical product_prices");
 assert.match(orderPricing, /pricing_model\s*=\s*'countertop_material_band'/i, "Stone must have an explicit Countertop Material Band routing branch");
 assert.match(orderPricing, /canonical Countertop workspace/i, "ordinary Stone pricing must fail closed with an actionable route");
