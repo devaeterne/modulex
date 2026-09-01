@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-01
-Main baseline: `1a7de5f932ab4707a1fc3d887c9d65bdb2bc1958`
+Main baseline: `1bf1a987a2c4499db4348f10d3c975ef7574b376`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
-Current Admin next action: **VAL-4 — Inventory / Warehouses / Stock Operations validation hardening is active in PR #224. Orders Product Pricing V2 remains parallel in draft PR #217 and is intentionally untouched; VAL-3 is deferred until that Orders work is reconciled. Pricing UI v2 PR #206 is merged, its production migration is present, and the exact merge-SHA Admin deployment is READY; this session does not re-claim signed-in pricing acceptance that was not independently reproduced.**
+Current Admin next action: **Countertop Product Catalog is active in draft PR #230 on current `main` baseline `1bf1a987a2c4499db4348f10d3c975ef7574b376`; its additive catalog RPC migration remains source-controlled and unapplied until merge. VAL-4 validation hardening remains an independent parallel workstream.**
 
 ## Admin UI standardization program
 
@@ -444,6 +444,13 @@ A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality
   - The end-to-end slice must cover stone → price group/manual price → square-foot/linear-foot/edge/sink/services pricing → immutable order snapshot → existing order item → quantity-based slab reservation.
   - Individual slab identity, remnants, advanced fabrication optimization, Prima/Ruvati imports, and faucet-specific rules remain future extensions.
   - Five additive production migrations are applied and production-accepted. Authenticated Admin, Customer/Dealer safe projection, revision identity, canonical reservation reconciliation, rollback fixture cleanup, Security Advisor, and Performance Advisor checks all passed. Acceptance evidence: `docs/acceptance/countertop-stone-sink.md`.
+- [~] Expose operational Stone and Sink catalog/pricing management directly in Admin.
+  - PR #230 adds `/pricing/countertop/catalog` plus explicit Pricing navigation for **Countertop Catalog** and **Countertop Setup** so operators no longer need to bounce between Products, Countertop References, and Product Prices.
+  - Stone create/edit keeps Product Master v2 canonical, writes the Stone profile atomically, and selects the existing B1–R22 `countertop_material_price_bands`; Order-level manual $/sq ft remains the explicit override path rather than creating a second catalog pricing model.
+  - Sink create/edit keeps Product Master v2 canonical and writes USD `product_prices` through the existing append-safe bulk pricing RPC for every active order-eligible, non-internal commercial price group exactly once.
+  - Product activate/deactivate stays on `set_product_status`; inactive Stone/Sink catalog products are excluded from Order Countertop dropdowns.
+  - TDD RED is recorded in Actions run `33525475929`. Fresh branch CI on PR #230 passes Admin UI Foundation run `33526954540`, Admin Products Pricing run `33526954525`, and Admin A1/Store portal boundaries run `33526954604`.
+  - Migration `20260901152500_countertop_catalog_product` is source-controlled but intentionally **not applied to production before merge**. Keep this row `[~]` until merge, production migration/advisor checks, deploy, and signed-in catalog acceptance are complete.
 
 ## Cross-cutting validation and data contract hardening track (VAL-1 → VAL-6)
 
@@ -625,6 +632,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
 - [x] Add targeted regression contracts whenever roadmap work changes critical domain behavior.
   - A2.1 warehouse/location integrity, A2.2 inventory/movement, and A2.3 stock-operations/scanning contracts are permanent Admin workflow gates. A2.3 protects scanner duplicate handling, guided confirmation/error recovery, QR label printing, mobile fallback behavior, and continued use of the A2.2 idempotent write boundary.
   - A3.1 product-master contract permanently protects canonical taxonomy/family/color semantics, lifecycle guards, server-side product list/export behavior, and A1/A2 regression boundaries.
+  - Countertop catalog/context regression protects visible Catalog/Setup navigation, Stone/Sink catalog ownership, active-product Order dropdown filtering, order-eligible commercial price-group scope, and canonical Product Master/Product Prices write reuse.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -743,25 +751,27 @@ Record material decisions here when they affect future phases.
 - [ ] Which customer financial capabilities, if any, should ever be exposed to the Customer/Dealer portals?
 - [x] Phase 2.1 first secondary CMS scope is **About + Gallery/Projects**; Blog remains disabled until a real editorial workflow is required. Ordinary Navbar/Footer links become configurable in Package D while route/security behavior remains code-owned.
 - [x] Granite/Oakwell migration uses a **structured hybrid CMS**. Production business content that operators should change without deployment is DB/Storage-backed and Admin-managed; Store receives narrow public projections. Granite Center is migration evidence only, not a runtime backend.
-- [x] New Granite migration domains are introduced incrementally by the package that first needs them after current-schema review; no speculative parallel CMS is created.
+- [x] New Granite migration domains are introduced incrementally by the package that first needs them after current production schema review; no speculative parallel CMS is created.
 - [x] A2.2 keeps the existing hybrid inventory architecture: mutable `inventory` snapshot for operational reads plus append-safe `inventory_movements` ledger. It does not adopt full event sourcing or create separate damaged/hold quantity buckets.
 - [x] A2.3 does not add a scan-specific write ledger or new mutation API. Camera/manual scans resolve workflow inputs; confirmed stock changes continue through the A2.2 idempotent RPC + movement-ledger boundary.
 - [x] A3.1 keeps `brand_id` / `category_id` canonical while legacy text taxonomy columns remain synchronized compatibility mirrors; physical product deletion is not part of the Admin product-master lifecycle.
 - [x] Product Type is dynamic master data and selects a controlled pricing behavior; it does not store price amounts. UOM is dynamic quantity/measurement master data and does not select pricing behavior.
 - [x] Pricing UI v2 keeps Stone material rates in canonical `countertop_material_price_bands`, Sink/Standard Price Group amounts in canonical `product_prices`, and unsupported `none` Product Types without an editable commercial amount.
+- [x] Countertop Catalog keeps Stone catalog pricing on Material Bands and Sink catalog pricing on order-eligible commercial `price_groups`; manual Stone $/sq ft remains an Order configuration override, not a second stored Stone price source.
 
 ---
 
 # Next Action
 
-Primary near-term independent Admin work is **VAL-4 — Inventory + Warehouses + Stock Operations validation hardening in draft PR #224**. **Orders Product Pricing V2 remains active in parallel draft PR #217 and must not be duplicated or modified from this workstream.**
+Countertop Product Catalog is active in **draft PR #230** while existing validation workstreams continue independently.
 
-1. Complete PR #224 RED → GREEN validation, A2.1/A2.2/A2.3 regressions, typecheck, lint, and production build without production business-data mutation.
-2. Keep VAL-4 `[~]` until merge/deploy and signed-in production acceptance; do not mark production completion from branch CI alone.
-3. Keep VAL-3 deferred while #217 is active because Customers/Orders validation overlaps that branch.
-4. Pricing UI v2 PR #206 is already merged; production contains its routing migration and the exact merge-SHA Admin deployment is READY. Do not repeat or invent pricing behavior; independently close any remaining signed-in acceptance evidence when that workstream is revisited.
-5. Countertop remains the next large domain after Orders Product Pricing V2 is fully reconciled; production B1–R22 material bands are canonical, so do not write an 8-band replacement migration.
+1. Keep migration `20260901152500_countertop_catalog_product` unapplied until PR #230 is merged; branch CI is not production acceptance.
+2. After merge, apply the canonical migration, run Supabase Security + Performance Advisor checks, deploy Admin, and perform signed-in Add/Edit/Activate/Deactivate acceptance for Stone and Sink.
+3. Verify a newly added active Stone appears only under its selected Stone Type in Add Countertop and displays its Material Band; verify inactive Stone/Sink products disappear from Order dropdowns.
+4. Verify Sink saves require one USD price for every active order-eligible non-internal commercial price group and Order pricing uses the saved Order price-group context.
+5. Preserve B1–R22 as the canonical Stone band catalog; do not create an 8-band replacement or a parallel Stone price table.
+6. Keep VAL-4/remaining validation work independent from this catalog package unless execution-time `main` shows a real conflict.
 
-**Cross-roadmap coordination:** this VAL-4 package changes Admin-only validation behavior and does not change Store public projections, so no functional `STORE_ROADMAP.md` status mutation is required.
+**Cross-roadmap coordination:** PR #230 changes the Admin management surface and shared operational RPC only; it does not widen Store public/Dealer projections, so no functional `STORE_ROADMAP.md` status mutation is required before merge.
 
-**Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so #217 and any newer merges are preserved rather than overwritten.
+**Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so newer merges are preserved rather than overwritten.
