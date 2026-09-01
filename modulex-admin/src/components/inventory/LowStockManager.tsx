@@ -2,6 +2,21 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableViewport,
+} from "@/components/ui/table";
 import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
@@ -36,14 +51,13 @@ type RetryAction =
   | { type: "load" }
   | { type: "threshold"; row: StockRow };
 
+type BadgeColor = "primary" | "success" | "error" | "warning" | "info" | "light";
+
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const RPC_PAGE_SIZE = 100;
 
 const focusClass =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900";
-
-const inputClass =
-  "h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-theme-xs outline-none transition focus-visible:border-brand-300 focus-visible:ring-2 focus-visible:ring-brand-500/20 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90";
 
 function numberValue(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
@@ -59,30 +73,14 @@ function csvCell(value: unknown) {
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-function stockState(row: StockRow) {
+function stockState(row: StockRow): { label: string; color: BadgeColor } {
   const available = numberValue(row.total_available_quantity);
-  if (available <= 0) {
-    return {
-      label: "OUT OF STOCK",
-      className: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400",
-    };
-  }
-  if (row.is_low_stock) {
-    return {
-      label: "LOW STOCK",
-      className: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400",
-    };
-  }
+  if (available <= 0) return { label: "OUT OF STOCK", color: "error" };
+  if (row.is_low_stock) return { label: "LOW STOCK", color: "warning" };
   if (numberValue(row.total_reserved_quantity) > 0) {
-    return {
-      label: "PARTIALLY RESERVED",
-      className: "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400",
-    };
+    return { label: "PARTIALLY RESERVED", color: "primary" };
   }
-  return {
-    label: "OK",
-    className: "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400",
-  };
+  return { label: "OK", color: "success" };
 }
 
 function getPageNumbers(currentPage: number, totalPages: number) {
@@ -105,10 +103,16 @@ export default function LowStockManager() {
   const [view, setView] = useState<ViewFilter>("alerts");
   const [typeId, setTypeId] = useState("");
   const [uomId, setUomId] = useState("");
-  const [typeOptions, setTypeOptions] = useState<{id:string;name:string}[]>([]);
-  const [uomOptions, setUomOptions] = useState<{id:string;name:string;code:string}[]>([]);
+  const [typeOptions, setTypeOptions] = useState<{ id: string; name: string }[]>([]);
+  const [uomOptions, setUomOptions] = useState<{ id: string; name: string; code: string }[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [serverSummary, setServerSummary] = useState<{products:number;alerts:number;out_of_stock:number;thresholds_set:number;shortfall_by_uom:Record<string,number>} | null>(null);
+  const [serverSummary, setServerSummary] = useState<{
+    products: number;
+    alerts: number;
+    out_of_stock: number;
+    thresholds_set: number;
+    shortfall_by_uom: Record<string, number>;
+  } | null>(null);
   const [thresholdDrafts, setThresholdDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -125,13 +129,33 @@ export default function LowStockManager() {
     setErrorMessage(null);
     setRetryAction(null);
 
-    const [{ data, error: loadError }, { data: summaryData, error: summaryError }] = await Promise.all([supabase.rpc("search_low_stock_page_v2", {
-      p_query: query, p_view: view, p_type_id: typeId || null, p_uom_id: uomId || null,
-      p_offset: (currentPage - 1) * pageSize, p_limit: pageSize, p_export_all: false,
-    }), supabase.rpc("get_low_stock_summary_v2", { p_query: query, p_view: view, p_type_id: typeId || null, p_uom_id: uomId || null })]);
+    const [{ data, error: loadError }, { data: summaryData, error: summaryError }] =
+      await Promise.all([
+        supabase.rpc("search_low_stock_page_v2", {
+          p_query: query,
+          p_view: view,
+          p_type_id: typeId || null,
+          p_uom_id: uomId || null,
+          p_offset: (currentPage - 1) * pageSize,
+          p_limit: pageSize,
+          p_export_all: false,
+        }),
+        supabase.rpc("get_low_stock_summary_v2", {
+          p_query: query,
+          p_view: view,
+          p_type_id: typeId || null,
+          p_uom_id: uomId || null,
+        }),
+      ]);
+
     const nextRows = (data ?? []) as StockRow[];
-    if (summaryError) { setServerSummary(null); setErrorMessage("Low-stock summary is temporarily unavailable. Please retry."); setRetryAction({ type: "load" }); }
-    else setServerSummary(summaryData as typeof serverSummary);
+    if (summaryError) {
+      setServerSummary(null);
+      setErrorMessage("Low-stock summary is temporarily unavailable. Please retry.");
+      setRetryAction({ type: "load" });
+    } else {
+      setServerSummary(summaryData as typeof serverSummary);
+    }
     setTotalCount(numberValue(nextRows[0]?.total_count));
 
     if (loadError) {
@@ -168,18 +192,36 @@ export default function LowStockManager() {
 
   useEffect(() => {
     void Promise.all([
-      supabase.from("product_types").select("id,name").eq("is_active", true).order("sort_order"),
-      supabase.from("units_of_measure").select("id,name,code").eq("is_active", true).order("sort_order"),
-    ]).then(([types, uoms]) => { setTypeOptions((types.data ?? []) as typeof typeOptions); setUomOptions((uoms.data ?? []) as typeof uomOptions); });
+      supabase
+        .from("product_types")
+        .select("id,name")
+        .eq("is_active", true)
+        .order("sort_order"),
+      supabase
+        .from("units_of_measure")
+        .select("id,name,code")
+        .eq("is_active", true)
+        .order("sort_order"),
+    ]).then(([types, uoms]) => {
+      setTypeOptions((types.data ?? []) as typeof typeOptions);
+      setUomOptions((uoms.data ?? []) as typeof uomOptions);
+    });
   }, []);
 
   const summary = useMemo(() => {
-    if (serverSummary) return { products: serverSummary.products, alerts: serverSummary.alerts, outOfStock: serverSummary.out_of_stock, thresholdsSet: serverSummary.thresholds_set, shortfallByUnit: serverSummary.shortfall_by_uom };
+    if (serverSummary) {
+      return {
+        products: serverSummary.products,
+        alerts: serverSummary.alerts,
+        outOfStock: serverSummary.out_of_stock,
+        thresholdsSet: serverSummary.thresholds_set,
+        shortfallByUnit: serverSummary.shortfall_by_uom,
+      };
+    }
     return { products: 0, alerts: 0, outOfStock: 0, thresholdsSet: 0, shortfallByUnit: {} };
   }, [rows, serverSummary]);
 
   const filteredRows = rows;
-
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   useEffect(() => {
@@ -234,8 +276,11 @@ export default function LowStockManager() {
     let exportOffset = 0;
     do {
       const { data, error } = await supabase.rpc("search_low_stock_page", {
-        p_query: query.trim(), p_view: "alerts", p_offset: exportOffset,
-        p_limit: RPC_PAGE_SIZE, p_export_all: false,
+        p_query: query.trim(),
+        p_view: "alerts",
+        p_offset: exportOffset,
+        p_limit: RPC_PAGE_SIZE,
+        p_export_all: false,
       });
       if (error) {
         reportLowStockError("alert export failed", error);
@@ -247,6 +292,7 @@ export default function LowStockManager() {
       exportOffset += page.length;
       if (page.length === 0 || exportOffset >= numberValue(page[0]?.total_count)) break;
     } while (true);
+
     const header = [
       "SKU",
       "Product",
@@ -271,10 +317,7 @@ export default function LowStockManager() {
         formatNumber(row.total_available_quantity),
         formatNumber(row.min_stock_level),
         formatNumber(
-          Math.max(
-            numberValue(row.min_stock_level) - numberValue(row.total_available_quantity),
-            0
-          )
+          Math.max(numberValue(row.min_stock_level) - numberValue(row.total_available_quantity), 0),
         ),
         state.label,
       ]
@@ -307,23 +350,34 @@ export default function LowStockManager() {
           emphasis={summary.outOfStock > 0 ? "error" : "default"}
         />
         <Metric label="Thresholds Set" value={`${summary.thresholdsSet}/${summary.products}`} />
-        <Metric label="Shortfall by UOM" value={Object.entries(summary.shortfallByUnit).map(([unit, value]) => `${unit}: ${formatNumber(value)}`).join(" · ") || "—"} />
+        <Metric
+          label="Shortfall by UOM"
+          value={
+            Object.entries(summary.shortfallByUnit)
+              .map(([unit, value]) => `${unit}: ${formatNumber(value)}`)
+              .join(" · ") || "—"
+          }
+        />
       </div>
 
       {summary.thresholdsSet === 0 && !isLoading ? (
-        <div className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-          Minimum stock thresholds are not configured yet. Use <strong>Threshold Not Set</strong> to assign reorder levels; low-stock alerts become operational once those values are defined.
-        </div>
+        <Alert
+          variant="warning"
+          title="Minimum stock thresholds are not configured"
+          message="Use Threshold Not Set to assign reorder levels; low-stock alerts become operational once those values are defined."
+        />
       ) : null}
 
       <div aria-live="polite" className="space-y-3">
         {errorMessage ? (
-          <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <span>{errorMessage}</span>
-              {retryAction ? (
-                <button
+          <div className="space-y-3">
+            <Alert variant="error" title="Low stock action failed" message={errorMessage} />
+            {retryAction ? (
+              <div className="flex justify-end">
+                <Button
                   type="button"
+                  size="sm"
+                  variant="outline"
                   onClick={() => {
                     if (retryAction.type === "load") {
                       void loadRows();
@@ -331,92 +385,110 @@ export default function LowStockManager() {
                     }
                     void saveThreshold(retryAction.row);
                   }}
-                  className={`font-medium text-error-800 underline underline-offset-2 dark:text-error-300 ${focusClass}`}
                 >
                   {retryAction.type === "load" ? "Retry" : "Retry update"}
-                </button>
-              ) : null}
-            </div>
+                </Button>
+              </div>
+            ) : null}
           </div>
         ) : null}
         {successMessage ? (
-          <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
-            {successMessage}
-          </div>
+          <Alert variant="success" title="Minimum stock updated" message={successMessage} />
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex flex-col gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Low Stock Control</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Availability includes reservations. Minimum levels can be maintained by users with product management access.
-            </p>
+      <ComponentCard
+        title="Low Stock Control"
+        desc="Availability includes reservations. Minimum levels can be maintained by users with product management access."
+      >
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6 xl:items-end">
+          <div className="md:col-span-2 xl:col-span-2">
+            <Label htmlFor="low-stock-search" className="sr-only">
+              Search low stock products
+            </Label>
+            <Input
+              id="low-stock-search"
+              type="search"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search SKU, product, brand..."
+            />
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div>
-              <label htmlFor="low-stock-search" className="sr-only">
-                Search low stock products
-              </label>
-              <input
-                id="low-stock-search"
-                type="search"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Search SKU, product, brand..."
-                className={`${inputClass} w-full sm:w-[280px]`}
-              />
-            </div>
-            <div>
-              <label htmlFor="low-stock-view" className="sr-only">
-                Filter low stock products
-              </label>
-              <select
-                id="low-stock-view"
-                value={view}
-                onChange={(event) => {
-                  setView(event.target.value as ViewFilter);
-                  setCurrentPage(1);
-                }}
-                className={`${inputClass} min-w-[180px]`}
-              >
-                <option value="alerts">Alerts Only</option>
-                <option value="all">All Products</option>
-                <option value="unset">Threshold Not Set</option>
-              </select>
-            </div>
-            <select aria-label="Product Type" value={typeId} onChange={(e) => { setTypeId(e.target.value); setCurrentPage(1); }} className={`${inputClass} min-w-[150px]`}>
-              <option value="">All types</option>{typeOptions.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
-            <select aria-label="Unit of Measure" value={uomId} onChange={(e) => { setUomId(e.target.value); setCurrentPage(1); }} className={`${inputClass} min-w-[140px]`}>
-              <option value="">All UOMs</option>{uomOptions.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.code})</option>)}
-            </select>
-            <button
-              type="button"
-              onClick={() => void loadRows()}
-              className={`h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
-            >
+
+          <div>
+            <Label htmlFor="low-stock-view" className="sr-only">
+              Filter low stock products
+            </Label>
+            <Select
+              id="low-stock-view"
+              value={view}
+              options={[
+                { value: "alerts", label: "Alerts Only" },
+                { value: "all", label: "All Products" },
+                { value: "unset", label: "Threshold Not Set" },
+              ]}
+              onChange={(value) => {
+                setView(value as ViewFilter);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="low-stock-product-type" className="sr-only">
+              Product Type
+            </Label>
+            <Select
+              id="low-stock-product-type"
+              value={typeId}
+              allowEmpty
+              placeholder="All types"
+              options={typeOptions.map((option) => ({ value: option.id, label: option.name }))}
+              onChange={(value) => {
+                setTypeId(value);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="low-stock-uom" className="sr-only">
+              Unit of Measure
+            </Label>
+            <Select
+              id="low-stock-uom"
+              value={uomId}
+              allowEmpty
+              placeholder="All UOMs"
+              options={uomOptions.map((option) => ({
+                value: option.id,
+                label: `${option.name} (${option.code})`,
+              }))}
+              onChange={(value) => {
+                setUomId(value);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2 md:col-span-2 xl:col-span-6 xl:justify-end">
+            <Button type="button" size="sm" variant="outline" disabled={isLoading} onClick={() => void loadRows()}>
               Refresh
-            </button>
-            <button
-              type="button"
-              onClick={() => void exportAlerts()}
-              disabled={summary.alerts === 0}
-              className={`h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 ${focusClass}`}
-            >
+            </Button>
+            <Button type="button" size="sm" disabled={summary.alerts === 0} onClick={() => void exportAlerts()}>
               Export Alerts
-            </button>
+            </Button>
           </div>
         </div>
 
-        <div className="admin-table-viewport">
-          <table className="min-w-[1120px] divide-y divide-gray-100 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/[0.02]">
-              <tr>
+        <TableViewport>
+          <Table variant="admin" className="w-full min-w-[1120px]">
+            <caption className="sr-only">Low stock products and minimum thresholds</caption>
+            <TableHeader variant="admin">
+              <TableRow>
                 {[
                   "Product",
                   "Type / Category",
@@ -428,37 +500,37 @@ export default function LowStockManager() {
                   "Status",
                   "Action",
                 ].map((label) => (
-                  <th
+                  <TableCell
                     key={label}
-                    scope="col"
-                    className={`${[
-                      "On Hand",
-                      "Reserved",
-                      "Available",
-                      "Minimum",
-                      "Shortfall",
-                    ].includes(label) ? "text-right" : "text-left"} px-5 py-3 text-xs font-medium uppercase text-gray-500 dark:text-gray-400`}
+                    isHeader
+                    variant="admin"
+                    className={
+                      ["On Hand", "Reserved", "Available", "Minimum", "Shortfall"].includes(label)
+                        ? "text-right"
+                        : "text-left"
+                    }
                   >
                     {label}
-                  </th>
+                  </TableCell>
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              </TableRow>
+            </TableHeader>
+
+            <TableBody variant="admin">
               {isLoading ? (
-                <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">
-                    Loading stock thresholds...
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={9} variant="admin" className="py-10 text-center">
+                    <span role="status">Loading stock thresholds...</span>
+                  </TableCell>
+                </TableRow>
               ) : paginatedRows.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-500">
+                <TableRow>
+                  <TableCell colSpan={9} variant="admin" className="py-10 text-center">
                     {view === "alerts"
                       ? "No low-stock alerts right now."
                       : "No products match the current filters."}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
                 paginatedRows.map((row) => {
                   const state = stockState(row);
@@ -466,9 +538,11 @@ export default function LowStockManager() {
                   const available = numberValue(row.total_available_quantity);
                   const draft = thresholdDrafts[row.product_id] ?? String(minimum);
                   const changed = Number(draft) !== minimum;
+                  const thresholdId = `low-stock-threshold-${row.product_id}`;
+
                   return (
-                    <tr key={row.product_id}>
-                      <td className="px-5 py-4">
+                    <TableRow key={row.product_id}>
+                      <TableCell variant="admin" className="align-top">
                         <Link
                           href={`/products/${row.product_id}`}
                           className={`text-sm font-semibold text-gray-800 transition hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400 ${focusClass}`}
@@ -477,63 +551,69 @@ export default function LowStockManager() {
                         </Link>
                         <p className="mt-0.5 text-xs text-gray-500">{row.product_name}</p>
                         {row.barcode ? <p className="text-xs text-gray-400">{row.barcode}</p> : null}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">
+                      </TableCell>
+
+                      <TableCell variant="admin" className="align-top">
                         <p>{row.product_type || "Standard"} · {row.category || "—"}</p>
                         <p className="text-xs text-gray-400">{row.brand || "No brand"}</p>
-                      </td>
-                      <td className="px-5 py-4 text-right text-sm font-medium text-gray-800 dark:text-white/90">
+                      </TableCell>
+
+                      <TableCell variant="admin" className="text-right font-medium text-gray-800 dark:text-white/90">
                         {formatNumber(row.total_quantity)}
-                      </td>
-                      <td className="px-5 py-4 text-right text-sm text-gray-600 dark:text-gray-300">
+                      </TableCell>
+                      <TableCell variant="admin" className="text-right">
                         {formatNumber(row.total_reserved_quantity)}
-                      </td>
-                      <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">
+                      </TableCell>
+                      <TableCell variant="admin" className="text-right font-semibold text-gray-800 dark:text-white/90">
                         {formatNumber(row.total_available_quantity)}
-                      </td>
-                      <td className="px-5 py-4 text-right">
+                      </TableCell>
+
+                      <TableCell variant="admin" className="text-right">
                         {canEditThresholds ? (
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={draft}
-                            aria-label={`Minimum stock level for ${row.sku}`}
-                            onChange={(event) =>
-                              setThresholdDrafts((current) => ({
-                                ...current,
-                                [row.product_id]: event.target.value,
-                              }))
-                            }
-                            className={`${inputClass} w-24 text-right`}
-                          />
+                          <div className="ml-auto w-24">
+                            <Label htmlFor={thresholdId} className="sr-only">
+                              Minimum stock level for {row.sku}
+                            </Label>
+                            <Input
+                              id={thresholdId}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={draft}
+                              onChange={(event) =>
+                                setThresholdDrafts((current) => ({
+                                  ...current,
+                                  [row.product_id]: event.target.value,
+                                }))
+                              }
+                              className="text-right"
+                            />
+                          </div>
                         ) : (
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            {formatNumber(row.min_stock_level)}
-                          </span>
+                          <span>{formatNumber(row.min_stock_level)}</span>
                         )}
-                      </td>
-                      <td className="px-5 py-4 text-right text-sm font-medium text-gray-800 dark:text-white/90">
-                        {row.is_low_stock
-                          ? formatNumber(Math.max(minimum - available, 0))
-                          : "—"}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${state.className}`}>
-                          {state.label}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
+                      </TableCell>
+
+                      <TableCell variant="admin" className="text-right font-medium text-gray-800 dark:text-white/90">
+                        {row.is_low_stock ? formatNumber(Math.max(minimum - available, 0)) : "—"}
+                      </TableCell>
+
+                      <TableCell variant="admin">
+                        <Badge color={state.color} size="sm">{state.label}</Badge>
+                      </TableCell>
+
+                      <TableCell variant="admin">
                         {canEditThresholds ? (
-                          <button
+                          <Button
                             type="button"
+                            size="sm"
+                            variant="outline"
                             disabled={!changed || savingId === row.product_id}
                             onClick={() => void saveThreshold(row)}
-                            aria-label={`Save minimum stock level for ${row.sku}`}
-                            className={`h-9 rounded-lg border border-gray-200 px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
                           >
+                            <span className="sr-only">Minimum stock level for {row.sku}: </span>
                             {savingId === row.product_id ? "Saving..." : "Save"}
-                          </button>
+                          </Button>
                         ) : (
                           <Link
                             href={`/products/${row.product_id}`}
@@ -542,77 +622,78 @@ export default function LowStockManager() {
                             View
                           </Link>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableViewport>
 
-        <div className="flex flex-col gap-4 border-t border-gray-200 px-5 py-4 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-4 border-t border-gray-200 pt-5 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-3 text-sm text-gray-500 dark:text-gray-400 sm:flex-row sm:items-center">
             <p aria-live="polite">
               Showing {startRow}–{endRow} of {filteredRows.length} matching products
             </p>
             <div className="flex items-center gap-2">
-              <label htmlFor="low-stock-page-size" className="text-xs font-medium">
+              <Label htmlFor="low-stock-page-size" className="mb-0 text-xs">
                 Rows per page
-              </label>
-              <select
-                id="low-stock-page-size"
-                value={pageSize}
-                onChange={(event) => {
-                  setPageSize(Number(event.target.value));
-                  setCurrentPage(1);
-                }}
-                className={`${inputClass} h-9 min-w-[76px] py-0`}
-              >
-                {PAGE_SIZE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
+              </Label>
+              <div className="w-24">
+                <Select
+                  id="low-stock-page-size"
+                  value={String(pageSize)}
+                  options={PAGE_SIZE_OPTIONS.map((option) => ({
+                    value: String(option),
+                    label: String(option),
+                  }))}
+                  onChange={(value) => {
+                    setPageSize(Number(value));
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
             </div>
           </div>
 
           <nav className="flex flex-wrap items-center gap-1" aria-label="Low stock pagination">
-            <button
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
               disabled={currentPage === 1 || filteredRows.length === 0}
-              className={`h-9 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
             >
               Previous
-            </button>
+            </Button>
+
             {pageNumbers.map((page) => (
-              <button
-                key={page}
-                type="button"
-                onClick={() => setCurrentPage(page)}
-                aria-current={currentPage === page ? "page" : undefined}
-                className={`h-9 min-w-9 rounded-lg px-3 text-sm font-medium transition ${
-                  currentPage === page
-                    ? "bg-brand-500 text-white"
-                    : "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-                } ${focusClass}`}
-              >
-                {page}
-              </button>
+              <span key={page} aria-current={currentPage === page ? "page" : undefined}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={currentPage === page ? "primary" : "outline"}
+                  className="min-w-9"
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </Button>
+              </span>
             ))}
-            <button
+
+            <Button
               type="button"
+              size="sm"
+              variant="outline"
               onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
               disabled={currentPage === totalPages || filteredRows.length === 0}
-              className={`h-9 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03] ${focusClass}`}
             >
               Next
-            </button>
+            </Button>
           </nav>
         </div>
-      </div>
+      </ComponentCard>
     </div>
   );
 }
