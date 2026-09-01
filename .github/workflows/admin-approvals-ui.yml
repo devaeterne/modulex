@@ -1,0 +1,58 @@
+name: Admin Approvals UI
+
+on:
+  push:
+    paths:
+      - "modulex-admin/src/app/(admin)/approvals/**"
+      - "modulex-admin/src/components/approvals/**"
+      - "modulex-admin/scripts/approvals-ui-contract.mjs"
+      - ".github/workflows/admin-approvals-ui.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/app/(admin)/approvals/**"
+      - "modulex-admin/src/components/approvals/**"
+      - "modulex-admin/scripts/approvals-ui-contract.mjs"
+      - ".github/workflows/admin-approvals-ui.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  approvals-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: Approvals UI contract
+        run: node scripts/approvals-ui-contract.mjs
+      - name: A1 core operations regression
+        run: npm run smoke:a1-core-operations
+      - name: Order domain regression
+        run: npm run smoke:order-domain
+      - name: Order lifecycle regression
+        run: npm run smoke:order-lifecycle
+      - name: Production surface regression
+        run: npm run smoke:production-surface
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Admin UI guardrails
+        run: npm run smoke:admin-ui
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build
