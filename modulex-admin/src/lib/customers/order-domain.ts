@@ -454,6 +454,12 @@ export async function loadOrderDetail(customerId: string, orderId: string): Prom
   const countertopSummaries = await loadCountertopLineSummaries(itemRows.map((item) => item.id));
   const summariesByItemId = new Map(countertopSummaries.map((summary) => [summary.orderItemId, summary]));
   const canManageCountertop = hasPermission(profile.role, "orders.manage");
+  const countertopProducts = itemRows.map((item) => item.product_id).filter((id): id is string => Boolean(id));
+  const countertopProfilesResult = canManageCountertop && countertopProducts.length
+    ? await supabase.from("countertop_stone_product_profiles").select("product_id").in("product_id", countertopProducts).eq("is_active", true)
+    : { data: [], error: null };
+  if (countertopProfilesResult.error) throw countertopProfilesResult.error;
+  const countertopProductIds = new Set((countertopProfilesResult.data ?? []).map((row) => row.product_id));
 
   return {
     customer: customerResult.data as Customer,
@@ -465,7 +471,7 @@ export async function loadOrderDetail(customerId: string, orderId: string): Prom
     canManageCountertop,
     countertopSummaries,
     countertopItems: canManageCountertop
-      ? itemRows.filter((item) => summariesByItemId.has(item.id)).map((item) => ({
+      ? itemRows.filter((item) => item.product_id && countertopProductIds.has(item.product_id) && summariesByItemId.has(item.id)).map((item) => ({
           orderItemId: item.id,
           orderNumber: orderResult.data.order_number,
           lineNo: item.line_no,
