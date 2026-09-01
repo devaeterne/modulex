@@ -36,6 +36,8 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
 
+  const hasOrderPricingContext = Boolean(orderId || orderItemId);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -47,25 +49,30 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
         supabase.from("price_groups").select("id,name").eq("is_active", true).order("name"),
       ]);
       const svc = await supabase.from("countertop_services").select("id,name,pricing_method,unit_price").eq("is_active", true).order("name");
-      const orderPricing = orderId
-        ? await supabase.from("customer_orders").select("price_group_id").eq("id", orderId).maybeSingle()
-        : { data: null, error: null };
-      if (!mounted) return;
 
-      if ([t, e, s, p, pg, svc].some((x) => x.error) || orderPricing.error) {
+      const orderItemContext = !orderId && orderItemId
+        ? await supabase.from("customer_order_items").select("order_id").eq("id", orderItemId).maybeSingle()
+        : { data: null, error: null };
+      const contextOrderId = orderId ?? orderItemContext.data?.order_id ?? null;
+      const orderPricing = contextOrderId
+        ? await supabase.from("customer_orders").select("price_group_id").eq("id", contextOrderId).maybeSingle()
+        : { data: null, error: null };
+
+      if (!mounted) return;
+      if ([t, e, s, p, pg, svc].some((x) => x.error) || orderItemContext.error || orderPricing.error) {
         setError("Countertop reference data could not be loaded.");
       }
       setTypes((t.data ?? []).map((x) => ({ value: x.id, label: x.name })));
       setEdges((e.data ?? []).map((x) => ({ value: x.id, label: x.name })));
       setSinks((s.data ?? []).map((x) => ({ value: x.id, label: `${x.name} (${x.sku})` })));
       setPriceGroups((pg.data ?? []).map((x) => ({ value: x.id, label: x.name })));
-      setPriceGroupId(orderId ? (orderPricing.data?.price_group_id ?? "") : (pg.data?.[0]?.id ?? ""));
+      setPriceGroupId(contextOrderId ? (orderPricing.data?.price_group_id ?? "") : (pg.data?.[0]?.id ?? ""));
       setStones((p.data ?? []).map((x: any) => ({ id: x.product_id, name: x.products?.name ?? "", sku: x.products?.sku, stone_type_id: x.stone_type_id, material_price_band_code: x.countertop_material_price_bands?.code, price_per_sqft: x.countertop_material_price_bands?.price_per_sqft })));
       setServices((svc.data ?? []).map((x) => ({ ...x, quantity: "1" })));
       setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [orderId]);
+  }, [orderId, orderItemId]);
 
   const filteredStones = useMemo(() => stones.filter((x) => !stoneTypeId || x.stone_type_id === stoneTypeId), [stones, stoneTypeId]);
   const selectedStone = stones.find((x) => x.id === stoneProductId);
@@ -146,7 +153,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
         <label className={fieldClass}>Edge<Select className="mt-1.5" options={edges} value={edgeId} onChange={setEdgeId} allowEmpty /></label>
         <label className={fieldClass}>Edge linear feet<Input className="mt-1.5" type="number" step="0.0001" min="0" value={edgeLinearFt} onChange={(e) => setEdgeLinearFt(e.target.value)} /></label>
         <label className={fieldClass}>Sink (optional)<Select className="mt-1.5" options={sinks} value={sinkId} onChange={setSinkId} allowEmpty /></label>
-        <label className={fieldClass}>Commercial price group<Select className="mt-1.5" options={priceGroups} value={priceGroupId} onChange={setPriceGroupId} disabled={Boolean(orderId)} /><span className="mt-1.5 block text-xs font-normal text-gray-500 dark:text-gray-400">{orderId ? "Inherited from the saved order." : "Select the pricing context for this countertop."}</span></label>
+        <label className={fieldClass}>Commercial price group<Select className="mt-1.5" options={priceGroups} value={priceGroupId} onChange={setPriceGroupId} disabled={hasOrderPricingContext} /><span className="mt-1.5 block text-xs font-normal text-gray-500 dark:text-gray-400">{hasOrderPricingContext ? "Inherited from the saved order." : "Select the pricing context for this countertop."}</span></label>
         <label className={fieldClass}>Manual $/sqft (optional)<Input className="mt-1.5" value={manualPrice} onChange={(e) => setManualPrice(e.target.value)} /></label>
         <label className={fieldClass}>Override reason<Input className="mt-1.5" value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} /></label>
       </div>
