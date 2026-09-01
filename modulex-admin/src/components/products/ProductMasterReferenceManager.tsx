@@ -19,6 +19,7 @@ import {
   TableCell,
   TableHeader,
   TableRow,
+  TableStateRow,
   TableViewport,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
@@ -484,7 +485,7 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
           <TableViewport>
             <Table
               variant="admin"
-              className={kind === "product_types" ? "min-w-[1280px]" : "min-w-[760px]"}
+              minWidth={kind === "product_types" ? "extraWide" : "standard"}
             >
               <TableHeader variant="admin">
                 <TableRow>
@@ -534,11 +535,9 @@ export default function ProductMasterReferenceManager({ kind }: { kind: Kind }) 
 
               <TableBody variant="admin">
                 {visible.length === 0 ? (
-                  <TableRow>
-                    <TableCell variant="admin" colSpan={columnCount} className="text-center">
-                      No {title.toLowerCase()} match the current filters.
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow colSpan={columnCount}>
+                    No {title.toLowerCase()} match the current filters.
+                  </TableStateRow>
                 ) : (
                   visible.map((row) => (
                     <TableRow key={row.id}>
