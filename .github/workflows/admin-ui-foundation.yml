@@ -11,6 +11,7 @@ on:
       - "modulex-admin/scripts/admin-ui-contract.mjs"
       - "modulex-admin/scripts/admin-table-system-contract.mjs"
       - "modulex-admin/scripts/admin-theme-design-contract.mjs"
+      - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
       - "modulex-admin/package.json"
       - ".github/workflows/admin-ui-foundation.yml"
   push:
@@ -23,6 +24,7 @@ on:
       - "modulex-admin/scripts/admin-ui-contract.mjs"
       - "modulex-admin/scripts/admin-table-system-contract.mjs"
       - "modulex-admin/scripts/admin-theme-design-contract.mjs"
+      - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
       - "modulex-admin/package.json"
       - ".github/workflows/admin-ui-foundation.yml"
 
@@ -47,6 +49,7 @@ jobs:
       - run: npm ci
       - run: node scripts/admin-table-system-contract.mjs
       - run: node scripts/admin-theme-design-contract.mjs
+      - run: node scripts/admin-full-route-regression-contract.mjs
       - run: npm run smoke:admin-ui
       - run: npm run smoke:production-surface
       - run: npm run smoke:rbac
