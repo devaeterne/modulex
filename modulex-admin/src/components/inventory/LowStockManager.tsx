@@ -662,7 +662,6 @@ export default function LowStockManager() {
               type="button"
               size="sm"
               variant="outline"
-              className="!px-3 !py-2"
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
               disabled={currentPage === 1 || filteredRows.length === 0}
             >
@@ -675,7 +674,7 @@ export default function LowStockManager() {
                   type="button"
                   size="sm"
                   variant={currentPage === page ? "primary" : "outline"}
-                  className="min-w-9 !px-3 !py-2"
+                  className="min-w-9"
                   onClick={() => setCurrentPage(page)}
                 >
                   {page}
@@ -687,7 +686,6 @@ export default function LowStockManager() {
               type="button"
               size="sm"
               variant="outline"
-              className="!px-3 !py-2"
               onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
               disabled={currentPage === totalPages || filteredRows.length === 0}
             >
