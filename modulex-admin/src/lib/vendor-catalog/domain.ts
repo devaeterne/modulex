@@ -4,6 +4,17 @@ export type VendorCatalogChangeState = "NEW" | "UPDATED" | "UNCHANGED";
 export type VendorCatalogReviewStatus = "PENDING" | "APPROVED" | "IGNORED";
 export type VendorAssetKind = "image" | "specification" | "cad" | "document";
 
+export type VendorCatalogCategory = {
+  key: string;
+  label: string;
+  productCount: number | null;
+};
+
+export type VendorCatalogDiscoveryScope = {
+  categoryKey?: string | null;
+  categoryLabel?: string | null;
+};
+
 export type VendorAsset = {
   kind: VendorAssetKind;
   url: string;
@@ -20,13 +31,19 @@ export type NormalizedVendorProduct = {
   productUrl: string;
   vendorPriceReference: number | null;
   vendorCurrency: string | null;
+  vendorCategoryKey: string | null;
+  vendorCategoryLabel: string | null;
+  familyKey: string;
+  variantCode: string | null;
+  variantLabel: string | null;
   assets: VendorAsset[];
   sourcePayload: unknown;
 };
 
 export interface VendorCatalogAdapter {
   readonly vendorCode: string;
-  discover(): Promise<NormalizedVendorProduct[]>;
+  listCategories?(): Promise<VendorCatalogCategory[]>;
+  discover(scope?: VendorCatalogDiscoveryScope): Promise<NormalizedVendorProduct[]>;
   enrich?(product: NormalizedVendorProduct): Promise<NormalizedVendorProduct>;
 }
 
@@ -65,8 +82,8 @@ function normalizedAssets(product: NormalizedVendorProduct) {
     );
 }
 
-export function stableDiscoveryHash(product: NormalizedVendorProduct) {
-  return hashSnapshot({
+function normalizedProductSnapshot(product: NormalizedVendorProduct) {
+  return {
     vendorCode: product.vendorCode,
     externalId: product.externalId,
     sku: product.sku,
@@ -75,22 +92,21 @@ export function stableDiscoveryHash(product: NormalizedVendorProduct) {
     productUrl: product.productUrl,
     vendorPriceReference: product.vendorPriceReference,
     vendorCurrency: product.vendorCurrency,
+    vendorCategoryKey: product.vendorCategoryKey,
+    vendorCategoryLabel: product.vendorCategoryLabel,
+    familyKey: product.familyKey,
+    variantCode: product.variantCode,
+    variantLabel: product.variantLabel,
     assets: normalizedAssets(product),
-  });
+  };
+}
+
+export function stableDiscoveryHash(product: NormalizedVendorProduct) {
+  return hashSnapshot(normalizedProductSnapshot(product));
 }
 
 export function stableProductHash(product: NormalizedVendorProduct) {
-  return hashSnapshot({
-    vendorCode: product.vendorCode,
-    externalId: product.externalId,
-    sku: product.sku,
-    title: product.title,
-    description: product.description,
-    productUrl: product.productUrl,
-    vendorPriceReference: product.vendorPriceReference,
-    vendorCurrency: product.vendorCurrency,
-    assets: normalizedAssets(product),
-  });
+  return hashSnapshot(normalizedProductSnapshot(product));
 }
 
 export function classifyVendorProduct(
