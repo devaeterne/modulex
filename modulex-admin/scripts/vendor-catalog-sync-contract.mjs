@@ -11,6 +11,7 @@ const sync = read("src/lib/vendor-catalog/sync.ts");
 const route = read("src/app/api/vendor-catalog/sync/route.ts");
 const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
 const sidebar = read("src/layout/AppSidebar.tsx");
+const vercel = read("vercel.json");
 const sql = read("sql/vendor-catalog-sync.sql");
 const migration = read("../modulex-store/supabase/migrations/20260901223000_vendor_catalog_sync.sql");
 const hardening = read("sql/vendor-catalog-sync-hardening.sql");
@@ -44,6 +45,7 @@ assert.match(route, /timingSafeEqual/);
 assert.match(route, /authorizeAdminSession/);
 assert.match(route, /supabaseAdmin\.auth\.getUser/);
 assert.match(route, /super_admin/);
+assert.match(route, /Object\.keys\(vendorCatalogRegistry\)/);
 assert.match(route, /runVendorCatalogSync/);
 assert.match(route, /autoPublished:\s*false/);
 
@@ -61,6 +63,9 @@ assert.match(page, /reference data only/i);
 assert.match(sidebar, /Vendor Imports/);
 assert.match(sidebar, /\/products\/vendor-imports/);
 assert.match(sidebar, /permission:\s*"products\.manage"/);
+
+assert.match(vercel, /\/api\/vendor-catalog\/sync/);
+assert.match(vercel, /0 7 \* \* \*/);
 
 assert.match(sql, /enable row level security/i);
 assert.match(sql, /vendor_catalog_items_admin_select/i);
