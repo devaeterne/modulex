@@ -171,11 +171,12 @@ export default function EditCustomerOrder() {
 
   useEffect(() => {
     if (!priceGroupId || !order) return;
+    const orderCurrency = order.currency_code;
     let active = true;
     async function loadPrices() {
       setIsLoadingPrices(true);
       try {
-        const data = await loadOrderPrices(priceGroupId, order.currency_code);
+        const data = await loadOrderPrices(priceGroupId, orderCurrency);
         if (active) setPrices(data);
       } catch (error) {
         if (active) setErrorMessage(error instanceof Error ? error.message : "Unable to load order prices.");
