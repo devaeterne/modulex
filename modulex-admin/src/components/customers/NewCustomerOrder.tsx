@@ -1,11 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
+import SummaryRow from "@/components/common/SummaryRow";
 import CountertopConfigurator from "@/components/countertop/CountertopConfigurator";
 import OrderProductPicker, { type OrderPickerProduct } from "@/components/customers/OrderProductPicker";
+import FormHint from "@/components/form/FormHint";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import TextArea from "@/components/form/input/TextArea";
@@ -39,15 +40,21 @@ function money(value: number) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(Number.isFinite(value) ? value : 0);
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><Label>{label}</Label>{children}</div>;
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
 }
 
-function TotalRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+function Field({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-sm">{label}</span>
-      <span className={strong ? "text-lg font-semibold" : "text-sm font-medium"}>{value}</span>
+    <div>
+      <Label>{label}</Label>
+      {children}
+      {hint ? <FormHint>{hint}</FormHint> : null}
     </div>
   );
 }
@@ -85,7 +92,7 @@ export default function NewCustomerOrder() {
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isStartingCountertop, setIsStartingCountertop] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessageState, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -119,7 +126,7 @@ export default function NewCustomerOrder() {
         setShippingAddressId(loadedAddresses.find((address) => address.is_default_shipping)?.id || "");
       } catch (error) {
         if (!active) return;
-        setErrorMessage(error instanceof Error ? error.message : "Unable to prepare order.");
+        setErrorMessage(errorMessage(error, "Unable to prepare order."));
       } finally {
         if (active) setIsLoading(false);
       }
@@ -149,7 +156,7 @@ export default function NewCustomerOrder() {
         setPrices(data);
       } catch (error) {
         if (!active) return;
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load order prices.");
+        setErrorMessage(errorMessage(error, "Unable to load order prices."));
         setPrices([]);
       } finally {
         if (active) setIsLoadingPrices(false);
@@ -313,7 +320,7 @@ export default function NewCustomerOrder() {
       const orderId = await createOrder(validItems, initialStatus);
       router.push(`/customers/${customer?.id}/orders/${orderId}`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to create order.");
+      setErrorMessage(errorMessage(error, "Unable to create order."));
       setIsSaving(false);
     }
   }
@@ -337,17 +344,21 @@ export default function NewCustomerOrder() {
       setCountertopDraftOrderId(orderId);
       setIsStartingCountertop(false);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to prepare a Draft order for Countertop configuration.");
+      setErrorMessage(errorMessage(error, "Unable to prepare a Draft order for Countertop configuration."));
       setIsStartingCountertop(false);
     }
   }
 
   if (isLoading) {
-    return <ComponentCard title="New Order" desc="Preparing customer order context…"><p className="text-sm">Preparing order…</p></ComponentCard>;
+    return (
+      <ComponentCard title="New Order" desc="Preparing customer order context…">
+        <FormHint>Preparing order…</FormHint>
+      </ComponentCard>
+    );
   }
 
   if (!customer) {
-    return <Alert variant="error" title="Unable to prepare order" message={errorMessage || "Customer not found."} />;
+    return <Alert variant="error" title="Unable to prepare order" message={errorMessageState || "Customer not found."} />;
   }
 
   if (countertopDraftOrderId) {
@@ -364,26 +375,26 @@ export default function NewCustomerOrder() {
     );
   }
 
+  const fulfillmentHint = selectedTaxRule?.is_active && selectedTaxRule.tax_rate !== null
+    ? `Configured tax rule: ${Number(selectedTaxRule.tax_rate).toFixed(3)}%`
+    : "No active tax rule configured for this fulfillment type.";
+  const commissionHint = `Default: ${defaultCommissionPercent.toFixed(2)}%${commissionOverridden ? ` · Override: ${appliedCommissionPercent.toFixed(2)}%` : ""}`;
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">New Order</h1>
-          <p className="mt-1 text-sm">{customer.name} · {customer.customer_code}</p>
-        </div>
-        <Link href={`/customers/${customer.id}/orders`}><Button variant="outline">Back to Orders</Button></Link>
-      </div>
-
-      {errorMessage ? <Alert variant="error" title="Order action failed" message={errorMessage} /> : null}
+      {errorMessageState ? <Alert variant="error" title="Order action failed" message={errorMessageState} /> : null}
       {selectedPriceGroup?.requires_approval ? <Alert variant="warning" title="Approval required" message={`${selectedPriceGroup.name} is a restricted price level. Sales orders using it require Admin approval before confirmation.`} /> : null}
 
-      <ComponentCard title="Order Information" desc="Choose the commercial, fulfillment and payment context for this order.">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="Price Group">
+      <ComponentCard
+        title="Order Information"
+        desc={`${customer.name} · ${customer.customer_code} — choose the commercial, fulfillment and payment context for this order.`}
+        headerAction={<Button variant="outline" onClick={() => router.push(`/customers/${customer.id}/orders`)}>Back to Orders</Button>}
+      >
+        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+          <Field label="Price Group" hint={isLoadingPrices ? "Loading prices…" : undefined}>
             <Select options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} />
-            {isLoadingPrices ? <p className="mt-1 text-xs">Loading prices…</p> : null}
           </Field>
-          <Field label="Fulfillment Type">
+          <Field label="Fulfillment Type" hint={fulfillmentHint}>
             <Select
               options={[
                 { value: "pickup", label: "Customer Pickup" },
@@ -393,17 +404,15 @@ export default function NewCustomerOrder() {
               value={fulfillmentType}
               onChange={(value) => setFulfillmentType(value as OrderFulfillmentType)}
             />
-            <p className="mt-1 text-xs">{selectedTaxRule?.is_active && selectedTaxRule.tax_rate !== null ? `Configured tax rule: ${Number(selectedTaxRule.tax_rate).toFixed(3)}%` : "No active tax rule configured for this fulfillment type."}</p>
           </Field>
           <Field label="Payment Method">
             <Select options={paymentMethods.map((method) => ({ value: method.id, label: `${method.name}${Number(method.commission_percent) > 0 ? ` (+${Number(method.commission_percent).toFixed(2)}%)` : ""}` }))} value={paymentMethodId} onChange={handlePaymentMethodChange} />
           </Field>
-          <Field label="Applied Commission (%)">
+          <Field label="Applied Commission (%)" hint={commissionHint}>
             <div className="flex gap-2">
               <div className="min-w-0 flex-1"><Input type="number" min="0" max="100" step="0.01" value={paymentCommissionPercent} onChange={(event) => setPaymentCommissionPercent(event.target.value)} /></div>
               <Button size="sm" variant="outline" onClick={() => setPaymentCommissionPercent(String(defaultCommissionPercent))}>Use Default</Button>
             </div>
-            <p className="mt-1 text-xs">Default: {defaultCommissionPercent.toFixed(2)}%{commissionOverridden ? ` · Override: ${appliedCommissionPercent.toFixed(2)}%` : ""}</p>
           </Field>
           <Field label="Initial Status">
             <Select options={[{ value: "draft", label: "Draft" }, { value: "confirmed", label: "Confirmed" }]} value={initialStatus} onChange={(value) => setInitialStatus(value as "draft" | "confirmed")} />
@@ -473,12 +482,12 @@ export default function NewCustomerOrder() {
         <div className="xl:col-span-4">
           <ComponentCard title="Order Total" desc="Preview; the server remains authoritative when the order is saved.">
             <div className="space-y-3">
-              <TotalRow label="Lines after discount" value={money(preview.subtotal)} />
-              <TotalRow label="Order discount" value={`-${money(Number(orderDiscount || 0))}`} />
-              <TotalRow label="Tax" value={money(preview.tax)} />
-              <TotalRow label="Order Total" value={money(preview.orderTotal)} />
-              {preview.paymentCommission > 0 ? <TotalRow label={`${selectedPaymentMethod?.name || "Payment"} Commission (${appliedCommissionPercent.toFixed(2)}%)`} value={money(preview.paymentCommission)} /> : null}
-              <div className="border-t pt-3"><TotalRow label="Grand Total" value={money(preview.grandTotal)} strong /></div>
+              <SummaryRow label="Lines after discount" value={money(preview.subtotal)} />
+              <SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0))}`} />
+              <SummaryRow label="Tax" value={money(preview.tax)} />
+              <SummaryRow label="Order Total" value={money(preview.orderTotal)} />
+              {preview.paymentCommission > 0 ? <SummaryRow label={`${selectedPaymentMethod?.name || "Payment"} Commission (${appliedCommissionPercent.toFixed(2)}%)`} value={money(preview.paymentCommission)} /> : null}
+              <SummaryRow label="Grand Total" value={money(preview.grandTotal)} strong divider />
               {commissionOverridden ? <Alert variant="warning" title="Commission override" message={`Payment commission is overridden from ${defaultCommissionPercent.toFixed(2)}% to ${appliedCommissionPercent.toFixed(2)}% for this order only.`} /> : null}
               <Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button>
             </div>
