@@ -33,8 +33,8 @@ expect(
 expect(manager.includes('<Table variant="admin"'), "Low Stock must use the shared admin table variant");
 expect(manager.includes("<TableViewport"), "Low Stock must use the shared responsive table viewport");
 expect(
-  manager.includes('className="w-full min-w-[1120px]"'),
-  "Low Stock table must fill the available card width while retaining its responsive minimum width",
+  manager.includes('minWidth="wide"'),
+  "Low Stock table must use the shared wide table width preset",
 );
 
 expect(
@@ -89,8 +89,8 @@ expect(
   "Low Stock semantic navigation links need visible keyboard focus states"
 );
 expect(
-  manager.includes("min-w-[1120px]"),
-  "Low Stock table needs an explicit responsive minimum width"
+  manager.includes("TableStateRow") && manager.includes("TABLE_COLUMN_COUNT = 9"),
+  "Low Stock table states must use the shared column-count contract"
 );
 expect(
   manager.includes("const [currentPage, setCurrentPage] = useState(1)"),
