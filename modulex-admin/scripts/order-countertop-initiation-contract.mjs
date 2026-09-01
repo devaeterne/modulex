@@ -50,9 +50,8 @@ assert(configurator.includes("material_subtotal") && configurator.includes("edge
 assert(newOrder.includes("Add Countertop"), "New Order must expose Add Countertop instead of a Pricing workspace link");
 assert(!newOrder.includes("Open Countertop workspace") && !newOrder.includes('href="/pricing/countertop"'), "New Order must not route order entry through pricing.manage workspace permissions");
 assert(newOrder.includes("hasPermission") && newOrder.includes('"orders.manage"'), "New Order Add Countertop must use the canonical orders.manage permission");
-assert(newOrder.includes("createCustomerOrder") && newOrder.includes("initialStatus: \"draft\""), "New Order Add Countertop must create a canonical Draft shell before attaching configuration");
+assert(newOrder.includes("getCurrentProfile") && newOrder.includes('createOrder(validItems, "draft")'), "New Order Add Countertop must authorize the current editor and create a canonical Draft shell before attaching configuration");
 assert(newOrder.includes("CountertopConfigurator") && newOrder.includes("countertopDraftOrderId"), "New Order must open the canonical CountertopConfigurator against the saved Draft shell");
-assert(orderDomain.includes("role: profile.role"), "New Order context must expose the already-authorized editor role for permission-aware actions");
 
 for (const token of [
   "create or replace function private.create_customer_order_core",
