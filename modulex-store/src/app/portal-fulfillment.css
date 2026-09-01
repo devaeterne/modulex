@@ -58,7 +58,7 @@
 }
 
 .portal-summary-card__metric {
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-playfair), serif;
   font-size: 2.2rem;
   line-height: 1;
 }

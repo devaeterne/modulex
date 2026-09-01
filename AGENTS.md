@@ -43,6 +43,8 @@ These instructions apply repo-wide unless a more specific `AGENTS.md` overrides 
 - Do not copy TailAdmin demo markup into production business surfaces.
 - Do not override shared component appearance with arbitrary Tailwind. If a required state is missing, extend the reviewed shared variant API.
 - New reusable visual patterns belong in the shared UI layer first.
+- Every new or modified Admin feature UI file must pass `npm run smoke:admin-ui-strict` in addition to the existing Admin UI regressions.
+- Do not add feature-level strict-gate suppression comments or ignore flags. If a valid state is missing, extend the reviewed shared primitive/token API and its centralized contract instead of bypassing the gate.
 - UI-changing PRs must run the Admin UI regression contract.
 
 ## Admin validation and mutation consistency

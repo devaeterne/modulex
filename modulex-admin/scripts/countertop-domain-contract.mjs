@@ -61,7 +61,12 @@ assert(sql.includes("upsert_countertop_reference") && sql.includes("Countertop r
 for (const text of ["Stone type name is required", "Material band code already exists", "valid pricing method", "Product, stone type and material band are required", "on conflict(id) do update", "is_active"]) assert(sql.includes(text), `reference validation/soft lifecycle missing: ${text}`);
 assert(fs.existsSync(path.join(root, "src/app/(admin)/pricing/countertop/settings/page.tsx")) && configurator.includes("Material price band"), "reference management route/configurator integration missing");
 const refs = read("src/components/countertop/CountertopReferenceManager.tsx");
-for (const field of ["Stone Product Profiles", "Product", "Stone type", "Material band", "Vendor", "Source", "Save mapping"]) assert(refs.includes(field), `stone profile management field missing: ${field}`);
+const catalog = read("src/components/countertop/CountertopCatalogManager.tsx");
+for (const field of ["Stone Types", "Material Price Bands", "Edge Profiles", "Services"]) assert(refs.includes(field), `countertop setup reference section missing: ${field}`);
+assert(refs.includes('rpc("upsert_countertop_reference"'), "Countertop Setup must keep canonical reference mutation");
+assert(!refs.includes("Stone Product Profiles") && !refs.includes("saveProfile") && !refs.includes("toggleProfile"), "Countertop Setup must not duplicate Stone Product Profile management");
+for (const field of ["Add Stone", "Stone Type", "Material Price Band", "Vendor", "Source"]) assert(catalog.includes(field), `Countertop Catalog stone ownership missing: ${field}`);
+assert(catalog.includes('rpc("save_countertop_catalog_product"'), "Countertop Catalog must own atomic Stone product/profile management");
 assert(!/<label>Material price band<Select/.test(configurator) && configurator.includes("price_per_sqft"), "configurator material band must be profile-derived and read-only");
 assert(!configurator.includes("bandId") && !configurator.includes("setBandId"), "configurator must not keep editable material band state");
 assert(!configurator.includes('from("countertop_material_price_bands")'), "configurator must not independently query material price bands");
@@ -107,9 +112,9 @@ assert(!runtimeMigration.includes("new.id") && !runtimeMigration.includes("old.i
 assert(runtimeMigration.includes("o.discount_amount") && runtimeMigration.includes("o.tax_rate") && runtimeMigration.includes("o.payment_commission_percent") && runtimeMigration.includes("sum(i.line_total)"), "countertop totals must read header fields separately from item totals");
 assert(runtimeMigration.includes("for update") && runtimeMigration.includes("Order discount cannot exceed subtotal") && runtimeMigration.includes("grand_total = v_grand_total"), "countertop attach must recalculate canonical parent order totals");
 assert(runtimeMigration.includes("v_tax_amount := round") && runtimeMigration.includes("v_commission_amount := round"), "parent order tax and commission formulas must be recalculated server-side");
-assert(refs.includes("toggleProfile(row)") && refs.includes("p_product_id: row.product_id") && refs.includes("p_is_active: !row.is_active"), "profile toggle must pass row values directly without stale state");
-assert(refs.includes("value={drafts.profile?.product_id") && refs.includes("value={drafts.profile?.stone_type_id") && refs.includes("value={drafts.profile?.material_price_band_id"), "profile edit selectors must hydrate selected values");
-assert(/countertop_stone_types.*eq\("is_active",true\)/.test(refs) && /countertop_material_price_bands.*eq\("is_active",true\)/.test(refs), "new profile selectors must use active references");
+assert(catalog.includes('from("countertop_stone_product_profiles")') && catalog.includes("stone_type_id") && catalog.includes("material_price_band_id"), "Countertop Catalog must load Stone Product Profile associations");
+assert(catalog.includes("value={stoneDraft.stone_type_id}") && catalog.includes("value={stoneDraft.material_price_band_id}"), "Catalog Stone editor must hydrate selected profile references");
+assert(catalog.includes('countertop_stone_types").select') && catalog.includes('countertop_material_price_bands").select'), "Catalog Stone editor must source active managed references");
 assert(sql.includes("audit_logs(table_name,record_id,action,old_data,new_data,changed_by)") && sql.includes("created_at"), "audit contract must preserve audit_logs created_at timestamp");
 const serviceInput = { materialUnitPrice: "34", sqft: "10", edgeUnitPrice: "10", edgeLinearFt: "8", services: [{ id: "sq", name: "Sq", pricing_method: "sq_ft", unit_price: "2", quantity: "3" }, { id: "lf", name: "Lf", pricing_method: "linear_ft", unit_price: "3", quantity: "2" }, { id: "flat", name: "Flat", pricing_method: "flat", unit_price: "5", quantity: "9" }] };
 assert(calculateCountertopPrice(serviceInput).services_subtotal === "49.0000", "service pricing methods must use sqft/linear-ft/flat semantics");
