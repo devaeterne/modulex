@@ -9,6 +9,7 @@ on:
       - "modulex-admin/src/components/inventory/**"
       - "modulex-admin/src/lib/validation.ts"
       - "modulex-admin/scripts/val-4-inventory-warehouses-validation-contract.mjs"
+      - "modulex-admin/package.json"
       - "modulex-admin/ADMIN_ROADMAP.md"
       - ".github/workflows/admin-val4-inventory-validation.yml"
   pull_request:
@@ -19,6 +20,7 @@ on:
       - "modulex-admin/src/components/inventory/**"
       - "modulex-admin/src/lib/validation.ts"
       - "modulex-admin/scripts/val-4-inventory-warehouses-validation-contract.mjs"
+      - "modulex-admin/package.json"
       - "modulex-admin/ADMIN_ROADMAP.md"
       - ".github/workflows/admin-val4-inventory-validation.yml"
 
@@ -40,7 +42,7 @@ jobs:
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
       - name: VAL-4 inventory, warehouses and stock operations contract
-        run: node scripts/val-4-inventory-warehouses-validation-contract.mjs
+        run: npm run smoke:val-4-inventory-validation
       - name: Warehouse/location regression
         run: npm run smoke:a2-warehouse-integrity
       - name: Inventory/movement regression
