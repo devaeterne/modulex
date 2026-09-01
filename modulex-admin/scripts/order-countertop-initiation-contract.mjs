@@ -8,7 +8,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const initiationMigrationPath = "../modulex-store/supabase/migrations/20260901123501_countertop_order_item_initiation.sql";
 const draftShellMigrationPath = "../modulex-store/supabase/migrations/20260901170000_countertop_new_order_draft_shell.sql";
 assert(fs.existsSync(path.join(root, initiationMigrationPath)), "repo must contain the production countertop order item initiation migration");
-assert(fs.existsSync(path.join(root, draftShellMigrationPath)), "repo must contain the draft-shell migration used by New Order Add Countertop");
+assert(fs.existsSync(path.join(root, draftShellMigrationPath)), "repo must contain the draft-shell migration used by New Order Countertop initiation");
 
 const initiationMigration = read(initiationMigrationPath);
 const draftShellMigration = read(draftShellMigrationPath);
@@ -39,7 +39,7 @@ assert(initiationMigration.includes("revoke all on function public.create_and_at
 assert(initiationMigration.includes("grant execute on function public.create_and_attach_countertop_order_item") && initiationMigration.includes("to authenticated"), "authenticated browser access must go through the reviewed public wrapper");
 assert(!/insert into public\.customer_order_items[\s\S]*p_unit_price/i.test(initiationMigration), "countertop initiation must not accept caller-controlled order pricing");
 
-assert(editOrder.includes("Add Countertop"), "Edit Order must expose an Add Countertop CTA");
+assert(editOrder.includes(">Countertop</Button>"), "Edit Order must expose the Countertop product action");
 assert(editOrder.includes("CountertopConfigurator"), "Edit Order must use the canonical CountertopConfigurator");
 assert(configurator.includes("create_and_attach_countertop_order_item"), "new countertop attachment must use the secure create+attach RPC");
 assert(configurator.includes("crypto.randomUUID()") || configurator.includes("randomUUID"), "new countertop initiation must send an idempotency request id");
@@ -49,10 +49,10 @@ assert(!configurator.includes("JSON.stringify(result"), "Countertop pricing must
 for (const label of ["Price Summary", "Material", "Edge", "Sink", "Services", "Total"]) assert(configurator.includes(label), `Countertop human-readable price summary is missing: ${label}`);
 assert(configurator.includes("material_subtotal") && configurator.includes("edge_subtotal") && configurator.includes("sink_subtotal") && configurator.includes("services_subtotal"), "Countertop price summary must preserve authoritative subtotal components");
 
-assert(newOrder.includes("Add Countertop"), "New Order must expose Add Countertop instead of a Pricing workspace link");
+assert(newOrder.includes('"Countertop"') && newOrder.includes("startCountertop"), "New Order must expose the Countertop product action instead of a Pricing workspace link");
 assert(!newOrder.includes("Open Countertop workspace") && !newOrder.includes('href="/pricing/countertop"'), "New Order must not route order entry through pricing.manage workspace permissions");
-assert(newOrder.includes("hasPermission") && newOrder.includes('"orders.manage"'), "New Order Add Countertop must use the canonical orders.manage permission");
-assert(newOrder.includes("getCurrentProfile") && newOrder.includes('createOrder(validItems, "draft")'), "New Order Add Countertop must authorize the current editor and create a canonical Draft shell before attaching configuration");
+assert(newOrder.includes("hasPermission") && newOrder.includes('"orders.manage"'), "New Order Countertop action must use the canonical orders.manage permission");
+assert(newOrder.includes("getCurrentProfile") && newOrder.includes('createOrder(validItems, "draft")'), "New Order Countertop action must authorize the current editor and create a canonical Draft shell before attaching configuration");
 assert(newOrder.includes("CountertopConfigurator") && newOrder.includes("countertopDraftOrderId"), "New Order must open the canonical CountertopConfigurator against the saved Draft shell");
 assert(newOrder.includes("FormHint") && newOrder.includes("SummaryRow"), "New Order must use shared dark-mode-safe helper and summary primitives");
 assert(!newOrder.includes('<h1 className="text-2xl font-semibold">New Order</h1>'), "New Order must not recreate a duplicate route-local page heading");
@@ -73,8 +73,9 @@ for (const token of [
 assert(draftShellMigration.includes("security definer") && draftShellMigration.includes("set search_path = public, private, pg_temp"), "Draft-shell wrapper must preserve the reviewed security-definer boundary");
 assert(draftShellMigration.includes("p_initial_status='confirmed'") || draftShellMigration.includes("p_initial_status = 'confirmed'"), "Requested Confirmed status semantics must remain explicit in the wrapper");
 
-assert(picker.includes('product.pricing_model !== "price_group"'), "ordinary Order Product Picker must keep non-price-group products disabled");
-assert(picker.includes("Use Countertop workspace"), "Stone picker guidance must remain explicit");
+assert(picker.includes('product.pricing_model !== "price_group"'), "ordinary Cabinet picker must keep non-price-group products disabled if any reach its eligible list");
+assert(picker.includes("excludedProductTypeCodes"), "ordinary Cabinet picker must support explicit Product Type exclusions");
+assert(newOrder.includes('excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]}') && editOrder.includes('excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]}'), "Cabinet entry must exclude Stone, Sink and Service Product Types");
 assert(configurator.includes('contains("metadata", { product_kind: "sink" })'), "Countertop sink dropdown must keep metadata-based sink discovery");
 assert(orderDomain.includes("pricing_model") && picker.includes("priceMap"), "normal Order picker must retain canonical Product Type pricing routing");
 

@@ -37,9 +37,9 @@ for (const label of ["Price Group", "Countertop Material Band", "No Commercial P
 }
 assert(migration.includes("new.unit_price:=round(v_price,4)"), "DB trigger must overwrite caller-controlled Price Group unit prices");
 assert(picker.includes("pricingModelLabel") && picker.includes("uom_name"), "product picker must show pricing route and UOM");
-assert(createOrder.includes("countertop_material_band") && createOrder.includes("Add Countertop"), "create UI must guide Stone into Add Countertop rather than ordinary product pricing");
-assert(createOrder.includes('hasPermission(role, "orders.manage")'), "New Order Add Countertop must be permission-aware");
-assert(createOrder.includes('createOrder(validItems, "draft")') && createOrder.includes("<CountertopConfigurator"), "New Order Add Countertop must save a Draft shell before opening the canonical configurator");
+assert(createOrder.includes("countertop_material_band") && createOrder.includes(">Countertop</Button>"), "create UI must guide Stone into the Countertop action rather than ordinary product pricing");
+assert(createOrder.includes('hasPermission(role, "orders.manage")'), "New Order Countertop action must be permission-aware");
+assert(createOrder.includes('createOrder(validItems, "draft")') && createOrder.includes("<CountertopConfigurator"), "New Order Countertop action must save a Draft shell before opening the canonical configurator");
 assert(!createOrder.includes('href="/pricing/countertop"'), "New Order must not route Countertop initiation through the Pricing workspace");
 assert(editOrder.includes("pricing_model") && detail.includes("pricingModelLabel"), "edit/detail UI must expose pricing route metadata");
 
@@ -48,10 +48,10 @@ assert(editOrder.includes("Server Price"), "Edit Order must label canonical Pric
 assert(!/<input[^>]+value=\{item\.unit_price\}[^>]+onChange=/s.test(editOrder), "Edit Order must not expose an editable unit_price input");
 assert(!editOrder.includes("useGroupPrice("), "Edit Order must not expose a manual Group Price copy action");
 assert(editOrder.includes("resolveOrderLineUnitPrice"), "Edit Order must resolve line money through one pricing-model-aware helper");
-assert(/pricing_model\s*===\s*"price_group"[\s\S]{0,180}priceMap\.get\(item\.product_id\)/.test(editOrder), "Price Group edit lines must resolve canonical priceMap money");
-assert(/pricing_model\s*===\s*"countertop_material_band"[\s\S]{0,220}item\.id[\s\S]{0,220}item\.unit_price/.test(editOrder), "Existing Stone edit lines must preserve configured stored money");
+assert(/model\s*===\s*"price_group"[\s\S]{0,180}priceMap\.get\(item\.product_id\)/.test(editOrder), "Price Group edit lines must resolve canonical priceMap money");
+assert(/model\s*===\s*"countertop_material_band"[\s\S]{0,300}item\.unit_price/.test(editOrder), "Existing Stone edit lines must preserve configured stored money");
 assert(/unitPrice:\s*String\([\s\S]{0,140}resolveOrderLineUnitPrice/.test(editOrder), "Edit Order submit payload must use pricing-model-aware canonical money");
-assert(/const price\s*=\s*Math\.max\(0,\s*resolveOrderLineUnitPrice/.test(editOrder), "Edit Order preview totals must use pricing-model-aware canonical money");
+assert(/price\s*=\s*Math\.max\(0,\s*resolveOrderLineUnitPrice/.test(editOrder), "Edit Order preview totals must use pricing-model-aware canonical money");
 
 // Hardening: semantic identity is immutable unless product identity actually changes.
 for (const snapshot of ["product_type_code_snapshot", "product_type_name_snapshot", "uom_code_snapshot", "uom_name_snapshot", "pricing_model_snapshot"]) {
