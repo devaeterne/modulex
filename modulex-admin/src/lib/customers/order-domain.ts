@@ -24,7 +24,18 @@ export type OrderDomainProduct = {
   category: string | null;
   brand_id: string | null;
   category_id: string | null;
+  product_type_name: string;
+  pricing_model: "price_group" | "countertop_material_band" | "none";
+  uom_code: string;
+  uom_name: string;
 };
+
+export function pricingModelLabel(model: OrderDomainProduct["pricing_model"] | string | null | undefined) {
+  if (model === "price_group") return "Price Group";
+  if (model === "countertop_material_band") return "Countertop Material Band";
+  if (model === "none") return "No Commercial Pricing";
+  return "Historical Snapshot";
+}
 
 export type OrderPriceRow = {
   product_id: string;
@@ -190,7 +201,22 @@ const ORDER_REVISION_IMMUTABLE_FIELDS = [
 ] as const;
 const PRICE_GROUP_COLUMNS = "id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only";
 const PAYMENT_METHOD_COLUMNS = "id, system_key, name, commission_percent, sort_order, is_active";
-const PRODUCT_COLUMNS = "id, sku, name, barcode, status, brand, category, brand_id, category_id";
+const PRODUCT_COLUMNS = "id, sku, name, barcode, status, brand, category, brand_id, category_id, product_types(name, pricing_model), units_of_measure(code, name)";
+
+type ProductQueryRow = Omit<OrderDomainProduct, "product_type_name" | "pricing_model" | "uom_code" | "uom_name"> & {
+  product_types: { name: string; pricing_model: OrderDomainProduct["pricing_model"] } | null;
+  units_of_measure: { code: string; name: string } | null;
+};
+
+function mapOrderProducts(rows: ProductQueryRow[]): OrderDomainProduct[] {
+  return rows.map(({ product_types, units_of_measure, ...product }) => ({
+    ...product,
+    product_type_name: product_types?.name ?? "Unknown Product Type",
+    pricing_model: product_types?.pricing_model ?? "none",
+    uom_code: units_of_measure?.code ?? "UNKNOWN",
+    uom_name: units_of_measure?.name ?? "Unknown UOM",
+  }));
+}
 
 export function getCustomerOrderRevisionPolicy(status: CustomerOrderStatus, role: UserRole): CustomerOrderRevisionPolicy {
   if (!ORDER_EDITOR_ROLES.includes(role)) {
@@ -307,7 +333,7 @@ export async function loadCreateOrderContext(customerId: string): Promise<Create
     addresses: (addressesResult.data ?? []) as CustomerAddress[],
     priceGroups: (groupsResult.data ?? []) as PriceGroupLookup[],
     paymentMethods: (methodsResult.data ?? []) as PaymentMethod[],
-    products: (productsResult.data ?? []) as OrderDomainProduct[],
+    products: mapOrderProducts((productsResult.data ?? []) as unknown as ProductQueryRow[]),
     taxRules: (taxRulesResult.data ?? []) as OrderTaxRule[],
   };
 }
@@ -336,7 +362,7 @@ export async function loadEditOrderContext(customerId: string, orderId: string):
     addresses: (addressesResult.data ?? []) as CustomerAddress[],
     priceGroups: (groupsResult.data ?? []) as PriceGroupLookup[],
     paymentMethods: (methodsResult.data ?? []) as PaymentMethod[],
-    products: (productsResult.data ?? []) as OrderDomainProduct[],
+    products: mapOrderProducts((productsResult.data ?? []) as unknown as ProductQueryRow[]),
     taxRules: (taxRulesResult.data ?? []) as OrderTaxRule[],
     role: profile.role,
   };

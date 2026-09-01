@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { loadOrderDetail, setCustomerOrderStatus } from "@/lib/customers/order-domain";
+import { loadOrderDetail, pricingModelLabel, setCustomerOrderStatus } from "@/lib/customers/order-domain";
 import CountertopConfigurator from "@/components/countertop/CountertopConfigurator";
+import Badge from "@/components/ui/badge/Badge";
 import type {
   Customer,
   CustomerOrder,
@@ -204,13 +205,15 @@ export default function CustomerOrderDetail() {
         <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Order Items</h2></div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["#", "SKU", "Product", "Qty", "Unit Price", "Discount", "Total", "Source", "Actions"].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>)}</tr></thead>
+            <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["#", "SKU", "Product", "Type / UOM", "Pricing Route", "Qty", "Unit Price", "Discount", "Total", "Source", "Actions"].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {items.map((item) => (
                 <tr key={item.id}>
                   <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">{item.line_no}</td>
                   <td className="px-4 py-4 text-sm font-semibold text-gray-800 dark:text-white/90">{item.sku_snapshot}</td>
                   <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">{item.product_name_snapshot}</td>
+                  <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">{item.product_type_name_snapshot || "Historical"} · {item.uom_name_snapshot || item.uom_code_snapshot || "—"}</td>
+                  <td className="px-4 py-4"><Badge size="sm" color={item.pricing_model_snapshot === "price_group" ? "success" : item.pricing_model_snapshot ? "warning" : "light"}>{pricingModelLabel(item.pricing_model_snapshot)}</Badge></td>
                   <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">{Number(item.quantity)}</td>
                   <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">{money(item.unit_price, currency)}</td>
                   <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400">{Number(item.discount_percent).toFixed(1)}%</td>
@@ -219,7 +222,7 @@ export default function CustomerOrderDetail() {
                   <td className="px-4 py-4">{order.status === "draft" && contextCanManageCountertop && countertopItemsById.has(item.id) ? <button type="button" onClick={() => setCountertopContext(countertopItemsById.get(item.id) ?? null)} className="text-sm font-medium text-brand-600 hover:underline dark:text-brand-400">Configure Countertop</button> : <span className="text-sm text-gray-400">—</span>}</td>
                 </tr>
               ))}
-              {items.length === 0 && <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-gray-500">No order items found.</td></tr>}
+              {items.length === 0 && <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-gray-500">No order items found.</td></tr>}
             </tbody>
           </table>
         </div>

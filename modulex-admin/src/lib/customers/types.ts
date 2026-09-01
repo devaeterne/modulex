@@ -78,6 +78,8 @@ export type CustomerOrder = {
 export type CustomerOrderItem = {
   id: string; order_id: string; product_id: string | null; line_no: number; sku_snapshot: string; product_name_snapshot: string;
   quantity: string | number; unit_price: string | number; discount_percent: string | number; discount_amount: string | number;
+  product_type_code_snapshot?: string | null; product_type_name_snapshot?: string | null; uom_code_snapshot?: string | null; uom_name_snapshot?: string | null;
+  pricing_model_snapshot?: "price_group" | "countertop_material_band" | "none" | null;
   line_subtotal: string | number; line_total: string | number; price_source: "price_group" | "manual"; created_at: string;
 };
 

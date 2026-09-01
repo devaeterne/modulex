@@ -230,6 +230,11 @@ These rules are mandatory for all future Modulex Admin work:
 
 ## A1.2 Orders
 
+- [~] Route order products through dynamic Product Type + UOM + `pricing_model`.
+  - Price Group lines remain server-authoritative through canonical `product_prices`; ordinary Countertop Material Band and No Commercial Pricing lines fail closed, while configured Stone continues through `calculate_countertop_price` → `attach_countertop_configuration`.
+  - Semantic Product Type/UOM snapshots are immutable unless product identity changes; Stone commercial writes require the private canonical-attach transaction gate; deferred item mutation triggers reconcile header totals from stored line totals.
+  - Production migration `20260901130000_order_product_pricing_v2` is applied and structurally/advisor verified. Production Admin still serves the pre-#217 UI, so signed-in feature acceptance and deployment remain pending; do not mark complete before those gates pass.
+
 - [x] Review global and customer-scoped order list consistency. (A1.2A)
   - Both `/customers/orders` and `/customers/[id]/orders` use the shared `CustomerOrdersList` contract with server-side search/status filtering, exact filtered count, page windows, URL state, and route-scope summary aggregation.
   - PR #130 repaired the earlier stacked-PR base error and merged A1.2A to `main` as `f9d9571c70e911ee41c588e2ff8bd17a9a351a05`; Vercel Admin production deployment `dpl_699J47YQfSx3fW9bvkEAAC9c8eo` is `READY` from that exact SHA.

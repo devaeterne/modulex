@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "@/components/ui/modal";
+import Button from "@/components/ui/button/Button";
+import Badge from "@/components/ui/badge/Badge";
+import { pricingModelLabel } from "@/lib/customers/order-domain";
 
 export type OrderPickerProduct = {
   id: string;
@@ -13,6 +16,10 @@ export type OrderPickerProduct = {
   category: string | null;
   brand_id: string | null;
   category_id: string | null;
+  product_type_name: string;
+  pricing_model: "price_group" | "countertop_material_band" | "none";
+  uom_code: string;
+  uom_name: string;
 };
 
 type OrderProductPickerProps = {
@@ -155,7 +162,7 @@ export default function OrderProductPicker({
           <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
             <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-900">
               <tr>
-                {["SKU", "Product", "Barcode", "Brand", "Category", "Price", "In Order", ""].map((label) => (
+                {["SKU", "Product", "Type / UOM", "Pricing Route", "Price", "In Order", ""].map((label) => (
                   <th key={label} className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
                     {label}
                   </th>
@@ -165,7 +172,7 @@ export default function OrderProductPicker({
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
                     No products found for the selected filters.
                   </td>
                 </tr>
@@ -173,15 +180,14 @@ export default function OrderProductPicker({
                 filteredProducts.map((product) => {
                   const selectedQuantity = selectedQuantities.get(product.id) ?? 0;
                   const hasPrice = priceMap.has(product.id);
-                  const isDisabled = disableWithoutPrice && !hasPrice;
+                  const isDisabled = product.pricing_model !== "price_group" || (disableWithoutPrice && !hasPrice);
 
                   return (
                     <tr key={product.id} className="transition hover:bg-gray-50 dark:hover:bg-white/[0.03]">
                       <td className="whitespace-nowrap px-4 py-3 text-sm font-semibold text-gray-800 dark:text-white/90">{product.sku}</td>
                       <td className="min-w-[240px] px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{product.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{product.barcode || "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{product.brand || "—"}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{product.category || "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{product.product_type_name} · {product.uom_name} ({product.uom_code})</td>
+                      <td className="whitespace-nowrap px-4 py-3"><Badge size="sm" color={product.pricing_model === "price_group" ? "success" : "warning"}>{pricingModelLabel(product.pricing_model)}</Badge>{product.pricing_model !== "price_group" && <span className="mt-1 block text-xs text-gray-500">{product.pricing_model === "countertop_material_band" ? "Use Countertop workspace" : "Cannot be sold on an order"}</span>}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-800 dark:text-white/90">
                         {hasPrice ? money(priceMap.get(product.id) ?? 0, currencyCode) : <span className="text-warning-600 dark:text-warning-400">No price</span>}
                       </td>
@@ -193,15 +199,13 @@ export default function OrderProductPicker({
                         ) : "—"}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <button
-                          type="button"
+                        <Button
+                          size="sm"
                           disabled={isDisabled}
                           onClick={() => onAdd(product)}
-                          className="inline-flex h-9 items-center justify-center rounded-lg bg-brand-500 px-3 text-xs font-semibold text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 dark:disabled:bg-gray-800 dark:disabled:text-gray-500"
-                          title={isDisabled ? "This product has no current price in the selected price group." : undefined}
                         >
                           {selectedQuantity > 0 ? "Add +1" : "Add"}
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   );
