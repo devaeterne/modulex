@@ -21,13 +21,13 @@ for (const primitive of ["ComponentCard", "Label", "Select", "TextArea", "Alert"
 }
 
 expect(!/<(?:select|textarea|button)\b/.test(manager), "Approvals UI must not reimplement shared select, textarea, or button primitives");
-expect(manager.includes('<article key={row.id}'), "Approvals must preserve the semantic per-request article list");
+expect(/<article\s+[\s\S]{0,120}key=\{row\.id\}/.test(manager), "Approvals must preserve the semantic per-request article list");
 expect(manager.includes("<Metric label=\"Pending\""), "Approvals must preserve its established metric-card summary pattern");
 
-expect(manager.includes('supabase.from("approval_requests").select("*").order("created_at", { ascending: false }).limit(150)'), "Approvals must preserve newest-first bounded approval loading");
-expect(manager.includes('supabase.from("profiles").select("id, full_name, email").eq("is_active", true)'), "Approvals must preserve active staff profile resolution");
-expect(manager.includes('supabase.from("customer_orders").select("id, customer_id, order_number").in("id", orderIds)'), "Approvals must preserve order record link resolution");
-expect(manager.includes('supabase.from("customer_invoices").select("id, customer_id, invoice_number").in("id", invoiceIds)'), "Approvals must preserve invoice record link resolution");
+expect(/supabase\.from\("approval_requests"\)\.select\("\*"\)\.order\("created_at", \{ ascending: false \}\)\.limit\(150\)/.test(manager), "Approvals must preserve newest-first bounded approval loading");
+expect(/supabase\.from\("profiles"\)\.select\("id, full_name, email"\)\.eq\("is_active", true\)/.test(manager), "Approvals must preserve active staff profile resolution");
+expect(/supabase\s*\.from\("customer_orders"\)\s*\.select\("id, customer_id, order_number"\)\s*\.in\("id", orderIds\)/.test(manager), "Approvals must preserve order record link resolution");
+expect(/supabase\s*\.from\("customer_invoices"\)\s*\.select\("id, customer_id, invoice_number"\)\s*\.in\("id", invoiceIds\)/.test(manager), "Approvals must preserve invoice record link resolution");
 expect(manager.includes('const canReview = role === "super_admin" || role === "admin"'), "Approvals must preserve the current admin/super-admin review rule");
 expect(manager.includes('canReview && row.status === "pending"'), "Approvals review controls must remain pending-only and permission-gated");
 
