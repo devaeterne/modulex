@@ -13,7 +13,7 @@
 .portal-account-card h2 {
   margin: 0 0 0.75rem;
   color: var(--portal-text);
-  font-family: 'Playfair Display', serif;
+  font-family: var(--font-playfair), serif;
   font-size: 1.35rem;
 }
 
