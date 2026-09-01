@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
+import StatTile from "@/components/common/StatTile";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
 import Checkbox from "@/components/form/input/Checkbox";
@@ -103,6 +104,17 @@ type PriceChange = { product_id: string; price_group_id: string; amount: string 
 const pageSizes = [25, 50, 100];
 const PRICE_DECIMAL = { precision: 18, scale: 4, min: 0, allowNull: true } as const;
 
+const sortLabels: Record<SortBy, string> = {
+  sku: "SKU",
+  name: "Product Name",
+  brand: "Brand",
+  category: "Category",
+  product_type: "Product Type",
+  uom: "Unit of Measure",
+  stock: "Stock",
+  status: "Status",
+};
+
 function key(productId: string, groupId: string) {
   return `${productId}:${groupId}`;
 }
@@ -139,6 +151,7 @@ function pricingErrorMessage(message: string) {
 }
 
 export default function ProductPricesServerTable() {
+  const router = useRouter();
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [groups, setGroups] = useState<PriceGroup[]>([]);
   const [brands, setBrands] = useState<Lookup[]>([]);
@@ -183,6 +196,9 @@ export default function ProductPricesServerTable() {
   const [bulkSourceGroupId, setBulkSourceGroupId] = useState("");
   const [bulkTargetGroupId, setBulkTargetGroupId] = useState("");
   const [bulkValue, setBulkValue] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [directoryOpen, setDirectoryOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const requestId = useRef(0);
 
   const dirtyChanges = useMemo(() => {
@@ -333,6 +349,10 @@ export default function ProductPricesServerTable() {
     uomFilter,
     stockFilter !== "all" ? stockFilter : "",
   ].filter(Boolean).length;
+
+  useEffect(() => {
+    if (activeFilters > 0) setFiltersOpen(true);
+  }, [activeFilters]);
 
   function ensureNoDirty() {
     if (!dirtyCount) return true;
@@ -492,7 +512,11 @@ export default function ProductPricesServerTable() {
           : `Bulk preview applied to ${applied} products. Review and save.`
       );
     } catch (caught) {
-      setError(caught instanceof Error ? pricingErrorMessage(caught.message) : "Unable to load selected prices.");
+      setError(
+        caught instanceof Error
+          ? pricingErrorMessage(caught.message)
+          : "Unable to load selected prices."
+      );
     }
   }
 
@@ -534,21 +558,34 @@ export default function ProductPricesServerTable() {
     (_, index) => Math.max(1, Math.min(totalPages - 4, page - 2)) + index
   ).filter((value) => value <= totalPages);
   const tableColumnCount = groups.length + (canManage ? 6 : 5);
+  const filterSummary = activeFilters
+    ? `${activeFilters} active filter${activeFilters === 1 ? "" : "s"}`
+    : "No active filters";
+  const directorySummary = `Showing ${start}–${end} of ${totalCount} · ${sortLabels[sortBy]} · ${
+    sortDirection === "asc" ? "Ascending" : "Descending"
+  } · ${pageSize}/page`;
+  const bulkSummary = `${selectedIds.size} selected · Preview changes before saving`;
 
   return (
     <div className="space-y-6">
       <ComponentCard
         title="Product Prices"
-        desc="Manage Price Group pricing only. Product Type routes each product to its supported pricing engine."
+        desc="Price Group pricing for eligible products. Product Type remains the pricing-engine authority."
+        headerAction={
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => router.push("/pricing/material-bands")}
+          >
+            Manage Material Bands
+          </Button>
+        }
       >
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
-            <Badge color="primary">Price Group: {routingSummary.price_group_products}</Badge>
-            <Badge color="warning">Material Band: {routingSummary.material_band_products}</Badge>
-            <Badge color="light">No Pricing: {routingSummary.no_pricing_products}</Badge>
-            <Link href="/pricing/material-bands">
-              <Badge color="info">Manage Material Bands</Badge>
-            </Link>
+            <Badge color="primary">Price Group · {routingSummary.price_group_products}</Badge>
+            <Badge color="light">Material Band · {routingSummary.material_band_products}</Badge>
+            <Badge color="light">No Pricing · {routingSummary.no_pricing_products}</Badge>
           </div>
           {canManage ? (
             <div className="flex flex-wrap gap-2">
@@ -568,26 +605,42 @@ export default function ProductPricesServerTable() {
 
       <ComponentCard title="Pricing Summary" desc="Current USD Price Group coverage for eligible products.">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div>
-            <small>Products</small>
-            <div><strong>{summary.total_products.toLocaleString()}</strong></div>
-          </div>
-          <div>
-            <small>Price Groups</small>
-            <div><strong>{summary.price_groups.toLocaleString()}</strong></div>
-          </div>
-          <div>
-            <small>Prices Entered</small>
-            <div><strong>{summary.filled_prices.toLocaleString()}</strong></div>
-          </div>
-          <div>
-            <small>Missing Prices</small>
-            <div><strong>{summary.missing_prices.toLocaleString()}</strong></div>
-          </div>
+          <StatTile
+            label="Eligible Products"
+            value={summary.total_products.toLocaleString()}
+            helper="Price Group routed"
+            tone="brand"
+          />
+          <StatTile
+            label="Price Groups"
+            value={summary.price_groups.toLocaleString()}
+            helper="Active groups"
+          />
+          <StatTile
+            label="Prices Entered"
+            value={summary.filled_prices.toLocaleString()}
+            helper="Current USD prices"
+            tone="success"
+          />
+          <StatTile
+            label="Missing Prices"
+            value={summary.missing_prices.toLocaleString()}
+            helper="Coverage gaps"
+            tone={summary.missing_prices > 0 ? "warning" : "neutral"}
+          />
         </div>
       </ComponentCard>
 
-      <ComponentCard title="Filters" desc="Search and filter the server-side Price Group product directory.">
+      <ComponentCard
+        title="Filters"
+        desc={filterSummary}
+        collapsed={!filtersOpen}
+        headerAction={
+          <Button size="sm" variant="outline" onClick={() => setFiltersOpen((value) => !value)}>
+            {filtersOpen ? "Hide Filters" : "Show Filters"}
+          </Button>
+        }
+      >
         <form onSubmit={submitSearch} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="md:col-span-2">
             <Label htmlFor="pricing-product-search">Search</Label>
@@ -700,7 +753,9 @@ export default function ProductPricesServerTable() {
             />
           </div>
           <div className="flex flex-wrap items-end gap-2 md:col-span-2 xl:col-span-4">
-            <Button type="submit" disabled={dirtyCount > 0}>Search</Button>
+            <Button type="submit" disabled={dirtyCount > 0}>
+              Search
+            </Button>
             <Button
               variant="outline"
               disabled={dirtyCount > 0 || activeFilters === 0}
@@ -712,21 +767,21 @@ export default function ProductPricesServerTable() {
         </form>
       </ComponentCard>
 
-      <ComponentCard title="Directory Controls" desc={`Showing ${start}–${end} of ${totalCount} eligible products.`}>
+      <ComponentCard
+        title="Directory Controls"
+        desc={directorySummary}
+        collapsed={!directoryOpen}
+        headerAction={
+          <Button size="sm" variant="outline" onClick={() => setDirectoryOpen((value) => !value)}>
+            {directoryOpen ? "Hide Controls" : "Show Controls"}
+          </Button>
+        }
+      >
         <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-4">
           <div>
             <Label>Sort By</Label>
             <Select
-              options={[
-                { value: "sku", label: "SKU" },
-                { value: "name", label: "Product Name" },
-                { value: "brand", label: "Brand" },
-                { value: "category", label: "Category" },
-                { value: "product_type", label: "Product Type" },
-                { value: "uom", label: "Unit of Measure" },
-                { value: "stock", label: "Stock" },
-                { value: "status", label: "Status" },
-              ]}
+              options={Object.entries(sortLabels).map(([value, label]) => ({ value, label }))}
               value={sortBy}
               onChange={(value) =>
                 applyNavigation(() => {
@@ -771,11 +826,17 @@ export default function ProductPricesServerTable() {
       {canManage ? (
         <ComponentCard
           title="Bulk Pricing"
-          desc="Bulk operations only receive products already routed to Price Group pricing."
+          desc={bulkSummary}
+          collapsed={!bulkOpen}
+          headerAction={
+            <Button size="sm" variant="outline" onClick={() => setBulkOpen((value) => !value)}>
+              {bulkOpen ? "Hide Bulk Pricing" : "Show Bulk Pricing"}
+            </Button>
+          }
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge color="light">{selectedIds.size} selected</Badge>
+              <Badge color={selectedIds.size ? "primary" : "light"}>{selectedIds.size} selected</Badge>
               <Button variant="outline" disabled={!filteredIds.length} onClick={selectAllFiltered}>
                 Select all filtered ({filteredIds.length})
               </Button>
@@ -818,7 +879,9 @@ export default function ProductPricesServerTable() {
                     onChange={setBulkSourceGroupId}
                   />
                 </div>
-              ) : <div />}
+              ) : (
+                <div />
+              )}
               <div>
                 <Label htmlFor="bulk-price-value">Value</Label>
                 <Input
@@ -890,13 +953,14 @@ export default function ProductPricesServerTable() {
                         </div>
                       </TableCell>
                       <TableCell variant="admin">
-                        <div className="flex flex-wrap gap-1">
-                          <Badge color="primary" size="sm">{row.product_type_name}</Badge>
-                          <Badge color="light" size="sm">{row.product_type_code}</Badge>
-                        </div>
+                        <Badge color="light" size="sm">
+                          {row.product_type_name} · {row.product_type_code}
+                        </Badge>
                       </TableCell>
                       <TableCell variant="admin">
-                        <Badge color="info" size="sm">{row.uom_name} ({row.uom_code})</Badge>
+                        <Badge color="light" size="sm">
+                          {row.uom_name} · {row.uom_code}
+                        </Badge>
                       </TableCell>
                       <TableCell variant="admin" className="text-right">
                         {stock(row.available_stock)}
