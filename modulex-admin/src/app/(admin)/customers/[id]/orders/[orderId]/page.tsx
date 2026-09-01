@@ -7,13 +7,16 @@ import CustomerOrderRevisionHistory from "@/components/customers/CustomerOrderRe
 import CreateInvoiceFromOrderButton from "@/components/customers/CreateInvoiceFromOrderButton";
 import CreateShipmentFromOrderButton from "@/components/customers/CreateShipmentFromOrderButton";
 import CreateInstallationFromOrder from "@/components/customers/CreateInstallationFromOrder";
+import OrderPricingSemanticsPanel from "@/components/customers/OrderPricingSemanticsPanel";
 
 export const metadata: Metadata = {
   title: "Order Detail | Modulex Admin",
   description: "Customer order detail, status and revision history",
 };
 
-export default function CustomerOrderDetailPage() {
+export default async function CustomerOrderDetailPage({ params }: { params: Promise<{ id: string; orderId: string }> }) {
+  const { orderId } = await params;
+
   return (
     <div>
       <PageBreadcrumb pageTitle="Order Detail" />
@@ -32,6 +35,7 @@ export default function CustomerOrderDetailPage() {
         <CustomerOrderEditActions />
       </PermissionVisible>
       <CustomerOrderDetail />
+      <OrderPricingSemanticsPanel orderId={orderId} />
       <CustomerOrderRevisionHistory />
     </div>
   );
