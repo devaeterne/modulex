@@ -6,8 +6,10 @@ import {
   type NormalizedVendorProduct,
   type VendorCatalogAdapter,
   type VendorCatalogChangeState,
+  type VendorCatalogDiscoveryScope,
   type VendorCatalogReviewStatus,
 } from "@/lib/vendor-catalog/domain";
+import { loadVendorCatalogCheck } from "@/lib/vendor-catalog/check";
 import {
   isSupabaseAdminConfigured,
   supabaseAdmin,
@@ -39,9 +41,18 @@ type PreparedProduct = {
   detailsRefreshedAt: string | null;
 };
 
+export type VendorCatalogSyncOptions = {
+  scope?: VendorCatalogDiscoveryScope;
+  checkId?: string | null;
+  changedOnly?: boolean;
+  userId?: string | null;
+};
+
 export type VendorCatalogSyncResult = {
   runId: string;
   vendorCode: string;
+  categoryKey: string | null;
+  categoryLabel: string | null;
   status: "SUCCEEDED" | "FAILED";
   counts: SyncCounts;
   errors: Array<{ externalId?: string; message: string }>;
@@ -81,12 +92,15 @@ async function loadExistingItems(vendorCode: string) {
 
 function prepareProducts(
   products: NormalizedVendorProduct[],
-  existingByExternalId: Map<string, ExistingItem>
+  existingByExternalId: Map<string, ExistingItem>,
+  forcedStates?: Map<string, VendorCatalogChangeState>
 ) {
   return products.map<PreparedProduct>((product) => {
     const existing = existingByExternalId.get(product.externalId);
     const discoveryHash = stableDiscoveryHash(product);
-    const changeState = classifyVendorProduct(existing?.discovery_hash, discoveryHash);
+    const changeState =
+      forcedStates?.get(product.externalId) ??
+      classifyVendorProduct(existing?.discovery_hash, discoveryHash);
     const reviewStatus: VendorCatalogReviewStatus =
       changeState === "UNCHANGED" ? existing?.review_status ?? "PENDING" : "PENDING";
 
@@ -106,12 +120,14 @@ function prepareProducts(
 }
 
 export async function runVendorCatalogSync(
-  adapter: VendorCatalogAdapter
+  adapter: VendorCatalogAdapter,
+  options: VendorCatalogSyncOptions = {}
 ): Promise<VendorCatalogSyncResult> {
   if (!isSupabaseAdminConfigured) {
     throw new Error("Vendor catalog sync requires SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY.");
   }
 
+  const errors: Array<{ externalId?: string; message: string }> = [];
   const counts: SyncCounts = {
     discovered: 0,
     created: 0,
@@ -119,12 +135,32 @@ export async function runVendorCatalogSync(
     unchanged: 0,
     failed: 0,
   };
-  const errors: Array<{ externalId?: string; message: string }> = [];
 
+  let scope: VendorCatalogDiscoveryScope = options.scope ?? {};
+  let snapshotProducts: NormalizedVendorProduct[] | null = null;
+  let snapshotStates: Map<string, VendorCatalogChangeState> | undefined;
+
+  if (options.checkId) {
+    const snapshot = await loadVendorCatalogCheck(options.checkId, adapter.vendorCode);
+    scope = snapshot.scope;
+    snapshotProducts = snapshot.products;
+    snapshotStates = snapshot.states;
+  }
+
+  const categoryKey = scope.categoryKey?.trim() || null;
+  const categoryLabel = scope.categoryLabel?.trim() || categoryKey;
   const { data: run, error: runError } = await supabaseAdmin
     .from("vendor_catalog_runs")
     .insert({
       vendor_code: adapter.vendorCode,
+      vendor_category_key: categoryKey,
+      vendor_category_label: categoryLabel,
+      sync_mode: "SYNC",
+      selection_payload: {
+        checkId: options.checkId ?? null,
+        changedOnly: options.changedOnly === true,
+        requestedBy: options.userId ?? null,
+      },
       status: "RUNNING",
       started_at: new Date().toISOString(),
     })
@@ -135,16 +171,24 @@ export async function runVendorCatalogSync(
 
   try {
     const [products, existingByExternalId] = await Promise.all([
-      adapter.discover(),
+      snapshotProducts ? Promise.resolve(snapshotProducts) : adapter.discover(scope),
       loadExistingItems(adapter.vendorCode),
     ]);
     counts.discovered = products.length;
 
-    const prepared = prepareProducts(products, existingByExternalId);
+    const prepared = prepareProducts(products, existingByExternalId, snapshotStates);
+    const candidates =
+      options.changedOnly === true
+        ? prepared.filter((entry) => entry.changeState !== "UNCHANGED")
+        : prepared;
+    if (options.changedOnly === true) {
+      counts.unchanged = prepared.filter((entry) => entry.changeState === "UNCHANGED").length;
+    }
+
     const persistedIds = new Map<string, string>();
     const now = new Date().toISOString();
 
-    for (const batch of chunk(prepared, 100)) {
+    for (const batch of chunk(candidates, 100)) {
       const { data, error } = await supabaseAdmin
         .from("vendor_catalog_items")
         .upsert(
@@ -157,6 +201,11 @@ export async function runVendorCatalogSync(
             product_url: entry.product.productUrl,
             vendor_price_reference: entry.product.vendorPriceReference,
             vendor_currency: entry.product.vendorCurrency,
+            vendor_category_key: entry.product.vendorCategoryKey,
+            vendor_category_label: entry.product.vendorCategoryLabel,
+            family_key: entry.product.familyKey,
+            variant_code: entry.product.variantCode,
+            variant_label: entry.product.variantLabel,
             snapshot_hash: entry.snapshotHash,
             discovery_hash: entry.discoveryHash,
             change_state: entry.changeState,
@@ -183,7 +232,7 @@ export async function runVendorCatalogSync(
       }
     }
 
-    const persisted = prepared.filter((entry) => persistedIds.has(entry.product.externalId));
+    const persisted = candidates.filter((entry) => persistedIds.has(entry.product.externalId));
     const changed = persisted.filter((entry) => entry.changeState !== "UNCHANGED");
 
     for (const itemIdBatch of chunk(
@@ -231,6 +280,11 @@ export async function runVendorCatalogSync(
         productUrl: entry.product.productUrl,
         vendorPriceReference: entry.product.vendorPriceReference,
         vendorCurrency: entry.product.vendorCurrency,
+        vendorCategoryKey: entry.product.vendorCategoryKey,
+        vendorCategoryLabel: entry.product.vendorCategoryLabel,
+        familyKey: entry.product.familyKey,
+        variantCode: entry.product.variantCode,
+        variantLabel: entry.product.variantLabel,
         assets: entry.product.assets,
       },
       source_payload: entry.product.sourcePayload,
@@ -267,6 +321,8 @@ export async function runVendorCatalogSync(
     return {
       runId: run.id,
       vendorCode: adapter.vendorCode,
+      categoryKey,
+      categoryLabel,
       status,
       counts,
       errors,
@@ -291,6 +347,8 @@ export async function runVendorCatalogSync(
     return {
       runId: run.id,
       vendorCode: adapter.vendorCode,
+      categoryKey,
+      categoryLabel,
       status: "FAILED",
       counts: { ...counts, failed: counts.failed + 1 },
       errors,
