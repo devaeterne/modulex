@@ -26,6 +26,15 @@ function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number.isFinite(value) ? value : 0);
 }
 
+function resolveOrderLineUnitPrice(item: DraftItem, product: Product | undefined, priceMap: Map<string, number>) {
+  if (product?.pricing_model === "price_group") return priceMap.get(item.product_id);
+  if (product?.pricing_model === "countertop_material_band" && item.id) {
+    const storedPrice = Number(item.unit_price || 0);
+    return Number.isFinite(storedPrice) && storedPrice >= 0 ? storedPrice : undefined;
+  }
+  return undefined;
+}
+
 export default function EditCustomerOrder() {
   const params = useParams<{ id: string; orderId: string }>();
   const router = useRouter();
@@ -152,7 +161,7 @@ export default function EditCustomerOrder() {
     let subtotal = 0;
     for (const item of items) {
       const qty = Math.max(0, Number(item.quantity || 0));
-      const price = Math.max(0, Number(item.unit_price || 0));
+      const price = Math.max(0, resolveOrderLineUnitPrice(item, productMap.get(item.product_id), priceMap) ?? 0);
       const discount = Math.min(100, Math.max(0, Number(item.discount_percent || 0)));
       subtotal += qty * price * (1 - discount / 100);
     }
@@ -163,7 +172,7 @@ export default function EditCustomerOrder() {
     const commissionPercent = Math.max(0, Number(appliedCommission || 0));
     const commission = orderTotal * commissionPercent / 100;
     return { subtotal, tax, orderTotal, commission, grandTotal: orderTotal + commission };
-  }, [items, orderDiscount, taxRate, appliedCommission]);
+  }, [items, productMap, priceMap, orderDiscount, taxRate, appliedCommission]);
 
   function updateItem(index: number, values: Partial<DraftItem>) {
     setItems((current) => current.map((item, i) => i === index ? { ...item, ...values } : item));
@@ -186,11 +195,6 @@ export default function EditCustomerOrder() {
         discount_percent: "0",
       }];
     });
-  }
-
-  function useGroupPrice(index: number) {
-    const groupPrice = priceMap.get(items[index].product_id);
-    if (groupPrice !== undefined) updateItem(index, { unit_price: String(groupPrice) });
   }
 
   function handlePriceGroupChange(groupId: string) {
@@ -219,7 +223,8 @@ export default function EditCustomerOrder() {
       if (product?.pricing_model === "none") return setErrorMessage("No Commercial Pricing products cannot be added to customer orders.");
       if (!item.product_id) return setErrorMessage("Select a product for every line.");
       if (Number(item.quantity) <= 0) return setErrorMessage("Quantity must be greater than zero.");
-      if (Number(item.unit_price) < 0) return setErrorMessage("Unit price cannot be negative.");
+      if (product?.pricing_model === "price_group" && !priceMap.has(item.product_id)) return setErrorMessage(`No current Price Group price exists for ${product.sku}.`);
+      if (resolveOrderLineUnitPrice(item, product, priceMap) === undefined) return setErrorMessage("The selected product does not have a valid commercial price for this order.");
       if (Number(item.discount_percent) < 0 || Number(item.discount_percent) > 100) return setErrorMessage("Line discount must be between 0 and 100%.");
     }
 
@@ -231,7 +236,7 @@ export default function EditCustomerOrder() {
           id: item.id,
           productId: item.product_id,
           quantity: item.quantity,
-          unitPrice: item.unit_price,
+          unitPrice: String(resolveOrderLineUnitPrice(item, productMap.get(item.product_id), priceMap) ?? 0),
           discountPercent: item.discount_percent,
         })),
         priceGroupId,
@@ -294,8 +299,8 @@ export default function EditCustomerOrder() {
     </div>
 
     <div className="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800"><div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Products</h2><p className="mt-1 text-sm text-gray-500">Search and add products. Manual prices, line discounts and margins are approval-controlled for Sales.</p></div><button type="button" onClick={() => setIsProductPickerOpen(true)} className="inline-flex h-9 items-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white shadow-theme-xs hover:bg-brand-600">Add Products</button></div>
-      <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Product","Qty","Unit Price","Discount %","Line Total",""].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">{items.length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No products added. Use <span className="font-medium text-gray-700 dark:text-gray-300">Add Products</span> to select items.</td></tr> : items.map((item, index) => { const product = productMap.get(item.product_id); const total = Number(item.quantity || 0) * Number(item.unit_price || 0) * (1 - Number(item.discount_percent || 0) / 100); const groupPrice = priceMap.get(item.product_id); const manualPrice = groupPrice !== undefined && Math.abs(Number(item.unit_price || 0) - groupPrice) > 0.0001; return <tr key={item.product_id}><td className="min-w-[340px] px-4 py-3"><div className="flex items-center gap-2"><span className="text-sm font-semibold text-gray-800 dark:text-white/90">{product?.sku ?? "Unknown product"}</span>{product?.status === "inactive" && <span className="rounded-full bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">Inactive</span>}</div><div className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{product?.name ?? item.product_id}</div></td><td className="w-[110px] px-4 py-3"><input value={item.quantity} onChange={(e) => updateItem(index, { quantity: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="min-w-[210px] px-4 py-3"><div className="flex gap-2"><input value={item.unit_price} onChange={(e) => updateItem(index, { unit_price: e.target.value })} inputMode="decimal" className={inputClass} /><button type="button" disabled={!priceMap.has(item.product_id)} onClick={() => useGroupPrice(index)} className="whitespace-nowrap rounded-lg border border-gray-300 px-2 text-xs font-medium text-gray-600 disabled:opacity-30 dark:border-gray-700 dark:text-gray-300">Group Price</button></div>{manualPrice && <span className="mt-1 block text-xs text-warning-600">Manual price · Sales approval required</span>}</td><td className="w-[130px] px-4 py-3"><input value={item.discount_percent} onChange={(e) => updateItem(index, { discount_percent: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="px-4 py-3 text-sm font-semibold text-gray-800 dark:text-white/90">{money(total)}</td><td className="px-4 py-3 text-right"><button type="button" onClick={() => setItems((current) => current.filter((_, i) => i !== index))} className="text-xs font-medium text-error-600">Remove</button></td></tr>; })}</tbody></table></div>
+      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800"><div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Products</h2><p className="mt-1 text-sm text-gray-500">Prices are resolved by the canonical pricing route and are read-only. Line discounts remain approval-controlled for Sales.</p></div><button type="button" onClick={() => setIsProductPickerOpen(true)} className="inline-flex h-9 items-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white shadow-theme-xs hover:bg-brand-600">Add Products</button></div>
+      <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Product","Qty","Server Price","Discount %","Line Total",""].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">{items.length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No products added. Use <span className="font-medium text-gray-700 dark:text-gray-300">Add Products</span> to select items.</td></tr> : items.map((item, index) => { const product = productMap.get(item.product_id); const resolvedPrice = resolveOrderLineUnitPrice(item, product, priceMap); const total = Number(item.quantity || 0) * Number(resolvedPrice ?? 0) * (1 - Number(item.discount_percent || 0) / 100); return <tr key={item.product_id}><td className="min-w-[340px] px-4 py-3"><div className="flex items-center gap-2"><span className="text-sm font-semibold text-gray-800 dark:text-white/90">{product?.sku ?? "Unknown product"}</span>{product?.status === "inactive" && <span className="rounded-full bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">Inactive</span>}</div><div className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{product?.name ?? item.product_id}</div></td><td className="w-[110px] px-4 py-3"><input value={item.quantity} onChange={(e) => updateItem(index, { quantity: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="min-w-[180px] px-4 py-3"><span className="text-sm font-semibold text-gray-800 dark:text-white/90">{resolvedPrice === undefined ? "Unavailable" : money(resolvedPrice)}</span><span className="mt-1 block text-xs text-gray-400">{product?.pricing_model === "countertop_material_band" ? "Countertop · configured price" : "Price Group · server authoritative"}</span></td><td className="w-[130px] px-4 py-3"><input value={item.discount_percent} onChange={(e) => updateItem(index, { discount_percent: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="px-4 py-3 text-sm font-semibold text-gray-800 dark:text-white/90">{money(total)}</td><td className="px-4 py-3 text-right"><button type="button" onClick={() => setItems((current) => current.filter((_, i) => i !== index))} className="text-xs font-medium text-error-600">Remove</button></td></tr>; })}</tbody></table></div>
     </div>
 
     <div className="grid gap-5 xl:grid-cols-12">
@@ -314,6 +319,7 @@ export default function EditCustomerOrder() {
       priceMap={priceMap}
       onAdd={addProduct}
       currencyCode={order.currency_code}
+      disableWithoutPrice
     />
   </div>;
 }
