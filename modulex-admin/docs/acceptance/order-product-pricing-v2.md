@@ -1,6 +1,6 @@
 # Orders — Product Type / UOM / Pricing Model Acceptance
 
-Status: `[~]` implementation + CI verification in draft PR. Production acceptance is intentionally not marked complete.
+Status: `[~]` implementation + final-HEAD CI verification complete in PR #216. Production acceptance is intentionally not marked complete.
 
 ## Architecture contract
 
@@ -37,9 +37,16 @@ Status: `[~]` implementation + CI verification in draft PR. Production acceptanc
 - `[~]` Existing inventory reservation/movement engine remains unchanged.
 - `[~]` Countertop slab reservation continues to use `countertop_reservation_quantity`.
 - `[~]` RBAC is preserved; new private trigger helpers expose no direct caller execute surface.
-- `[~]` Admin UI Foundation contract must pass on final HEAD.
-- `[~]` Store/portal boundary and build regression must pass on final HEAD.
-- `[~]` GC-8B performance baseline drift was traced to literal `Playfair Display` declarations in `portal-dealer.css` and `portal-fulfillment.css`; those consumers now use the existing `--font-playfair` Next font variable rather than weakening the performance contract.
+- `[~]` Admin UI Foundation final-HEAD CI: PASS.
+- `[~]` Admin Customers UI final-HEAD CI: PASS.
+- `[~]` Admin A1 Core Operations final-HEAD contract/regression/lint/build: PASS.
+- `[~]` Store portal boundary/lint/build final-HEAD CI: PASS.
+- `[~]` GC-8B accessibility/performance/lint/build final-HEAD CI: PASS.
+- `[~]` All GitHub Actions workflows triggered for final HEAD completed successfully.
+
+## GC-8B baseline repair
+
+The GC-8B failure was traced to literal `Playfair Display` declarations in `portal-dealer.css` and `portal-fulfillment.css`. Those consumers now use the existing `--font-playfair` Next font variable. The performance contract itself was not weakened. Final-HEAD GC-8B accessibility, performance, Store lint and Store production build all pass.
 
 ## Known fail-closed limitation
 
