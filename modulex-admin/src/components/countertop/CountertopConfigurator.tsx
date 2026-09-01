@@ -14,13 +14,17 @@ import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 
 type Option = { value: string; label: string };
+type MaterialBandRow = {
+  id: string;
+  code: string;
+  price_per_sqft: string;
+};
 type StoneRow = {
   id: string;
   name: string;
   sku?: string;
   stone_type_id?: string;
-  material_price_band_code?: string;
-  price_per_sqft?: string;
+  material_price_band_id?: string;
 };
 type ServiceRow = {
   id: string;
@@ -37,6 +41,7 @@ type CountertopPriceResult = {
     sqft?: string | number;
     stone_type?: string;
     price_per_sqft?: string | number;
+    material_price_band_id?: string;
     material_price_band?: string;
   };
   subtotal?: string | number;
@@ -49,6 +54,7 @@ type CountertopPriceResult = {
 };
 type ExistingConfiguration = {
   stone_product_id: string;
+  material_price_band_id: string | null;
   sink_product_id: string | null;
   price_group_id: string;
   sqft: string | number;
@@ -118,9 +124,11 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
   const [sinks, setSinks] = useState<Option[]>([]);
   const [priceGroups, setPriceGroups] = useState<Option[]>([]);
   const [stones, setStones] = useState<StoneRow[]>([]);
+  const [materialBands, setMaterialBands] = useState<MaterialBandRow[]>([]);
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [stoneTypeId, setStoneTypeId] = useState("");
   const [stoneProductId, setStoneProductId] = useState("");
+  const [materialBandId, setMaterialBandId] = useState("");
   const [priceGroupId, setPriceGroupId] = useState("");
   const [edgeId, setEdgeId] = useState("");
   const [sinkId, setSinkId] = useState("");
@@ -140,11 +148,12 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
   useEffect(() => {
     let mounted = true;
     void (async () => {
-      const [typeResult, edgeResult, sinkResult, profileResult, priceGroupResult, serviceResult] = await Promise.all([
+      const [typeResult, edgeResult, sinkResult, profileResult, bandResult, priceGroupResult, serviceResult] = await Promise.all([
         supabase.from("countertop_stone_types").select("id,name").eq("is_active", true).order("name"),
         supabase.from("countertop_edge_profiles").select("id,name").eq("is_active", true).order("name"),
         supabase.from("products").select("id,name,sku").eq("status", "active").contains("metadata", { product_kind: "sink" }).order("name"),
-        supabase.from("countertop_stone_product_profiles").select("product_id,stone_type_id,products(id,name,sku,status),countertop_material_price_bands(code,price_per_sqft)").eq("is_active", true),
+        supabase.from("countertop_stone_product_profiles").select("product_id,stone_type_id,material_price_band_id,products(id,name,sku,status)").eq("is_active", true),
+        supabase.from("countertop_material_price_bands").select("id,code,price_per_sqft").eq("is_active", true).order("sort_order").order("code"),
         supabase.from("price_groups").select("id,name,available_for_orders,internal_only").eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
         supabase.from("countertop_services").select("id,name,pricing_method,unit_price").eq("is_active", true).order("name"),
       ]);
@@ -158,12 +167,12 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
           ? supabase.from("customer_orders").select("price_group_id").eq("id", contextOrderId).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
         orderItemId
-          ? supabase.from("countertop_configurations").select("stone_product_id,sink_product_id,price_group_id,sqft,edge_profile_id,edge_linear_ft,slab_quantity,manual_price_per_sqft,override_reason,configuration,pricing_snapshot").eq("order_item_id", orderItemId).maybeSingle()
+          ? supabase.from("countertop_configurations").select("stone_product_id,material_price_band_id,sink_product_id,price_group_id,sqft,edge_profile_id,edge_linear_ft,slab_quantity,manual_price_per_sqft,override_reason,configuration,pricing_snapshot").eq("order_item_id", orderItemId).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
       ]);
 
       if (!mounted) return;
-      const referenceError = [typeResult, edgeResult, sinkResult, profileResult, priceGroupResult, serviceResult].find((entry) => entry.error)?.error
+      const referenceError = [typeResult, edgeResult, sinkResult, profileResult, bandResult, priceGroupResult, serviceResult].find((entry) => entry.error)?.error
         ?? orderItemContext.error
         ?? orderPricing.error
         ?? existingConfigurationResult.error;
@@ -171,20 +180,24 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
 
       const mappedStones = (profileResult.data ?? []).flatMap((row) => {
         const product = Array.isArray(row.products) ? row.products[0] : row.products;
-        const band = Array.isArray(row.countertop_material_price_bands) ? row.countertop_material_price_bands[0] : row.countertop_material_price_bands;
         if (!product || product.status !== "active") return [];
         return [{
           id: row.product_id,
           name: product.name ?? "",
           sku: product.sku ?? undefined,
           stone_type_id: row.stone_type_id,
-          material_price_band_code: band?.code ?? undefined,
-          price_per_sqft: band?.price_per_sqft === undefined || band?.price_per_sqft === null ? undefined : String(band.price_per_sqft),
+          material_price_band_id: row.material_price_band_id,
         }];
       });
+      const mappedBands = (bandResult.data ?? []).map((row) => ({
+        id: row.id,
+        code: row.code,
+        price_per_sqft: String(row.price_per_sqft),
+      }));
       const baseServices = (serviceResult.data ?? []).map((row) => ({ ...row, unit_price: String(row.unit_price), quantity: "1", selected: false }));
       const existing = existingConfigurationResult.data as ExistingConfiguration | null;
       const savedSnapshot = asRecord(existing?.pricing_snapshot);
+      const savedStoneSnapshot = asRecord(savedSnapshot.stone);
       const savedServiceRows = Array.isArray(savedSnapshot.services) ? savedSnapshot.services : [];
       const savedServiceMap = new Map(savedServiceRows.flatMap((entry) => {
         const service = asRecord(entry);
@@ -197,14 +210,17 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
       setSinks((sinkResult.data ?? []).map((row) => ({ value: row.id, label: `${row.name} (${row.sku})` })));
       setPriceGroups((priceGroupResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
       setStones(mappedStones);
+      setMaterialBands(mappedBands);
       setServices(baseServices.map((service) => savedServiceMap.has(service.id)
         ? { ...service, selected: true, quantity: savedServiceMap.get(service.id) ?? "1" }
         : service));
 
       if (existing) {
         const savedStone = mappedStones.find((stone) => stone.id === existing.stone_product_id);
+        const snapshotBandId = typeof savedStoneSnapshot.material_price_band_id === "string" ? savedStoneSnapshot.material_price_band_id : null;
         setStoneProductId(existing.stone_product_id);
         setStoneTypeId(savedStone?.stone_type_id ?? "");
+        setMaterialBandId(existing.material_price_band_id || snapshotBandId || savedStone?.material_price_band_id || "");
         setPriceGroupId(existing.price_group_id || orderPricing.data?.price_group_id || "");
         setSqft(String(existing.sqft));
         setEdgeId(existing.edge_profile_id ?? "");
@@ -224,8 +240,17 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
 
   const filteredStones = useMemo(() => stones.filter((row) => !stoneTypeId || row.stone_type_id === stoneTypeId), [stones, stoneTypeId]);
   const selectedStone = stones.find((row) => row.id === stoneProductId);
-  const canCalculate = Boolean(stoneProductId && priceGroupId && Number(sqft) > 0);
+  const selectedBand = materialBands.find((row) => row.id === materialBandId);
+  const defaultBand = materialBands.find((row) => row.id === selectedStone?.material_price_band_id);
+  const canCalculate = Boolean(stoneProductId && materialBandId && priceGroupId && Number(sqft) > 0);
   const selectedServices = () => services.filter((row) => row.selected).map((row) => ({ service_id: row.id, quantity: row.quantity }));
+  const materialBandHint = !selectedStone
+    ? "Select a stone. Its catalog band will be preselected, and any active band can be used for this order."
+    : defaultBand && materialBandId === defaultBand.id
+      ? `Default for this stone: ${defaultBand.code} · ${money(defaultBand.price_per_sqft)} / sq ft.`
+      : defaultBand
+        ? `Stone default: ${defaultBand.code} · ${money(defaultBand.price_per_sqft)} / sq ft. This order uses the selected band.`
+        : "Choose any active Material Price Band for this order.";
 
   function toggleService(id: string) {
     setServices((rows) => rows.map((row) => row.id === id ? { ...row, selected: !row.selected } : row));
@@ -236,9 +261,11 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
     setResult(null);
     if (!priceGroupId) return setError("This order needs a saved price group before countertop pricing can be calculated.");
     if (!stoneProductId || Number(sqft) <= 0) return setError("Select a stone and enter square footage before calculating.");
+    if (!materialBandId) return setError("Select a Material Price Band before calculating.");
 
     const { data, error: pricingError } = await supabase.rpc("calculate_countertop_price", {
       p_stone_product_id: stoneProductId,
+      p_material_price_band_id: materialBandId,
       p_price_group_id: priceGroupId,
       p_sqft: sqft,
       p_edge_profile_id: edgeId || null,
@@ -254,18 +281,20 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
   async function attach() {
     if (!result) return setError("Calculate countertop pricing before attaching.");
     if (!orderItemId && !orderId) return setError("Open a draft customer order to configure and attach a countertop.");
+    if (!materialBandId) return setError("Select a Material Price Band before saving the countertop.");
 
     setSaving(true);
     setError(null);
     const common = {
       p_stone_product_id: stoneProductId,
+      p_material_price_band_id: materialBandId,
       p_price_group_id: priceGroupId,
       p_sqft: sqft,
       p_edge_profile_id: edgeId || null,
       p_edge_linear_ft: edgeLinearFt || "0",
       p_sink_product_id: sinkId || null,
       p_services: selectedServices(),
-      p_configuration: { edge_profile_id: edgeId || null, service_selection: selectedServices() },
+      p_configuration: { edge_profile_id: edgeId || null, material_price_band_id: materialBandId, service_selection: selectedServices() },
       p_manual_material_price: manualPrice || null,
       p_slab_quantity: slabQuantity,
       p_override_reason: overrideReason || null,
@@ -309,13 +338,30 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
 
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Stone type">
-              <Select options={types} value={stoneTypeId} placeholder="Select Stone Type" allowEmpty onChange={(value) => { setStoneTypeId(value); setStoneProductId(""); setResult(null); }} />
+              <Select options={types} value={stoneTypeId} placeholder="Select Stone Type" allowEmpty onChange={(value) => { setStoneTypeId(value); setStoneProductId(""); setMaterialBandId(""); setResult(null); }} />
             </Field>
             <Field label="Stone" required>
-              <Select options={filteredStones.map((row) => ({ value: row.id, label: `${row.name} (${row.sku})` }))} value={stoneProductId} placeholder="Select Stone" onChange={(value) => { setStoneProductId(value); setResult(null); }} required />
+              <Select
+                options={filteredStones.map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name }))}
+                value={stoneProductId}
+                placeholder="Select Stone"
+                onChange={(value) => {
+                  const nextStone = stones.find((row) => row.id === value);
+                  setStoneProductId(value);
+                  setMaterialBandId(nextStone?.material_price_band_id ?? "");
+                  setResult(null);
+                }}
+                required
+              />
             </Field>
-            <Field label="Material price band" hint={!selectedStone ? "Select a stone to view its material price band." : undefined}>
-              {selectedStone ? <Badge color="info">{selectedStone.material_price_band_code} · {money(selectedStone.price_per_sqft)} / sq ft</Badge> : null}
+            <Field label="Material price band" required hint={materialBandHint}>
+              <Select
+                options={materialBands.map((band) => ({ value: band.id, label: `${band.code} · ${money(band.price_per_sqft)} / sq ft` }))}
+                value={materialBandId}
+                placeholder="Select Material Price Band"
+                onChange={(value) => { setMaterialBandId(value); setResult(null); }}
+                required
+              />
             </Field>
             <Field label="Square feet" required>
               <Input type="number" step="0.0001" min="0.0001" value={sqft} onChange={(event) => { setSqft(event.target.value); setResult(null); }} />
@@ -335,7 +381,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
             <Field label="Commercial price group" hint={hasOrderPricingContext ? "Inherited from the saved order." : "Select the pricing context for this countertop."}>
               <Select options={priceGroups} value={priceGroupId} onChange={(value) => { setPriceGroupId(value); setResult(null); }} disabled={hasOrderPricingContext} />
             </Field>
-            <Field label="Manual $/sq ft (optional)">
+            <Field label="Manual $/sq ft (optional)" hint={selectedBand ? `Overrides the selected ${selectedBand.code} band price for this order only.` : undefined}>
               <Input inputMode="decimal" value={manualPrice} onChange={(event) => { setManualPrice(event.target.value); setResult(null); }} />
             </Field>
             <Field label="Override reason">

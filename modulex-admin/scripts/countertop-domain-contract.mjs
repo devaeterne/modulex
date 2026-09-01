@@ -67,11 +67,11 @@ assert(refs.includes('rpc("upsert_countertop_reference"'), "Countertop Setup mus
 assert(!refs.includes("Stone Product Profiles") && !refs.includes("saveProfile") && !refs.includes("toggleProfile"), "Countertop Setup must not duplicate Stone Product Profile management");
 for (const field of ["Add Stone", "Stone Type", "Material Price Band", "Vendor", "Source"]) assert(catalog.includes(field), `Countertop Catalog stone ownership missing: ${field}`);
 assert(catalog.includes('rpc("save_countertop_catalog_product"'), "Countertop Catalog must own atomic Stone product/profile management");
-assert(!/<label>Material price band<Select/.test(configurator) && configurator.includes("price_per_sqft"), "configurator material band must be profile-derived and read-only");
-assert(!configurator.includes("bandId") && !configurator.includes("setBandId"), "configurator must not keep editable material band state");
-assert(!configurator.includes('from("countertop_material_price_bands")'), "configurator must not independently query material price bands");
-assert(configurator.includes("material_price_band_code") && configurator.includes("countertop_material_price_bands(code,price_per_sqft)"), "selected stone profile must supply material band code and price");
-assert(configurator.includes("Select a stone to view its material price band."), "configurator must explain missing profile-derived material band");
+assert(configurator.includes('from("countertop_material_price_bands")'), "configurator must load active Material Price Bands independently of the Stone profile");
+assert(configurator.includes("materialBandId") && configurator.includes("setMaterialBandId"), "configurator must keep editable Material Price Band state");
+assert(configurator.includes("p_material_price_band_id: materialBandId"), "configurator must send the selected Material Price Band to server pricing and attach RPCs");
+assert(configurator.includes("material_price_band_id") && configurator.includes("material_price_band_id,products"), "Stone profile must retain its catalog default Material Price Band identity");
+assert(configurator.includes("Default for this stone") && configurator.includes("Stone default"), "configurator must present the Stone profile band as a default rather than a lock");
 assert(!configurator.includes("Draft order item ID") && !configurator.includes("setOrderItemId"), "configurator must not expose editable order item UUID input");
 assert(configurator.includes("orderItemId?: string") && configurator.includes("p_order_item_id: orderItemId"), "configurator must accept only canonical internal order context for attach");
 assert(configurator.includes("Open a draft customer order to configure and attach a countertop."), "standalone configurator must guide users to a draft order for attachment");
