@@ -141,4 +141,63 @@ expect(sharedTable.includes("title?: string"), "Shared TableRow must support nat
 expect(warehouseForm.includes('htmlFor="warehouse-code"') && warehouseForm.includes('id="warehouse-code"'), "Warehouse code label must remain associated with its input");
 expect(warehouseForm.includes('htmlFor="warehouse-type"') && warehouseForm.includes('id="warehouse-type"'), "Warehouse type label must remain associated with its select");
 
-console.log("inventory + stock movements + stock operations + warehouse + QR UI contract: ok");
+const zonesTable = read("src/components/zones/ZonesTable.tsx");
+const zoneForm = read("src/components/zones/ZoneForm.tsx");
+const zonesUi = `${zonesTable}\n${zoneForm}`;
+for (const primitive of [
+  "ComponentCard",
+  "Input",
+  "Label",
+  "Select",
+  "TextArea",
+  "Alert",
+  "Badge",
+  "Button",
+  "TableViewport",
+  "TableHeader",
+  "TableBody",
+  "TableRow",
+  "TableCell",
+]) {
+  expect(zonesUi.includes(primitive), `Zones UI must compose shared ${primitive} primitives`);
+}
+expect(!zoneForm.includes("function WarehouseSelect"), "Zone form must not ship a route-local warehouse select implementation");
+expect(!/<(?:input|select|textarea|table|thead|tbody|tr|th|td|button)\b/.test(zonesUi), "Zones UI must not reimplement shared form, button, or table primitives");
+expect(zonesTable.includes('<Table variant="admin"'), "Zones directory must use the shared admin table variant");
+expect(zonesTable.includes("<TableViewport>"), "Zones directory must use the shared responsive table viewport");
+expect(zonesTable.includes("onDoubleClick={canManage ?"), "Zones directory must preserve permission-gated double-click editing");
+expect(zonesTable.includes('supabase.rpc("delete_zone_if_empty"'), "Zones must preserve stock-safe delete RPC behavior");
+expect(zonesTable.includes('zonesQuery = zonesQuery.eq("warehouse_id", warehouseId)'), "Zones must preserve warehouse filtering");
+expect(zoneForm.includes('htmlFor="zone-warehouse"') && zoneForm.includes('id="zone-warehouse"'), "Zone warehouse label must remain associated with its select");
+expect(zoneForm.includes('htmlFor="zone-code"') && zoneForm.includes('id="zone-code"'), "Zone code label must remain associated with its input");
+
+const locationsTable = read("src/components/locations/LocationsTable.tsx");
+const locationForm = read("src/components/locations/LocationForm.tsx");
+const locationsUi = `${locationsTable}\n${locationForm}`;
+for (const primitive of [
+  "ComponentCard",
+  "Input",
+  "Label",
+  "Select",
+  "Alert",
+  "Badge",
+  "Button",
+  "TableViewport",
+  "TableHeader",
+  "TableBody",
+  "TableRow",
+  "TableCell",
+]) {
+  expect(locationsUi.includes(primitive), `Locations UI must compose shared ${primitive} primitives`);
+}
+expect(!/<(?:input|select|textarea|table|thead|tbody|tr|th|td|button)\b/.test(locationsUi), "Locations UI must not reimplement shared form, button, or table primitives");
+expect(locationsTable.includes('<Table variant="admin"'), "Locations directory must use the shared admin table variant");
+expect(locationsTable.includes("<TableViewport>"), "Locations directory must use the shared responsive table viewport");
+expect(locationsTable.includes("onDoubleClick={canManage ?"), "Locations directory must preserve permission-gated double-click editing");
+expect(locationsTable.includes('supabase.rpc("delete_location_if_empty"'), "Locations must preserve stock-safe delete RPC behavior");
+expect(locationsTable.includes('locationsQuery = locationsQuery.eq(') && locationsTable.includes('"zone_id"') && locationsTable.includes('"warehouse_id"'), "Locations must preserve zone and warehouse filtering");
+expect(locationForm.includes("This location contains stock. Transfer all stock out before moving the location to another warehouse."), "Location form must preserve the stock-safe warehouse move guard");
+expect(locationForm.includes('htmlFor="location-warehouse"') && locationForm.includes('id="location-warehouse"'), "Location warehouse label must remain associated with its select");
+expect(locationForm.includes('htmlFor="location-zone"') && locationForm.includes('id="location-zone"'), "Location zone label must remain associated with its select");
+
+console.log("inventory + stock movements + stock operations + warehouse + zones + locations + QR UI contract: ok");
