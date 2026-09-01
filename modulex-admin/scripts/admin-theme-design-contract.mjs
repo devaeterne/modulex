@@ -28,10 +28,14 @@ for (const token of [
 }
 expect(theme.includes("dark:"), "Shared Admin theme tokens must define dark-mode behavior");
 expect(theme.includes("focus-visible:"), "Shared Admin theme tokens must own keyboard focus treatment");
+expect(
+  /ADMIN_BUTTON_VARIANTS\s*=\s*\{[\s\S]*?danger:[\s\S]*?ghost:/m.test(theme),
+  "Shared button tokens must expose danger and ghost semantic variants",
+);
 
 const button = read("src/components/ui/button/Button.tsx");
 expect(button.includes("ADMIN_BUTTON_VARIANTS"), "Button must consume shared semantic button tokens");
-expect(button.includes('"danger"') && button.includes('"ghost"'), "Button must expose danger and ghost semantic variants");
+expect(button.includes("AdminButtonVariant"), "Button variant typing must derive from shared semantic tokens");
 expect(button.includes("ADMIN_FOCUS_RING"), "Button must consume the shared focus ring");
 
 const badge = read("src/components/ui/badge/Badge.tsx");
@@ -53,7 +57,7 @@ expect(checkbox.includes("ADMIN_FOCUS_RING"), "Checkbox must expose the shared k
 expect(!checkbox.includes('stroke="#E4E7EC"'), "Checkbox must not hardcode a theme color in SVG state");
 
 const switchSource = read("src/components/form/switch/Switch.tsx");
-expect(switchSource.includes('<button'), "Switch must use a native keyboard-operable button");
+expect(switchSource.includes("<button"), "Switch must use a native keyboard-operable button");
 expect(switchSource.includes('role="switch"'), "Switch must expose role=switch");
 expect(switchSource.includes("aria-checked"), "Switch must expose aria-checked state");
 expect(switchSource.includes("ADMIN_FOCUS_RING"), "Switch must expose the shared keyboard focus treatment");
