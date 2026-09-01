@@ -33,12 +33,13 @@ const sidebarRoutes = [...sidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) =>
 const uniqueSidebarRoutes = [...new Set(sidebarRoutes)];
 
 expect(sidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
-expect(uniqueSidebarRoutes.length === 71, `UI-2D expects 71 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
+expect(uniqueSidebarRoutes.length === 72, `UI-2D expects 72 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
 for (const route of uniqueSidebarRoutes) {
   expect(pageRoutes.has(route), `Sidebar route is missing a page.tsx: ${route}`);
 }
 
 for (const route of [
+  "/products/vendor-imports",
   "/products/types",
   "/products/uom",
   "/pricing/material-bands",
