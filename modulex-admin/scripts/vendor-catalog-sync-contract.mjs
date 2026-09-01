@@ -1,0 +1,56 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const root = process.cwd();
+const read = (path) => readFileSync(resolve(root, path), "utf8");
+
+const domain = read("src/lib/vendor-catalog/domain.ts");
+const adapters = read("src/lib/vendor-catalog/adapters.ts");
+const sync = read("src/lib/vendor-catalog/sync.ts");
+const route = read("src/app/api/vendor-catalog/sync/route.ts");
+const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
+const sql = read("sql/vendor-catalog-sync.sql");
+const docs = read("docs/VENDOR_CATALOG_SYNC.md");
+
+assert.match(domain, /NEW/);
+assert.match(domain, /UPDATED/);
+assert.match(domain, /UNCHANGED/);
+assert.match(domain, /stableProductHash/);
+assert.match(domain, /modulexPrice > 0/);
+
+assert.match(adapters, /class KarranAdapter/);
+assert.match(adapters, /products\.json/);
+assert.match(adapters, /class RuvatiAdapter/);
+assert.match(adapters, /wp-json\/wc\/store\/v1\/products/);
+assert.match(adapters, /product-sitemap\.xml/);
+assert.match(adapters, /\.dxf|\.dwg/);
+
+assert.match(sync, /vendor_catalog_runs/);
+assert.match(sync, /vendor_catalog_items/);
+assert.match(sync, /vendor_catalog_snapshots/);
+assert.match(sync, /vendor_catalog_assets/);
+assert.doesNotMatch(sync, /store.*publish/i);
+
+assert.match(route, /VENDOR_CATALOG_SYNC_SECRET/);
+assert.match(route, /timingSafeEqual/);
+assert.match(route, /runVendorCatalogSync/);
+
+assert.match(page, /Vendor Import Review/);
+assert.match(page, /vendor_catalog_items/);
+assert.match(page, /PENDING/);
+assert.match(page, /APPROVED/);
+assert.match(page, /IGNORED/);
+
+assert.match(sql, /enable row level security/i);
+assert.match(sql, /vendor_catalog_items_admin_select/i);
+assert.match(sql, /vendor_catalog_items_admin_update/i);
+assert.match(sql, /vendor_price_reference/);
+assert.match(sql, /canonical_product_id/);
+assert.match(sql, /review_status/);
+
+assert.match(docs, /never auto-publishes/i);
+assert.match(docs, /Modulex selling price/i);
+assert.match(docs, /add a vendor/i);
+
+console.log("vendor catalog sync contract: ok");
