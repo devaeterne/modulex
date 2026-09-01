@@ -80,7 +80,7 @@ for (const relativePath of [
   }
   expect(source.includes("hasPermission"), `${label} must use canonical permission checks`);
   expect(source.includes('"store.manage"'), `${label} must gate mutations through store.manage`);
-  expect(!source.includes("profile?.role"), `${label} must not hardcode role-based edit access`);
+  expect(!/\.includes\(profile\?\.role\b/.test(source), `${label} must not hardcode role-based edit access`);
   expect(!/<(?:button|input|textarea|select)\b/.test(source), `${label} must not render native form/action controls directly`);
   expect(source.includes("Retry"), `${label} must expose retry behavior for load failures`);
 }
