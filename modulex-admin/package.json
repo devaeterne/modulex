@@ -23,6 +23,7 @@
     "smoke:customer-detail": "node scripts/customer-detail-integrity-contract.mjs",
     "smoke:order-list": "node scripts/order-list-consistency-contract.mjs",
     "smoke:order-domain": "node scripts/order-domain-contract.mjs",
+    "smoke:order-product-pricing-v2": "node scripts/order-product-pricing-v2-contract.mjs",
     "smoke:order-lifecycle": "node scripts/order-lifecycle-editability-contract.mjs",
     "smoke:a1-core-operations": "node scripts/a1-core-operations-contract.mjs",
     "smoke:a2-warehouse-integrity": "node scripts/a2-warehouse-location-integrity-contract.mjs",
