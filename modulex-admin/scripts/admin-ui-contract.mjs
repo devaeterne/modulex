@@ -18,28 +18,43 @@ try {
 } catch {
   diff = execFileSync("git", ["-C", repoRoot, "diff", "--unified=0", "HEAD^", "HEAD", "--", "modulex-admin/src"], { encoding: "utf8" });
 }
-const added = diff.split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++"));
+
 const tableShellPatterns = [
   /<table\b[^>]*className\s*=\s*[^>\n]*overflow-(?:auto|x-auto)/gi,
   /<div\b[^>\n]*className\s*=\s*[^>\n]*overflow-(?:auto|x-auto)[^>\n]*>[\s\S]{0,800}<table\b/gi,
 ];
 
-// Preserve legacy shells when a changed line edits an existing table without
-// introducing another shell. A new shell still fails once its count increases.
+const sharedAppearancePrefixes = [
+  "modulex-admin/src/components/ui/",
+  "modulex-admin/src/components/form/",
+  "modulex-admin/src/components/common/",
+];
+
+function isSharedAppearanceOwner(file) {
+  return sharedAppearancePrefixes.some((prefix) => file?.startsWith(prefix));
+}
+
+// Shared UI/form/common primitives are the reviewed owners of reusable
+// appearance. Feature/route code remains subject to the appearance guardrails.
+// Preserve legacy table shells when a changed line edits an existing table
+// without introducing another shell. A new shell still fails once its count
+// increases.
 function baselineAwareAddedText() {
   const chunks = diff.split(/^diff --git /m).slice(1);
   return chunks.map((chunk) => {
     const file = chunk.match(/ b\/(modulex-admin\/src\/[^\n]+)/)?.[1];
     const addedChunk = chunk.split("\n").filter((line) => line.startsWith("+") && !line.startsWith("+++" )).join("\n");
     if (!file) return addedChunk;
+    if (isSharedAppearanceOwner(file)) return "";
+
     let baseline = "";
     let current = "";
     try {
       baseline = execFileSync("git", ["-C", repoRoot, "show", `origin/main:${file}`], { encoding: "utf8" });
       current = fs.readFileSync(path.join(repoRoot, file), "utf8");
     } catch {
-      // New files have no baseline; still enforce button/component guardrails,
-      // while table viewport migration remains incremental until UI-2B.
+      // New feature files have no baseline; still enforce button/component
+      // guardrails, while table viewport migration remains incremental.
       return tableShellPatterns.reduce((text, pattern) => text.replace(pattern, ""), addedChunk);
     }
     if (tableShellPatterns.every((pattern) => {

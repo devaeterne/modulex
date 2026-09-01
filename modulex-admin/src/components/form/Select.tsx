@@ -1,4 +1,10 @@
 import React, { useState } from "react";
+import {
+  ADMIN_CONTROL_DISABLED,
+  ADMIN_FIELD_BASE,
+  ADMIN_FIELD_STATES,
+  ADMIN_FOCUS_RING,
+} from "@/components/ui/theme/adminTheme";
 
 interface Option {
   value: string;
@@ -7,55 +13,68 @@ interface Option {
 
 interface SelectProps {
   id?: string;
+  name?: string;
   options: Option[];
   placeholder?: string;
   allowEmpty?: boolean;
   onChange: (value: string) => void;
+  onBlur?: (event: React.FocusEvent<HTMLSelectElement>) => void;
   className?: string;
   defaultValue?: string;
   value?: string;
   disabled?: boolean;
   required?: boolean;
+  ariaLabel?: string;
+  ariaDescribedBy?: string;
 }
 
 const Select: React.FC<SelectProps> = ({
   id,
+  name,
   options,
   placeholder = "Select an option",
   allowEmpty = false,
   onChange,
+  onBlur,
   className = "",
   defaultValue = "",
   value,
   disabled = false,
   required = false,
+  ariaLabel,
+  ariaDescribedBy,
 }) => {
   const [selectedValue, setSelectedValue] = useState<string>(defaultValue);
   const effectiveValue = value ?? selectedValue;
 
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextValue = e.target.value;
+  const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextValue = event.target.value;
     setSelectedValue(nextValue);
     onChange(nextValue);
   };
 
+  const stateClass = disabled
+    ? ADMIN_FIELD_STATES.disabled
+    : ADMIN_FIELD_STATES.default;
+
   return (
     <select
       id={id}
-      className={`h-11 w-full appearance-none rounded-lg border border-gray-300 px-4 py-2.5 pr-11 text-sm shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800 ${
-        effectiveValue
-          ? "text-gray-800 dark:text-white/90"
-          : "text-gray-400 dark:text-gray-400"
-      } ${className}`}
+      name={name}
+      className={`${ADMIN_FIELD_BASE} ${stateClass} ${ADMIN_FOCUS_RING} ${ADMIN_CONTROL_DISABLED} pr-11 data-[placeholder=true]:text-gray-400 dark:data-[placeholder=true]:text-gray-400 ${className}`}
       value={effectiveValue}
       onChange={handleChange}
+      onBlur={onBlur}
       disabled={disabled}
       required={required}
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      data-placeholder={effectiveValue ? undefined : "true"}
     >
       <option
         value=""
         disabled={!allowEmpty}
-        className="text-gray-700 dark:bg-gray-900 dark:text-gray-400"
+        className="bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-300"
       >
         {placeholder}
       </option>
@@ -63,7 +82,7 @@ const Select: React.FC<SelectProps> = ({
         <option
           key={option.value}
           value={option.value}
-          className="text-gray-700 dark:bg-gray-900 dark:text-gray-400"
+          className="bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-300"
         >
           {option.label}
         </option>
