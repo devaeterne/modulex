@@ -1,5 +1,12 @@
 "use client";
 
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Input from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+
 import React, {
   useCallback,
   useState,
@@ -356,14 +363,6 @@ function formatText(
       (character) =>
         character.toUpperCase()
     );
-}
-
-function activeBadge(
-  active: boolean
-) {
-  return active
-    ? "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400"
-    : "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400";
 }
 
 export default function ScanPanel() {
@@ -1739,822 +1738,224 @@ export default function ScanPanel() {
 
   return (
     <div className="space-y-6">
-      {/* OPERATION SELECTOR */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            What do you want
-            to do?
-          </h3>
-
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Select an action,
-            then scan the
-            required product or
-            shelf QR.
-          </p>
+      <ComponentCard
+        title="What do you want to do?"
+        desc="Select an action, then scan the required product or shelf QR."
+      >
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {operationOptions.map((item) => {
+            const selected = operation === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => handleOperationChange(item.value)}
+                className={`rounded-xl border px-3 py-4 text-left transition ${selected ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10" : "border-gray-200 hover:border-brand-300 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.03]"}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-white/90">{item.label}</p>
+                  {selected ? <Badge color="primary" size="sm">Active</Badge> : null}
+                </div>
+                <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{item.description}</p>
+              </button>
+            );
+          })}
         </div>
+      </ComponentCard>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          {operationOptions.map(
-            (item) => {
-              const selected =
-                operation ===
-                item.value;
-
-              return (
-                <button
-                  key={
-                    item.value
-                  }
-                  type="button"
-                  onClick={() =>
-                    handleOperationChange(
-                      item.value
-                    )
-                  }
-                  className={`rounded-xl border px-3 py-4 text-left transition ${selected
-                    ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
-                    : "border-gray-200 hover:border-brand-300 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.03]"
-                    }`}
-                >
-                  <p
-                    className={`text-sm font-semibold ${selected
-                      ? "text-brand-700 dark:text-brand-400"
-                      : "text-gray-800 dark:text-white/90"
-                      }`}
-                  >
-                    {
-                      item.label
-                    }
-                  </p>
-
-                  <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">
-                    {
-                      item.description
-                    }
-                  </p>
-                </button>
-              );
-            }
-          )}
-        </div>
-      </div>
-
-      {/* CURRENT ACTION */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
-            Current Action
-          </p>
-
-          <h3 className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-            {
-              selectedOperation?.label
-            }
-          </h3>
-
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {
-              selectedOperation?.description
-            }
-          </p>
-        </div>
-
-        {!showCamera ? (
-          <button
+      <ComponentCard
+        title={selectedOperation?.label ?? "Scan"}
+        desc={selectedOperation?.description ?? "Scan a label to continue."}
+        headerAction={
+          <Button
             type="button"
-            onClick={() =>
-              setShowCamera(
-                true
-              )
-            }
-            className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-brand-500 px-5 text-sm font-medium text-white hover:bg-brand-600"
+            variant={showCamera ? "outline" : "primary"}
+            onClick={() => setShowCamera((current) => !current)}
           >
-            Scan with Camera
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() =>
-              setShowCamera(
-                false
-              )
-            }
-            className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-gray-200 px-5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-          >
-            Hide Camera
-          </button>
-        )}
-      </div>
+            {showCamera ? "Hide Camera" : "Scan with Camera"}
+          </Button>
+        }
+      >
+        <div>
+          <Label htmlFor="scan-manual-input">Manual Input / Hardware Scanner</Label>
+          <form onSubmit={handleManualSubmit} className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex-1">
+              <Input
+                id="scan-manual-input"
+                value={manualValue}
+                onChange={(event) => setManualValue(event.target.value)}
+                autoComplete="off"
+                placeholder="Scan or enter QR, SKU, or barcode..."
+                className="font-mono"
+              />
+            </div>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Checking..." : "Submit"}
+            </Button>
+          </form>
+        </div>
+      </ComponentCard>
 
-      {/* CAMERA — ONLY WHILE NEEDED */}
-      {showCamera && (
-        <CameraScanner
-          onScanSuccess={
-            handleCameraScan
-          }
+      {showCamera ? <CameraScanner onScanSuccess={handleCameraScan} /> : null}
+
+      {errorMessage ? <Alert variant="error" title="Scan could not be completed" message={errorMessage} /> : null}
+
+      {operation !== "check" ? (
+        <GuidedStockOperation
+          key={operation}
+          operationType={operation}
+          scannedValue={workflowScan.value}
+          scanNonce={workflowScan.nonce}
+          onWorkflowReadyChange={handleWorkflowReady}
         />
-      )}
+      ) : null}
 
-      {/* MANUAL / HARDWARE INPUT */}
-      <details className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <summary className="cursor-pointer px-5 py-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-          Manual Input /
-          Hardware Scanner
-        </summary>
-
-        <form
-          onSubmit={
-            handleManualSubmit
-          }
-          className="flex flex-col gap-3 border-t border-gray-200 p-5 dark:border-gray-800 sm:flex-row"
-        >
-          <input
-            value={manualValue}
-            onChange={(
-              event
-            ) =>
-              setManualValue(
-                event.target.value
-              )
-            }
-            autoComplete="off"
-            placeholder="Scan or enter QR, SKU, or barcode..."
-            className="h-11 flex-1 rounded-lg border border-gray-200 bg-transparent px-4 font-mono text-sm text-gray-800 placeholder:font-sans placeholder:text-gray-400 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          />
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="inline-flex h-11 items-center justify-center rounded-lg bg-brand-500 px-5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
-          >
-            {isLoading
-              ? "Checking..."
-              : "Submit"}
-          </button>
-        </form>
-      </details>
-
-      {/* GENERAL ERROR */}
-      {errorMessage && (
-        <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
-          {errorMessage}
-        </div>
-      )}
-
-      {/* STOCK WORKFLOW */}
-      {operation !==
-        "check" && (
-          <GuidedStockOperation
-            key={operation}
-            operationType={
-              operation
-            }
-            scannedValue={
-              workflowScan.value
-            }
-            scanNonce={
-              workflowScan.nonce
-            }
-            onWorkflowReadyChange={
-              handleWorkflowReady
-            }
-          />
-        )}
-
-      {/* CHECK STOCK EMPTY STATE */}
-      {operation ===
-        "check" &&
-        !checkResult &&
-        !errorMessage &&
-        !isLoading && (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-              Scan anything
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-gray-500 dark:text-gray-400">
-              Scan a product to
-              see where it is
-              stored, or scan a
-              shelf to see which
-              products are
-              currently there.
-            </p>
-
-            <div className="mx-auto mt-5 grid max-w-xl grid-cols-2 gap-3 text-left md:grid-cols-4">
-              {[
-                "Warehouse",
-                "Zone",
-                "Location",
-                "Product",
-              ].map(
-                (item) => (
-                  <div
-                    key={item}
-                    className="rounded-xl bg-gray-50 p-3 text-center text-xs font-medium text-gray-600 dark:bg-white/[0.03] dark:text-gray-400"
-                  >
-                    {item}
-                  </div>
-                )
-              )}
-            </div>
+      {operation === "check" && !checkResult && !errorMessage && !isLoading ? (
+        <ComponentCard title="Scan anything" desc="Scan a product to see where it is stored, or scan a shelf to see which products are currently there.">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {["Warehouse", "Zone", "Location", "Product"].map((item) => (
+              <div key={item} className="rounded-xl bg-gray-50 p-3 text-center text-xs font-medium text-gray-600 dark:bg-white/[0.03] dark:text-gray-400">
+                {item}
+              </div>
+            ))}
           </div>
-        )}
+        </ComponentCard>
+      ) : null}
 
-      {/* LOADING */}
-      {operation ===
-        "check" &&
-        isLoading && (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+      {operation === "check" && isLoading ? (
+        <ComponentCard title="Checking scan">
+          <div className="py-6 text-center" role="status">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent" />
-
-            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              Checking...
-            </p>
+            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">Checking...</p>
           </div>
-        )}
+        </ComponentCard>
+      ) : null}
 
-      {/* WAREHOUSE RESULT */}
-      {checkResult?.type ===
-        "warehouse" && (
-          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-              <div>
-                <p className="text-xs font-medium uppercase text-gray-500">
-                  Warehouse
-                </p>
-
-                <h3 className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-                  {
-                    checkResult
-                      .data.code
-                  }{" "}
-                  —{" "}
-                  {
-                    checkResult
-                      .data.name
-                  }
-                </h3>
-
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {formatText(
-                    checkResult
-                      .data
-                      .warehouse_type
-                  )}
-                </p>
+      {checkResult?.type === "warehouse" ? (
+        <ComponentCard
+          title={`${checkResult.data.code} — ${checkResult.data.name}`}
+          desc={formatText(checkResult.data.warehouse_type)}
+          headerAction={<Badge color={checkResult.data.is_active ? "success" : "light"} size="sm">{checkResult.data.is_active ? "Active" : "Inactive"}</Badge>}
+        >
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            {[
+              ["Zones", checkResult.data.zone_count],
+              ["Locations", checkResult.data.location_count],
+              ["On Hand", checkResult.data.total_quantity],
+              ["Reserved", checkResult.data.reserved_quantity],
+              ["Available", checkResult.data.available_quantity],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.03]">
+                <p className="text-xs text-gray-500">{label}</p>
+                <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-white">{formatNumber(value)}</p>
               </div>
+            ))}
+          </div>
+          {checkResult.data.description ? <p className="text-sm text-gray-500 dark:text-gray-400">{checkResult.data.description}</p> : null}
+          <Button type="button" variant="outline" onClick={() => setShowCamera(true)}>Scan Again</Button>
+        </ComponentCard>
+      ) : null}
 
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${activeBadge(
-                  checkResult
-                    .data
-                    .is_active
-                )}`}
-              >
-                {checkResult
-                  .data
-                  .is_active
-                  ? "Active"
-                  : "Inactive"}
-              </span>
-            </div>
+      {checkResult?.type === "zone" ? (
+        <ComponentCard
+          title={`${checkResult.data.warehouse_code} / ${checkResult.data.code} — ${checkResult.data.name}`}
+          desc={checkResult.data.warehouse_name}
+          headerAction={<Badge color={checkResult.data.is_active ? "success" : "light"} size="sm">{checkResult.data.is_active ? "Active" : "Inactive"}</Badge>}
+        >
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              ["Locations", checkResult.data.location_count],
+              ["On Hand", checkResult.data.total_quantity],
+              ["Reserved", checkResult.data.reserved_quantity],
+              ["Available", checkResult.data.available_quantity],
+            ].map(([label, value]) => (
+              <div key={String(label)} className="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.03]">
+                <p className="text-xs text-gray-500">{label}</p>
+                <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-white">{formatNumber(value)}</p>
+              </div>
+            ))}
+          </div>
+          {checkResult.data.description ? <p className="text-sm text-gray-500 dark:text-gray-400">{checkResult.data.description}</p> : null}
+          <Button type="button" variant="outline" onClick={() => setShowCamera(true)}>Scan Again</Button>
+        </ComponentCard>
+      ) : null}
 
-            <div className="grid grid-cols-2 gap-px bg-gray-200 dark:bg-gray-800 md:grid-cols-5">
-              {[
-                {
-                  label: "Zones",
-                  value:
-                    checkResult
-                      .data
-                      .zone_count,
-                },
-                {
-                  label:
-                    "Locations",
-                  value:
-                    checkResult
-                      .data
-                      .location_count,
-                },
-                {
-                  label:
-                    "On Hand",
-                  value:
-                    checkResult
-                      .data
-                      .total_quantity,
-                },
-                {
-                  label:
-                    "Reserved",
-                  value:
-                    checkResult
-                      .data
-                      .reserved_quantity,
-                },
-                {
-                  label:
-                    "Available",
-                  value:
-                    checkResult
-                      .data
-                      .available_quantity,
-                },
-              ].map(
-                (item) => (
-                  <div
-                    key={
-                      item.label
-                    }
-                    className="bg-white p-4 dark:bg-gray-900"
-                  >
-                    <p className="text-xs text-gray-500">
-                      {
-                        item.label
-                      }
-                    </p>
-
-                    <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-white">
-                      {formatNumber(
-                        item.value
-                      )}
-                    </p>
+      {checkResult?.type === "location" ? (
+        <ComponentCard
+          title={`${checkResult.data.warehouse_code} / ${checkResult.data.zone_code ? `${checkResult.data.zone_code} / ` : ""}${checkResult.data.code} — ${checkResult.data.name}`}
+          desc={`${checkResult.data.warehouse_name}${checkResult.data.zone_name ? ` · ${checkResult.data.zone_name}` : ""} · ${formatText(checkResult.data.location_type)}`}
+          headerAction={<Badge color={checkResult.data.is_active ? "success" : "light"} size="sm">{checkResult.data.is_active ? "Active" : "Inactive"}</Badge>}
+        >
+          {locationInventory.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No stock is currently recorded on this shelf.</p>
+          ) : (
+            <div className="space-y-2">
+              {locationInventory.map((item) => (
+                <div key={item.inventory_id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-white/90">{item.sku} — {item.product_name}</p>
+                      {item.barcode ? <p className="mt-1 font-mono text-xs text-gray-500">{item.barcode}</p> : null}
+                    </div>
+                    <Badge color={Number(item.available_quantity) > 0 ? "success" : "light"} size="sm">{formatText(item.stock_status)}</Badge>
                   </div>
-                )
-              )}
-            </div>
-
-            <div className="p-5">
-              <button
-                type="button"
-                onClick={() =>
-                  setShowCamera(
-                    true
-                  )
-                }
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300"
-              >
-                Scan Again
-              </button>
-            </div>
-          </div>
-        )}
-
-      {/* ZONE RESULT */}
-      {checkResult?.type ===
-        "zone" && (
-          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-              <div>
-                <p className="text-xs font-medium uppercase text-gray-500">
-                  Zone
-                </p>
-
-                <h3 className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-                  {
-                    checkResult
-                      .data
-                      .warehouse_code
-                  }{" "}
-                  /{" "}
-                  {
-                    checkResult
-                      .data.code
-                  }{" "}
-                  —{" "}
-                  {
-                    checkResult
-                      .data.name
-                  }
-                </h3>
-
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {
-                    checkResult
-                      .data
-                      .warehouse_name
-                  }
-                </p>
-              </div>
-
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs font-medium ${activeBadge(
-                  checkResult
-                    .data
-                    .is_active
-                )}`}
-              >
-                {checkResult
-                  .data
-                  .is_active
-                  ? "Active"
-                  : "Inactive"}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-px bg-gray-200 dark:bg-gray-800 md:grid-cols-4">
-              {[
-                {
-                  label:
-                    "Locations",
-                  value:
-                    checkResult
-                      .data
-                      .location_count,
-                },
-                {
-                  label:
-                    "On Hand",
-                  value:
-                    checkResult
-                      .data
-                      .total_quantity,
-                },
-                {
-                  label:
-                    "Reserved",
-                  value:
-                    checkResult
-                      .data
-                      .reserved_quantity,
-                },
-                {
-                  label:
-                    "Available",
-                  value:
-                    checkResult
-                      .data
-                      .available_quantity,
-                },
-              ].map(
-                (item) => (
-                  <div
-                    key={
-                      item.label
-                    }
-                    className="bg-white p-4 dark:bg-gray-900"
-                  >
-                    <p className="text-xs text-gray-500">
-                      {
-                        item.label
-                      }
-                    </p>
-
-                    <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-white">
-                      {formatNumber(
-                        item.value
-                      )}
-                    </p>
+                  <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <span>On Hand: {formatNumber(item.quantity)}</span>
+                    <span>Reserved: {formatNumber(item.reserved_quantity)}</span>
+                    <span>Available: {formatNumber(item.available_quantity)}</span>
                   </div>
-                )
-              )}
+                </div>
+              ))}
             </div>
+          )}
+          <Button type="button" variant="outline" onClick={() => setShowCamera(true)}>Scan Again</Button>
+        </ComponentCard>
+      ) : null}
 
-            <div className="p-5">
-              <button
-                type="button"
-                onClick={() =>
-                  setShowCamera(
-                    true
-                  )
-                }
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300"
-              >
-                Scan Again
-              </button>
+      {checkResult?.type === "product" ? (
+        <ComponentCard
+          title={`${checkResult.data.sku} — ${checkResult.data.name}`}
+          desc={[checkResult.data.brand, checkResult.data.category, checkResult.data.unit].filter(Boolean).join(" · ")}
+          headerAction={<Badge color={checkResult.data.status === "active" ? "success" : "light"} size="sm">{formatText(checkResult.data.status)}</Badge>}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.03]">
+              <p className="text-xs text-gray-500">Barcode</p>
+              <p className="mt-1 break-all font-mono text-sm font-medium text-gray-800 dark:text-white/90">{checkResult.data.barcode ?? "—"}</p>
+            </div>
+            <div className="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.03]">
+              <p className="text-xs text-gray-500">QR Value</p>
+              <p className="mt-1 break-all font-mono text-sm font-medium text-gray-800 dark:text-white/90">{checkResult.data.qr_value ?? "—"}</p>
             </div>
           </div>
-        )}
-
-      {/* LOCATION RESULT */}
-      {checkResult?.type ===
-        "location" && (
-          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase text-gray-500">
-                  Shelf Location
-                </p>
-
-                <h3 className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-                  {
-                    checkResult
-                      .data
-                      .warehouse_code
-                  }{" "}
-                  /{" "}
-                  {checkResult
-                    .data.zone_code
-                    ? `${checkResult.data.zone_code} / `
-                    : ""}
-                  {
-                    checkResult
-                      .data.code
-                  }
-                </h3>
-
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {
-                    checkResult
-                      .data.name
-                  }{" "}
-                  ·{" "}
-                  {formatText(
-                    checkResult
-                      .data
-                      .location_type
-                  )}
-                </p>
-              </div>
-
-              <span
-                className={`w-fit rounded-full px-2.5 py-1 text-xs font-medium ${activeBadge(
-                  checkResult
-                    .data
-                    .is_active
-                )}`}
-              >
-                {checkResult
-                  .data
-                  .is_active
-                  ? "Active"
-                  : "Inactive"}
-              </span>
+          {productStock.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">No shelf stock was found for this product.</p>
+          ) : (
+            <div className="space-y-2">
+              {productStock.map((item) => (
+                <div key={item.inventory_id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                        {item.warehouse_code} / {item.zone_code ? `${item.zone_code} / ` : ""}{item.location_code}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{item.warehouse_name} · {item.location_name}</p>
+                    </div>
+                    <Badge color={Number(item.available_quantity) > 0 ? "success" : "light"} size="sm">{formatText(item.stock_status)}</Badge>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
+                    <span>On Hand: {formatNumber(item.quantity)}</span>
+                    <span>Reserved: {formatNumber(item.reserved_quantity)}</span>
+                    <span>Available: {formatNumber(item.available_quantity)}</span>
+                  </div>
+                </div>
+              ))}
             </div>
-
-            <div className="p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                    Products on this
-                    shelf
-                  </h4>
-
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {
-                      locationInventory.length
-                    }{" "}
-                    product position
-                    {locationInventory.length ===
-                      1
-                      ? ""
-                      : "s"}
-                  </p>
-                </div>
-              </div>
-
-              {locationInventory.length ===
-                0 ? (
-                <div className="rounded-xl bg-gray-50 p-5 text-sm text-gray-500 dark:bg-white/[0.03] dark:text-gray-400">
-                  This shelf is
-                  currently empty.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-                    <thead>
-                      <tr>
-                        <th className="py-2 text-left text-xs font-medium uppercase text-gray-500">
-                          Product
-                        </th>
-
-                        <th className="py-2 text-right text-xs font-medium uppercase text-gray-500">
-                          On Hand
-                        </th>
-
-                        <th className="py-2 text-right text-xs font-medium uppercase text-gray-500">
-                          Reserved
-                        </th>
-
-                        <th className="py-2 text-right text-xs font-medium uppercase text-gray-500">
-                          Available
-                        </th>
-                      </tr>
-                    </thead>
-
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                      {locationInventory.map(
-                        (item) => (
-                          <tr
-                            key={
-                              item.inventory_id
-                            }
-                          >
-                            <td className="py-3 pr-4">
-                              <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                                {
-                                  item.sku
-                                }
-                              </p>
-
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {
-                                  item.product_name
-                                }
-                              </p>
-                            </td>
-
-                            <td className="py-3 text-right text-sm">
-                              {formatNumber(
-                                item.quantity
-                              )}
-                            </td>
-
-                            <td className="py-3 text-right text-sm">
-                              {formatNumber(
-                                item.reserved_quantity
-                              )}
-                            </td>
-
-                            <td className="py-3 text-right text-sm font-semibold text-gray-800 dark:text-white">
-                              {formatNumber(
-                                item.available_quantity
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setShowCamera(
-                    true
-                  )
-                }
-                className="mt-5 inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300"
-              >
-                Scan Again
-              </button>
-            </div>
-          </div>
-        )}
-
-      {/* PRODUCT RESULT */}
-      {checkResult?.type ===
-        "product" && (
-          <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-              <p className="text-xs font-medium uppercase text-gray-500">
-                Product
-              </p>
-
-              <h3 className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">
-                {
-                  checkResult
-                    .data.sku
-                }{" "}
-                —{" "}
-                {
-                  checkResult
-                    .data.name
-                }
-              </h3>
-
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-                {checkResult
-                  .data.brand && (
-                    <span>
-                      {
-                        checkResult
-                          .data.brand
-                      }
-                    </span>
-                  )}
-
-                {checkResult
-                  .data.category && (
-                    <span>
-                      {
-                        checkResult
-                          .data
-                          .category
-                      }
-                    </span>
-                  )}
-
-                {checkResult
-                  .data
-                  .barcode && (
-                    <span className="font-mono">
-                      {
-                        checkResult
-                          .data
-                          .barcode
-                      }
-                    </span>
-                  )}
-              </div>
-            </div>
-
-            <div className="p-5">
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                  Where is this
-                  product?
-                </h4>
-
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Current stock by
-                  shelf location.
-                </p>
-              </div>
-
-              {productStock.length ===
-                0 ? (
-                <div className="rounded-xl bg-gray-50 p-5 text-sm text-gray-500 dark:bg-white/[0.03] dark:text-gray-400">
-                  No stock
-                  locations found.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {productStock.map(
-                    (stock) => (
-                      <div
-                        key={`${stock.inventory_id}-${stock.location_id}`}
-                        className="rounded-xl border border-gray-200 p-4 dark:border-gray-800"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                              {
-                                stock.warehouse_code
-                              }{" "}
-                              /{" "}
-                              {stock.zone_code
-                                ? `${stock.zone_code} / `
-                                : ""}
-                              {
-                                stock.location_code
-                              }
-                            </p>
-
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                              {
-                                stock.warehouse_name
-                              }{" "}
-                              ·{" "}
-                              {
-                                stock.location_name
-                              }
-                            </p>
-                          </div>
-
-                          <div className="text-right">
-                            <p className="text-xs text-gray-500">
-                              Available
-                            </p>
-
-                            <p className="text-lg font-semibold text-gray-800 dark:text-white">
-                              {formatNumber(
-                                stock.available_quantity
-                              )}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex gap-4 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-gray-800">
-                          <span>
-                            On Hand:{" "}
-                            {formatNumber(
-                              stock.quantity
-                            )}
-                          </span>
-
-                          <span>
-                            Reserved:{" "}
-                            {formatNumber(
-                              stock.reserved_quantity
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  )}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setShowCamera(
-                    true
-                  )
-                }
-                className="mt-5 inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300"
-              >
-                Scan Again
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+          <Button type="button" variant="outline" onClick={() => setShowCamera(true)}>Scan Again</Button>
+        </ComponentCard>
+      ) : null}
     </div>
   );
 }

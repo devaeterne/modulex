@@ -1,5 +1,14 @@
 "use client";
 
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/lib/supabase/client";
@@ -616,153 +625,194 @@ export default function GuidedStockOperation({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">{meta.title}</h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{meta.description}</p>
+    <ComponentCard title={meta.title} desc={meta.description}>
+      <div className="flex flex-wrap gap-2" aria-label="Stock operation progress">
+        <Badge color={productReady ? "success" : "light"} size="sm">
+          Product: {productReady ? "Ready" : "Waiting"}
+        </Badge>
+        <Badge color={sourceReady ? "success" : "light"} size="sm">
+          Source: {!needsSource ? "N/A" : sourceReady ? "Ready" : "Waiting"}
+        </Badge>
+        <Badge color={targetReady ? "success" : "light"} size="sm">
+          Target: {!needsTarget ? "N/A" : targetReady ? "Ready" : "Waiting"}
+        </Badge>
       </div>
 
-      <div className="space-y-5 p-5">
-        <div className="grid grid-cols-3 gap-2" aria-label="Stock operation progress">
-          <div className={`rounded-xl border p-3 ${productReady ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10" : "border-gray-200 dark:border-gray-800"}`}>
-            <p className="text-[10px] font-medium uppercase text-gray-500">Product</p>
-            <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90">{productReady ? "Ready ✓" : "Waiting"}</p>
-          </div>
-          <div className={`rounded-xl border p-3 ${sourceReady ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10" : "border-gray-200 dark:border-gray-800"}`}>
-            <p className="text-[10px] font-medium uppercase text-gray-500">Source</p>
-            <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90">{!needsSource ? "—" : sourceReady ? "Ready ✓" : "Waiting"}</p>
-          </div>
-          <div className={`rounded-xl border p-3 ${targetReady ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10" : "border-gray-200 dark:border-gray-800"}`}>
-            <p className="text-[10px] font-medium uppercase text-gray-500">Target</p>
-            <p className="mt-1 text-sm font-semibold text-gray-800 dark:text-white/90">{!needsTarget ? "—" : targetReady ? "Ready ✓" : "Waiting"}</p>
-          </div>
-        </div>
+      {errorMessage ? <Alert variant="error" title="Operation blocked" message={errorMessage} /> : null}
+      {successMessage ? <Alert variant="success" title="Operation complete" message={successMessage} /> : null}
+      {infoMessage ? <Alert variant="info" title="Scan update" message={infoMessage} /> : null}
 
-        {errorMessage && <div role="alert" className="rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-600 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
-        {successMessage && <div role="status" aria-live="polite" className="rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">{successMessage}</div>}
-        {infoMessage && <div role="status" className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400">{infoMessage}</div>}
+      <div>
+        <Label htmlFor={`guided-product-${operationType}`}>Product</Label>
+        <Select
+          id={`guided-product-${operationType}`}
+          value={productId}
+          disabled={isLoadingOptions}
+          placeholder="Scan or select product"
+          options={products.map((product) => ({ value: product.id, label: `${product.sku} — ${product.name}` }))}
+          onChange={(value) => {
+            setProductId(value);
+            setSourceLocationId("");
+            setTargetLocationId("");
+            resetMessages();
+          }}
+        />
+      </div>
 
+      {needsSource && productId ? (
         <div>
-          <label htmlFor={`guided-product-${operationType}`} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Product</label>
-          <select
-            id={`guided-product-${operationType}`}
-            value={productId}
-            disabled={isLoadingOptions}
-            onChange={(event) => {
-              setProductId(event.target.value);
-              setSourceLocationId("");
-              setTargetLocationId("");
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <Label>Source Shelf</Label>
+            {filteredSourceLocations.length > 1 ? (
+              <Badge size="sm" color="light">{filteredSourceLocations.length} locations found</Badge>
+            ) : null}
+          </div>
+
+          {isLoadingProductLocations ? (
+            <Alert variant="info" title="Loading source shelves" message="Loading product locations..." />
+          ) : filteredSourceLocations.length === 0 ? (
+            <Alert variant="warning" title="No eligible source" message="No eligible source shelf found." />
+          ) : (
+            <div className="space-y-2">
+              {filteredSourceLocations.map((stock) => {
+                const location = locations.find((item) => item.location_id === stock.location_id);
+                const isSelected = sourceLocationId === stock.location_id;
+                return (
+                  <button
+                    key={stock.inventory_id}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      setSourceLocationId(stock.location_id);
+                      resetMessages();
+                    }}
+                    className={`w-full rounded-xl border p-4 text-left transition ${isSelected ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10" : "border-gray-200 hover:border-brand-300 dark:border-gray-800"}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                          {stock.warehouse_code} / {location?.zone_code ? `${location.zone_code} / ` : ""}{stock.location_code}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          {location ? `${location.warehouse_name} · ${formatWarehouseType(location.warehouse_type)}` : stock.warehouse_name}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{stock.location_name}</p>
+                      </div>
+                      <div className="text-right">
+                        {isSelected ? <Badge color="primary" size="sm">Selected</Badge> : null}
+                        <p className="mt-1 text-xs text-gray-500">Available</p>
+                        <p className="text-base font-semibold text-gray-800 dark:text-white">{formatNumber(stock.available_quantity)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex gap-4 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                      <span>On Hand: {formatNumber(stock.quantity)}</span>
+                      <span>Reserved: {formatNumber(stock.reserved_quantity)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {needsTarget ? (
+        <div>
+          <Label htmlFor={`guided-target-${operationType}`}>Target Shelf</Label>
+          <Select
+            id={`guided-target-${operationType}`}
+            value={targetLocationId}
+            disabled={isLoadingOptions || !productId}
+            placeholder="Scan or select target shelf"
+            options={locations.map((location) => ({
+              value: location.location_id,
+              label: `${location.warehouse_code} / ${location.zone_code ? `${location.zone_code} / ` : ""}${location.location_code} — ${location.location_name}`,
+            }))}
+            onChange={(value) => {
+              setTargetLocationId(value);
               resetMessages();
             }}
-            className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-          >
-            <option value="">Scan or select product</option>
-            {products.map((product) => <option key={product.id} value={product.id}>{product.sku} — {product.name}</option>)}
-          </select>
+          />
         </div>
+      ) : null}
 
-        {needsSource && productId && (
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-400">Source Shelf</label>
-              {filteredSourceLocations.length > 1 && <span className="text-xs text-gray-500 dark:text-gray-400">{filteredSourceLocations.length} locations found</span>}
+      {selectedProduct ? (
+        <div className="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.03]">
+          <p className="text-xs font-medium uppercase text-gray-500">Operation Summary</p>
+          <div className="mt-3 space-y-2 text-sm">
+            <div className="flex justify-between gap-4">
+              <span className="text-gray-500">Product</span>
+              <span className="text-right font-medium text-gray-800 dark:text-white/90">{selectedProduct.sku} — {selectedProduct.name}</span>
             </div>
-
-            {isLoadingProductLocations ? (
-              <div role="status" className="rounded-xl border border-gray-200 p-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">Loading product locations...</div>
-            ) : filteredSourceLocations.length === 0 ? (
-              <div className="rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">No eligible source shelf found.</div>
-            ) : (
-              <div className="space-y-2">
-                {filteredSourceLocations.map((stock) => {
-                  const location = locations.find((item) => item.location_id === stock.location_id);
-                  const isSelected = sourceLocationId === stock.location_id;
-                  return (
-                    <button
-                      key={stock.inventory_id}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => { setSourceLocationId(stock.location_id); resetMessages(); }}
-                      className={`w-full rounded-xl border p-4 text-left transition ${isSelected ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10" : "border-gray-200 hover:border-brand-300 dark:border-gray-800"}`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800 dark:text-white/90">{stock.warehouse_code} / {location?.zone_code ? `${location.zone_code} / ` : ""}{stock.location_code}</p>
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{location ? `${location.warehouse_name} · ${formatWarehouseType(location.warehouse_type)}` : stock.warehouse_name}</p>
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{stock.location_name}</p>
-                        </div>
-                        <div className="text-right">
-                          {isSelected && <p className="mb-1 text-xs font-semibold text-brand-600 dark:text-brand-400">Selected ✓</p>}
-                          <p className="text-xs text-gray-500">Available</p>
-                          <p className="text-base font-semibold text-gray-800 dark:text-white">{formatNumber(stock.available_quantity)}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex gap-4 border-t border-gray-100 pt-3 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                        <span>On Hand: {formatNumber(stock.quantity)}</span>
-                        <span>Reserved: {formatNumber(stock.reserved_quantity)}</span>
-                      </div>
-                    </button>
-                  );
-                })}
+            {needsSource ? (
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-500">From</span>
+                <span className="text-right font-medium text-gray-800 dark:text-white/90">
+                  {sourceLocation ? `${sourceLocation.warehouse_code} / ${sourceLocationMeta?.zone_code ? `${sourceLocationMeta.zone_code} / ` : ""}${sourceLocation.location_code}` : "Waiting"}
+                </span>
               </div>
-            )}
-          </div>
-        )}
-
-        {needsTarget && (
-          <div>
-            <label htmlFor={`guided-target-${operationType}`} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Target Shelf</label>
-            <select
-              id={`guided-target-${operationType}`}
-              value={targetLocationId}
-              disabled={isLoadingOptions || !productId}
-              onChange={(event) => { setTargetLocationId(event.target.value); resetMessages(); }}
-              className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90"
-            >
-              <option value="">Scan or select target shelf</option>
-              {locations.map((location) => (
-                <option key={location.location_id} value={location.location_id}>
-                  {location.warehouse_code} / {location.zone_code ? `${location.zone_code} / ` : ""}{location.location_code} — {location.location_name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {selectedProduct && (
-          <div className="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.03]">
-            <p className="text-xs font-medium uppercase text-gray-500">Operation Summary</p>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between gap-4"><span className="text-gray-500">Product</span><span className="text-right font-medium text-gray-800 dark:text-white/90">{selectedProduct.sku} — {selectedProduct.name}</span></div>
-              {needsSource && <div className="flex justify-between gap-4"><span className="text-gray-500">From</span><span className="text-right font-medium text-gray-800 dark:text-white/90">{sourceLocation ? `${sourceLocation.warehouse_code} / ${sourceLocationMeta?.zone_code ? `${sourceLocationMeta.zone_code} / ` : ""}${sourceLocation.location_code}` : "Waiting"}</span></div>}
-              {needsTarget && <div className="flex justify-between gap-4"><span className="text-gray-500">To</span><span className="text-right font-medium text-gray-800 dark:text-white/90">{targetLocation ? `${targetLocation.warehouse_code} / ${targetLocation.zone_code ? `${targetLocation.zone_code} / ` : ""}${targetLocation.location_code}` : "Waiting"}</span></div>}
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label htmlFor={`guided-quantity-${operationType}`} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Quantity</label>
-            <input id={`guided-quantity-${operationType}`} value={quantity} onChange={(event) => setQuantity(event.target.value)} type="number" min="0.01" step="0.01" className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90" />
-          </div>
-          <div>
-            <label htmlFor={`guided-reference-${operationType}`} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Reference No</label>
-            <input id={`guided-reference-${operationType}`} value={referenceNo} onChange={(event) => setReferenceNo(event.target.value)} type="text" placeholder="Optional" className="h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90" />
+            ) : null}
+            {needsTarget ? (
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-500">To</span>
+                <span className="text-right font-medium text-gray-800 dark:text-white/90">
+                  {targetLocation ? `${targetLocation.warehouse_code} / ${targetLocation.zone_code ? `${targetLocation.zone_code} / ` : ""}${targetLocation.location_code}` : "Waiting"}
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
+      ) : null}
 
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label htmlFor={`guided-notes-${operationType}`} className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Notes</label>
-          <textarea id={`guided-notes-${operationType}`} value={notes} onChange={(event) => setNotes(event.target.value)} rows={2} placeholder="Optional" className="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90" />
+          <Label htmlFor={`guided-quantity-${operationType}`}>Quantity</Label>
+          <Input
+            id={`guided-quantity-${operationType}`}
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            type="number"
+            min="0.01"
+            step="0.01"
+          />
         </div>
-
-        <div className="flex gap-3">
-          <button type="button" onClick={runOperation} disabled={isSubmitting || !workflowReady} className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">
-            {isSubmitting ? "Processing..." : meta.buttonLabel}
-          </button>
-          <button type="button" onClick={resetOperation} disabled={isSubmitting} className="inline-flex h-11 items-center justify-center rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.03]">Reset</button>
+        <div>
+          <Label htmlFor={`guided-reference-${operationType}`}>Reference No</Label>
+          <Input
+            id={`guided-reference-${operationType}`}
+            value={referenceNo}
+            onChange={(event) => setReferenceNo(event.target.value)}
+            placeholder="Optional"
+          />
         </div>
       </div>
-    </div>
+
+      <div>
+        <Label htmlFor={`guided-notes-${operationType}`}>Notes</Label>
+        <TextArea
+          id={`guided-notes-${operationType}`}
+          value={notes}
+          onChange={setNotes}
+          rows={2}
+          placeholder="Optional"
+        />
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button
+          type="button"
+          className="flex-1"
+          onClick={() => {
+            void runOperation();
+          }}
+          disabled={isSubmitting || !workflowReady}
+        >
+          {isSubmitting ? "Processing..." : meta.buttonLabel}
+        </Button>
+        <Button type="button" variant="outline" onClick={resetOperation} disabled={isSubmitting}>
+          Reset
+        </Button>
+      </div>
+    </ComponentCard>
   );
 }
