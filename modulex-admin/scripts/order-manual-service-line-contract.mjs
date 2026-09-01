@@ -33,6 +33,7 @@ assert(!/default_uom_id\s*=\s*'[0-9a-f]{8}-[0-9a-f-]{27,}'/i.test(migration), "S
 assert(/product_types[\s\S]*'SERVICE'[\s\S]*'manual_service'/i.test(migration), "Service Product Type must be seeded by stable SERVICE code");
 assert(/products[\s\S]*'SERVICE'[\s\S]*'Service'/i.test(migration), "canonical Service product must be seeded by stable SERVICE SKU/name");
 assert(!/insert\s+into\s+public\.product_prices/i.test(migration), "canonical Service product must not receive a Product Group price");
+assert(!/insert\s+into\s+public\.product_categories/i.test(migration), "Service migration must resolve the existing active Service category and fail closed instead of creating or reactivating categories");
 
 for (const token of [
   "private.enforce_customer_order_item_pricing_v2",
@@ -51,6 +52,7 @@ assert(/new\.price_source\s*:?=\s*'manual'/i.test(migration), "manual Service pr
 assert(/pricing_model_snapshot\s*=\s*'manual_service'|pricing_model_snapshot\s*<>\s*'manual_service'/i.test(migration), "inventory functions must identify manual_service from the saved pricing snapshot");
 assert(/customer_invoice_items[\s\S]*line_note/i.test(migration) && /customer_order_items[\s\S]*line_note/i.test(migration), "invoice creation must copy the historical Service line_note from order to invoice");
 assert(/item\s*->>\s*'line_note'/i.test(migration), "canonical order JSON parsing must preserve Service line_note");
+assert(/Manual unit price is only accepted for the canonical SERVICE manual_service product\./i.test(migration), "create/update RPCs must explicitly reject caller-supplied manual prices outside canonical SERVICE manual_service lines");
 
 assertExists(modalPath, "manual Service entry must use one shared modal component");
 assertExists(detailsPath, "manual Service detail must use one shared historical line-detail component");
