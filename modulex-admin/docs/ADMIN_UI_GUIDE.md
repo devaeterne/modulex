@@ -16,6 +16,34 @@ This is the Modulex Admin UI source of truth. Feature code composes shared primi
 - Badges, modals, tables, cards and common surfaces: `src/components/ui` and `src/components/common`.
 - If a state is missing, extend a reviewed shared variant/API first; do not create a route-local primitive.
 
+### Canonical component matrix
+
+| Need | Canonical owner |
+| --- | --- |
+| Route heading / breadcrumb | `PageBreadCrumb` / reviewed shared page header |
+| Cards and feature surfaces | `ComponentCard` |
+| Field labels | `Label` |
+| Text/number input | `Input` |
+| Select | `Select` |
+| Multiline input | `TextArea` |
+| Actions | `Button` semantic variants |
+| Error/success/info feedback | `Alert` |
+| Status | `Badge` |
+| CRUD dialog | `Modal` |
+| Data table | `TableViewport`, `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableCell`, `TableStateRow` |
+
+## Mandatory strict changed-file gate
+
+Every new or modified Admin feature UI file must pass `npm run smoke:admin-ui-strict`. The gate is diff-aware so unchanged legacy files do not fail merely because they predate the current standard.
+
+Audited feature roots are `src/app/(admin)/**/page.tsx` and `src/components/**/*.tsx`. The reviewed primitive-owner roots `src/components/ui/**`, `src/components/form/**`, and `src/components/common/**` are excluded. `src/layout/**` is outside the audited feature roots; it is not a feature-level exception.
+
+For audited files, the gate rejects native `button`, `input`, `select`, `textarea`, `label`, and table elements when a Modulex primitive exists. It also rejects route-local reusable appearance ownership such as `bg-*`, color-bearing `text-*`/`border-*`, `rounded*`, `shadow*`, visual `ring*`, and `dark:*` overrides. Layout and typography composition remains allowed, including flex/grid, gap/space, margin/padding, width constraints, alignment, overflow containment, responsive columns, text sizing/alignment, and font weight.
+
+Admin route pages must keep the shared breadcrumb/page-header convention. Feature files must not use strict-disable comments or local suppression flags. If the gate identifies a legitimate missing visual state, extend the reviewed shared primitive/token API and its contract instead of bypassing the checker.
+
+The checker has deterministic self-tests through `npm run smoke:admin-ui-strict:self-test`. Pull-request CI resolves the merge-base against the base branch; push CI uses the pushed commit range when available. `ADMIN_UI_STRICT_FILES` and `ADMIN_UI_STRICT_BASE_REF` are available for deterministic local/scoped runs.
+
 ## Semantic variants and states
 
 - Button intent is semantic: `primary`, `outline`, `danger`, or `ghost`. Routes do not recreate those states with local color classes.
