@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-01
-Main baseline: `3671c66929e79dae9f27b0f0029c0db45dd0519b`
+Main baseline: `1a7de5f932ab4707a1fc3d887c9d65bdb2bc1958`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
-Current Admin next action: **Pricing UI v2 / Product Type pricing routing is in review in PR #206. Preserve the closed A3.3 price-group/effective-date/audit/Dealer no-fallback contract; production migration, exact-SHA deploy, authenticated route smoke and advisor acceptance remain pending.**
+Current Admin next action: **VAL-4 — Inventory / Warehouses / Stock Operations validation hardening is active in PR #224. Orders Product Pricing V2 remains parallel in draft PR #217 and is intentionally untouched; VAL-3 is deferred until that Orders work is reconciled. Pricing UI v2 PR #206 is merged, its production migration is present, and the exact merge-SHA Admin deployment is READY; this session does not re-claim signed-in pricing acceptance that was not independently reproduced.**
 
 ## Admin UI standardization program
 
@@ -424,11 +424,11 @@ Pricing UI v2 / Product Type routing above is an additive follow-up to this clos
 
 ## Cross-cutting Admin UI hardening track (UI-2A → UI-2E)
 
-- [~] UI-2A responsive shell foundation is implemented in PR #184; merge/deploy acceptance remains pending.
-- [ ] UI-2B shared table viewport/shell standardization.
-- [ ] UI-2C shared component variants, semantic tokens, dark mode, and accessibility normalization.
-- [ ] UI-2D route-level consistency cleanup after shared primitives are ready.
-- [ ] UI-2E final Admin UI regression and production acceptance.
+- [x] UI-2A Responsive Shell foundation.
+- [x] UI-2B shared Data Table System standardization.
+- [x] UI-2C Theme / Design Tokens, dark mode, and accessibility normalization.
+- [x] UI-2D Full Route Regression.
+- [x] UI-2E Resolution Matrix production closeout through PR #223 / merge `ef48dc50029347829fd1d519c449ed38f8b87969`; supported matrix: 360, 390, 768, 1024, 1280, 1366, 1440, 1536, 1920, 2560 with the runtime mobile/desktop boundary at 1024px.
 
 A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality track and does not replace the functional roadmap.
 
@@ -447,7 +447,8 @@ A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality
 - [~] VAL-2 — Products & Pricing.
   - Targeted audit found decimal precision loss in Product/Pricing input hydration and bulk previews, incomplete numeric preflight for `numeric(12,2)` minimum stock, and a need to keep Cost & Margin read-only visibility separate from `pricing.manage` mutations. Shared decimal validation and the VAL-2 contract are implemented; production acceptance remains pending.
 - [ ] VAL-3 — Customers / Orders / Invoices.
-- [ ] VAL-4 — Inventory / Warehouses / Stock Operations.
+- [~] VAL-4 — Inventory + Warehouses + Stock Operations.
+  - PR #224 hardens warehouse and stock-operation field validation against the production DB/RPC contract without changing Orders/Customers, inventory mutation authority, or business data. Production acceptance remains pending until merge/deploy.
 - [ ] VAL-5 — Store CMS / Users / Settings / remaining Admin forms.
 - [ ] VAL-6 — Full validation regression & production acceptance.
 
@@ -748,13 +749,14 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Primary near-term Admin work is **Pricing UI v2 / Product Type routing production closeout in PR #206**. A3.3 remains CLOSED; this is an additive routing/UX hardening package. **VAL-2 — Products & Pricing** resumes as the next cross-cutting hardening package after #206 is production-accepted.
+Primary near-term independent Admin work is **VAL-4 — Inventory + Warehouses + Stock Operations validation hardening in draft PR #224**. **Orders Product Pricing V2 remains active in parallel draft PR #217 and must not be duplicated or modified from this workstream.**
 
-1. Merge PR #206 only after fresh head CI is green apart from the documented unrelated Store GC-8B baseline failure.
-2. Apply `20260901010000_pricing_product_type_routing.sql` once to production, verify exact merge-SHA Admin deployment, repeat authenticated Product Prices/Material Bands acceptance, and run Supabase Security + Performance Advisors.
-3. Mark Pricing UI v2 `[x]` only after that production closeout; keep Product Master UX v2 `[~]` until signed-in browser click-through is explicitly accepted.
-4. Resume VAL-2 without widening Store public data or Dealer pricing visibility.
+1. Complete PR #224 RED → GREEN validation, A2.1/A2.2/A2.3 regressions, typecheck, lint, and production build without production business-data mutation.
+2. Keep VAL-4 `[~]` until merge/deploy and signed-in production acceptance; do not mark production completion from branch CI alone.
+3. Keep VAL-3 deferred while #217 is active because Customers/Orders validation overlaps that branch.
+4. Pricing UI v2 PR #206 is already merged; production contains its routing migration and the exact merge-SHA Admin deployment is READY. Do not repeat or invent pricing behavior; independently close any remaining signed-in acceptance evidence when that workstream is revisited.
+5. Countertop remains the next large domain after Orders Product Pricing V2 is fully reconciled; production B1–R22 material bands are canonical, so do not write an 8-band replacement migration.
 
-**Cross-roadmap coordination:** Store remains on the existing approved canonical product/public projections. Pricing UI v2 and VAL-2 must not widen Store public data or Dealer pricing visibility while hardening Admin input/pricing compatibility.
+**Cross-roadmap coordination:** this VAL-4 package changes Admin-only validation behavior and does not change Store public projections, so no functional `STORE_ROADMAP.md` status mutation is required.
 
-**Parallel-work rule:** before any GC package touches Admin, re-read current `main` and this roadmap so A4, VAL, UI, or other concurrently merged Admin work is preserved rather than overwritten.
+**Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so #217 and any newer merges are preserved rather than overwritten.
