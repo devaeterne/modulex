@@ -214,6 +214,9 @@ export default function EditCustomerOrder() {
     if (Number(appliedCommission) < 0 || Number(appliedCommission) > 100) return setErrorMessage("Applied commission must be between 0 and 100%.");
 
     for (const item of items) {
+      const product = productMap.get(item.product_id);
+      if (product?.pricing_model === "countertop_material_band" && !item.id) return setErrorMessage("Countertop Material Band products must be configured in the Countertop workspace.");
+      if (product?.pricing_model === "none") return setErrorMessage("No Commercial Pricing products cannot be added to customer orders.");
       if (!item.product_id) return setErrorMessage("Select a product for every line.");
       if (Number(item.quantity) <= 0) return setErrorMessage("Quantity must be greater than zero.");
       if (Number(item.unit_price) < 0) return setErrorMessage("Unit price cannot be negative.");

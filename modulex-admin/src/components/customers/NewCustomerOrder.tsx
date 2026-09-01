@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import OrderProductPicker, { type OrderPickerProduct } from "@/components/customers/OrderProductPicker";
+import Button from "@/components/ui/button/Button";
 import {
   createCustomerOrder,
   loadCreateOrderContext,
@@ -197,6 +198,9 @@ export default function NewCustomerOrder() {
     if (validItems.length === 0) return setErrorMessage("Add at least one valid product line.");
 
     for (const item of validItems) {
+      const product = productMap.get(item.product_id);
+      if (product?.pricing_model === "countertop_material_band") return setErrorMessage("Countertop Material Band products must be configured in the Countertop workspace.");
+      if (product?.pricing_model === "none") return setErrorMessage("No Commercial Pricing products cannot be added to customer orders.");
       if (!priceMap.has(item.product_id)) {
         return setErrorMessage(`No current price exists for ${productMap.get(item.product_id)?.sku ?? "selected product"} in this price group.`);
       }
@@ -264,7 +268,7 @@ export default function NewCustomerOrder() {
     </div>
 
     <div className="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800"><div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Products</h2><p className="mt-1 text-sm text-gray-500">Search and add products from the picker. Prices resolve from the selected price group.</p></div><button type="button" onClick={() => setIsProductPickerOpen(true)} className="inline-flex h-9 items-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white shadow-theme-xs hover:bg-brand-600">Add Products</button></div>
+      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800"><div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Products</h2><p className="mt-1 text-sm text-gray-500">Price Group products are priced by the server. Stone uses the Countertop workflow.</p><Link className="mt-2 inline-block" href="/pricing/countertop"><Button size="sm" variant="outline">Open Countertop workspace</Button></Link></div><button type="button" onClick={() => setIsProductPickerOpen(true)} className="inline-flex h-9 items-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white shadow-theme-xs hover:bg-brand-600">Add Products</button></div>
       <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Product", "Qty", "Unit Price", "Discount %", "Line Total", ""].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">
         {items.length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No products added yet. Use <span className="font-medium text-gray-700 dark:text-gray-300">Add Products</span> to search and select items.</td></tr> : items.map((item, index) => {
           const product = productMap.get(item.product_id);

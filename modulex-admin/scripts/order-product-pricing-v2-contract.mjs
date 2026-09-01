@@ -25,7 +25,7 @@ assert(migration.includes("product_prices") && migration.includes("valid_to is n
 assert(!/v_unit_price\s*:=\s*coalesce\(\(v_item->>'unit_price'\)/.test(migration), "order pricing must not trust client unit_price");
 assert(migration.includes("Countertop Material Band products must be configured in the Countertop workspace"), "Stone ordinary pricing must fail closed with a human-readable error");
 assert(migration.includes("No Commercial Pricing products cannot be added to customer orders"), "pricing_model none must fail closed");
-assert(migration.includes("Configured countertop lines must be changed in the countertop configurator"), "configured countertop history must retain the canonical edit guard");
+assert(migration.includes("v_configured") && migration.includes("countertop_configurations") && migration.includes("return new"), "configured countertop history must bypass ordinary repricing and retain the canonical configurator boundary");
 assert(migration.includes("sku_snapshot") && migration.includes("product_name_snapshot"), "order item SKU/name snapshots must be preserved");
 assert(migration.includes("line_total") && migration.includes("subtotal") && migration.includes("grand_total"), "order totals must remain server-authoritative");
 
@@ -35,7 +35,7 @@ for (const field of ["product_type_name", "pricing_model", "uom_code", "uom_name
 for (const label of ["Price Group", "Countertop Material Band", "No Commercial Pricing"]) {
   assert(domain.includes(label), `friendly pricing label missing: ${label}`);
 }
-assert(!domain.includes("unit_price: numeric(item.unitPrice)"), "update payload must not send a caller-controlled unit price");
+assert(migration.includes("new.unit_price:=round(v_price,4)"), "DB trigger must overwrite caller-controlled Price Group unit prices");
 assert(picker.includes("pricingModelLabel") && picker.includes("uom_name"), "product picker must show pricing route and UOM");
 assert(createOrder.includes("countertop_material_band") && createOrder.includes("/pricing/countertop"), "create UI must guide Stone to the canonical Countertop workspace");
 assert(editOrder.includes("pricing_model") && detail.includes("pricingModelLabel"), "edit/detail UI must expose pricing route metadata");
