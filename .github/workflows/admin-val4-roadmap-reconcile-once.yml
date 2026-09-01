@@ -44,20 +44,17 @@ jobs:
           if marker not in text:
               raise SystemExit("Next Action marker missing")
           prefix = text.split(marker, 1)[0]
-          next_action = """# Next Action
-
-Primary near-term independent Admin work is **VAL-4 — Inventory + Warehouses + Stock Operations validation hardening in draft PR #224**. **Orders Product Pricing V2 remains active in parallel draft PR #217 and must not be duplicated or modified from this workstream.**
-
-1. Complete PR #224 RED → GREEN validation, A2.1/A2.2/A2.3 regressions, typecheck, lint, and production build without production business-data mutation.
-2. Keep VAL-4 `[~]` until merge/deploy and signed-in production acceptance; do not mark production completion from branch CI alone.
-3. Keep VAL-3 deferred while #217 is active because Customers/Orders validation overlaps that branch.
-4. Pricing UI v2 PR #206 is already merged; production contains its routing migration and the exact merge-SHA Admin deployment is READY. Do not repeat or invent pricing behavior; independently close any remaining signed-in acceptance evidence when that workstream is revisited.
-5. Countertop remains the next large domain after Orders Product Pricing V2 is fully reconciled; production B1–R22 material bands are canonical, so do not write an 8-band replacement migration.
-
-**Cross-roadmap coordination:** this VAL-4 package changes Admin-only validation behavior and does not change Store public projections, so no functional `STORE_ROADMAP.md` status mutation is required.
-
-**Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so #217 and any newer merges are preserved rather than overwritten.
-"""
+          next_action = (
+              "# Next Action\n\n"
+              "Primary near-term independent Admin work is **VAL-4 — Inventory + Warehouses + Stock Operations validation hardening in draft PR #224**. **Orders Product Pricing V2 remains active in parallel draft PR #217 and must not be duplicated or modified from this workstream.**\n\n"
+              "1. Complete PR #224 RED → GREEN validation, A2.1/A2.2/A2.3 regressions, typecheck, lint, and production build without production business-data mutation.\n"
+              "2. Keep VAL-4 `[~]` until merge/deploy and signed-in production acceptance; do not mark production completion from branch CI alone.\n"
+              "3. Keep VAL-3 deferred while #217 is active because Customers/Orders validation overlaps that branch.\n"
+              "4. Pricing UI v2 PR #206 is already merged; production contains its routing migration and the exact merge-SHA Admin deployment is READY. Do not repeat or invent pricing behavior; independently close any remaining signed-in acceptance evidence when that workstream is revisited.\n"
+              "5. Countertop remains the next large domain after Orders Product Pricing V2 is fully reconciled; production B1–R22 material bands are canonical, so do not write an 8-band replacement migration.\n\n"
+              "**Cross-roadmap coordination:** this VAL-4 package changes Admin-only validation behavior and does not change Store public projections, so no functional `STORE_ROADMAP.md` status mutation is required.\n\n"
+              "**Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so #217 and any newer merges are preserved rather than overwritten.\n"
+          )
           roadmap_path.write_text(prefix + next_action)
 
           package_path = Path("modulex-admin/package.json")
