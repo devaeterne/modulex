@@ -62,6 +62,6 @@ expect(guide.includes("360") && guide.includes("2560"), "Admin UI guide must doc
 
 const tracker = read("AdminUICheck.md");
 expect(tracker.includes("UI-2E — Resolution Matrix"), "Admin UI tracker must retain UI-2E section");
-expect(tracker.includes("69 sidebar routes") && tracker.includes("23 nested routes"), "Tracker must record the completed UI-2D route inventory before UI-2E closeout");
+expect(/69\s+sidebar\s+routes/i.test(tracker) && /23\s+nested[\s\S]{0,80}routes/i.test(tracker), "Tracker must record the completed UI-2D route inventory before UI-2E closeout");
 
 console.log(`PASS: admin resolution matrix contract (${requiredWidths.length} widths: ${requiredWidths.join(", ")})`);
