@@ -4,6 +4,10 @@ import path from "node:path";
 const root = path.resolve(process.cwd(), "..");
 const migrationPath = path.join(root, "modulex-store/supabase/migrations/20260901130000_order_product_pricing_routing.sql");
 const pickerPath = path.join(root, "modulex-admin/src/components/customers/OrderProductPicker.tsx");
+const editPath = path.join(root, "modulex-admin/src/components/customers/EditCustomerOrder.tsx");
+const semanticsPath = path.join(root, "modulex-admin/src/components/customers/OrderPricingSemanticsPanel.tsx");
+const detailPagePath = path.join(root, "modulex-admin/src/app/(admin)/customers/[id]/orders/[orderId]/page.tsx");
+const listPagePath = path.join(root, "modulex-admin/src/app/(admin)/customers/[id]/orders/page.tsx");
 
 function read(file) {
   if (!fs.existsSync(file)) throw new Error(`Missing required file: ${path.relative(root, file)}`);
@@ -16,6 +20,10 @@ function expect(text, pattern, reason) {
 
 const migration = read(migrationPath);
 const picker = read(pickerPath);
+const edit = read(editPath);
+const semantics = read(semanticsPath);
+const detailPage = read(detailPagePath);
+const listPage = read(listPagePath);
 
 expect(migration, /product_type_code_snapshot/i, "Order items must snapshot Product Type semantics.");
 expect(migration, /uom_code_snapshot/i, "Order items must snapshot UOM semantics.");
@@ -43,5 +51,24 @@ expect(picker, /canonical Countertop workspace/, "Stone selection must explain t
 expect(picker, /@\/components\/ui\/button\/Button/, "Order picker must use shared Button.");
 expect(picker, /@\/components\/form\/Select/, "Order picker must use shared Select.");
 expect(picker, /TableViewport/, "Order picker must use shared Table/TableViewport primitives.");
+
+expect(edit, /Server Price/, "Edit Order must label unit price as server-derived.");
+expect(edit, /Price Group · server authoritative/, "Edit Order must explain the authoritative pricing source.");
+expect(edit, /unitPrice:\s*String\(priceMap\.get\(item\.product_id\)/, "Revision payload must use the current Price Group preview instead of an editable client unit price.");
+expect(edit, /disableWithoutPrice/, "Edit picker must fail closed when the selected Price Group has no current product price.");
+expect(edit, /Prices are resolved from the selected Price Group and are read-only/, "Edit Order must explain read-only Price Group pricing.");
+expect(edit, /No current Price Group price exists/, "Edit Order must fail closed when a current Price Group price is unavailable.");
+expect(edit, /updateItem\(index, \{ unit_price: e\.target\.value \}\)/.test(edit) ? /$a/ : /.*/, "Edit Order must not expose an editable line unit-price handler.");
+
+expect(semantics, /product_type_name_snapshot/, "Detail/List semantics must read Product Type snapshots.");
+expect(semantics, /uom_name_snapshot/, "Detail/List semantics must read UOM snapshots.");
+expect(semantics, /pricing_model_snapshot/, "Detail/List semantics must read pricing-route snapshots.");
+expect(semantics, /Price Group/, "Detail/List semantics must use a friendly Price Group label.");
+expect(semantics, /Countertop Material Band/, "Detail/List semantics must use a friendly Countertop label.");
+expect(semantics, /No Commercial Pricing/, "Detail/List semantics must use a friendly none-pricing label.");
+expect(semantics, /@\/components\/ui\/badge\/Badge/, "Detail/List semantics must use shared Badge.");
+expect(semantics, /TableViewport/, "Detail/List semantics must use shared Table/TableViewport primitives.");
+expect(detailPage, /OrderPricingSemanticsPanel\s+orderId=/, "Order Detail must compose the pricing semantics snapshot panel.");
+expect(listPage, /OrderPricingSemanticsPanel\s+customerId=/, "Order List must compose the pricing semantics snapshot panel.");
 
 console.log("Order Product Type/UOM/pricing routing contract: PASS");
