@@ -2,6 +2,8 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
 import type {
+  CountertopLineSummary,
+  CountertopOrderContext,
   Customer,
   CustomerAddress,
   CustomerOrder,
@@ -11,7 +13,6 @@ import type {
   OrderFulfillmentType,
   PaymentMethod,
   PriceGroupLookup,
-  CountertopOrderContext,
 } from "@/lib/customers/types";
 
 export type OrderDomainProduct = {
@@ -60,6 +61,7 @@ export type CreateOrderContext = {
 export type EditOrderContext = CreateOrderContext & {
   order: CustomerOrder;
   items: CustomerOrderItem[];
+  countertopSummaries: CountertopLineSummary[];
   role: UserRole;
 };
 
@@ -72,6 +74,7 @@ export type OrderDetailContext = {
   canManage: boolean;
   canManageCountertop: boolean;
   countertopItems: CountertopOrderContext[];
+  countertopSummaries: CountertopLineSummary[];
 };
 
 type CreateOrderItemInput = {
@@ -208,6 +211,11 @@ type ProductQueryRow = Omit<OrderDomainProduct, "product_type_name" | "pricing_m
   units_of_measure: { code: string; name: string } | null;
 };
 
+type CountertopConfigurationRow = {
+  order_item_id: string;
+  pricing_snapshot: unknown;
+};
+
 function mapOrderProducts(rows: ProductQueryRow[]): OrderDomainProduct[] {
   return rows.map(({ product_types, units_of_measure, ...product }) => ({
     ...product,
@@ -216,6 +224,62 @@ function mapOrderProducts(rows: ProductQueryRow[]): OrderDomainProduct[] {
     uom_code: units_of_measure?.code ?? "UNKNOWN",
     uom_name: units_of_measure?.name ?? "Unknown UOM",
   }));
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function textValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function numberValue(value: unknown): number | null {
+  const parsed = typeof value === "number" || typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseCountertopLineSummary(row: CountertopConfigurationRow): CountertopLineSummary {
+  const snapshot = asRecord(row.pricing_snapshot);
+  const stone = asRecord(snapshot.stone);
+  const edge = asRecord(snapshot.edge);
+  const sink = asRecord(snapshot.sink);
+  const manualOverride = asRecord(snapshot.manual_override);
+  const serviceRows = Array.isArray(snapshot.services) ? snapshot.services : [];
+
+  return {
+    orderItemId: row.order_item_id,
+    stoneName: textValue(stone.name),
+    stoneSku: textValue(stone.sku),
+    stoneType: textValue(stone.stone_type),
+    sqft: numberValue(stone.sqft),
+    materialPriceBand: textValue(stone.material_price_band),
+    pricePerSqft: numberValue(stone.price_per_sqft),
+    edgeName: textValue(edge.name),
+    edgeLinearFt: numberValue(edge.linear_ft),
+    sinkName: textValue(sink.name),
+    sinkSku: textValue(sink.sku),
+    services: serviceRows.flatMap((entry) => {
+      const service = asRecord(entry);
+      const name = textValue(service.name);
+      const quantity = numberValue(service.quantity);
+      return name && quantity !== null ? [{ name, quantity }] : [];
+    }),
+    manualOverrideApplied: manualOverride.applied === true,
+    manualOverridePricePerSqft: numberValue(manualOverride.price_per_sqft),
+    manualOverrideReason: textValue(manualOverride.reason),
+  };
+}
+
+async function loadCountertopLineSummaries(orderItemIds: string[]): Promise<CountertopLineSummary[]> {
+  if (orderItemIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("countertop_configurations")
+    .select("order_item_id, pricing_snapshot")
+    .in("order_item_id", orderItemIds);
+
+  if (error) throw error;
+  return ((data ?? []) as CountertopConfigurationRow[]).map(parseCountertopLineSummary);
 }
 
 export function getCustomerOrderRevisionPolicy(status: CustomerOrderStatus, role: UserRole): CustomerOrderRevisionPolicy {
@@ -355,10 +419,14 @@ export async function loadEditOrderContext(customerId: string, orderId: string):
   const firstError = customerResult.error || orderResult.error || itemsResult.error || addressesResult.error || groupsResult.error || methodsResult.error || productsResult.error || taxRulesResult.error;
   if (firstError) throw firstError;
 
+  const itemRows = (itemsResult.data ?? []) as CustomerOrderItem[];
+  const countertopSummaries = await loadCountertopLineSummaries(itemRows.map((item) => item.id));
+
   return {
     customer: customerResult.data as Customer,
     order: orderResult.data as CustomerOrder,
-    items: (itemsResult.data ?? []) as CustomerOrderItem[],
+    items: itemRows,
+    countertopSummaries,
     addresses: (addressesResult.data ?? []) as CustomerAddress[],
     priceGroups: (groupsResult.data ?? []) as PriceGroupLookup[],
     paymentMethods: (methodsResult.data ?? []) as PaymentMethod[],
@@ -383,8 +451,10 @@ export async function loadOrderDetail(customerId: string, orderId: string): Prom
   if (firstError) throw firstError;
 
   const itemRows = (itemsResult.data ?? []) as CustomerOrderItem[];
+  const countertopSummaries = await loadCountertopLineSummaries(itemRows.map((item) => item.id));
+  const summariesByItemId = new Map(countertopSummaries.map((summary) => [summary.orderItemId, summary]));
+  const canManageCountertop = hasPermission(profile.role, "orders.manage");
   const countertopProducts = itemRows.map((item) => item.product_id).filter((id): id is string => Boolean(id));
-  const canManageCountertop = hasPermission(profile.role, "pricing.manage");
   const countertopProfilesResult = canManageCountertop && countertopProducts.length
     ? await supabase.from("countertop_stone_product_profiles").select("product_id").in("product_id", countertopProducts).eq("is_active", true)
     : { data: [], error: null };
@@ -399,13 +469,17 @@ export async function loadOrderDetail(customerId: string, orderId: string): Prom
     pendingApprovals: approvalsResult.error ? 0 : approvalsResult.count ?? 0,
     canManage: hasPermission(profile.role, "orders.manage"),
     canManageCountertop,
-    countertopItems: itemRows.filter((item) => item.product_id && countertopProductIds.has(item.product_id)).map((item) => ({
-      orderItemId: item.id,
-      orderNumber: orderResult.data.order_number,
-      lineNo: item.line_no,
-      sku: item.sku_snapshot,
-      productName: item.product_name_snapshot,
-    })),
+    countertopSummaries,
+    countertopItems: canManageCountertop
+      ? itemRows.filter((item) => item.product_id && countertopProductIds.has(item.product_id) && summariesByItemId.has(item.id)).map((item) => ({
+          orderItemId: item.id,
+          orderNumber: orderResult.data.order_number,
+          lineNo: item.line_no,
+          sku: item.sku_snapshot,
+          productName: item.product_name_snapshot,
+          summary: summariesByItemId.get(item.id),
+        }))
+      : [],
   };
 }
 
