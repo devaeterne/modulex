@@ -1,99 +1,13 @@
-import { timingSafeEqual } from "node:crypto";
 import {
   getVendorCatalogAdapter,
   vendorCatalogRegistry,
 } from "@/lib/vendor-catalog/adapters";
+import { authorizeVendorCatalogRequest } from "@/lib/vendor-catalog/auth";
 import { runVendorCatalogSync } from "@/lib/vendor-catalog/sync";
-import {
-  isSupabaseAdminConfigured,
-  supabaseAdmin,
-} from "@/lib/supabase/server-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
-
-function secureEquals(left: string, right: string) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-function bearerToken(request: Request) {
-  const authorization = request.headers.get("authorization");
-  return authorization?.startsWith("Bearer ")
-    ? authorization.slice("Bearer ".length).trim()
-    : "";
-}
-
-function isCronSecret(token: string) {
-  if (!token) return false;
-  const secrets = [
-    process.env.CRON_SECRET,
-    process.env.VENDOR_CATALOG_SYNC_SECRET,
-  ].filter((secret): secret is string => Boolean(secret));
-  return secrets.some((secret) => secureEquals(token, secret));
-}
-
-async function authorizeAdminSession(token: string) {
-  if (!isSupabaseAdminConfigured) {
-    return Response.json(
-      { error: "Vendor catalog sync is not configured." },
-      { status: 503 }
-    );
-  }
-
-  if (!token) {
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
-  }
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabaseAdmin.auth.getUser(token);
-
-  if (userError || !user) {
-    return Response.json({ error: "Unauthorized." }, { status: 401 });
-  }
-
-  const [{ data: profile, error: profileError }, { data: roleRows, error: rolesError }] =
-    await Promise.all([
-      supabaseAdmin
-        .from("profiles")
-        .select("role,is_active")
-        .eq("id", user.id)
-        .maybeSingle(),
-      supabaseAdmin.from("user_roles").select("role").eq("user_id", user.id),
-    ]);
-
-  if (profileError || rolesError || !profile?.is_active) {
-    return Response.json({ error: "Forbidden." }, { status: 403 });
-  }
-
-  const roles = new Set<string>([
-    profile.role,
-    ...(roleRows ?? []).map((row) => row.role),
-  ]);
-
-  if (!roles.has("admin") && !roles.has("super_admin")) {
-    return Response.json({ error: "Forbidden." }, { status: 403 });
-  }
-
-  return null;
-}
-
-async function authorize(request: Request, allowAdminSession: boolean) {
-  const token = bearerToken(request);
-
-  if (isCronSecret(token)) return null;
-
-  if (allowAdminSession) {
-    return authorizeAdminSession(token);
-  }
-
-  return Response.json({ error: "Unauthorized." }, { status: 401 });
-}
 
 function requestedVendors(request: Request, body?: unknown) {
   const url = new URL(request.url);
@@ -122,8 +36,11 @@ async function handle(
   body: unknown,
   allowAdminSession: boolean
 ) {
-  const unauthorized = await authorize(request, allowAdminSession);
-  if (unauthorized) return unauthorized;
+  const authorization = await authorizeVendorCatalogRequest(request, {
+    allowCron: true,
+    allowAdmin: allowAdminSession,
+  });
+  if (authorization instanceof Response) return authorization;
 
   const vendors = [...new Set(requestedVendors(request, body))];
   const unknown = vendors.filter((vendor) => !vendorCatalogRegistry[vendor]);
@@ -134,12 +51,11 @@ async function handle(
     );
   }
 
-  const results = [];
-  for (const vendor of vendors) {
-    results.push(await runVendorCatalogSync(getVendorCatalogAdapter(vendor)));
-  }
-
+  const results = await Promise.all(
+    vendors.map((vendor) => runVendorCatalogSync(getVendorCatalogAdapter(vendor)))
+  );
   const failed = results.some((result) => result.status === "FAILED");
+
   return Response.json(
     {
       status: failed ? "PARTIAL_FAILURE" : "SUCCEEDED",
@@ -155,7 +71,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Admin-triggered sync intentionally runs every registered adapter so future
-  // vendors are picked up without changing this UI action.
-  return handle(request, undefined, true);
+  const body = await request.json().catch(() => undefined);
+  return handle(request, body, true);
 }
