@@ -27,14 +27,9 @@ comment on column public.customer_order_items.line_note is
 comment on column public.customer_invoice_items.line_note is
   'Invoice-time snapshot of the source order Service line detail.';
 
--- Product Master requires a category, an active brand, and an allowed UOM.
--- Resolve generated IDs by stable business keys only.
-insert into public.product_categories (name, status)
-values ('Service', 'active')
-on conflict (name) do update
-set status = excluded.status,
-    updated_at = now();
-
+-- Product Master requires an existing active category, an active brand, and an
+-- allowed UOM. Resolve generated IDs by stable business keys only and fail
+-- closed when those prerequisites are not already valid.
 do $$
 declare
   v_piece_id uuid;
@@ -198,6 +193,7 @@ begin
 end
 $$;
 
+-- Manual unit price is only accepted for the canonical SERVICE manual_service product.
 create or replace function private.enforce_customer_order_item_pricing_v2()
 returns trigger
 language plpgsql
@@ -259,6 +255,10 @@ begin
   end if;
 
   if v_type.pricing_model = 'manual_service' then
+    if v_type.code <> 'SERVICE' or v_product.sku <> 'SERVICE' then
+      raise exception 'Manual unit price is only accepted for the canonical SERVICE manual_service product.';
+    end if;
+
     if not v_type.is_active
        or v_product.status::text <> 'active'
        or not v_uom.is_active
@@ -391,6 +391,7 @@ declare
   v_sku text;
   v_product_name text;
   v_pricing_model text;
+  v_product_type_code text;
   v_line_note text;
   v_line_subtotal numeric;
   v_line_discount numeric;
@@ -596,8 +597,8 @@ begin
       raise exception 'Line discount must be between 0 and 100.';
     end if;
 
-    select p.sku, p.name, pt.pricing_model
-    into v_sku, v_product_name, v_pricing_model
+    select p.sku, p.name, pt.pricing_model, pt.code
+    into v_sku, v_product_name, v_pricing_model, v_product_type_code
     from public.products p
     join public.product_types pt on pt.id = p.product_type_id
     where p.id = v_product_id
@@ -608,6 +609,9 @@ begin
     end if;
 
     if v_pricing_model = 'manual_service' then
+      if v_product_type_code <> 'SERVICE' or v_sku <> 'SERVICE' then
+        raise exception 'Manual unit price is only accepted for the canonical SERVICE manual_service product.';
+      end if;
       if v_quantity <> 1 then
         raise exception 'Manual Service quantity must be exactly 1.';
       end if;
@@ -627,31 +631,28 @@ begin
       v_price_source := 'manual';
     else
       v_line_note := null;
-      if v_item ? 'unit_price'
-         and v_item->'unit_price' <> 'null'::jsonb
-         and trim(coalesce(v_item->>'unit_price','')) <> '' then
-        v_manual_price := (v_item->>'unit_price')::numeric;
-        if v_manual_price < 0 then
-          raise exception 'Manual unit price cannot be negative.';
-        end if;
-        v_unit_price := round(v_manual_price, 4);
-        v_price_source := 'manual';
-      else
-        select pp.amount into v_unit_price
-        from public.product_prices pp
-        where pp.product_id = v_product_id
-          and pp.price_group_id = v_price_group_id
-          and pp.currency_code = upper(v_currency)
-          and pp.is_active = true
-          and pp.valid_to is null
-        order by pp.valid_from desc
-        limit 1;
-
-        if v_unit_price is null then
-          raise exception 'No current % price exists for SKU % in price group %.', upper(v_currency), v_sku, v_price_group_name;
-        end if;
-        v_price_source := 'price_group';
+      if v_pricing_model = 'countertop_material_band' then
+        raise exception 'Countertop Material Band products must be configured in the Countertop workspace.';
+      elsif v_pricing_model = 'none' then
+        raise exception 'No Commercial Pricing products cannot be added to customer orders.';
+      elsif v_pricing_model <> 'price_group' then
+        raise exception 'Unsupported Product Type pricing route.';
       end if;
+
+      select pp.amount into v_unit_price
+      from public.product_prices pp
+      where pp.product_id = v_product_id
+        and pp.price_group_id = v_price_group_id
+        and pp.currency_code = upper(v_currency)
+        and pp.is_active = true
+        and pp.valid_to is null
+      order by pp.valid_from desc
+      limit 1;
+
+      if v_unit_price is null then
+        raise exception 'No current % price exists for SKU % in price group %.', upper(v_currency), v_sku, v_price_group_name;
+      end if;
+      v_price_source := 'price_group';
     end if;
 
     v_line_subtotal := round(v_quantity * v_unit_price, 4);
@@ -753,6 +754,7 @@ declare
   v_sku text;
   v_product_name text;
   v_pricing_model text;
+  v_product_type_code text;
   v_line_note text;
   v_current_group_price numeric;
   v_price_source text;
@@ -823,8 +825,11 @@ begin
     if v_shipping_snapshot is null then raise exception 'Shipping address does not belong to this customer.'; end if;
   end if;
 
+  -- Validate every incoming line before any revision or line mutation.
   for v_item in select value from jsonb_array_elements(p_items)
   loop
+    v_existing := null;
+    v_is_configured := false;
     v_item_id := nullif(v_item->>'id','')::uuid;
     if v_item_id is not null then
       if v_item_id = any(v_seen_ids) then raise exception 'Duplicate order item id in revision.'; end if;
@@ -833,7 +838,12 @@ begin
       select * into v_existing from public.customer_order_items where id = v_item_id and order_id = p_order_id for update;
       if v_existing.id is null then raise exception 'Order item does not belong to this order.'; end if;
       v_is_configured := exists(select 1 from public.countertop_configurations where order_item_id = v_item_id);
-      if v_is_configured and (v_existing.product_id is distinct from nullif(v_item->>'product_id','')::uuid or v_existing.quantity is distinct from coalesce((v_item->>'quantity')::numeric,0) or v_existing.unit_price is distinct from coalesce((v_item->>'unit_price')::numeric,-1) or v_existing.discount_percent is distinct from coalesce((v_item->>'discount_percent')::numeric,0)) then
+      if v_is_configured and (
+        v_existing.product_id is distinct from nullif(v_item->>'product_id','')::uuid
+        or v_existing.quantity is distinct from coalesce((v_item->>'quantity')::numeric,0)
+        or v_existing.unit_price is distinct from coalesce((v_item->>'unit_price')::numeric,-1)
+        or v_existing.discount_percent is distinct from coalesce((v_item->>'discount_percent')::numeric,0)
+      ) then
         raise exception 'Configured countertop lines must be changed in the countertop configurator.';
       end if;
     end if;
@@ -849,16 +859,21 @@ begin
     if v_unit_price < 0 then raise exception 'Unit price cannot be negative.'; end if;
     if v_discount_percent < 0 or v_discount_percent > 100 then raise exception 'Line discount must be between 0 and 100.'; end if;
 
-    select p.sku, pt.pricing_model
-    into v_sku, v_pricing_model
+    select p.sku, pt.pricing_model, pt.code
+    into v_sku, v_pricing_model, v_product_type_code
     from public.products p
     join public.product_types pt on pt.id = p.product_type_id
     where p.id = v_product_id and p.status <> 'archived';
 
     if v_sku is null then raise exception 'Product does not exist or is archived.'; end if;
     if v_pricing_model = 'manual_service' then
+      if v_product_type_code <> 'SERVICE' or v_sku <> 'SERVICE' then
+        raise exception 'Manual unit price is only accepted for the canonical SERVICE manual_service product.';
+      end if;
       if v_quantity <> 1 then raise exception 'Manual Service quantity must be exactly 1.'; end if;
       if v_line_note is null then raise exception 'Service detail is required.'; end if;
+    elsif v_line_note is not null then
+      raise exception 'Line note is only supported for manual Service lines.';
     end if;
   end loop;
 
@@ -889,6 +904,8 @@ begin
 
   for v_item in select value from jsonb_array_elements(p_items)
   loop
+    v_existing := null;
+    v_is_configured := false;
     v_line_no := v_line_no + 1;
     v_item_id := nullif(v_item->>'id','')::uuid;
     if v_item_id is not null then
@@ -897,7 +914,12 @@ begin
       select * into v_existing from public.customer_order_items where id = v_item_id and order_id = p_order_id for update;
       if v_existing.id is null then raise exception 'Order item does not belong to this order.'; end if;
       v_is_configured := exists(select 1 from public.countertop_configurations where order_item_id = v_item_id);
-      if v_is_configured and (v_existing.product_id is distinct from nullif(v_item->>'product_id','')::uuid or v_existing.quantity is distinct from coalesce((v_item->>'quantity')::numeric,0) or v_existing.unit_price is distinct from coalesce((v_item->>'unit_price')::numeric,-1) or v_existing.discount_percent is distinct from coalesce((v_item->>'discount_percent')::numeric,0)) then
+      if v_is_configured and (
+        v_existing.product_id is distinct from nullif(v_item->>'product_id','')::uuid
+        or v_existing.quantity is distinct from coalesce((v_item->>'quantity')::numeric,0)
+        or v_existing.unit_price is distinct from coalesce((v_item->>'unit_price')::numeric,-1)
+        or v_existing.discount_percent is distinct from coalesce((v_item->>'discount_percent')::numeric,0)
+      ) then
         raise exception 'Configured countertop lines must be changed in the countertop configurator.';
       end if;
     end if;
@@ -913,8 +935,8 @@ begin
     if v_unit_price < 0 then raise exception 'Unit price cannot be negative.'; end if;
     if v_discount_percent < 0 or v_discount_percent > 100 then raise exception 'Line discount must be between 0 and 100.'; end if;
 
-    select p.sku, p.name, pt.pricing_model
-    into v_sku, v_product_name, v_pricing_model
+    select p.sku, p.name, pt.pricing_model, pt.code
+    into v_sku, v_product_name, v_pricing_model, v_product_type_code
     from public.products p
     join public.product_types pt on pt.id = p.product_type_id
     where p.id = v_product_id and p.status <> 'archived';
@@ -922,10 +944,20 @@ begin
     if v_sku is null then raise exception 'Product does not exist or is archived.'; end if;
 
     if v_pricing_model = 'manual_service' then
+      if v_product_type_code <> 'SERVICE' or v_sku <> 'SERVICE' then
+        raise exception 'Manual unit price is only accepted for the canonical SERVICE manual_service product.';
+      end if;
       if v_quantity <> 1 then raise exception 'Manual Service quantity must be exactly 1.'; end if;
       if v_line_note is null then raise exception 'Service detail is required.'; end if;
       v_price_source := 'manual';
-    else
+    elsif v_pricing_model = 'countertop_material_band' then
+      if v_item_id is null or not v_is_configured then
+        raise exception 'Countertop Material Band products must be configured in the Countertop workspace.';
+      end if;
+      v_line_note := null;
+      v_unit_price := v_existing.unit_price;
+      v_price_source := v_existing.price_source;
+    elsif v_pricing_model = 'price_group' then
       v_line_note := null;
       select pp.amount into v_current_group_price
       from public.product_prices pp
@@ -936,7 +968,16 @@ begin
         and pp.valid_to is null
       order by pp.valid_from desc
       limit 1;
-      v_price_source := case when v_current_group_price is not null and round(v_unit_price,4) = round(v_current_group_price,4) then 'price_group' else 'manual' end;
+
+      if v_current_group_price is null then
+        raise exception 'No current % price exists for SKU % in price group %.', v_order.currency_code, v_sku, v_price_group_name;
+      end if;
+      v_unit_price := round(v_current_group_price, 4);
+      v_price_source := 'price_group';
+    elsif v_pricing_model = 'none' then
+      raise exception 'No Commercial Pricing products cannot be added to customer orders.';
+    else
+      raise exception 'Unsupported Product Type pricing route.';
     end if;
 
     v_line_subtotal := round(v_quantity * v_unit_price, 4);
