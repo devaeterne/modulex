@@ -1,0 +1,94 @@
+name: Manual Service Roadmap Sync
+
+on:
+  push:
+    branches:
+      - feat/order-manual-service-line
+    paths:
+      - .github/workflows/manual-service-roadmap-sync.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync-roadmaps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/order-manual-service-line
+          fetch-depth: 0
+      - name: Update Admin and Store roadmap tracking
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          baseline = "669178a44bb0386b4c8b40bffecf1d95a366829a"
+
+          admin_path = Path("modulex-admin/ADMIN_ROADMAP.md")
+          admin = admin_path.read_text()
+          admin = re.sub(r"^Last reviewed: .*?$", "Last reviewed: 2026-09-02", admin, count=1, flags=re.M)
+          admin = re.sub(r"^Main baseline: `[^`]+`$", f"Main baseline: `{baseline}`", admin, count=1, flags=re.M)
+          admin = re.sub(
+              r"^Current Admin next action: .*?$",
+              "Current Admin next action: **Manual Service Order Line is active in draft PR #239 on the execution-time `main` baseline. The implementation is source-complete and under CI verification, but production preflight correctly fails closed because production has no active `Service` product category. Migration `20260902000000_order_manual_service_line.sql` remains source-controlled and unapplied. Countertop Product Catalog PR #230 is merged; parallel validation workstreams remain independent.**",
+              admin,
+              count=1,
+              flags=re.M,
+          )
+
+          a12_marker = "## A1.2 Orders\n"
+          manual_block = """
+
+- [~] Complete Manual Service order lines through canonical `SERVICE` + `manual_service`.
+  - Draft PR #239 adds the shared `PlusIcon` + `Countertop` / `Cabinet` / `Service` action contract, Cabinet filtering for `STONE` / `SINK` / `SERVICE`, a shared Service modal, fixed quantity `1`, required trimmed `line_note`, and manual Service pricing without weakening normal Price Group or Countertop pricing authority.
+  - `customer_order_items.line_note` is the canonical order detail and `customer_invoice_items.line_note` is the immutable invoice snapshot. Order detail/edit/print and invoice detail/print render the saved note; invoice creation copies the order item snapshot.
+  - Reservation/release triggers explicitly skip `pricing_model_snapshot = 'manual_service'`; Service remains commercial-only and does not require inventory availability.
+  - TDD RED proved the migration previously attempted to create/reactivate taxonomy and allowed caller price influence outside the intended Service boundary. GREEN contracts now require existing active master-data prerequisites and keep normal Price Group pricing server-authoritative.
+  - Rollback-only production preflight on 2026-09-02 left no schema/reference-data changes behind and intentionally failed closed because production currently has active categories `Cabinet`, `Sink`, and `Stone` only; there is no active `Service` category. Do not invent a category mapping or apply the migration until that business prerequisite is resolved.
+  - Migration `20260902000000_order_manual_service_line.sql` is source-controlled and **not applied to production**. Keep this row `[~]` until merge, production prerequisite resolution/migration, deploy, and signed-in order/invoice acceptance are complete.
+"""
+          if "Complete Manual Service order lines through canonical" not in admin:
+              admin = admin.replace(a12_marker, a12_marker + manual_block, 1)
+
+          next_action = """# Next Action
+
+Manual Service Order Line is the active bounded Orders package in **draft PR #239**; parallel roadmap work remains independent.
+
+1. Keep `20260902000000_order_manual_service_line.sql` unapplied while PR #239 is in draft/review.
+2. Preserve the fail-closed production prerequisite: production currently has no active `Service` product category. Do not map Service to Cabinet/Sink/Stone or create taxonomy implicitly without an explicit business decision.
+3. Require exact-head CI to pass Manual Service, A1/order lifecycle, pricing, Countertop context/initiation, strict Admin UI, Customers UI, RBAC, TypeScript, lint, Admin build, Store portal boundary, and Store build regressions.
+4. After merge and explicit prerequisite resolution, apply the canonical migration, run Supabase Security + Performance Advisor checks, deploy Admin, and perform signed-in create/edit/order-detail/invoice-detail/invoice-print acceptance.
+5. Preserve normal Product Group pricing authority, canonical Countertop pricing/attach behavior, and existing Store/Dealer public projection boundaries.
+
+**Parallel-work rule:** re-read execution-time `main`, open PRs, and both roadmaps before every package so newer merges are preserved rather than overwritten.
+"""
+          if "# Next Action\n" in admin:
+              admin = admin.split("# Next Action\n", 1)[0] + next_action
+          admin_path.write_text(admin)
+
+          store_path = Path("modulex-store/STORE_ROADMAP.md")
+          store = store_path.read_text()
+          store = re.sub(r"^Last reviewed: .*?$", "Last reviewed: 2026-09-02", store, count=1, flags=re.M)
+          store = re.sub(r"^Main baseline: `[^`]+`$", f"Main baseline: `{baseline}`", store, count=1, flags=re.M)
+          store_marker = "## Countertop / Stone / Sink cross-roadmap completion\n"
+          store_block = """
+
+- [~] Track Manual Service Order Line shared-Supabase migration ownership without widening Store projections.
+  - Draft PR #239 adds Admin/private order + invoice semantics only: canonical `SERVICE` / `manual_service`, order/invoice `line_note` snapshots, fixed quantity `1`, manual Service pricing, and inventory reservation/release skip behavior.
+  - Store public and Dealer/Customer portal projections are unchanged; the A1 Store portal boundary job is GREEN on the feature work before final tracking closeout.
+  - Rollback-only production preflight on 2026-09-02 left production unchanged and failed closed because no active `Service` product category exists. Migration `20260902000000_order_manual_service_line.sql` remains source-controlled and **not applied to production**; do not invent a Store-facing category or expose Service through public projections.
+"""
+          if "Track Manual Service Order Line shared-Supabase migration ownership" not in store:
+              store = store.replace(store_marker, store_marker + store_block, 1)
+          store_path.write_text(store)
+          PY
+      - name: Commit roadmap-only tracking and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin/ADMIN_ROADMAP.md modulex-store/STORE_ROADMAP.md
+          git rm .github/workflows/manual-service-roadmap-sync.yml
+          git commit -m "docs: track manual service rollout status"
+          git push origin HEAD:feat/order-manual-service-line
