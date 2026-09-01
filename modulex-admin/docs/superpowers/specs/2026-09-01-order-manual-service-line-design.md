@@ -108,14 +108,14 @@ Replace the current two-action presentation with:
 
 `Add Countertop` keeps the current Countertop configurator workflow.
 
-`Add Cabinet` is the current ordinary product workflow, presented as the Cabinet action. It must exclude Stone/Countertop and the canonical Service product; Sink remains managed through the Countertop workflow unless an existing explicit direct-Sink order behavior requires otherwise.
+`Add Cabinet` is the current ordinary product workflow, presented as the Cabinet action. It must exclude Product Types `STONE`, `SINK`, and `SERVICE`. Sink selection remains part of the Countertop workflow and is not exposed through Add Cabinet.
 
 ### Add Service interaction
 
 `Add Service` opens a shared-primitive modal/form with exactly the required business inputs:
 
 - **Service Detail*** — multiline text, required.
-- **Service Price*** — USD manual amount, required, numeric, >= 0.
+- **Service Price*** — manual amount in the order currency, required, numeric, >= 0. In the current Cabinet deployment this is displayed as USD.
 
 Quantity is not asked; it is fixed to `1`.
 
@@ -129,7 +129,7 @@ A Service line shows:
 - The entered `line_note` directly below the product name as secondary line detail.
 - Qty: `1`.
 - Server/manual price.
-- Existing discount and line total presentation where applicable.
+- Existing discount and line total presentation.
 
 Order Detail and Order Edit must both show the historical `line_note` from the order item, not a live product description.
 
@@ -153,7 +153,7 @@ A Service line participates in the same order financial totals as other sellable
 - subject to existing order tax behavior,
 - subject to existing payment commission behavior,
 - included in invoice subtotal/total,
-- may use the existing line-discount semantics unless a future commercial rule explicitly disables service discounts.
+- line discounts remain allowed using the existing order-line discount semantics.
 
 No new tax or commission exception is introduced by this package.
 
@@ -184,10 +184,11 @@ Existing orders/invoices require no backfill because their `line_note` is legiti
 TDD must cover at least:
 
 - Service UI contract: Products actions are Countertop / Cabinet / Service and new UI uses shared primitives.
+- Add Cabinet excludes `STONE`, `SINK`, and `SERVICE` Product Types.
 - Service form rejects missing detail.
 - Service form rejects missing/negative amount.
 - Server rejects blank `line_note` for `manual_service` even if UI is bypassed.
-- Server forces/requires quantity `1` and manual price source.
+- Server requires quantity `1` and manual price source.
 - Server does not perform Price Group lookup for Service.
 - Inventory reservation path skips Service.
 - Order subtotal/total includes Service amount.
