@@ -1,4 +1,5 @@
 import React from "react";
+import { ADMIN_SURFACE_CARD } from "@/components/ui/theme/adminTheme";
 
 interface ComponentCardProps {
   title: string;
@@ -18,9 +19,7 @@ const ComponentCard: React.FC<ComponentCardProps> = ({
   collapsed = false,
 }) => {
   return (
-    <div
-      className={`overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] ${className}`}
-    >
+    <section className={`${ADMIN_SURFACE_CARD} ${className}`}>
       <div className="flex items-start justify-between gap-4 px-6 py-5">
         <div className="min-w-0">
           <h3 className="text-base font-medium text-gray-800 dark:text-white/90">
@@ -40,7 +39,7 @@ const ComponentCard: React.FC<ComponentCardProps> = ({
           <div className="space-y-6">{children}</div>
         </div>
       ) : null}
-    </div>
+    </section>
   );
 };
 
