@@ -30,6 +30,8 @@ type ExistingItem = {
   discovery_hash: string | null;
   review_status: VendorCatalogReviewStatus;
   details_refreshed_at: string | null;
+  vendor_category_key: string | null;
+  vendor_category_label: string | null;
 };
 
 type PreparedProduct = {
@@ -77,7 +79,9 @@ async function loadExistingItems(vendorCode: string) {
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabaseAdmin
       .from("vendor_catalog_items")
-      .select("id,external_id,snapshot_hash,discovery_hash,review_status,details_refreshed_at")
+      .select(
+        "id,external_id,snapshot_hash,discovery_hash,review_status,details_refreshed_at,vendor_category_key,vendor_category_label"
+      )
       .eq("vendor_code", vendorCode)
       .range(from, from + pageSize - 1);
 
@@ -103,9 +107,16 @@ function prepareProducts(
       classifyVendorProduct(existing?.discovery_hash, discoveryHash);
     const reviewStatus: VendorCatalogReviewStatus =
       changeState === "UNCHANGED" ? existing?.review_status ?? "PENDING" : "PENDING";
+    const productWithPreservedScope: NormalizedVendorProduct = {
+      ...product,
+      vendorCategoryKey:
+        product.vendorCategoryKey ?? existing?.vendor_category_key ?? null,
+      vendorCategoryLabel:
+        product.vendorCategoryLabel ?? existing?.vendor_category_label ?? null,
+    };
 
     return {
-      product,
+      product: productWithPreservedScope,
       discoveryHash,
       snapshotHash:
         changeState === "UNCHANGED" && existing?.snapshot_hash
