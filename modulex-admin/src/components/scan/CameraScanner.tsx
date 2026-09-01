@@ -1,5 +1,10 @@
 "use client";
 
+import ComponentCard from "@/components/common/ComponentCard";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+
 import React, {
   useEffect,
   useRef,
@@ -379,123 +384,73 @@ export default function CameraScanner({
   }, []);
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-        <div>
-          <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
-            Scan QR / Barcode
-          </h3>
-
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Point the camera at
-            the product or shelf
-            label.
-          </p>
-        </div>
-
-        <div className="shrink-0">
-          {isStarting ? (
-            <span className="inline-flex rounded-full bg-warning-50 px-2.5 py-1 text-xs font-medium text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">
-              Starting...
-            </span>
-          ) : isScanning ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-1 text-xs font-medium text-success-700 dark:bg-success-500/10 dark:text-success-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success-500" />
-
-              Scanning
-            </span>
-          ) : (
-            <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-white/[0.06] dark:text-gray-400">
-              Camera Off
-            </span>
-          )}
-        </div>
-      </div>
-
-      {errorMessage && (
-        <div className="border-b border-error-200 bg-error-50 px-5 py-4 dark:border-error-500/30 dark:bg-error-500/10">
-          <p className="text-sm font-medium text-error-600 dark:text-error-400">
-            Camera unavailable
-          </p>
-
-          <p className="mt-1 text-xs leading-5 text-error-500 dark:text-error-400">
-            {errorMessage}
-          </p>
-
-          <button
+    <ComponentCard
+      title="Scan QR / Barcode"
+      desc="Point the camera at the product or shelf label."
+      headerAction={
+        <Badge
+          size="sm"
+          color={isStarting ? "warning" : isScanning ? "success" : "light"}
+        >
+          {isStarting ? "Starting..." : isScanning ? "Scanning" : "Camera Off"}
+        </Badge>
+      }
+    >
+      {errorMessage ? (
+        <div className="space-y-3">
+          <Alert variant="error" title="Camera unavailable" message={errorMessage} />
+          <Button
             type="button"
+            variant="outline"
             onClick={() => {
               void startScanner();
             }}
-            className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-error-500 px-4 text-xs font-medium text-white hover:bg-error-600"
           >
             Try Again
-          </button>
+          </Button>
         </div>
-      )}
+      ) : null}
 
-      <div className="relative bg-black">
+      <div className="relative overflow-hidden rounded-xl bg-black">
         <div
-          id={
-            SCANNER_REGION_ID
-          }
+          id={SCANNER_REGION_ID}
           className="min-h-[300px] w-full sm:min-h-[360px]"
         />
 
-        {isStarting &&
-          !errorMessage && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black">
-              <div className="text-center">
-                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-white/30 border-t-white" />
-
-                <p className="mt-3 text-sm font-medium text-white">
-                  Opening camera...
-                </p>
-              </div>
+        {isStarting && !errorMessage ? (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black">
+            <div className="text-center">
+              <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-white/30 border-t-white" />
+              <p className="mt-3 text-sm font-medium text-white">Opening camera...</p>
             </div>
-          )}
+          </div>
+        ) : null}
 
-        {isScanning && (
+        {isScanning ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-[210px] w-[210px] rounded-2xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.15)] sm:h-[250px] sm:w-[250px]" />
           </div>
-        )}
+        ) : null}
       </div>
 
-      <div className="flex min-h-[58px] items-center justify-between gap-4 px-5 py-3">
+      <div className="flex min-h-[58px] items-center justify-between gap-4">
         <div>
           {lastScannedValue ? (
             <>
-              <p className="text-[10px] font-medium uppercase tracking-wide text-success-600 dark:text-success-400">
-                Scan accepted
-              </p>
-
-              <p className="mt-0.5 max-w-[260px] truncate font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
-                {
-                  lastScannedValue
-                }
+              <Badge size="sm" color="success">Scan accepted</Badge>
+              <p className="mt-1 max-w-[260px] truncate font-mono text-xs font-medium text-gray-700 dark:text-gray-300">
+                {lastScannedValue}
               </p>
             </>
           ) : (
             <>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Ready to scan
-              </p>
-
-              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                Keep the label
-                inside the frame.
-              </p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Ready to scan</p>
+              <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">Keep the label inside the frame.</p>
             </>
           )}
         </div>
-
-        {isScanning && (
-          <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
-            Continuous
-          </span>
-        )}
+        {isScanning ? <Badge size="sm" color="info">Continuous</Badge> : null}
       </div>
-    </div>
+    </ComponentCard>
   );
 }

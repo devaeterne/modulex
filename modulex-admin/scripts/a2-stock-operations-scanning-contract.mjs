@@ -51,6 +51,12 @@ expectCompactIncludes(cameraScanner, [
   'facingMode: "environment"',
   "navigator.vibrate",
 ], "CameraScanner");
+expectIncludes(cameraScanner, [
+  "ComponentCard",
+  "Alert",
+  "Badge",
+  "Button",
+], "CameraScanner TailAdmin UI");
 
 expectIncludes(guidedOperation, [
   "scanNonce",
@@ -65,6 +71,14 @@ expectIncludes(guidedOperation, [
   "This shelf code exists in more than one location. Scan the full shelf QR.",
   "No active product found for this SKU, barcode, or product QR.",
   "onWorkflowReadyChange?.(workflowReady)",
+  "ComponentCard",
+  "Label",
+  "Select",
+  "Input",
+  "TextArea",
+  "Alert",
+  "Badge",
+  "Button",
 ], "GuidedStockOperation");
 
 expectIncludes(scanPanel, [
@@ -76,7 +90,12 @@ expectIncludes(scanPanel, [
   "processInput",
   "grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6",
   "sm:flex-row",
-  "h-11",
+  "ComponentCard",
+  "Label",
+  "Input",
+  "Alert",
+  "Badge",
+  "Button",
 ], "ScanPanel");
 
 expectIncludes(qrLabels, [
@@ -125,4 +144,5 @@ expectIncludes(acceptance, [
   "Production inventory/movement mutation: NONE",
 ], "A2.3 acceptance artifact");
 
+// Scan UI may evolve, but scanner and stock-operation behavior stay contract-locked above.
 console.log("A2.3 stock operations + scanning contract: PASS");
