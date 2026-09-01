@@ -24,6 +24,12 @@ export type OrderDomainProduct = {
   category: string | null;
   brand_id: string | null;
   category_id: string | null;
+  product_type_id: string;
+  product_type_name: string;
+  pricing_model: "price_group" | "countertop_material_band" | "none";
+  uom_id: string;
+  uom_code: string;
+  pricing_route_reason: string | null;
 };
 
 export type OrderPriceRow = {
@@ -135,7 +141,6 @@ const ORDER_REVISION_LOCKED_STATUSES: CustomerOrderStatus[] = ["shipped", "deliv
 const ORDER_REVISION_EDITABLE_FIELDS = [
   "items.product_id",
   "items.quantity",
-  "items.unit_price",
   "items.discount_percent",
   "price_group_id",
   "fulfillment_type",
@@ -181,6 +186,7 @@ const ORDER_REVISION_IMMUTABLE_FIELDS = [
   "items.line_no",
   "items.sku_snapshot",
   "items.product_name_snapshot",
+  "items.unit_price",
   "items.discount_amount",
   "items.line_subtotal",
   "items.line_total",
@@ -190,106 +196,87 @@ const ORDER_REVISION_IMMUTABLE_FIELDS = [
 ] as const;
 const PRICE_GROUP_COLUMNS = "id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only";
 const PAYMENT_METHOD_COLUMNS = "id, system_key, name, commission_percent, sort_order, is_active";
-const PRODUCT_COLUMNS = "id, sku, name, barcode, status, brand, category, brand_id, category_id";
+const PRODUCT_COLUMNS = "id, sku, name, barcode, status, brand, category, brand_id, category_id, product_type_id, uom_id, product_type:product_types(name, pricing_model), uom:units_of_measure(code)";
+
+type RawOrderProduct = Omit<OrderDomainProduct, "product_type_name" | "pricing_model" | "uom_code" | "pricing_route_reason"> & {
+  product_type: { name: string; pricing_model: OrderDomainProduct["pricing_model"] } | null;
+  uom: { code: string } | null;
+};
+
+function normalizeProducts(rows: unknown[] | null): OrderDomainProduct[] {
+  return ((rows ?? []) as RawOrderProduct[]).flatMap((row) => {
+    if (!row.product_type || !row.uom || !row.product_type_id || !row.uom_id) return [];
+    const pricingModel = row.product_type.pricing_model;
+    return [{
+      id: row.id,
+      sku: row.sku,
+      name: row.name,
+      barcode: row.barcode,
+      status: row.status,
+      brand: row.brand,
+      category: row.category,
+      brand_id: row.brand_id,
+      category_id: row.category_id,
+      product_type_id: row.product_type_id,
+      product_type_name: row.product_type.name,
+      pricing_model: pricingModel,
+      uom_id: row.uom_id,
+      uom_code: row.uom.code,
+      pricing_route_reason: pricingModel === "countertop_material_band"
+        ? "Use the Countertop configurator for material-band pricing."
+        : pricingModel === "none"
+          ? "This Product Type has no commercial pricing route."
+          : null,
+    }];
+  });
+}
 
 export function getCustomerOrderRevisionPolicy(status: CustomerOrderStatus, role: UserRole): CustomerOrderRevisionPolicy {
   if (!ORDER_EDITOR_ROLES.includes(role)) {
-    return {
-      mode: "locked",
-      canEdit: false,
-      editableFields: [],
-      immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
-      reason: "You do not have permission to revise customer orders.",
-    };
+    return { mode: "locked", canEdit: false, editableFields: [], immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS, reason: "You do not have permission to revise customer orders." };
   }
-
   if (ORDER_REVISION_LOCKED_STATUSES.includes(status)) {
-    return {
-      mode: "locked",
-      canEdit: false,
-      editableFields: [],
-      immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
-      reason: "Order revisions are locked once fulfillment has started or the order is finalized.",
-    };
+    return { mode: "locked", canEdit: false, editableFields: [], immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS, reason: "Order revisions are locked once fulfillment has started or the order is finalized." };
   }
-
   if (!ORDER_REVISION_EDITABLE_STATUSES.includes(status)) {
-    return {
-      mode: "locked",
-      canEdit: false,
-      editableFields: [],
-      immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
-      reason: "This order status does not allow commercial revisions.",
-    };
+    return { mode: "locked", canEdit: false, editableFields: [], immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS, reason: "This order status does not allow commercial revisions." };
   }
-
   if (status !== "draft" && role === "sales") {
-    return {
-      mode: "approval",
-      canEdit: true,
-      editableFields: ORDER_REVISION_EDITABLE_FIELDS,
-      immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
-      reason: "Sales revisions to confirmed pre-fulfillment orders require Admin approval.",
-    };
+    return { mode: "approval", canEdit: true, editableFields: ORDER_REVISION_EDITABLE_FIELDS, immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS, reason: "Sales revisions to confirmed pre-fulfillment orders require Admin approval." };
   }
-
-  return {
-    mode: "direct",
-    canEdit: true,
-    editableFields: ORDER_REVISION_EDITABLE_FIELDS,
-    immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS,
-    reason: status === "draft" ? "Draft orders can be revised directly." : "Pre-fulfillment orders can be revised directly by Admin.",
-  };
+  return { mode: "direct", canEdit: true, editableFields: ORDER_REVISION_EDITABLE_FIELDS, immutableFields: ORDER_REVISION_IMMUTABLE_FIELDS, reason: status === "draft" ? "Draft orders can be revised directly." : "Pre-fulfillment orders can be revised directly by Admin." };
 }
 
 function nullableText(value: string | null | undefined) {
   const normalized = value?.trim() ?? "";
   return normalized || null;
 }
-
-function nullableId(value: string | null | undefined) {
-  return value || null;
-}
-
-function numeric(value: string | number | null | undefined) {
-  return Number(value ?? 0);
-}
+function nullableId(value: string | null | undefined) { return value || null; }
+function numeric(value: string | number | null | undefined) { return Number(value ?? 0); }
 
 async function requireEditorProfile(action: "create" | "edit") {
   const { profile, error } = await getCurrentProfile();
   if (error) throw error;
-  if (!profile || !ORDER_EDITOR_ROLES.includes(profile.role)) {
-    throw new Error(`You do not have permission to ${action} orders.`);
-  }
+  if (!profile || !ORDER_EDITOR_ROLES.includes(profile.role)) throw new Error(`You do not have permission to ${action} orders.`);
   return profile;
 }
-
 async function requireViewerProfile() {
   const { profile, error } = await getCurrentProfile();
   if (error) throw error;
   if (!profile) throw new Error("User profile could not be loaded.");
-  if (!hasPermission(profile.role, "orders.view")) {
-    throw new Error("You do not have permission to view customer orders.");
-  }
+  if (!hasPermission(profile.role, "orders.view")) throw new Error("You do not have permission to view customer orders.");
   return profile;
 }
 
 export async function loadCustomerOrderRevisionPolicy(customerId: string, orderId: string): Promise<CustomerOrderRevisionPolicy> {
   const profile = await requireEditorProfile("edit");
-  const { data, error } = await supabase
-    .from("customer_orders")
-    .select("status")
-    .eq("id", orderId)
-    .eq("customer_id", customerId)
-    .single();
-
+  const { data, error } = await supabase.from("customer_orders").select("status").eq("id", orderId).eq("customer_id", customerId).single();
   if (error) throw error;
   return getCustomerOrderRevisionPolicy(data.status as CustomerOrderStatus, profile.role);
 }
 
 export async function loadCreateOrderContext(customerId: string): Promise<CreateOrderContext> {
   await requireEditorProfile("create");
-
   const [customerResult, addressesResult, groupsResult, methodsResult, productsResult, taxRulesResult] = await Promise.all([
     supabase.from("customers").select("*").eq("id", customerId).single(),
     supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("address_name"),
@@ -298,23 +285,20 @@ export async function loadCreateOrderContext(customerId: string): Promise<Create
     supabase.from("products").select(PRODUCT_COLUMNS).eq("status", "active").order("sku"),
     supabase.from("order_tax_rules").select("fulfillment_type, tax_rate, is_active"),
   ]);
-
   const firstError = customerResult.error || addressesResult.error || groupsResult.error || methodsResult.error || productsResult.error || taxRulesResult.error;
   if (firstError) throw firstError;
-
   return {
     customer: customerResult.data as Customer,
     addresses: (addressesResult.data ?? []) as CustomerAddress[],
     priceGroups: (groupsResult.data ?? []) as PriceGroupLookup[],
     paymentMethods: (methodsResult.data ?? []) as PaymentMethod[],
-    products: (productsResult.data ?? []) as OrderDomainProduct[],
+    products: normalizeProducts(productsResult.data),
     taxRules: (taxRulesResult.data ?? []) as OrderTaxRule[],
   };
 }
 
 export async function loadEditOrderContext(customerId: string, orderId: string): Promise<EditOrderContext> {
   const profile = await requireEditorProfile("edit");
-
   const [customerResult, orderResult, itemsResult, addressesResult, groupsResult, methodsResult, productsResult, taxRulesResult] = await Promise.all([
     supabase.from("customers").select("*").eq("id", customerId).single(),
     supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
@@ -325,10 +309,8 @@ export async function loadEditOrderContext(customerId: string, orderId: string):
     supabase.from("products").select(PRODUCT_COLUMNS).in("status", ["active", "inactive"]).order("sku"),
     supabase.from("order_tax_rules").select("fulfillment_type, tax_rate, is_active"),
   ]);
-
   const firstError = customerResult.error || orderResult.error || itemsResult.error || addressesResult.error || groupsResult.error || methodsResult.error || productsResult.error || taxRulesResult.error;
   if (firstError) throw firstError;
-
   return {
     customer: customerResult.data as Customer,
     order: orderResult.data as CustomerOrder,
@@ -336,7 +318,7 @@ export async function loadEditOrderContext(customerId: string, orderId: string):
     addresses: (addressesResult.data ?? []) as CustomerAddress[],
     priceGroups: (groupsResult.data ?? []) as PriceGroupLookup[],
     paymentMethods: (methodsResult.data ?? []) as PaymentMethod[],
-    products: (productsResult.data ?? []) as OrderDomainProduct[],
+    products: normalizeProducts(productsResult.data),
     taxRules: (taxRulesResult.data ?? []) as OrderTaxRule[],
     role: profile.role,
   };
@@ -344,7 +326,6 @@ export async function loadEditOrderContext(customerId: string, orderId: string):
 
 export async function loadOrderDetail(customerId: string, orderId: string): Promise<OrderDetailContext> {
   const profile = await requireViewerProfile();
-
   const [customerResult, orderResult, itemsResult, historyResult, approvalsResult] = await Promise.all([
     supabase.from("customers").select("*").eq("id", customerId).single(),
     supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
@@ -352,10 +333,8 @@ export async function loadOrderDetail(customerId: string, orderId: string): Prom
     supabase.from("customer_order_status_history").select("*").eq("order_id", orderId).order("created_at", { ascending: false }),
     supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("entity_type", "order").eq("entity_id", orderId).eq("status", "pending"),
   ]);
-
   const firstError = customerResult.error || orderResult.error || itemsResult.error || historyResult.error;
   if (firstError) throw firstError;
-
   const itemRows = (itemsResult.data ?? []) as CustomerOrderItem[];
   const countertopProducts = itemRows.map((item) => item.product_id).filter((id): id is string => Boolean(id));
   const canManageCountertop = hasPermission(profile.role, "pricing.manage");
@@ -364,7 +343,6 @@ export async function loadOrderDetail(customerId: string, orderId: string): Prom
     : { data: [], error: null };
   if (countertopProfilesResult.error) throw countertopProfilesResult.error;
   const countertopProductIds = new Set((countertopProfilesResult.data ?? []).map((row) => row.product_id));
-
   return {
     customer: customerResult.data as Customer,
     order: orderResult.data as CustomerOrder,
@@ -383,27 +361,24 @@ export async function loadOrderDetail(customerId: string, orderId: string): Prom
   };
 }
 
-export async function loadOrderPrices(priceGroupId: string, currencyCode: string): Promise<OrderPriceRow[]> {
-  const { data, error } = await supabase
-    .from("product_prices")
-    .select("product_id, amount")
-    .eq("price_group_id", priceGroupId)
-    .eq("is_active", true)
-    .is("valid_to", null)
-    .eq("currency_code", currencyCode || "USD");
-
+export async function loadOrderPriceQuotes(priceGroupId: string, currencyCode: string): Promise<OrderPriceRow[]> {
+  const { data, error } = await supabase.rpc("get_customer_order_product_quotes", {
+    p_product_ids: null,
+    p_price_group_id: priceGroupId,
+    p_currency_code: currencyCode || "USD",
+  });
   if (error) throw error;
-  return (data ?? []) as OrderPriceRow[];
+  return ((data ?? []) as Array<{ product_id: string; unit_price: string | number | null; can_add_ordinary_line: boolean }>)
+    .filter((row) => row.can_add_ordinary_line && row.unit_price !== null)
+    .map((row) => ({ product_id: row.product_id, amount: row.unit_price as string | number }));
 }
 
+export const loadOrderPrices = loadOrderPriceQuotes;
+
 export async function createCustomerOrder(input: CreateCustomerOrderInput): Promise<string> {
-  const { data, error } = await supabase.rpc("create_customer_order", {
+  const { data, error } = await supabase.rpc("create_customer_order_v2", {
     p_customer_id: input.customerId,
-    p_items: input.items.map((item) => ({
-      product_id: item.productId,
-      quantity: numeric(item.quantity),
-      discount_percent: numeric(item.discountPercent),
-    })),
+    p_items: input.items.map((item) => ({ product_id: item.productId, quantity: numeric(item.quantity), discount_percent: numeric(item.discountPercent) })),
     p_price_group_id: input.priceGroupId,
     p_billing_address_id: nullableId(input.billingAddressId),
     p_shipping_address_id: nullableId(input.shippingAddressId),
@@ -418,19 +393,17 @@ export async function createCustomerOrder(input: CreateCustomerOrderInput): Prom
     p_initial_status: input.initialStatus,
     p_fulfillment_type: input.fulfillmentType,
   });
-
   if (error) throw error;
   return String(data);
 }
 
 export async function updateCustomerOrder(input: UpdateCustomerOrderInput): Promise<number> {
-  const { data, error } = await supabase.rpc("update_customer_order", {
+  const { data, error } = await supabase.rpc("update_customer_order_v2", {
     p_order_id: input.orderId,
     p_items: input.items.map((item) => ({
       ...(item.id ? { id: item.id } : {}),
       product_id: item.productId,
       quantity: numeric(item.quantity),
-      unit_price: numeric(item.unitPrice),
       discount_percent: numeric(item.discountPercent),
     })),
     p_price_group_id: input.priceGroupId,
@@ -447,7 +420,6 @@ export async function updateCustomerOrder(input: UpdateCustomerOrderInput): Prom
     p_revision_reason: nullableText(input.revisionReason),
     p_fulfillment_type: input.fulfillmentType,
   });
-
   if (error) throw error;
   return Number(data);
 }
@@ -458,7 +430,6 @@ export async function setCustomerOrderStatus(input: SetCustomerOrderStatusInput)
     p_status: input.status,
     p_note: nullableText(input.note),
   });
-
   if (error) throw error;
   return data === null ? null : String(data);
 }
