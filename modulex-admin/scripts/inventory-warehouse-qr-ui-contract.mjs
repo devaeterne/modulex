@@ -195,7 +195,8 @@ expect(locationsTable.includes('<Table variant="admin"'), "Locations directory m
 expect(locationsTable.includes("<TableViewport>"), "Locations directory must use the shared responsive table viewport");
 expect(locationsTable.includes("onDoubleClick={canManage ?"), "Locations directory must preserve permission-gated double-click editing");
 expect(locationsTable.includes('supabase.rpc("delete_location_if_empty"'), "Locations must preserve stock-safe delete RPC behavior");
-expect(locationsTable.includes('locationsQuery = locationsQuery.eq(') && locationsTable.includes('"zone_id"') && locationsTable.includes('"warehouse_id"'), "Locations must preserve zone and warehouse filtering");
+expect(locationsTable.includes('locationsQuery = locationsQuery.eq("zone_id", zoneId)'), "Locations must preserve zone filtering");
+expect(locationsTable.includes('locationsQuery = locationsQuery.eq("warehouse_id", warehouseId)'), "Locations must preserve warehouse filtering");
 expect(locationForm.includes("This location contains stock. Transfer all stock out before moving the location to another warehouse."), "Location form must preserve the stock-safe warehouse move guard");
 expect(locationForm.includes('htmlFor="location-warehouse"') && locationForm.includes('id="location-warehouse"'), "Location warehouse label must remain associated with its select");
 expect(locationForm.includes('htmlFor="location-zone"') && locationForm.includes('id="location-zone"'), "Location zone label must remain associated with its select");
