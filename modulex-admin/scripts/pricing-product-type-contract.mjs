@@ -9,6 +9,7 @@ const migrationPath = "../modulex-store/supabase/migrations/20260901010000_prici
 const productPricesPath = "src/components/pricing/ProductPricesServerTable.tsx";
 const materialBandsPath = "src/components/pricing/MaterialBandPricingTable.tsx";
 const materialBandsPagePath = "src/app/(admin)/pricing/material-bands/page.tsx";
+const componentCardPath = "src/components/common/ComponentCard.tsx";
 
 assert.ok(fs.existsSync(path.join(root, migrationPath)), "Pricing Product Type routing migration is required");
 assert.ok(fs.existsSync(path.join(root, materialBandsPath)), "Material Bands pricing workspace is required");
@@ -18,6 +19,7 @@ const migration = read(migrationPath);
 const productPrices = read(productPricesPath);
 const materialBands = read(materialBandsPath);
 const materialBandsPage = read(materialBandsPagePath);
+const componentCard = read(componentCardPath);
 const sidebar = read("src/layout/AppSidebar.tsx");
 
 assert.match(migration, /get_product_prices_page_v2/i, "Pricing directory must expose a v2 RPC");
@@ -40,6 +42,18 @@ assert.match(productPrices, /set_product_prices_bulk/, "Existing audited bulk pr
 for (const sharedPrimitive of [/ComponentCard/, /<Select/, /<Badge/, /<TableViewport/, /<Table/]) {
   assert.match(productPrices, sharedPrimitive, "Product Prices must compose shared Admin UI primitives");
 }
+
+assert.match(componentCard, /headerAction\?:\s*React\.ReactNode/, "Shared ComponentCard must support header actions");
+assert.match(componentCard, /collapsed\?:\s*boolean/, "Shared ComponentCard must support compact collapsed bodies");
+assert.match(productPrices, /filtersOpen.*useState\(true\)/s, "Filters must default open");
+assert.match(productPrices, /directoryOpen.*useState\(false\)/s, "Directory Controls must default closed");
+assert.match(productPrices, /bulkOpen.*useState\(false\)/s, "Bulk Pricing must default closed");
+assert.match(productPrices, /collapsed=\{!filtersOpen\}/, "Filters must use the shared collapsible card state");
+assert.match(productPrices, /collapsed=\{!directoryOpen\}/, "Directory Controls must use the shared collapsible card state");
+assert.match(productPrices, /collapsed=\{!bulkOpen\}/, "Bulk Pricing must use the shared collapsible card state");
+assert.match(productPrices, /Manage Material Bands[\s\S]*<\/Button>/, "Material Bands navigation must use the shared Button action");
+assert.match(productPrices, /activeFilters.*active filter/i, "Collapsed Filters header must summarize active filters");
+assert.match(productPrices, /selectedIds\.size.*selected/i, "Collapsed Bulk Pricing header must summarize selection count");
 
 assert.match(materialBandsPage, /MaterialBandPricingTable/, "Material Bands route must render the focused pricing workspace");
 assert.match(materialBands, /countertop_material_price_bands/, "Material Bands workspace must read the canonical band table");
