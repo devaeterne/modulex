@@ -1,3 +1,4 @@
+# VAL-4 branch verification gate. Vercel preview status is managed by the active Admin Vercel project.
 name: Admin VAL-4 Inventory Validation
 
 on:
