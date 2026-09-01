@@ -201,4 +201,22 @@ expect(locationForm.includes("This location contains stock. Transfer all stock o
 expect(locationForm.includes('htmlFor="location-warehouse"') && locationForm.includes('id="location-warehouse"'), "Location warehouse label must remain associated with its select");
 expect(locationForm.includes('htmlFor="location-zone"') && locationForm.includes('id="location-zone"'), "Location zone label must remain associated with its select");
 
-console.log("inventory + stock movements + stock operations + warehouse + zones + locations + QR UI contract: ok");
+const qrLabels = read("src/components/qr-labels/QRLabelsGrid.tsx");
+for (const primitive of ["ComponentCard", "Label", "Select", "Input", "Alert", "Badge", "Button", "Modal"]) {
+  expect(qrLabels.includes(primitive), `QR Labels UI must compose shared ${primitive} primitives`);
+}
+expect(!/<(?:input|select|button)\b/.test(qrLabels), "QR Labels screen UI must not reimplement shared input, select, or button primitives");
+expect(/\.from\("zones"\)(?:(?!\.from\("locations"\))[\s\S])*?\.eq\("is_active", true\)/.test(qrLabels), "QR Labels must keep active-only zone loading on the zones query");
+expect(/\.from\("locations"\)[\s\S]{0,900}?\.eq\("is_active", true\)/.test(qrLabels), "QR Labels must keep active-only location loading on the locations query");
+expect(qrLabels.includes('location.qr_code?.startsWith("LOC-")'), "QR Labels must preserve canonical location QR-code compatibility behavior");
+expect(qrLabels.includes("buildZoneQrPayload") && qrLabels.includes("buildLocationQrPayload"), "QR Labels must preserve canonical QR payload generation");
+expect(qrLabels.includes('window.addEventListener("afterprint"'), "QR Labels must preserve after-print cleanup");
+expect(qrLabels.includes("window.print()"), "QR Labels must preserve browser printing");
+expect(qrLabels.includes('kind: "single-label"') && qrLabels.includes('kind: "single-a4"') && qrLabels.includes('kind: "bulk"'), "QR Labels must preserve all print job modes");
+expect(qrLabels.includes('useState<BulkPrintMode>("a4")'), "QR Labels must preserve A4 as the default bulk-print mode");
+expect(qrLabels.includes('useState<LabelSizeKey>("60x40")'), "QR Labels must preserve 60x40 as the default label size");
+expect(qrLabels.includes('useState<A4GridSizeKey>("medium")'), "QR Labels must preserve medium as the default A4 grid size");
+expect(qrLabels.includes('className="modulex-print-root"'), "QR Labels must preserve isolated print-only output");
+expect(qrLabels.includes("No QR labels found."), "QR Labels must preserve its empty state");
+
+console.log("inventory + stock movements + stock operations + warehouse + zones + locations + QR labels UI contract: ok");
