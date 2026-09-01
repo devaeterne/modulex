@@ -14,6 +14,7 @@ import {
   TableCell,
   TableHeader,
   TableRow,
+  TableStateRow,
   TableViewport,
 } from "@/components/ui/table";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -30,6 +31,7 @@ type MaterialBand = {
 };
 
 const PRICE_DECIMAL = { precision: 18, scale: 4, min: 0, allowNull: false } as const;
+const TABLE_COLUMN_COUNT = 4;
 
 function bandErrorMessage(message: string) {
   const normalized = message.toLowerCase();
@@ -154,7 +156,12 @@ export default function MaterialBandPricingTable() {
       </ComponentCard>
 
       {error && !editing ? (
-        <Alert variant="error" title="Material pricing unavailable" message={error} />
+        <div className="space-y-3">
+          <Alert variant="error" title="Material pricing unavailable" message={error} />
+          <Button variant="outline" onClick={() => void load()}>
+            Retry
+          </Button>
+        </div>
       ) : null}
       {success ? <Alert variant="success" title="Material pricing updated" message={success} /> : null}
 
@@ -170,7 +177,7 @@ export default function MaterialBandPricingTable() {
           />
         ) : (
           <TableViewport>
-            <Table variant="admin" className="min-w-[720px]">
+            <Table variant="admin" minWidth="standard">
               <TableHeader variant="admin">
                 <TableRow>
                   <TableCell isHeader variant="admin" className="text-left">
@@ -195,7 +202,7 @@ export default function MaterialBandPricingTable() {
                         <Badge color="primary">{row.code}</Badge>
                       </TableCell>
                       <TableCell variant="admin" className="text-right">
-                        {new Intl.NumberFormat("en-US", {
+                        {new Intl.NumberFormat(undefined, {
                           style: "currency",
                           currency: "USD",
                           minimumFractionDigits: 2,
@@ -224,11 +231,9 @@ export default function MaterialBandPricingTable() {
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow>
-                    <TableCell variant="admin" colSpan={4} className="text-center">
-                      No material price bands found.
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow colSpan={TABLE_COLUMN_COUNT}>
+                    No material price bands found.
+                  </TableStateRow>
                 )}
               </TableBody>
             </Table>
@@ -236,7 +241,12 @@ export default function MaterialBandPricingTable() {
         )}
       </ComponentCard>
 
-      <Modal isOpen={Boolean(editing)} onClose={closeEditor} className="m-4 max-w-[640px]">
+      <Modal
+        isOpen={Boolean(editing)}
+        onClose={closeEditor}
+        className="m-4 max-w-[640px]"
+        ariaLabel="Edit material band price"
+      >
         <div className="p-4 sm:p-6">
           <ComponentCard
             title={editing ? `Edit ${editing.code}` : "Edit Material Band"}

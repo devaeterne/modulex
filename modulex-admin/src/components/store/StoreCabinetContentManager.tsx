@@ -1,6 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import { hasPermission } from "@/lib/auth/permissions";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import {
   deleteFaqEntry,
@@ -16,6 +26,14 @@ import {
 } from "@/lib/store/cabinetContent";
 
 const SOURCE_PAGE = "https://granitecenterva.com/kitchen-cabinet-sale/";
+const PROCESS_ATTRIBUTION_OPTIONS = [
+  { value: "adapted_parent_source", label: "Adapted parent source" },
+  { value: "original_oakwell", label: "Original Oakwell" },
+];
+const FAQ_ATTRIBUTION_OPTIONS = [
+  { value: "original_oakwell", label: "Original Oakwell" },
+  { value: "adapted_parent_source", label: "Adapted parent source" },
+];
 
 type ProcessDraft = {
   id: string | null;
@@ -59,9 +77,9 @@ function emptyFaq(sortOrder: number): FaqDraft {
 
 function StatusBadge({ status }: { status: "draft" | "published" }) {
   return (
-    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status === "published" ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400" : "bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-400"}`}>
-      {status}
-    </span>
+    <Badge color={status === "published" ? "success" : "light"} size="sm">
+      {status === "published" ? "Published" : "Draft"}
+    </Badge>
   );
 }
 
@@ -73,10 +91,12 @@ export default function StoreCabinetContentManager() {
   const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadFailed(false);
     setError(null);
     try {
       const [{ profile, error: profileError }, content] = await Promise.all([
@@ -84,13 +104,15 @@ export default function StoreCabinetContentManager() {
         loadCabinetContent(),
       ]);
       if (profileError) throw profileError;
-      setCanEdit(["super_admin", "admin"].includes(profile?.role ?? ""));
+      setCanEdit(hasPermission(profile?.roles, "store.manage"));
       setSteps(content.steps);
       setFaqs(content.faqs);
       setNewStep(emptyProcess((content.steps.at(-1)?.sort_order ?? 0) + 10));
       setNewFaq(emptyFaq((content.faqs.at(-1)?.sort_order ?? 0) + 10));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to load Cabinet Content.");
+      console.error("Failed to load Cabinet Content", caught);
+      setLoadFailed(true);
+      setError("Cabinet Content could not be loaded. Please retry.");
     } finally {
       setLoading(false);
     }
@@ -102,96 +124,148 @@ export default function StoreCabinetContentManager() {
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
+    setLoadFailed(false);
     setError(null);
     try {
       await action();
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Cabinet Content update failed.");
+      console.error("Cabinet Content update failed", caught);
+      setError("Cabinet Content update failed. Check the values and try again.");
     } finally {
       setBusy(false);
     }
   }
 
   if (loading) {
-    return <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Loading Cabinet Content...</div>;
+    return (
+      <Alert
+        variant="info"
+        title="Loading Cabinet Content"
+        message="Cabinet planning and FAQ content is being loaded."
+      />
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="space-y-3">
+        <Alert
+          variant="error"
+          title="Cabinet Content unavailable"
+          message={error ?? "Cabinet Content could not be loaded."}
+        />
+        <Button variant="outline" onClick={() => void load()}>
+          Retry
+        </Button>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Cabinet Content</h1>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-              Manage the cabinet planning process and Oakwell cabinetry FAQ. Drafts stay private; publishing is always explicit.
-            </p>
+      <ComponentCard
+        title="Cabinet Content"
+        desc="Manage the cabinet planning process and Oakwell cabinetry FAQ. Drafts stay private; publishing is always explicit."
+        headerAction={
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <Badge color={canEdit ? "success" : "light"}>{canEdit ? "Manage" : "View only"}</Badge>
+            <Link
+              href="/store/pages"
+              className="text-sm font-medium text-brand-500 underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:text-brand-400"
+            >
+              Edit page SEO & copy
+            </Link>
           </div>
-          <a href="/store/pages" className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">
-            Edit page SEO & copy
-          </a>
-        </div>
-        {error ? <p className="mt-3 text-sm text-error-600 dark:text-error-400">{error}</p> : null}
-      </section>
+        }
+      >
+        {error ? <Alert variant="error" title="Unable to update Cabinet Content" message={error} /> : null}
+      </ComponentCard>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-        <div className="mb-5">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Cabinet Planning Process</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Source-adapted steps retain their Granite & Cabinet Center source URL internally; the public RPC does not expose provenance.</p>
-        </div>
-
+      <ComponentCard
+        title="Cabinet Planning Process"
+        desc="Source-adapted steps retain their Granite & Cabinet Center source URL internally; the public RPC does not expose provenance."
+      >
         <div className="space-y-4">
           {steps.map((step) => (
             <ProcessRow key={step.id} step={step} disabled={!canEdit || busy} run={run} />
           ))}
-          {steps.length === 0 ? <p className="text-sm text-gray-500">No process steps yet.</p> : null}
+          {steps.length === 0 ? (
+            <Alert variant="info" title="No process steps" message="Add the first cabinet planning process step below." />
+          ) : null}
         </div>
 
-        <div className="mt-6 border-t border-gray-200 pt-5 dark:border-gray-800">
-          <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Add process step</h3>
-          <ProcessFields value={newStep} onChange={setNewStep} disabled={!canEdit || busy} />
-          <button
-            type="button"
-            disabled={!canEdit || busy}
-            onClick={() => run(() => saveProcessStep(null, { ...newStep, source_page_url: newStep.source_page_url || null }))}
-            className="mt-3 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Save draft step
-          </button>
-        </div>
-      </section>
+        <ComponentCard
+          title="Add process step"
+          desc="Create a private draft first. Publishing remains a separate explicit action."
+        >
+          <ProcessFields value={newStep} onChange={setNewStep} disabled={!canEdit || busy} prefix="new-process" />
+          <div className="flex justify-end">
+            <Button
+              disabled={!canEdit || busy}
+              onClick={() =>
+                void run(() =>
+                  saveProcessStep(null, {
+                    ...newStep,
+                    source_page_url: newStep.source_page_url || null,
+                  }),
+                )
+              }
+            >
+              Save draft step
+            </Button>
+          </div>
+        </ComponentCard>
+      </ComponentCard>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-        <div className="mb-5">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Cabinet FAQ</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">FAQ copy is Oakwell-authored managed content; Granite&apos;s stone FAQ is not imported.</p>
-        </div>
-
+      <ComponentCard
+        title="Cabinet FAQ"
+        desc="FAQ copy is Oakwell-authored managed content; Granite's stone FAQ is not imported."
+      >
         <div className="space-y-4">
           {faqs.map((faq) => (
             <FaqRow key={faq.id} faq={faq} disabled={!canEdit || busy} run={run} />
           ))}
-          {faqs.length === 0 ? <p className="text-sm text-gray-500">No FAQ entries yet.</p> : null}
+          {faqs.length === 0 ? (
+            <Alert variant="info" title="No FAQ entries" message="Add the first Oakwell cabinetry FAQ entry below." />
+          ) : null}
         </div>
 
-        <div className="mt-6 border-t border-gray-200 pt-5 dark:border-gray-800">
-          <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Add FAQ</h3>
-          <FaqFields value={newFaq} onChange={setNewFaq} disabled={!canEdit || busy} />
-          <button
-            type="button"
-            disabled={!canEdit || busy}
-            onClick={() => run(() => saveFaqEntry(null, { ...newFaq, source_page_url: newFaq.source_page_url || null }))}
-            className="mt-3 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Save draft FAQ
-          </button>
-        </div>
-      </section>
+        <ComponentCard
+          title="Add FAQ"
+          desc="Create a private FAQ draft first. Publishing remains a separate explicit action."
+        >
+          <FaqFields value={newFaq} onChange={setNewFaq} disabled={!canEdit || busy} prefix="new-faq" />
+          <div className="flex justify-end">
+            <Button
+              disabled={!canEdit || busy}
+              onClick={() =>
+                void run(() =>
+                  saveFaqEntry(null, {
+                    ...newFaq,
+                    source_page_url: newFaq.source_page_url || null,
+                  }),
+                )
+              }
+            >
+              Save draft FAQ
+            </Button>
+          </div>
+        </ComponentCard>
+      </ComponentCard>
     </div>
   );
 }
 
-function ProcessRow({ step, disabled, run }: { step: StoreProcessStep; disabled: boolean; run: (action: () => Promise<void>) => Promise<void> }) {
+function ProcessRow({
+  step,
+  disabled,
+  run,
+}: {
+  step: StoreProcessStep;
+  disabled: boolean;
+  run: (action: () => Promise<void>) => Promise<void>;
+}) {
   const [draft, setDraft] = useState<ProcessDraft>({
     id: step.id,
     title: step.title,
@@ -200,23 +274,60 @@ function ProcessRow({ step, disabled, run }: { step: StoreProcessStep; disabled:
     source_page_url: step.source_page_url ?? "",
     attribution_classification: step.attribution_classification,
   });
+
   return (
-    <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <StatusBadge status={step.status} />
-        <span className="text-xs text-gray-400">Updated {new Date(step.updated_at).toLocaleString()}</span>
+    <ComponentCard
+      title={step.title || "Process step"}
+      desc={`Updated ${new Date(step.updated_at).toLocaleString()}`}
+      headerAction={<StatusBadge status={step.status} />}
+    >
+      <ProcessFields value={draft} onChange={setDraft} disabled={disabled} prefix={`process-${step.id}`} />
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={() =>
+            void run(() =>
+              saveProcessStep(step.id, {
+                ...draft,
+                source_page_url: draft.source_page_url || null,
+              }),
+            )
+          }
+        >
+          Save as draft
+        </Button>
+        <Button
+          size="sm"
+          variant={step.status === "published" ? "outline" : "primary"}
+          disabled={disabled}
+          onClick={() => void run(() => setProcessStepPublished(step.id, step.status !== "published"))}
+        >
+          {step.status === "published" ? "Unpublish" : "Publish"}
+        </Button>
+        <Button
+          size="sm"
+          variant="danger"
+          disabled={disabled}
+          onClick={() => void run(() => deleteProcessStep(step.id))}
+        >
+          Delete
+        </Button>
       </div>
-      <ProcessFields value={draft} onChange={setDraft} disabled={disabled} />
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" disabled={disabled} onClick={() => run(() => saveProcessStep(step.id, { ...draft, source_page_url: draft.source_page_url || null }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700">Save as draft</button>
-        <button type="button" disabled={disabled} onClick={() => run(() => setProcessStepPublished(step.id, step.status !== "published"))} className="rounded-lg bg-brand-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{step.status === "published" ? "Unpublish" : "Publish"}</button>
-        <button type="button" disabled={disabled} onClick={() => run(() => deleteProcessStep(step.id))} className="rounded-lg border border-error-300 px-3 py-2 text-sm text-error-600 dark:border-error-500/40">Delete</button>
-      </div>
-    </div>
+    </ComponentCard>
   );
 }
 
-function FaqRow({ faq, disabled, run }: { faq: StoreFaqEntry; disabled: boolean; run: (action: () => Promise<void>) => Promise<void> }) {
+function FaqRow({
+  faq,
+  disabled,
+  run,
+}: {
+  faq: StoreFaqEntry;
+  disabled: boolean;
+  run: (action: () => Promise<void>) => Promise<void>;
+}) {
   const [draft, setDraft] = useState<FaqDraft>({
     id: faq.id,
     question: faq.question,
@@ -225,42 +336,191 @@ function FaqRow({ faq, disabled, run }: { faq: StoreFaqEntry; disabled: boolean;
     source_page_url: faq.source_page_url ?? "",
     attribution_classification: faq.attribution_classification,
   });
+
   return (
-    <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <StatusBadge status={faq.status} />
-        <span className="text-xs text-gray-400">Updated {new Date(faq.updated_at).toLocaleString()}</span>
+    <ComponentCard
+      title={faq.question || "FAQ entry"}
+      desc={`Updated ${new Date(faq.updated_at).toLocaleString()}`}
+      headerAction={<StatusBadge status={faq.status} />}
+    >
+      <FaqFields value={draft} onChange={setDraft} disabled={disabled} prefix={`faq-${faq.id}`} />
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={() =>
+            void run(() =>
+              saveFaqEntry(faq.id, {
+                ...draft,
+                source_page_url: draft.source_page_url || null,
+              }),
+            )
+          }
+        >
+          Save as draft
+        </Button>
+        <Button
+          size="sm"
+          variant={faq.status === "published" ? "outline" : "primary"}
+          disabled={disabled}
+          onClick={() => void run(() => setFaqEntryPublished(faq.id, faq.status !== "published"))}
+        >
+          {faq.status === "published" ? "Unpublish" : "Publish"}
+        </Button>
+        <Button
+          size="sm"
+          variant="danger"
+          disabled={disabled}
+          onClick={() => void run(() => deleteFaqEntry(faq.id))}
+        >
+          Delete
+        </Button>
       </div>
-      <FaqFields value={draft} onChange={setDraft} disabled={disabled} />
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" disabled={disabled} onClick={() => run(() => saveFaqEntry(faq.id, { ...draft, source_page_url: draft.source_page_url || null }))} className="rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-700">Save as draft</button>
-        <button type="button" disabled={disabled} onClick={() => run(() => setFaqEntryPublished(faq.id, faq.status !== "published"))} className="rounded-lg bg-brand-500 px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{faq.status === "published" ? "Unpublish" : "Publish"}</button>
-        <button type="button" disabled={disabled} onClick={() => run(() => deleteFaqEntry(faq.id))} className="rounded-lg border border-error-300 px-3 py-2 text-sm text-error-600 dark:border-error-500/40">Delete</button>
+    </ComponentCard>
+  );
+}
+
+function ProcessFields({
+  value,
+  onChange,
+  disabled,
+  prefix,
+}: {
+  value: ProcessDraft;
+  onChange: (next: ProcessDraft) => void;
+  disabled: boolean;
+  prefix: string;
+}) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <div>
+        <Label htmlFor={`${prefix}-title`}>Title</Label>
+        <Input
+          id={`${prefix}-title`}
+          disabled={disabled}
+          value={value.title}
+          onChange={(event) => onChange({ ...value, title: event.target.value })}
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${prefix}-sort-order`}>Sort order</Label>
+        <Input
+          id={`${prefix}-sort-order`}
+          disabled={disabled}
+          type="number"
+          min={0}
+          value={value.sort_order}
+          onChange={(event) => onChange({ ...value, sort_order: Number(event.target.value) })}
+        />
+      </div>
+      <div className="md:col-span-2">
+        <Label htmlFor={`${prefix}-body`}>Body</Label>
+        <TextArea
+          id={`${prefix}-body`}
+          disabled={disabled}
+          rows={3}
+          value={value.body}
+          onChange={(body) => onChange({ ...value, body })}
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${prefix}-source-url`}>Source page URL</Label>
+        <Input
+          id={`${prefix}-source-url`}
+          disabled={disabled}
+          type="url"
+          value={value.source_page_url}
+          onChange={(event) => onChange({ ...value, source_page_url: event.target.value })}
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${prefix}-attribution`}>Attribution</Label>
+        <Select
+          id={`${prefix}-attribution`}
+          disabled={disabled}
+          options={PROCESS_ATTRIBUTION_OPTIONS}
+          value={value.attribution_classification}
+          onChange={(attribution_classification) =>
+            onChange({
+              ...value,
+              attribution_classification: attribution_classification as CabinetContentAttribution,
+            })
+          }
+        />
       </div>
     </div>
   );
 }
 
-function ProcessFields({ value, onChange, disabled }: { value: ProcessDraft; onChange: (next: ProcessDraft) => void; disabled: boolean }) {
+function FaqFields({
+  value,
+  onChange,
+  disabled,
+  prefix,
+}: {
+  value: FaqDraft;
+  onChange: (next: FaqDraft) => void;
+  disabled: boolean;
+  prefix: string;
+}) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      <label className="text-sm text-gray-600 dark:text-gray-300">Title<input disabled={disabled} value={value.title} onChange={(event) => onChange({ ...value, title: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700" /></label>
-      <label className="text-sm text-gray-600 dark:text-gray-300">Sort order<input disabled={disabled} type="number" min={0} value={value.sort_order} onChange={(event) => onChange({ ...value, sort_order: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700" /></label>
-      <label className="text-sm text-gray-600 dark:text-gray-300 md:col-span-2">Body<textarea disabled={disabled} rows={3} value={value.body} onChange={(event) => onChange({ ...value, body: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700" /></label>
-      <label className="text-sm text-gray-600 dark:text-gray-300">Source page URL<input disabled={disabled} value={value.source_page_url} onChange={(event) => onChange({ ...value, source_page_url: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700" /></label>
-      <label className="text-sm text-gray-600 dark:text-gray-300">Attribution<select disabled={disabled} value={value.attribution_classification} onChange={(event) => onChange({ ...value, attribution_classification: event.target.value as CabinetContentAttribution })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700"><option value="adapted_parent_source">Adapted parent source</option><option value="original_oakwell">Original Oakwell</option></select></label>
-    </div>
-  );
-}
-
-function FaqFields({ value, onChange, disabled }: { value: FaqDraft; onChange: (next: FaqDraft) => void; disabled: boolean }) {
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      <label className="text-sm text-gray-600 dark:text-gray-300">Question<input disabled={disabled} value={value.question} onChange={(event) => onChange({ ...value, question: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700" /></label>
-      <label className="text-sm text-gray-600 dark:text-gray-300">Sort order<input disabled={disabled} type="number" min={0} value={value.sort_order} onChange={(event) => onChange({ ...value, sort_order: Number(event.target.value) })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700" /></label>
-      <label className="text-sm text-gray-600 dark:text-gray-300 md:col-span-2">Answer<textarea disabled={disabled} rows={3} value={value.answer} onChange={(event) => onChange({ ...value, answer: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700" /></label>
-      <label className="text-sm text-gray-600 dark:text-gray-300">Source page URL (optional)<input disabled={disabled} value={value.source_page_url} onChange={(event) => onChange({ ...value, source_page_url: event.target.value })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700" /></label>
-      <label className="text-sm text-gray-600 dark:text-gray-300">Attribution<select disabled={disabled} value={value.attribution_classification} onChange={(event) => onChange({ ...value, attribution_classification: event.target.value as CabinetContentAttribution })} className="mt-1 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 dark:border-gray-700"><option value="original_oakwell">Original Oakwell</option><option value="adapted_parent_source">Adapted parent source</option></select></label>
+    <div className="grid gap-4 md:grid-cols-2">
+      <div>
+        <Label htmlFor={`${prefix}-question`}>Question</Label>
+        <Input
+          id={`${prefix}-question`}
+          disabled={disabled}
+          value={value.question}
+          onChange={(event) => onChange({ ...value, question: event.target.value })}
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${prefix}-sort-order`}>Sort order</Label>
+        <Input
+          id={`${prefix}-sort-order`}
+          disabled={disabled}
+          type="number"
+          min={0}
+          value={value.sort_order}
+          onChange={(event) => onChange({ ...value, sort_order: Number(event.target.value) })}
+        />
+      </div>
+      <div className="md:col-span-2">
+        <Label htmlFor={`${prefix}-answer`}>Answer</Label>
+        <TextArea
+          id={`${prefix}-answer`}
+          disabled={disabled}
+          rows={3}
+          value={value.answer}
+          onChange={(answer) => onChange({ ...value, answer })}
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${prefix}-source-url`}>Source page URL (optional)</Label>
+        <Input
+          id={`${prefix}-source-url`}
+          disabled={disabled}
+          type="url"
+          value={value.source_page_url}
+          onChange={(event) => onChange({ ...value, source_page_url: event.target.value })}
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${prefix}-attribution`}>Attribution</Label>
+        <Select
+          id={`${prefix}-attribution`}
+          disabled={disabled}
+          options={FAQ_ATTRIBUTION_OPTIONS}
+          value={value.attribution_classification}
+          onChange={(attribution_classification) =>
+            onChange({
+              ...value,
+              attribution_classification: attribution_classification as CabinetContentAttribution,
+            })
+          }
+        />
+      </div>
     </div>
   );
 }
