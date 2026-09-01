@@ -248,7 +248,9 @@ export default function VendorImportsPage() {
               </Button>
             ))}
           </div>
-          <p className="text-xs">{recordLabel}</p>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+            {recordLabel}
+          </p>
         </div>
 
         <fieldset className="flex flex-wrap gap-x-5 gap-y-3">
