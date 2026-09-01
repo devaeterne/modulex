@@ -140,6 +140,13 @@ begin
   );
 
   if v_kind = 'sink' then
+    -- Product Master intentionally preserves existing metadata during edits.
+    -- Countertop Catalog owns this domain marker, so ensure legacy Sink rows
+    -- become discoverable by the existing configurator as part of this same transaction.
+    update public.products
+    set metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object('product_kind','sink')
+    where id = v_product_id;
+
     if p_prices is null or jsonb_typeof(p_prices) <> 'array' then
       raise exception 'Sink prices must be supplied for every order price group.';
     end if;
