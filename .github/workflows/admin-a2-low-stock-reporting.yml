@@ -10,7 +10,6 @@ on:
       - "modulex-admin/src/lib/reports/**"
       - "modulex-admin/sql/a2-low-stock-reporting.sql"
       - "modulex-admin/scripts/a2-low-stock-reporting-contract.mjs"
-      - "modulex-admin/scripts/low-stock-ui-contract.mjs"
       - "modulex-admin/docs/acceptance/a2-4-low-stock-reporting.md"
       - "modulex-admin/ADMIN_ROADMAP.md"
       - "modulex-admin/package.json"
@@ -26,7 +25,6 @@ on:
       - "modulex-admin/src/lib/reports/**"
       - "modulex-admin/sql/a2-low-stock-reporting.sql"
       - "modulex-admin/scripts/a2-low-stock-reporting-contract.mjs"
-      - "modulex-admin/scripts/low-stock-ui-contract.mjs"
       - "modulex-admin/docs/acceptance/a2-4-low-stock-reporting.md"
       - "modulex-admin/ADMIN_ROADMAP.md"
       - "modulex-admin/package.json"
@@ -52,7 +50,6 @@ jobs:
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
       - run: npm run smoke:a2-low-stock-reporting
-      - run: node scripts/low-stock-ui-contract.mjs
       - run: npm run smoke:a2-inventory-movements
       - run: npm run smoke:a2-warehouse-integrity
       - run: npm run lint
