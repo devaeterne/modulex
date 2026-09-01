@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
+import SectionTitle from "@/components/common/SectionTitle";
 import SummaryRow from "@/components/common/SummaryRow";
 import FormHint from "@/components/form/FormHint";
 import Label from "@/components/form/Label";
@@ -324,8 +325,10 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
               {orderContext ? (
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Badge color="info">Order {orderContext.orderNumber}</Badge>
-                  <span>{orderContext.lineNo ? `Line ${orderContext.lineNo}` : "New countertop"}</span>
-                  {(orderContext.sku || orderContext.productName) ? <span>{orderContext.sku} · {orderContext.productName}</span> : null}
+                  <Badge color="light">{orderContext.lineNo ? `Line ${orderContext.lineNo}` : "New countertop"}</Badge>
+                  {(orderContext.sku || orderContext.productName) ? (
+                    <Badge color="light">{[orderContext.sku, orderContext.productName].filter(Boolean).join(" · ")}</Badge>
+                  ) : null}
                 </div>
               ) : null}
               {!orderItemId && !orderId ? <FormHint>Open a draft customer order to configure and attach a countertop.</FormHint> : null}
@@ -390,7 +393,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold">Additional services</h3>
+            <SectionTitle>Additional services</SectionTitle>
             {services.length === 0 ? <FormHint>No active services.</FormHint> : null}
             {services.map((service) => (
               <div key={service.id} className="flex flex-wrap items-center gap-3">
@@ -432,7 +435,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
         <ComponentCard title="Price Summary" desc="Authoritative server calculation for this Countertop configuration.">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold">{result.stone?.name ?? selectedStone?.name ?? "Selected stone"}</span>
+              <Badge color="light">{result.stone?.name ?? selectedStone?.name ?? "Selected stone"}</Badge>
               {result.stone?.stone_type ? <Badge color="info">{result.stone.stone_type}</Badge> : null}
               {result.stone?.material_price_band ? <Badge color="primary">{result.stone.material_price_band}</Badge> : null}
               {result.stone?.sqft !== undefined ? <Badge color="light">{Number(result.stone.sqft)} sq ft</Badge> : null}

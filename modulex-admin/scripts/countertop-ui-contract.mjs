@@ -7,6 +7,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 
 const catalog = read("src/components/countertop/CountertopCatalogManager.tsx");
 const setup = read("src/components/countertop/CountertopReferenceManager.tsx");
+const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const catalogPage = read("src/app/(admin)/pricing/countertop/catalog/page.tsx");
 const setupPage = read("src/app/(admin)/pricing/countertop/settings/page.tsx");
 
@@ -22,5 +23,12 @@ assert(!setup.includes("saveProfile") && !setup.includes("toggleProfile"), "Setu
 assert(!setup.includes('from("countertop_stone_product_profiles")'), "Setup must not load Stone Product Profiles after Catalog becomes canonical operator surface");
 assert(catalogPage.includes("PageBreadcrumb") && setupPage.includes("PageBreadcrumb"), "Countertop routes must preserve shared page heading convention");
 for (const text of ["Add Stone", "Add Sink", "Stone Type", "Material Price Band", "Sink prices"]) assert(catalog.includes(text), `Countertop Catalog capability missing: ${text}`);
+
+assert(configurator.includes('import SectionTitle from "@/components/common/SectionTitle"'), "Countertop configurator section headings must use the shared SectionTitle tone");
+assert(configurator.includes("<SectionTitle>Additional services</SectionTitle>"), "Additional services heading must use the shared dark-mode-safe SectionTitle");
+assert(!configurator.includes('<h3 className="text-sm font-semibold">Additional services</h3>'), "Countertop configurator must not render a raw unthemed Additional services heading");
+assert(!configurator.includes('<span>{orderContext.lineNo ? `Line ${orderContext.lineNo}` : "New countertop"}</span>'), "Countertop order context must not rely on inherited text color");
+assert(!configurator.includes('<span className="text-sm font-semibold">{result.stone?.name ?? selectedStone?.name ?? "Selected stone"}</span>'), "Countertop price summary Stone label must not rely on inherited text color");
+assert(configurator.includes('Badge color="light"'), "Countertop contextual labels must use semantic shared Badge tones");
 
 console.log("Countertop shared UI contract: PASS");
