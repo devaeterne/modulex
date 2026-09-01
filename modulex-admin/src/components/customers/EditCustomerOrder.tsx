@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import CountertopConfigurator from "@/components/countertop/CountertopConfigurator";
 import OrderProductPicker, { type OrderPickerProduct } from "@/components/customers/OrderProductPicker";
+import Button from "@/components/ui/button/Button";
 import {
   getCustomerOrderRevisionPolicy,
   loadEditOrderContext,
@@ -33,6 +35,16 @@ function resolveOrderLineUnitPrice(item: DraftItem, product: Product | undefined
     return Number.isFinite(storedPrice) && storedPrice >= 0 ? storedPrice : undefined;
   }
   return undefined;
+}
+
+function mapDraftItem(item: { id: string; product_id: string | null; quantity: string | number; unit_price: string | number; discount_percent: string | number }): DraftItem {
+  return {
+    id: item.id,
+    product_id: item.product_id ?? "",
+    quantity: String(item.quantity),
+    unit_price: String(item.unit_price),
+    discount_percent: String(item.discount_percent),
+  };
 }
 
 export default function EditCustomerOrder() {
@@ -67,6 +79,7 @@ export default function EditCustomerOrder() {
   const [revisionReason, setRevisionReason] = useState("");
 
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+  const [isCountertopOpen, setIsCountertopOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -89,13 +102,7 @@ export default function EditCustomerOrder() {
         setPaymentMethods(context.paymentMethods);
         setProducts(context.products as Product[]);
         setTaxRules(context.taxRules);
-        setItems(context.items.map((item) => ({
-          id: item.id,
-          product_id: item.product_id ?? "",
-          quantity: String(item.quantity),
-          unit_price: String(item.unit_price),
-          discount_percent: String(item.discount_percent),
-        })));
+        setItems(context.items.map(mapDraftItem));
 
         setPriceGroupId(loadedOrder.price_group_id ?? "");
         setFulfillmentType(loadedOrder.fulfillment_type || "delivery");
@@ -156,6 +163,7 @@ export default function EditCustomerOrder() {
   const selectedPaymentMethod = useMemo(() => paymentMethods.find((m) => m.id === paymentMethodId) ?? null, [paymentMethods, paymentMethodId]);
   const selectedTaxRule = useMemo(() => taxRules.find((rule) => rule.fulfillment_type === fulfillmentType) ?? null, [taxRules, fulfillmentType]);
   const revisionPolicy = useMemo(() => order && role ? getCustomerOrderRevisionPolicy(order.status, role) : null, [order, role]);
+  const canManageCountertop = role !== null && ["super_admin", "admin", "sales"].includes(role);
 
   const preview = useMemo(() => {
     let subtotal = 0;
@@ -195,6 +203,21 @@ export default function EditCustomerOrder() {
         discount_percent: "0",
       }];
     });
+  }
+
+  async function handleCountertopAttached(createdItemId: string) {
+    try {
+      const context = await loadEditOrderContext(customerId, orderId);
+      const createdItem = context.items.find((item) => item.id === createdItemId);
+      if (!createdItem) throw new Error("The new countertop line could not be reloaded.");
+      setProducts(context.products as Product[]);
+      setItems((current) => current.some((item) => item.id === createdItemId)
+        ? current.map((item) => item.id === createdItemId ? mapDraftItem(createdItem) : item)
+        : [...current, mapDraftItem(createdItem)]);
+      setIsCountertopOpen(false);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Countertop was attached but the order line could not be refreshed.");
+    }
   }
 
   function handlePriceGroupChange(groupId: string) {
@@ -299,9 +322,24 @@ export default function EditCustomerOrder() {
     </div>
 
     <div className="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-      <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800"><div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Products</h2><p className="mt-1 text-sm text-gray-500">Prices are resolved by the canonical pricing route and are read-only. Line discounts remain approval-controlled for Sales.</p></div><button type="button" onClick={() => setIsProductPickerOpen(true)} className="inline-flex h-9 items-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white shadow-theme-xs hover:bg-brand-600">Add Products</button></div>
-      <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Product","Qty","Server Price","Discount %","Line Total",""].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">{items.length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No products added. Use <span className="font-medium text-gray-700 dark:text-gray-300">Add Products</span> to select items.</td></tr> : items.map((item, index) => { const product = productMap.get(item.product_id); const resolvedPrice = resolveOrderLineUnitPrice(item, product, priceMap); const total = Number(item.quantity || 0) * Number(resolvedPrice ?? 0) * (1 - Number(item.discount_percent || 0) / 100); return <tr key={item.product_id}><td className="min-w-[340px] px-4 py-3"><div className="flex items-center gap-2"><span className="text-sm font-semibold text-gray-800 dark:text-white/90">{product?.sku ?? "Unknown product"}</span>{product?.status === "inactive" && <span className="rounded-full bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">Inactive</span>}</div><div className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{product?.name ?? item.product_id}</div></td><td className="w-[110px] px-4 py-3"><input value={item.quantity} onChange={(e) => updateItem(index, { quantity: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="min-w-[180px] px-4 py-3"><span className="text-sm font-semibold text-gray-800 dark:text-white/90">{resolvedPrice === undefined ? "Unavailable" : money(resolvedPrice)}</span><span className="mt-1 block text-xs text-gray-400">{product?.pricing_model === "countertop_material_band" ? "Countertop · configured price" : "Price Group · server authoritative"}</span></td><td className="w-[130px] px-4 py-3"><input value={item.discount_percent} onChange={(e) => updateItem(index, { discount_percent: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="px-4 py-3 text-sm font-semibold text-gray-800 dark:text-white/90">{money(total)}</td><td className="px-4 py-3 text-right"><button type="button" onClick={() => setItems((current) => current.filter((_, i) => i !== index))} className="text-xs font-medium text-error-600">Remove</button></td></tr>; })}</tbody></table></div>
+      <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Products</h2><p className="mt-1 text-sm text-gray-500">Prices are resolved by the canonical pricing route and are read-only. Line discounts remain approval-controlled for Sales.</p></div>
+        <div className="flex flex-wrap gap-2">
+          {canManageCountertop && <Button size="sm" variant="outline" onClick={() => setIsCountertopOpen(true)}>Add Countertop</Button>}
+          <Button size="sm" onClick={() => setIsProductPickerOpen(true)}>Add Products</Button>
+        </div>
+      </div>
+      <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Product","Qty","Server Price","Discount %","Line Total",""].map((label) => <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{label}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">{items.length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No products added. Use <span className="font-medium text-gray-700 dark:text-gray-300">Add Products</span> for standard products or <span className="font-medium text-gray-700 dark:text-gray-300">Add Countertop</span> for Stone.</td></tr> : items.map((item, index) => { const product = productMap.get(item.product_id); const resolvedPrice = resolveOrderLineUnitPrice(item, product, priceMap); const total = Number(item.quantity || 0) * Number(resolvedPrice ?? 0) * (1 - Number(item.discount_percent || 0) / 100); return <tr key={item.id ?? `${item.product_id}-${index}`}><td className="min-w-[340px] px-4 py-3"><div className="flex items-center gap-2"><span className="text-sm font-semibold text-gray-800 dark:text-white/90">{product?.sku ?? "Unknown product"}</span>{product?.status === "inactive" && <span className="rounded-full bg-warning-50 px-2 py-0.5 text-[11px] font-medium text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">Inactive</span>}</div><div className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{product?.name ?? item.product_id}</div></td><td className="w-[110px] px-4 py-3"><input value={item.quantity} onChange={(e) => updateItem(index, { quantity: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="min-w-[180px] px-4 py-3"><span className="text-sm font-semibold text-gray-800 dark:text-white/90">{resolvedPrice === undefined ? "Unavailable" : money(resolvedPrice)}</span><span className="mt-1 block text-xs text-gray-400">{product?.pricing_model === "countertop_material_band" ? "Countertop · configured price" : "Price Group · server authoritative"}</span></td><td className="w-[130px] px-4 py-3"><input value={item.discount_percent} onChange={(e) => updateItem(index, { discount_percent: e.target.value })} inputMode="decimal" className={inputClass} /></td><td className="px-4 py-3 text-sm font-semibold text-gray-800 dark:text-white/90">{money(total)}</td><td className="px-4 py-3 text-right"><button type="button" onClick={() => setItems((current) => current.filter((_, i) => i !== index))} className="text-xs font-medium text-error-600">Remove</button></td></tr>; })}</tbody></table></div>
     </div>
+
+    {isCountertopOpen && (
+      <CountertopConfigurator
+        orderId={order.id}
+        orderContext={{ orderNumber: order.order_number }}
+        onAttached={handleCountertopAttached}
+        onClose={() => setIsCountertopOpen(false)}
+      />
+    )}
 
     <div className="grid gap-5 xl:grid-cols-12">
       <div className="space-y-5 xl:col-span-8">
