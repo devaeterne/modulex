@@ -10,16 +10,19 @@ const productPricesPath = "src/components/pricing/ProductPricesServerTable.tsx";
 const materialBandsPath = "src/components/pricing/MaterialBandPricingTable.tsx";
 const materialBandsPagePath = "src/app/(admin)/pricing/material-bands/page.tsx";
 const componentCardPath = "src/components/common/ComponentCard.tsx";
+const statTilePath = "src/components/common/StatTile.tsx";
 
 assert.ok(fs.existsSync(path.join(root, migrationPath)), "Pricing Product Type routing migration is required");
 assert.ok(fs.existsSync(path.join(root, materialBandsPath)), "Material Bands pricing workspace is required");
 assert.ok(fs.existsSync(path.join(root, materialBandsPagePath)), "Material Bands pricing route is required");
+assert.ok(fs.existsSync(path.join(root, statTilePath)), "Pricing summary must use the shared StatTile primitive");
 
 const migration = read(migrationPath);
 const productPrices = read(productPricesPath);
 const materialBands = read(materialBandsPath);
 const materialBandsPage = read(materialBandsPagePath);
 const componentCard = read(componentCardPath);
+const statTile = read(statTilePath);
 const sidebar = read("src/layout/AppSidebar.tsx");
 
 assert.match(migration, /get_product_prices_page_v2/i, "Pricing directory must expose a v2 RPC");
@@ -39,10 +42,12 @@ assert.match(productPrices, /Unit of Measure/, "Product Prices must show UOM sem
 assert.match(productPrices, /\/pricing\/material-bands/, "Product Prices must route Stone pricing to Material Bands");
 assert.match(productPrices, /set_product_prices_bulk/, "Existing audited bulk price mutation must remain canonical");
 
-for (const sharedPrimitive of [/ComponentCard/, /<Select/, /<Badge/, /<TableViewport/, /<Table/]) {
+for (const sharedPrimitive of [/ComponentCard/, /<StatTile/, /<Select/, /<Badge/, /<TableViewport/, /<Table/]) {
   assert.match(productPrices, sharedPrimitive, "Product Prices must compose shared Admin UI primitives");
 }
 
+assert.match(statTile, /dark:/, "Shared StatTile must preserve dark mode appearance");
+assert.match(statTile, /tone/, "Shared StatTile must expose semantic tone rather than route-local colors");
 assert.match(componentCard, /headerAction\?:\s*React\.ReactNode/, "Shared ComponentCard must support header actions");
 assert.match(componentCard, /collapsed\?:\s*boolean/, "Shared ComponentCard must support compact collapsed bodies");
 assert.match(productPrices, /filtersOpen.*useState\(true\)/s, "Filters must default open");
