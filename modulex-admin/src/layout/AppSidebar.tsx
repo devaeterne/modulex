@@ -60,6 +60,8 @@ const navItems: NavItem[] = [
       { name: "Pricing Dashboard", path: "/pricing/dashboard", permission: "pricing.view" },
       { name: "Product Prices", path: "/pricing/products", permission: "pricing.view" },
       { name: "Material Bands", path: "/pricing/material-bands", permission: "pricing.view" },
+      { name: "Countertop Catalog", path: "/pricing/countertop/catalog", permission: "pricing.manage" },
+      { name: "Countertop Setup", path: "/pricing/countertop/settings", permission: "pricing.manage" },
       { name: "Price Groups", path: "/pricing/groups", permission: "pricing.manage" },
     ],
   },
