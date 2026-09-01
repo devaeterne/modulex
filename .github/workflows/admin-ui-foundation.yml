@@ -9,6 +9,10 @@ on:
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/src/**"
       - "modulex-admin/scripts/admin-ui-contract.mjs"
+      - "modulex-admin/scripts/admin-ui-strict-contract.mjs"
+      - "modulex-admin/scripts/admin-ui-strict-contract.test.mjs"
+      - "modulex-admin/scripts/countertop-ui-contract.mjs"
+      - "modulex-admin/scripts/countertop-domain-contract.mjs"
       - "modulex-admin/scripts/admin-table-system-contract.mjs"
       - "modulex-admin/scripts/admin-theme-design-contract.mjs"
       - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
@@ -23,6 +27,10 @@ on:
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/src/**"
       - "modulex-admin/scripts/admin-ui-contract.mjs"
+      - "modulex-admin/scripts/admin-ui-strict-contract.mjs"
+      - "modulex-admin/scripts/admin-ui-strict-contract.test.mjs"
+      - "modulex-admin/scripts/countertop-ui-contract.mjs"
+      - "modulex-admin/scripts/countertop-domain-contract.mjs"
       - "modulex-admin/scripts/admin-table-system-contract.mjs"
       - "modulex-admin/scripts/admin-theme-design-contract.mjs"
       - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
@@ -49,6 +57,15 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
+      - name: Admin UI strict self-test
+        run: npm run smoke:admin-ui-strict:self-test
+      - name: Admin UI strict changed-file gate
+        env:
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+        run: npm run smoke:admin-ui-strict
+      - run: npm run smoke:countertop-ui
+      - run: npm run smoke:countertop-domain
+      - run: npm run smoke:order-countertop-context
       - run: node scripts/admin-table-system-contract.mjs
       - run: node scripts/admin-theme-design-contract.mjs
       - run: node scripts/admin-full-route-regression-contract.mjs
