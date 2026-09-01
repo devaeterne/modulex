@@ -1,0 +1,93 @@
+import { createHash } from "node:crypto";
+
+export type VendorCatalogChangeState = "NEW" | "UPDATED" | "UNCHANGED";
+export type VendorCatalogReviewStatus = "PENDING" | "APPROVED" | "IGNORED";
+export type VendorAssetKind = "image" | "specification" | "cad" | "document";
+
+export type VendorAsset = {
+  kind: VendorAssetKind;
+  url: string;
+  label?: string | null;
+  fileType?: string | null;
+};
+
+export type NormalizedVendorProduct = {
+  vendorCode: string;
+  externalId: string;
+  sku: string | null;
+  title: string;
+  description: string | null;
+  productUrl: string;
+  vendorPriceReference: number | null;
+  vendorCurrency: string | null;
+  assets: VendorAsset[];
+  sourcePayload: unknown;
+};
+
+export interface VendorCatalogAdapter {
+  readonly vendorCode: string;
+  discover(): Promise<NormalizedVendorProduct[]>;
+}
+
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, child]) => [key, canonicalize(child)])
+    );
+  }
+
+  return value;
+}
+
+export function stableProductHash(product: NormalizedVendorProduct) {
+  const snapshot = {
+    vendorCode: product.vendorCode,
+    externalId: product.externalId,
+    sku: product.sku,
+    title: product.title,
+    description: product.description,
+    productUrl: product.productUrl,
+    vendorPriceReference: product.vendorPriceReference,
+    vendorCurrency: product.vendorCurrency,
+    assets: [...product.assets]
+      .map((asset) => ({
+        kind: asset.kind,
+        url: asset.url,
+        label: asset.label ?? null,
+        fileType: asset.fileType ?? null,
+      }))
+      .sort((left, right) =>
+        `${left.kind}:${left.url}`.localeCompare(`${right.kind}:${right.url}`)
+      ),
+  };
+
+  return createHash("sha256")
+    .update(JSON.stringify(canonicalize(snapshot)))
+    .digest("hex");
+}
+
+export function classifyVendorProduct(
+  previousHash: string | null | undefined,
+  nextHash: string
+): VendorCatalogChangeState {
+  if (!previousHash) return "NEW";
+  return previousHash === nextHash ? "UNCHANGED" : "UPDATED";
+}
+
+export function canPublishWithModulexPrice(modulexPrice: number | null | undefined) {
+  return typeof modulexPrice === "number" && Number.isFinite(modulexPrice) && modulexPrice > 0;
+}
+
+export function assertPublishableWithModulexPrice(
+  modulexPrice: number | null | undefined
+) {
+  if (!canPublishWithModulexPrice(modulexPrice)) {
+    throw new Error("Store publication requires a Modulex selling price greater than zero.");
+  }
+}
