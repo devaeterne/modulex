@@ -1,0 +1,49 @@
+name: Admin Vendor Catalog Sync
+
+on:
+  push:
+    paths:
+      - "modulex-admin/src/lib/vendor-catalog/**"
+      - "modulex-admin/src/app/api/vendor-catalog/**"
+      - "modulex-admin/src/app/(admin)/products/vendor-imports/**"
+      - "modulex-admin/sql/vendor-catalog-sync.sql"
+      - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
+      - "modulex-admin/docs/VENDOR_CATALOG_SYNC.md"
+      - "modulex-store/supabase/migrations/*vendor_catalog_sync*.sql"
+      - ".github/workflows/admin-vendor-catalog-sync.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/lib/vendor-catalog/**"
+      - "modulex-admin/src/app/api/vendor-catalog/**"
+      - "modulex-admin/src/app/(admin)/products/vendor-imports/**"
+      - "modulex-admin/sql/vendor-catalog-sync.sql"
+      - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
+      - "modulex-admin/docs/VENDOR_CATALOG_SYNC.md"
+      - "modulex-store/supabase/migrations/*vendor_catalog_sync*.sql"
+      - ".github/workflows/admin-vendor-catalog-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vendor-catalog-sync-verification:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - run: node scripts/vendor-catalog-sync-contract.mjs
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
