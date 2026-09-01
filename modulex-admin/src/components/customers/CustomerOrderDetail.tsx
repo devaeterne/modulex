@@ -6,6 +6,7 @@ import ComponentCard from "@/components/common/ComponentCard";
 import SummaryRow from "@/components/common/SummaryRow";
 import CountertopConfigurator from "@/components/countertop/CountertopConfigurator";
 import CountertopLineDetails from "@/components/customers/CountertopLineDetails";
+import ServiceLineDetails from "@/components/customers/ServiceLineDetails";
 import FormHint from "@/components/form/FormHint";
 import Input from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
@@ -146,14 +147,11 @@ export default function CustomerOrderDetail() {
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-
     try {
       const result = await setCustomerOrderStatus({ orderId: order.id, status: newStatus, note: statusNote });
       await load();
       setStatusNote("");
-      setSuccessMessage(result === "approval_requested"
-        ? "Approval requested. The order status was not changed yet."
-        : "Order status updated.");
+      setSuccessMessage(result === "approval_requested" ? "Approval requested. The order status was not changed yet." : "Order status updated.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unable to update order status.");
     } finally {
@@ -169,9 +167,7 @@ export default function CustomerOrderDetail() {
 
   const billing = order.billing_address_snapshot as Record<string, string | null> | null;
   const shipping = order.shipping_address_snapshot as Record<string, string | null> | null;
-  const grandTotal = Number(order.grand_total ?? 0) > 0 || Number(order.total_amount ?? 0) === 0
-    ? Number(order.grand_total ?? 0)
-    : Number(order.total_amount ?? 0);
+  const grandTotal = Number(order.grand_total ?? 0) > 0 || Number(order.total_amount ?? 0) === 0 ? Number(order.grand_total ?? 0) : Number(order.total_amount ?? 0);
   const currency = order.currency_code || "USD";
 
   return (
@@ -201,14 +197,7 @@ export default function CustomerOrderDetail() {
       {errorMessage ? <Alert variant="error" title="Order action failed" message={errorMessage} /> : null}
       {successMessage ? <Alert variant="success" title="Order updated" message={successMessage} /> : null}
       {pendingApprovals > 0 ? (
-        <ComponentCard
-          title="Approval Pending"
-          desc={`${pendingApprovals} approval request${pendingApprovals === 1 ? " is" : "s are"} pending for this order.`}
-          headerAction={<Button size="sm" variant="outline" onClick={() => router.push("/approvals")}>Open Approvals</Button>}
-          collapsed
-        >
-          <div />
-        </ComponentCard>
+        <ComponentCard title="Approval Pending" desc={`${pendingApprovals} approval request${pendingApprovals === 1 ? " is" : "s are"} pending for this order.`} headerAction={<Button size="sm" variant="outline" onClick={() => router.push("/approvals")}>Open Approvals</Button>} collapsed><div /></ComponentCard>
       ) : null}
 
       {canManage ? (
@@ -221,14 +210,10 @@ export default function CustomerOrderDetail() {
         </ComponentCard>
       ) : null}
 
-      <ComponentCard title="Order Items" desc="Product, pricing and Countertop selections are historical order snapshots.">
+      <ComponentCard title="Order Items" desc="Product, pricing, Countertop and Service details are historical order snapshots.">
         <TableViewport>
           <Table variant="admin" minWidth="wide">
-            <TableHeader variant="admin">
-              <TableRow>
-                {["#", "SKU", "Product", "Type / UOM", "Pricing Route", "Qty", "Unit Price", "Discount", "Total", "Source", "Actions"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}
-              </TableRow>
-            </TableHeader>
+            <TableHeader variant="admin"><TableRow>{["#", "SKU", "Product", "Type / UOM", "Pricing Route", "Qty", "Unit Price", "Discount", "Total", "Source", "Actions"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader>
             <TableBody variant="admin">
               {items.length === 0 ? <TableStateRow colSpan={11}>No order items found.</TableStateRow> : items.map((item) => {
                 const countertopSummary = summariesByItemId.get(item.id);
@@ -239,6 +224,7 @@ export default function CustomerOrderDetail() {
                     <TableCell variant="admin" className="min-w-[360px]">
                       <span>{item.product_name_snapshot}</span>
                       <CountertopLineDetails summary={countertopSummary} />
+                      <ServiceLineDetails lineNote={item.line_note} />
                     </TableCell>
                     <TableCell variant="admin">{item.product_type_name_snapshot || "Historical"} · {item.uom_name_snapshot || item.uom_code_snapshot || "—"}</TableCell>
                     <TableCell variant="admin"><Badge size="sm" color={item.pricing_model_snapshot === "price_group" ? "success" : item.pricing_model_snapshot ? "warning" : "light"}>{pricingModelLabel(item.pricing_model_snapshot)}</Badge></TableCell>
@@ -247,11 +233,7 @@ export default function CustomerOrderDetail() {
                     <TableCell variant="admin">{Number(item.discount_percent).toFixed(1)}%</TableCell>
                     <TableCell variant="admin" className="font-semibold">{money(item.line_total, currency)}</TableCell>
                     <TableCell variant="admin"><Badge size="sm" color="light">{titleCase(item.price_source)}</Badge></TableCell>
-                    <TableCell variant="admin">
-                      {order.status === "draft" && contextCanManageCountertop && countertopItemsById.has(item.id)
-                        ? <Button size="sm" variant="outline" onClick={() => setCountertopContext(countertopItemsById.get(item.id) ?? null)}>Configure Countertop</Button>
-                        : <FormHint>—</FormHint>}
-                    </TableCell>
+                    <TableCell variant="admin">{order.status === "draft" && contextCanManageCountertop && countertopItemsById.has(item.id) ? <Button size="sm" variant="outline" onClick={() => setCountertopContext(countertopItemsById.get(item.id) ?? null)}>Configure Countertop</Button> : <FormHint>—</FormHint>}</TableCell>
                   </TableRow>
                 );
               })}
@@ -274,19 +256,9 @@ export default function CustomerOrderDetail() {
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="space-y-5 xl:col-span-8">
-          <div className="grid gap-5 md:grid-cols-2">
-            <AddressCard title="Billing Address" data={billing} />
-            <AddressCard title="Shipping Address" data={shipping} />
-          </div>
-          <ComponentCard title="Notes & References">
-            <div className="grid gap-4 md:grid-cols-3">
-              <InfoBlock label="Customer Reference" value={order.customer_reference} />
-              <InfoBlock label="Customer Notes" value={order.customer_notes} />
-              <InfoBlock label="Internal Notes" value={order.internal_notes} />
-            </div>
-          </ComponentCard>
+          <div className="grid gap-5 md:grid-cols-2"><AddressCard title="Billing Address" data={billing} /><AddressCard title="Shipping Address" data={shipping} /></div>
+          <ComponentCard title="Notes & References"><div className="grid gap-4 md:grid-cols-3"><InfoBlock label="Customer Reference" value={order.customer_reference} /><InfoBlock label="Customer Notes" value={order.customer_notes} /><InfoBlock label="Internal Notes" value={order.internal_notes} /></div></ComponentCard>
         </div>
-
         <div className="space-y-5 xl:col-span-4">
           <ComponentCard title="Totals & Payment">
             <div className="space-y-3">
@@ -299,7 +271,6 @@ export default function CustomerOrderDetail() {
               <SummaryRow label="Grand Total" value={money(grandTotal, currency)} strong divider />
             </div>
           </ComponentCard>
-
           <ComponentCard title="Status Timeline">
             <div className="space-y-4">
               {history.length === 0 ? <FormHint>No status history yet.</FormHint> : history.map((entry) => (
