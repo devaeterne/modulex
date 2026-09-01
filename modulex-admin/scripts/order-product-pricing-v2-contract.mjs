@@ -40,12 +40,15 @@ assert(picker.includes("pricingModelLabel") && picker.includes("uom_name"), "pro
 assert(createOrder.includes("countertop_material_band") && createOrder.includes("/pricing/countertop"), "create UI must guide Stone to the canonical Countertop workspace");
 assert(editOrder.includes("pricing_model") && detail.includes("pricingModelLabel"), "edit/detail UI must expose pricing route metadata");
 
-// UI boundary: Price Group money is server-authoritative and must not be manually editable in Edit Order.
+// UI boundary: Price Group money is server-authoritative; configured Stone preserves its stored canonical price.
 assert(editOrder.includes("Server Price"), "Edit Order must label canonical Price Group money as Server Price");
 assert(!/<input[^>]+value=\{item\.unit_price\}[^>]+onChange=/s.test(editOrder), "Edit Order must not expose an editable unit_price input");
 assert(!editOrder.includes("useGroupPrice("), "Edit Order must not expose a manual Group Price copy action");
-assert(/unitPrice:\s*String\(priceMap\.get\(item\.product_id\)\s*\?\?\s*0\)/.test(editOrder), "Edit Order submit payload must use canonical priceMap money");
-assert(/const price = Math\.max\(0, priceMap\.get\(item\.product_id\) \?\? 0\)/.test(editOrder), "Edit Order preview totals must use canonical priceMap money");
+assert(editOrder.includes("resolveOrderLineUnitPrice"), "Edit Order must resolve line money through one pricing-model-aware helper");
+assert(/pricing_model\s*===\s*"price_group"[\s\S]{0,180}priceMap\.get\(item\.product_id\)/.test(editOrder), "Price Group edit lines must resolve canonical priceMap money");
+assert(/pricing_model\s*===\s*"countertop_material_band"[\s\S]{0,220}item\.id[\s\S]{0,220}item\.unit_price/.test(editOrder), "Existing Stone edit lines must preserve configured stored money");
+assert(/unitPrice:\s*String\([\s\S]{0,140}resolveOrderLineUnitPrice/.test(editOrder), "Edit Order submit payload must use pricing-model-aware canonical money");
+assert(/const price\s*=\s*Math\.max\(0,\s*resolveOrderLineUnitPrice/.test(editOrder), "Edit Order preview totals must use pricing-model-aware canonical money");
 
 // Hardening: semantic identity is immutable unless product identity actually changes.
 for (const snapshot of ["product_type_code_snapshot", "product_type_name_snapshot", "uom_code_snapshot", "uom_name_snapshot", "pricing_model_snapshot"]) {
