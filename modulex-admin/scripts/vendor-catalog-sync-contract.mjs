@@ -10,6 +10,7 @@ const adapters = read("src/lib/vendor-catalog/adapters.ts");
 const sync = read("src/lib/vendor-catalog/sync.ts");
 const route = read("src/app/api/vendor-catalog/sync/route.ts");
 const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
+const sidebar = read("src/layout/AppSidebar.tsx");
 const sql = read("sql/vendor-catalog-sync.sql");
 const migration = read("../modulex-store/supabase/migrations/20260901223000_vendor_catalog_sync.sql");
 const hardening = read("sql/vendor-catalog-sync-hardening.sql");
@@ -48,6 +49,9 @@ assert.match(page, /PENDING/);
 assert.match(page, /APPROVED/);
 assert.match(page, /IGNORED/);
 assert.match(page, /reference data only/i);
+assert.match(sidebar, /Vendor Imports/);
+assert.match(sidebar, /\/products\/vendor-imports/);
+assert.match(sidebar, /products\.manage/);
 
 assert.match(sql, /enable row level security/i);
 assert.match(sql, /vendor_catalog_items_admin_select/i);
