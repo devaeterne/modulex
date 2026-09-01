@@ -10,6 +10,7 @@ const adapters = read("src/lib/vendor-catalog/adapters.ts");
 const sync = read("src/lib/vendor-catalog/sync.ts");
 const route = read("src/app/api/vendor-catalog/sync/route.ts");
 const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
+const sidebar = read("src/layout/AppSidebar.tsx");
 const sql = read("sql/vendor-catalog-sync.sql");
 const migration = read("../modulex-store/supabase/migrations/20260901223000_vendor_catalog_sync.sql");
 const hardening = read("sql/vendor-catalog-sync-hardening.sql");
@@ -38,16 +39,28 @@ assert.match(sync, /vendor_catalog_assets/);
 assert.doesNotMatch(sync, /store.*publish/i);
 
 assert.match(route, /VENDOR_CATALOG_SYNC_SECRET/);
+assert.match(route, /CRON_SECRET/);
 assert.match(route, /timingSafeEqual/);
+assert.match(route, /authorizeAdminSession/);
+assert.match(route, /supabaseAdmin\.auth\.getUser/);
+assert.match(route, /super_admin/);
 assert.match(route, /runVendorCatalogSync/);
 assert.match(route, /autoPublished:\s*false/);
 
 assert.match(page, /Vendor Import Review/);
 assert.match(page, /vendor_catalog_items/);
+assert.match(page, /Run Vendor Sync/);
+assert.match(page, /Synced \/ Unchanged/);
+assert.match(page, /\.in\("change_state", changeStates\)/);
+assert.match(page, /\["NEW", "UPDATED"\]/);
 assert.match(page, /PENDING/);
 assert.match(page, /APPROVED/);
 assert.match(page, /IGNORED/);
 assert.match(page, /reference data only/i);
+
+assert.match(sidebar, /Vendor Imports/);
+assert.match(sidebar, /\/products\/vendor-imports/);
+assert.match(sidebar, /permission:\s*"products\.manage"/);
 
 assert.match(sql, /enable row level security/i);
 assert.match(sql, /vendor_catalog_items_admin_select/i);
