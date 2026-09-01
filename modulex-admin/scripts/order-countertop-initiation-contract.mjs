@@ -52,6 +52,9 @@ assert(!newOrder.includes("Open Countertop workspace") && !newOrder.includes('hr
 assert(newOrder.includes("hasPermission") && newOrder.includes('"orders.manage"'), "New Order Add Countertop must use the canonical orders.manage permission");
 assert(newOrder.includes("getCurrentProfile") && newOrder.includes('createOrder(validItems, "draft")'), "New Order Add Countertop must authorize the current editor and create a canonical Draft shell before attaching configuration");
 assert(newOrder.includes("CountertopConfigurator") && newOrder.includes("countertopDraftOrderId"), "New Order must open the canonical CountertopConfigurator against the saved Draft shell");
+assert(newOrder.includes("FormHint") && newOrder.includes("SummaryRow"), "New Order must use shared dark-mode-safe helper and summary primitives");
+assert(!newOrder.includes('<h1 className="text-2xl font-semibold">New Order</h1>'), "New Order must not recreate a duplicate route-local page heading");
+assert(newOrder.includes('"message" in error') && newOrder.includes("errorMessage(error"), "New Order must surface Supabase/RPC error messages instead of hiding them behind a generic fallback");
 
 for (const token of [
   "create or replace function private.create_customer_order_core",
