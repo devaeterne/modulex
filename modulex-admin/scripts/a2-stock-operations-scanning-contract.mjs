@@ -144,4 +144,5 @@ expectIncludes(acceptance, [
   "Production inventory/movement mutation: NONE",
 ], "A2.3 acceptance artifact");
 
+// Scan UI may evolve, but scanner and stock-operation behavior stay contract-locked above.
 console.log("A2.3 stock operations + scanning contract: PASS");
