@@ -20,7 +20,11 @@ import { supabase } from "@/lib/supabase/client";
 
 type ReviewStatus = "PENDING" | "APPROVED" | "IGNORED";
 type ChangeState = "NEW" | "UPDATED" | "UNCHANGED";
-type SyncAlert = { variant: "success" | "warning"; message: string };
+
+type SyncAlert = {
+  variant: "success" | "warning";
+  message: string;
+};
 
 type VendorCatalogItem = {
   id: string;
@@ -55,16 +59,37 @@ type SyncResponse = {
   error?: string;
 };
 
-const REVIEW_STATUSES: ReviewStatus[] = ["PENDING", "APPROVED", "IGNORED"];
-const CHANGE_FILTERS: Array<{ state: ChangeState; label: string }> = [
-  { state: "NEW", label: "New" },
-  { state: "UPDATED", label: "Updated" },
-  { state: "UNCHANGED", label: "Synced / Unchanged" },
+const REVIEW_STATUSES: ReviewStatus[] = [
+  "PENDING",
+  "APPROVED",
+  "IGNORED",
 ];
 
+const CHANGE_FILTERS: Array<{
+  state: ChangeState;
+  label: string;
+}> = [
+    {
+      state: "NEW",
+      label: "New",
+    },
+    {
+      state: "UPDATED",
+      label: "Updated",
+    },
+    {
+      state: "UNCHANGED",
+      label: "Synced / Unchanged",
+    },
+  ];
+
 function formatPrice(item: VendorCatalogItem) {
-  if (item.vendor_price_reference === null) return "—";
+  if (item.vendor_price_reference === null) {
+    return "—";
+  }
+
   const currency = item.vendor_currency || "USD";
+
   try {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -75,21 +100,80 @@ function formatPrice(item: VendorCatalogItem) {
   }
 }
 
-function badgeColor(state: ChangeState): "success" | "warning" | "light" {
-  if (state === "NEW") return "success";
-  if (state === "UPDATED") return "warning";
+function badgeColor(
+  state: ChangeState
+): "success" | "warning" | "light" {
+  if (state === "NEW") {
+    return "success";
+  }
+
+  if (state === "UPDATED") {
+    return "warning";
+  }
+
   return "light";
 }
 
+function getSyncErrorMessage(
+  status: number,
+  payload: SyncResponse
+) {
+  if (status === 504) {
+    return (
+      "Vendor sync exceeded the server execution time limit. " +
+      "Some products may already have been synchronized before the timeout. " +
+      "Refresh the list before running the sync again."
+    );
+  }
+
+  if (status === 502 || status === 503) {
+    return (
+      payload.error ||
+      "The vendor sync service is temporarily unavailable."
+    );
+  }
+
+  if (status === 401) {
+    return "Your admin session could not be verified. Please sign in again.";
+  }
+
+  if (status === 403) {
+    return "You do not have permission to run vendor synchronization.";
+  }
+
+  return (
+    payload.error ||
+    `Vendor sync failed with HTTP ${status}.`
+  );
+}
+
 export default function VendorImportsPage() {
-  const [reviewStatus, setReviewStatus] = useState<ReviewStatus>("PENDING");
-  const [changeStates, setChangeStates] = useState<ChangeState[]>(["NEW", "UPDATED"]);
-  const [items, setItems] = useState<VendorCatalogItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [syncAlert, setSyncAlert] = useState<SyncAlert | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [reviewStatus, setReviewStatus] =
+    useState<ReviewStatus>("PENDING");
+
+  const [changeStates, setChangeStates] =
+    useState<ChangeState[]>([
+      "NEW",
+      "UPDATED",
+    ]);
+
+  const [items, setItems] =
+    useState<VendorCatalogItem[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState<string | null>(null);
+
+  const [syncAlert, setSyncAlert] =
+    useState<SyncAlert | null>(null);
+
+  const [syncing, setSyncing] =
+    useState(false);
+
+  const [updatingId, setUpdatingId] =
+    useState<string | null>(null);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -101,22 +185,43 @@ export default function VendorImportsPage() {
       return;
     }
 
-    const { data, error: queryError } = await supabase
+    const {
+      data,
+      error: queryError,
+    } = await supabase
       .from("vendor_catalog_items")
       .select(
-        "id,vendor_code,external_id,sku,title,product_url,vendor_price_reference,vendor_currency,change_state,review_status,canonical_product_id,last_seen_at"
+        [
+          "id",
+          "vendor_code",
+          "external_id",
+          "sku",
+          "title",
+          "product_url",
+          "vendor_price_reference",
+          "vendor_currency",
+          "change_state",
+          "review_status",
+          "canonical_product_id",
+          "last_seen_at",
+        ].join(",")
       )
       .eq("review_status", reviewStatus)
       .in("change_state", changeStates)
-      .order("last_seen_at", { ascending: false })
+      .order("last_seen_at", {
+        ascending: false,
+      })
       .limit(100);
 
     if (queryError) {
       setError(queryError.message);
       setItems([]);
     } else {
-      setItems((data ?? []) as VendorCatalogItem[]);
+      setItems(
+        (data ?? []) as VendorCatalogItem[]
+      );
     }
+
     setLoading(false);
   }, [changeStates, reviewStatus]);
 
@@ -124,18 +229,25 @@ export default function VendorImportsPage() {
     void loadItems();
   }, [loadItems]);
 
-  const recordLabel = useMemo(
-    () =>
-      reviewStatus === "PENDING"
-        ? `${items.length} pending records · latest 100 matches`
-        : `${items.length} records · latest 100 matches`,
-    [items.length, reviewStatus]
-  );
+  const recordLabel = useMemo(() => {
+    if (reviewStatus === "PENDING") {
+      return `${items.length} pending records · latest 100 matches`;
+    }
 
-  function toggleChangeState(state: ChangeState) {
+    return `${items.length} records · latest 100 matches`;
+  }, [
+    items.length,
+    reviewStatus,
+  ]);
+
+  function toggleChangeState(
+    state: ChangeState
+  ) {
     setChangeStates((current) =>
       current.includes(state)
-        ? current.filter((item) => item !== state)
+        ? current.filter(
+          (item) => item !== state
+        )
         : [...current, state]
     );
   }
@@ -149,70 +261,152 @@ export default function VendorImportsPage() {
       const {
         data: { session },
         error: sessionError,
-      } = await supabase.auth.getSession();
+      } =
+        await supabase.auth.getSession();
 
-      if (sessionError || !session?.access_token) {
-        throw new Error("Your admin session could not be verified. Please sign in again.");
+      if (
+        sessionError ||
+        !session?.access_token
+      ) {
+        throw new Error(
+          "Your admin session could not be verified. Please sign in again."
+        );
       }
 
-      const response = await fetch("/api/vendor-catalog/sync", {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${session.access_token}`,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({}),
-      });
+      const response = await fetch(
+        "/api/vendor-catalog/sync",
+        {
+          method: "POST",
+          headers: {
+            authorization:
+              `Bearer ${session.access_token}`,
+            "content-type":
+              "application/json",
+          },
+          body: JSON.stringify({}),
+        }
+      );
 
-      const payload = (await response.json().catch(() => ({}))) as SyncResponse;
+      const payload =
+        (await response
+          .json()
+          .catch(() => ({}))) as SyncResponse;
+
       if (!response.ok) {
-        throw new Error(payload.error || `Vendor sync failed with HTTP ${response.status}.`);
+        throw new Error(
+          getSyncErrorMessage(
+            response.status,
+            payload
+          )
+        );
       }
 
-      const results = payload.results ?? [];
+      const results =
+        payload.results ?? [];
+
       const totals = results.reduce(
         (sum, result) => ({
-          discovered: sum.discovered + result.counts.discovered,
-          created: sum.created + result.counts.created,
-          updated: sum.updated + result.counts.updated,
-          unchanged: sum.unchanged + result.counts.unchanged,
-          failed: sum.failed + result.counts.failed,
+          discovered:
+            sum.discovered +
+            result.counts.discovered,
+
+          created:
+            sum.created +
+            result.counts.created,
+
+          updated:
+            sum.updated +
+            result.counts.updated,
+
+          unchanged:
+            sum.unchanged +
+            result.counts.unchanged,
+
+          failed:
+            sum.failed +
+            result.counts.failed,
         }),
-        { discovered: 0, created: 0, updated: 0, unchanged: 0, failed: 0 }
+        {
+          discovered: 0,
+          created: 0,
+          updated: 0,
+          unchanged: 0,
+          failed: 0,
+        }
       );
 
       setSyncAlert({
-        variant: totals.failed > 0 || payload.status === "PARTIAL_FAILURE" ? "warning" : "success",
-        message: `Sync complete: ${totals.discovered} discovered, ${totals.created} new, ${totals.updated} updated, ${totals.unchanged} unchanged, ${totals.failed} failed.`,
+        variant:
+          totals.failed > 0 ||
+            payload.status ===
+            "PARTIAL_FAILURE"
+            ? "warning"
+            : "success",
+
+        message:
+          `Sync complete: ` +
+          `${totals.discovered} discovered, ` +
+          `${totals.created} new, ` +
+          `${totals.updated} updated, ` +
+          `${totals.unchanged} unchanged, ` +
+          `${totals.failed} failed.`,
       });
+
       await loadItems();
     } catch (syncError) {
-      setError(syncError instanceof Error ? syncError.message : String(syncError));
+      setError(
+        syncError instanceof Error
+          ? syncError.message
+          : String(syncError)
+      );
+
+      // A timeout may happen after some products
+      // have already been written.
+      // Refresh the review list so partial progress
+      // can still become visible.
+      await loadItems().catch(() => undefined);
     } finally {
       setSyncing(false);
     }
   }
 
-  async function setStatus(itemId: string, nextStatus: ReviewStatus) {
+  async function setStatus(
+    itemId: string,
+    nextStatus: ReviewStatus
+  ) {
     setUpdatingId(itemId);
     setError(null);
 
-    const { error: updateError } = await supabase
+    const {
+      error: updateError,
+    } = await supabase
       .from("vendor_catalog_items")
-      .update({ review_status: nextStatus })
+      .update({
+        review_status: nextStatus,
+      })
       .eq("id", itemId);
 
     if (updateError) {
-      setError(updateError.message);
+      setError(
+        updateError.message
+      );
     } else {
-      setItems((current) => current.filter((item) => item.id !== itemId));
+      setItems((current) =>
+        current.filter(
+          (item) =>
+            item.id !== itemId
+        )
+      );
     }
+
     setUpdatingId(null);
   }
 
   return (
     <div className="space-y-6">
-      <PageBreadcrumb pageTitle="Vendor Import Review" />
+      <PageBreadcrumb
+        pageTitle="Vendor Import Review"
+      />
 
       <Alert
         variant="warning"
@@ -220,136 +414,343 @@ export default function VendorImportsPage() {
         message="Vendor prices are reference data only. APPROVED does not publish or overwrite a Modulex product. Store publication still requires a Modulex selling price greater than zero."
       />
 
-      {syncAlert ? (
-        <Alert variant={syncAlert.variant} title="Vendor sync result" message={syncAlert.message} />
-      ) : null}
+      <div aria-live="polite">
+        {syncAlert ? (
+          <Alert
+            variant={syncAlert.variant}
+            title="Vendor sync result"
+            message={syncAlert.message}
+          />
+        ) : null}
+      </div>
 
-      {error ? <Alert variant="error" title="Vendor catalog error" message={error} /> : null}
+      <div aria-live="assertive">
+        {error ? (
+          <Alert
+            variant="error"
+            title="Vendor catalog error"
+            message={error}
+          />
+        ) : null}
+      </div>
 
       <ComponentCard
         title="Vendor catalog review"
         desc="Review vendor discoveries before linking them to canonical Modulex products."
         headerAction={
-          <Button onClick={() => void runVendorSync()} disabled={syncing}>
-            {syncing ? "Running Vendor Sync…" : "Run Vendor Sync"}
+          <Button
+            onClick={() =>
+              void runVendorSync()
+            }
+            disabled={syncing}
+          >
+            {syncing
+              ? "Running Vendor Sync…"
+              : "Run Vendor Sync"}
           </Button>
         }
       >
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap gap-2" aria-label="Review status filters">
-            {REVIEW_STATUSES.map((status) => (
-              <Button
-                key={status}
-                size="sm"
-                variant={reviewStatus === status ? "primary" : "outline"}
-                onClick={() => setReviewStatus(status)}
-              >
-                {status}
-              </Button>
-            ))}
+          <div
+            className="flex flex-wrap gap-2"
+            aria-label="Review status filters"
+          >
+            {REVIEW_STATUSES.map(
+              (status) => (
+                <Button
+                  key={status}
+                  size="sm"
+                  variant={
+                    reviewStatus ===
+                      status
+                      ? "primary"
+                      : "outline"
+                  }
+                  aria-pressed={
+                    reviewStatus ===
+                    status
+                  }
+                  onClick={() =>
+                    setReviewStatus(
+                      status
+                    )
+                  }
+                >
+                  {status}
+                </Button>
+              )
+            )}
           </div>
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+
+          <Badge
+            size="sm"
+            color="light"
+          >
             {recordLabel}
-          </p>
+          </Badge>
         </div>
 
         <fieldset className="flex flex-wrap gap-x-5 gap-y-3">
-          <legend className="sr-only">Catalog change filters</legend>
-          {CHANGE_FILTERS.map(({ state, label }) => (
-            <Checkbox
-              key={state}
-              id={`vendor-state-${state.toLowerCase()}`}
-              label={label}
-              checked={changeStates.includes(state)}
-              onChange={() => toggleChangeState(state)}
-            />
-          ))}
+          <legend className="sr-only">
+            Catalog change filters
+          </legend>
+
+          {CHANGE_FILTERS.map(
+            ({
+              state,
+              label,
+            }) => (
+              <Checkbox
+                key={state}
+                id={
+                  `vendor-state-${state.toLowerCase()}`
+                }
+                label={label}
+                checked={
+                  changeStates.includes(
+                    state
+                  )
+                }
+                onChange={() =>
+                  toggleChangeState(
+                    state
+                  )
+                }
+              />
+            )
+          )}
         </fieldset>
 
         <TableViewport>
-          <Table variant="admin" minWidth="extraWide">
+          <Table
+            variant="admin"
+            minWidth="extraWide"
+          >
             <TableHeader variant="admin">
               <TableRow>
-                <TableCell isHeader variant="admin">Vendor</TableCell>
-                <TableCell isHeader variant="admin">State</TableCell>
-                <TableCell isHeader variant="admin">SKU</TableCell>
-                <TableCell isHeader variant="admin">Product</TableCell>
-                <TableCell isHeader variant="admin">Vendor price</TableCell>
-                <TableCell isHeader variant="admin">Canonical link</TableCell>
-                <TableCell isHeader variant="admin">Last seen</TableCell>
-                <TableCell isHeader variant="admin" className="text-right">Review</TableCell>
+                <TableCell
+                  isHeader
+                  variant="admin"
+                >
+                  Vendor
+                </TableCell>
+
+                <TableCell
+                  isHeader
+                  variant="admin"
+                >
+                  State
+                </TableCell>
+
+                <TableCell
+                  isHeader
+                  variant="admin"
+                >
+                  SKU
+                </TableCell>
+
+                <TableCell
+                  isHeader
+                  variant="admin"
+                >
+                  Product
+                </TableCell>
+
+                <TableCell
+                  isHeader
+                  variant="admin"
+                >
+                  Vendor price
+                </TableCell>
+
+                <TableCell
+                  isHeader
+                  variant="admin"
+                >
+                  Canonical link
+                </TableCell>
+
+                <TableCell
+                  isHeader
+                  variant="admin"
+                >
+                  Last seen
+                </TableCell>
+
+                <TableCell
+                  isHeader
+                  variant="admin"
+                  className="text-right"
+                >
+                  Review
+                </TableCell>
               </TableRow>
             </TableHeader>
+
             <TableBody variant="admin">
               {loading ? (
-                <TableStateRow colSpan={8}>Loading vendor imports…</TableStateRow>
-              ) : changeStates.length === 0 ? (
-                <TableStateRow colSpan={8}>
-                  Select at least one catalog state to show vendor imports.
+                <TableStateRow
+                  colSpan={8}
+                >
+                  Loading vendor
+                  imports…
+                </TableStateRow>
+              ) : changeStates.length ===
+                0 ? (
+                <TableStateRow
+                  colSpan={8}
+                >
+                  Select at least one
+                  catalog state to show
+                  vendor imports.
                 </TableStateRow>
               ) : items.length === 0 ? (
-                <TableStateRow colSpan={8}>
-                  No matching {reviewStatus.toLowerCase()} vendor imports.
+                <TableStateRow
+                  colSpan={8}
+                >
+                  No matching{" "}
+                  {reviewStatus.toLowerCase()}{" "}
+                  vendor imports.
                 </TableStateRow>
               ) : (
                 items.map((item) => (
-                  <TableRow key={item.id} className="align-top">
-                    <TableCell variant="admin" className="font-medium uppercase">
-                      {item.vendor_code}
+                  <TableRow
+                    key={item.id}
+                    className="align-top"
+                  >
+                    <TableCell
+                      variant="admin"
+                      className="font-medium uppercase"
+                    >
+                      {
+                        item.vendor_code
+                      }
                     </TableCell>
+
                     <TableCell variant="admin">
-                      <Badge size="sm" color={badgeColor(item.change_state)}>
-                        {item.change_state}
+                      <Badge
+                        size="sm"
+                        color={badgeColor(
+                          item.change_state
+                        )}
+                      >
+                        {
+                          item.change_state
+                        }
                       </Badge>
                     </TableCell>
-                    <TableCell variant="admin" className="font-mono text-xs">
-                      {item.sku || "—"}
+
+                    <TableCell
+                      variant="admin"
+                      className="font-mono text-xs"
+                    >
+                      {item.sku ||
+                        "—"}
                     </TableCell>
-                    <TableCell variant="admin" className="max-w-sm">
+
+                    <TableCell
+                      variant="admin"
+                      className="max-w-sm"
+                    >
                       <a
-                        href={item.product_url}
+                        href={
+                          item.product_url
+                        }
                         target="_blank"
                         rel="noreferrer"
-                        className="font-medium underline"
+                        className="font-medium underline underline-offset-4 transition-opacity hover:opacity-75"
                       >
-                        {item.title}
+                        {
+                          item.title
+                        }
                       </a>
-                      <span className="mt-1 block truncate text-xs">{item.external_id}</span>
+
+                      <span className="mt-1 block truncate text-xs opacity-70">
+                        {
+                          item.external_id
+                        }
+                      </span>
                     </TableCell>
-                    <TableCell variant="admin">{formatPrice(item)}</TableCell>
-                    <TableCell variant="admin" className="font-mono text-xs">
-                      {item.canonical_product_id || "Not linked"}
+
+                    <TableCell variant="admin">
+                      {formatPrice(
+                        item
+                      )}
                     </TableCell>
-                    <TableCell variant="admin" className="whitespace-nowrap text-xs">
-                      {new Date(item.last_seen_at).toLocaleString()}
+
+                    <TableCell
+                      variant="admin"
+                      className="font-mono text-xs"
+                    >
+                      {item.canonical_product_id ||
+                        "Not linked"}
                     </TableCell>
+
+                    <TableCell
+                      variant="admin"
+                      className="whitespace-nowrap text-xs"
+                    >
+                      {new Date(
+                        item.last_seen_at
+                      ).toLocaleString()}
+                    </TableCell>
+
                     <TableCell variant="admin">
                       <div className="flex justify-end gap-2">
-                        {reviewStatus !== "APPROVED" ? (
+                        {reviewStatus !==
+                          "APPROVED" ? (
                           <Button
                             size="sm"
-                            disabled={updatingId === item.id}
-                            onClick={() => void setStatus(item.id, "APPROVED")}
+                            disabled={
+                              updatingId ===
+                              item.id
+                            }
+                            onClick={() =>
+                              void setStatus(
+                                item.id,
+                                "APPROVED"
+                              )
+                            }
                           >
                             APPROVED
                           </Button>
                         ) : null}
-                        {reviewStatus !== "IGNORED" ? (
+
+                        {reviewStatus !==
+                          "IGNORED" ? (
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={updatingId === item.id}
-                            onClick={() => void setStatus(item.id, "IGNORED")}
+                            disabled={
+                              updatingId ===
+                              item.id
+                            }
+                            onClick={() =>
+                              void setStatus(
+                                item.id,
+                                "IGNORED"
+                              )
+                            }
                           >
                             IGNORED
                           </Button>
                         ) : null}
-                        {reviewStatus !== "PENDING" ? (
+
+                        {reviewStatus !==
+                          "PENDING" ? (
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={updatingId === item.id}
-                            onClick={() => void setStatus(item.id, "PENDING")}
+                            disabled={
+                              updatingId ===
+                              item.id
+                            }
+                            onClick={() =>
+                              void setStatus(
+                                item.id,
+                                "PENDING"
+                              )
+                            }
                           >
                             PENDING
                           </Button>
