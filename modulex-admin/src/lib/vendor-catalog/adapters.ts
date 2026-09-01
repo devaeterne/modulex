@@ -42,6 +42,14 @@ function documentKind(url: string): VendorAssetKind {
   return "document";
 }
 
+function mergeAssets(...groups: VendorAsset[][]) {
+  const byIdentity = new Map<string, VendorAsset>();
+  for (const asset of groups.flat()) {
+    byIdentity.set(`${asset.kind}:${asset.url}`, asset);
+  }
+  return [...byIdentity.values()];
+}
+
 export function extractDocumentAssets(html: string, baseUrl: string): VendorAsset[] {
   const assets = new Map<string, VendorAsset>();
   const hrefPattern = /<a\b[^>]*\bhref=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
@@ -133,7 +141,6 @@ export class KarranAdapter implements VendorCatalogAdapter {
     const normalized: NormalizedVendorProduct[] = [];
     for (const product of products) {
       const productUrl = `${this.baseUrl}/products/${product.handle ?? product.id}`;
-      const detailAssets = await fetchDetailAssets(this.fetchImpl, productUrl);
       const images: VendorAsset[] = (product.images ?? [])
         .filter((image): image is { src: string; alt?: string | null } => Boolean(image.src))
         .map((image) => ({
@@ -159,13 +166,18 @@ export class KarranAdapter implements VendorCatalogAdapter {
           productUrl,
           vendorPriceReference: normalizePrice(variant.price),
           vendorCurrency: "USD",
-          assets: [...images, ...detailAssets],
+          assets: images,
           sourcePayload: { product, variant },
         });
       }
     }
 
     return normalized;
+  }
+
+  async enrich(product: NormalizedVendorProduct) {
+    const detailAssets = await fetchDetailAssets(this.fetchImpl, product.productUrl);
+    return { ...product, assets: mergeAssets(product.assets, detailAssets) };
   }
 }
 
@@ -190,10 +202,12 @@ function extractSitemapUrls(xml: string) {
     .filter(Boolean);
 }
 
-function extractPageTitle(html: string, fallback: string) {
-  const ogTitle = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
-  const title = ogTitle ?? html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
-  return stripHtml(title) ?? fallback;
+function titleFromSlug(slug: string) {
+  return slug
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export class RuvatiAdapter implements VendorCatalogAdapter {
@@ -210,6 +224,11 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
     const products = await this.discoverFromStoreApi();
     if (products) return products;
     return this.discoverFromSitemap();
+  }
+
+  async enrich(product: NormalizedVendorProduct) {
+    const detailAssets = await fetchDetailAssets(this.fetchImpl, product.productUrl);
+    return { ...product, assets: mergeAssets(product.assets, detailAssets) };
   }
 
   private async discoverFromStoreApi(): Promise<NormalizedVendorProduct[] | null> {
@@ -236,17 +255,15 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
     return this.normalizeWooProducts(products);
   }
 
-  private async normalizeWooProducts(products: WooProduct[]) {
-    const normalized: NormalizedVendorProduct[] = [];
-    for (const product of products) {
+  private normalizeWooProducts(products: WooProduct[]) {
+    return products.map<NormalizedVendorProduct>((product) => {
       const productUrl = product.permalink ?? `${this.baseUrl}/?p=${product.id}`;
-      const detailAssets = await fetchDetailAssets(this.fetchImpl, productUrl);
       const images: VendorAsset[] = (product.images ?? [])
         .filter((image): image is { src: string; alt?: string | null } => Boolean(image.src))
         .map((image) => ({ kind: "image", url: image.src, label: image.alt ?? null, fileType: null }));
       const minorUnit = product.prices?.currency_minor_unit ?? 0;
 
-      normalized.push({
+      return {
         vendorCode: this.vendorCode,
         externalId: String(product.id),
         sku: product.sku?.trim() || null,
@@ -255,11 +272,10 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
         productUrl,
         vendorPriceReference: normalizePrice(product.prices?.price, minorUnit),
         vendorCurrency: product.prices?.currency_code ?? "USD",
-        assets: [...images, ...detailAssets],
+        assets: images,
         sourcePayload: product,
-      });
-    }
-    return normalized;
+      };
+    });
   }
 
   private async discoverFromSitemap(): Promise<NormalizedVendorProduct[]> {
@@ -272,32 +288,33 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
       throw new Error(`Ruvati catalog discovery failed (${response.status})`);
     }
 
-    const urls = extractSitemapUrls(await response.text());
-    const normalized: NormalizedVendorProduct[] = [];
-    for (const productUrl of urls) {
-      const detail = await this.fetchImpl(productUrl, {
-        headers: { accept: "text/html,application/xhtml+xml" },
-        cache: "no-store",
-      });
-      if (!detail.ok) continue;
-      const html = await detail.text();
+    return extractSitemapUrls(await response.text()).map((productUrl) => {
       const slug = new URL(productUrl).pathname.split("/").filter(Boolean).at(-1) ?? productUrl;
-      normalized.push({
+      return {
         vendorCode: this.vendorCode,
         externalId: `sitemap:${slug}`,
-        sku: html.match(/(?:SKU|sku)[^A-Za-z0-9_-]*([A-Za-z0-9_-]{3,})/)?.[1] ?? null,
-        title: extractPageTitle(html, slug),
+        sku: null,
+        title: titleFromSlug(slug),
         description: null,
         productUrl,
         vendorPriceReference: null,
         vendorCurrency: null,
-        assets: extractDocumentAssets(html, productUrl),
+        assets: [],
         sourcePayload: { source: "product-sitemap.xml", productUrl },
-      });
-    }
-    return normalized;
+      } satisfies NormalizedVendorProduct;
+    });
   }
 }
+
+export const vendorCatalogLabels: Record<string, string> = {
+  karran: "Karran",
+  ruvati: "Ruvati",
+};
+
+export const vendorCatalogImageHosts: Record<string, string[]> = {
+  karran: ["karran.com", "www.karran.com", "cdn.shopify.com"],
+  ruvati: ["ruvati.com", "www.ruvati.com"],
+};
 
 export const vendorCatalogRegistry: Record<string, () => VendorCatalogAdapter> = {
   karran: () => new KarranAdapter(),
