@@ -7,13 +7,15 @@ const expect = (ok, message) => { if (!ok) throw new Error(message); };
 
 const context = read("src/context/SidebarContext.tsx");
 const header = read("src/layout/AppHeader.tsx");
+const viewport = read("src/components/ui/responsive/adminViewport.ts");
 const css = read("src/layout/AppHeader.module.css");
 const notifications = read("src/components/header/NotificationDropdown.tsx");
 const userDropdown = read("src/components/header/UserDropdown.tsx");
 const workflow = read("../.github/workflows/admin-mobile-shell-ui.yml");
 
 expect(context.includes("usePathname"), "Sidebar context must observe route changes");
-expect(context.includes("window.innerWidth < 1024"), "Sidebar mobile breakpoint must match the lg header breakpoint");
+expect(viewport.includes("ADMIN_DESKTOP_BREAKPOINT = 1024") && viewport.includes("width < ADMIN_DESKTOP_BREAKPOINT"), "Shared Admin viewport contract must keep the lg boundary at 1024px");
+expect(context.includes("isAdminMobileViewport(window.innerWidth)"), "Sidebar mobile breakpoint must use the shared Admin viewport contract");
 expect(context.includes("setIsMobileOpen(false)") && context.includes("[pathname]"), "Mobile sidebar must close after route changes");
 expect(context.includes("closeMobileSidebar"), "Sidebar context must expose an idempotent mobile close action");
 expect(context.includes('target.closest("aside a[href]")'), "Mobile sidebar navigation links must close the drawer immediately on click");
@@ -23,7 +25,7 @@ expect(context.includes("if (!isMobile) return"), "Sidebar link clicks must not 
 expect(header.includes('import styles from "./AppHeader.module.css"'), "Header must scope mobile notification layout styles");
 expect(header.includes("usePathname") && header.includes("setApplicationMenuOpen(false)"), "Mobile application menu must close after navigation");
 expect(header.includes("styles.mobileNotification"), "Notification dropdown must use the viewport-safe wrapper");
-expect(header.includes("window.innerWidth >= 1024") && header.includes("toggleSidebar()") && header.includes("toggleMobileSidebar()"), "Header toggle must keep desktop and mobile sidebar behavior separate");
+expect(header.includes("!isAdminMobileViewport(window.innerWidth)") && header.includes("toggleSidebar()") && header.includes("toggleMobileSidebar()"), "Header toggle must keep desktop and mobile sidebar behavior separate through the shared viewport contract");
 expect(header.includes("<ThemeToggleButton") && header.includes("<NotificationDropdown") && header.includes("<UserDropdown"), "Header must compose the shared theme, notification, and user controls");
 
 expect(css.includes("position: fixed"), "Mobile notification panel must be viewport-positioned");
