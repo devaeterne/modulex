@@ -43,8 +43,7 @@ import type {
 
 type Product = OrderPickerProduct;
 type PriceRow = OrderPriceRow;
-type DraftItem = {
-  id?: string;
+type DraftItem = { id?: string;
   product_id: string;
   quantity: string;
   unit_price: string;
@@ -376,7 +375,6 @@ export default function EditCustomerOrder() {
   if (!revisionPolicy.canEdit) {
     return <div className="space-y-5"><ComponentCard title={`Revision Locked · ${order.order_number}`} desc={`${customer.name} · ${revisionPolicy.reason}`} headerAction={<Button variant="outline" onClick={() => router.push(`/customers/${customerId}/orders/${orderId}`)}>Back to Order</Button>}><Alert variant="warning" title="Commercial revision disabled" message={`Commercial revision is disabled for status ${order.status.replaceAll("_", " ")}. Order identity, snapshots and calculated totals remain immutable; status changes continue through the dedicated status workflow.`} /></ComponentCard></div>;
   }
-
   const defaultCommission = Number(selectedPaymentMethod?.commission_percent ?? 0);
   const commissionOverridden = Math.abs(Number(appliedCommission || 0) - defaultCommission) > 0.0001;
   const taxHint = selectedTaxRule?.is_active && selectedTaxRule.tax_rate !== null ? `Configured tax rule: ${Number(selectedTaxRule.tax_rate).toFixed(3)}%` : "No active tax rule configured.";
