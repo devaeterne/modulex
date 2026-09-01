@@ -20,7 +20,7 @@ const picker = read(pickerPath);
 expect(migration, /product_type_code_snapshot/i, "Order items must snapshot Product Type semantics.");
 expect(migration, /uom_code_snapshot/i, "Order items must snapshot UOM semantics.");
 expect(migration, /pricing_model_snapshot/i, "Order items must snapshot the pricing route.");
-expect(migration, /pricing_model\s*=\s*'price_group'/i, "Standard/Sink and other Price Group products must use the canonical route.");
+expect(migration, /pricing_model\s*<>\s*'price_group'/i, "All non-Price-Group routes must fail closed after explicit supported branches.");
 expect(migration, /countertop_material_band/i, "Ordinary Orders must explicitly fail closed for Countertop Material Band pricing.");
 expect(migration, /No Commercial Pricing/i, "Ordinary Orders must explicitly fail closed for pricing_model=none.");
 expect(migration, /product_prices/i, "Price Group products must resolve through canonical product_prices pricing.");
