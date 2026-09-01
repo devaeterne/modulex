@@ -249,7 +249,7 @@ export default function CustomerOrderDetail() {
                     <TableCell variant="admin"><Badge size="sm" color="light">{titleCase(item.price_source)}</Badge></TableCell>
                     <TableCell variant="admin">
                       {order.status === "draft" && contextCanManageCountertop && countertopItemsById.has(item.id)
-                        ? <Button size="sm" variant="outline" onClick={() => setCountertopContext(countertopItemsById.get(item.id) ?? null)}>Configure</Button>
+                        ? <Button size="sm" variant="outline" onClick={() => setCountertopContext(countertopItemsById.get(item.id) ?? null)}>Configure Countertop</Button>
                         : <FormHint>—</FormHint>}
                     </TableCell>
                   </TableRow>
