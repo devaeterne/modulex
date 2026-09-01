@@ -37,7 +37,10 @@ for (const label of ["Price Group", "Countertop Material Band", "No Commercial P
 }
 assert(migration.includes("new.unit_price:=round(v_price,4)"), "DB trigger must overwrite caller-controlled Price Group unit prices");
 assert(picker.includes("pricingModelLabel") && picker.includes("uom_name"), "product picker must show pricing route and UOM");
-assert(createOrder.includes("countertop_material_band") && createOrder.includes("/pricing/countertop"), "create UI must guide Stone to the canonical Countertop workspace");
+assert(createOrder.includes("countertop_material_band") && createOrder.includes("Add Countertop"), "create UI must guide Stone into Add Countertop rather than ordinary product pricing");
+assert(createOrder.includes('hasPermission(role, "orders.manage")'), "New Order Add Countertop must be permission-aware");
+assert(createOrder.includes('createOrder(validItems, "draft")') && createOrder.includes("<CountertopConfigurator"), "New Order Add Countertop must save a Draft shell before opening the canonical configurator");
+assert(!createOrder.includes('href="/pricing/countertop"'), "New Order must not route Countertop initiation through the Pricing workspace");
 assert(editOrder.includes("pricing_model") && detail.includes("pricingModelLabel"), "edit/detail UI must expose pricing route metadata");
 
 // UI boundary: Price Group money is server-authoritative; configured Stone preserves its stored canonical price.
