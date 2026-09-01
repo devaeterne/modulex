@@ -63,19 +63,18 @@ Comparison rules:
 
 ### Audited feature surface
 
-Audit `.tsx` files under:
+Audit only changed/new files matching either of these roots:
 
-- `modulex-admin/src/app/(admin)/**`
-- `modulex-admin/src/components/**`
+- `src/app/(admin)/**/page.tsx`
+- `src/components/**/*.tsx`
 
-Exclude reviewed shared-owner layers where primitive implementation legitimately uses native elements or visual tokens:
+The following shared-owner component roots are excluded because they are the reviewed primitive implementation layer and may legitimately contain native elements or visual tokens:
 
 - `src/components/ui/**`
 - `src/components/form/**`
 - `src/components/common/**`
-- shared shell/layout implementation files where the UI guide explicitly assigns ownership.
 
-Exclusions are centralized in the contract. Feature files may not add inline disable comments to bypass the gate.
+No other `src/components/**` exception is implicit. `src/layout/**` is outside the audited roots rather than being a special exemption. Exclusions are centralized in the contract. Feature files may not add inline disable comments to bypass the gate.
 
 ### Enforced rules
 
@@ -83,8 +82,8 @@ Use TypeScript/JSX-aware source inspection rather than a fragile whole-file rege
 
 For audited feature files, fail on:
 
-1. Native action/form/table primitives when a Modulex primitive exists: `button`, `input`, `select`, `textarea`, `label`, and raw table elements.
-2. Route-local visual surface/color utilities, including direct background colors, text colors, border colors, rounded/shadow/ring appearance, and route-local `dark:*` appearance overrides. Layout/structure utilities such as grid, flex, gap, spacing, width, min-width, alignment and responsive column composition remain allowed.
+1. Native action/form/table primitives when a Modulex primitive exists: `button`, `input`, `select`, `textarea`, `label`, `table`, `thead`, `tbody`, `tr`, `th`, and `td`.
+2. Route-local visual surface/color utilities. Block direct `bg-*`, color-bearing `text-*` and `border-*`, `rounded*`, `shadow*`, visual `ring*`, and route-local `dark:*` appearance overrides. Structural/typographic composition remains allowed where it does not create a new component appearance: grid/flex, gap/space, margin/padding, width/min/max width, alignment, overflow containment, responsive column/layout utilities, text sizing/alignment and font weight.
 3. Hand-built colored error/success/warning status text in place of `Alert` / `Badge` semantics.
 4. New/changed Admin route pages that abandon the established breadcrumb/page-header convention without using a reviewed shared alternative.
 5. Re-creation of existing shared primitives in feature code.
@@ -112,7 +111,7 @@ Keep all current data/RPC behavior from PR #230. Refactor presentation only.
 
 - `PageBreadCrumb` remains the route heading convention.
 - One `Stones` `ComponentCard` and one `Sinks` `ComponentCard`.
-- Each card has a short domain description and a primary Add action.
+- Each card has a short domain description and a primary Add action through the existing `ComponentCard.headerAction` API.
 - Load failure uses `Alert` with Retry.
 - Mutation success/error uses shared feedback components.
 
@@ -162,7 +161,7 @@ Countertop Setup owns controlled Countertop reference masters only:
 Each domain becomes a shared `ComponentCard` with:
 
 - concise description;
-- Add action;
+- Add action through `headerAction`;
 - shared table with loading/empty/populated state;
 - semantic status `Badge`;
 - Edit + Activate/Deactivate actions using shared `Button`;
