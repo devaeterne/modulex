@@ -57,8 +57,8 @@ assert.match(productPrices, /collapsed=\{!filtersOpen\}/, "Filters must use the 
 assert.match(productPrices, /collapsed=\{!directoryOpen\}/, "Directory Controls must use the shared collapsible card state");
 assert.match(productPrices, /collapsed=\{!bulkOpen\}/, "Bulk Pricing must use the shared collapsible card state");
 assert.match(productPrices, /Manage Material Bands[\s\S]*<\/Button>/, "Material Bands navigation must use the shared Button action");
-assert.match(productPrices, /activeFilters.*active filter/i, "Collapsed Filters header must summarize active filters");
-assert.match(productPrices, /selectedIds\.size.*selected/i, "Collapsed Bulk Pricing header must summarize selection count");
+assert.match(productPrices, /activeFilters[\s\S]*active filter/i, "Collapsed Filters header must summarize active filters");
+assert.match(productPrices, /selectedIds\.size[\s\S]*selected/i, "Collapsed Bulk Pricing header must summarize selection count");
 
 assert.match(materialBandsPage, /MaterialBandPricingTable/, "Material Bands route must render the focused pricing workspace");
 assert.match(materialBands, /countertop_material_price_bands/, "Material Bands workspace must read the canonical band table");
