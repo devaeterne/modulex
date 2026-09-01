@@ -17,11 +17,13 @@ import {
   TableHeader,
   TableRow,
   TableViewport,
+  TableStateRow,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
 
+const TABLE_COLUMN_COUNT = 8;
 type WarehouseType = "sellable" | "non_sellable";
 
 type WarehouseSummary = {
@@ -343,7 +345,7 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
       {errorMessage ? <Alert variant="error" title="Zone action failed" message={errorMessage} /> : null}
 
       <TableViewport>
-        <Table variant="admin" className="w-full min-w-[1520px]">
+        <Table variant="admin" minWidth="extraWide">
           <TableHeader variant="admin">
             <TableRow>
               {["Zone", "Warehouse", "QR", "Structure", "Stock", "Status", "Updated"].map((label) => (
@@ -357,15 +359,13 @@ export default function ZonesTable({ warehouseId }: ZonesTableProps) {
 
           <TableBody variant="admin">
             {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={8} variant="admin" className="py-8 text-center">
+              <TableStateRow colSpan={TABLE_COLUMN_COUNT}>
                   <span role="status">Loading zones...</span>
-                </TableCell>
-              </TableRow>
+                </TableStateRow>
             ) : filteredZones.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} variant="admin" className="py-8 text-center">No zones found.</TableCell>
-              </TableRow>
+              <TableStateRow colSpan={TABLE_COLUMN_COUNT}>
+                  No zones found.
+                </TableStateRow>
             ) : (
               filteredZones.map((zone) => {
                 const isActionLoading = actionLoadingId === zone.id;

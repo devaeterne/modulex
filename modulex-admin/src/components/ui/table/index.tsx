@@ -1,6 +1,13 @@
 import React, { ReactNode } from "react";
 
 type TableVariant = "plain" | "admin";
+type TableMinWidth = "standard" | "wide" | "extraWide";
+
+const TABLE_MIN_WIDTHS: Record<TableMinWidth, string> = {
+  standard: "max(100%, 960px)",
+  wide: "max(100%, 1120px)",
+  extraWide: "max(100%, 1520px)",
+};
 
 interface TableViewportProps {
   children: ReactNode;
@@ -11,6 +18,7 @@ interface TableProps {
   children: ReactNode;
   className?: string;
   variant?: TableVariant;
+  minWidth?: TableMinWidth;
 }
 
 interface TableHeaderProps {
@@ -41,18 +49,38 @@ interface TableCellProps {
   colSpan?: number;
 }
 
+interface TableStateRowProps {
+  children: ReactNode;
+  colSpan: number;
+  className?: string;
+  variant?: TableVariant;
+}
+
 const TableViewport: React.FC<TableViewportProps> = ({ children, className = "" }) => (
   <div
-    className={`w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 ${className}`}
+    className={`w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-gray-200 [scrollbar-gutter:stable] dark:border-gray-800 ${className}`}
   >
     {children}
   </div>
 );
 
-const Table: React.FC<TableProps> = ({ children, className = "", variant = "plain" }) => {
+const Table: React.FC<TableProps> = ({
+  children,
+  className = "",
+  variant = "plain",
+  minWidth,
+}) => {
   const variantClass =
     variant === "admin" ? "divide-y divide-gray-200 dark:divide-gray-800" : "";
-  return <table className={`min-w-full ${variantClass} ${className}`}>{children}</table>;
+
+  return (
+    <table
+      className={`w-full min-w-full ${variantClass} ${className}`}
+      style={minWidth ? { minWidth: TABLE_MIN_WIDTHS[minWidth] } : undefined}
+    >
+      {children}
+    </table>
+  );
 };
 
 const TableHeader: React.FC<TableHeaderProps> = ({
@@ -111,4 +139,29 @@ const TableCell: React.FC<TableCellProps> = ({
   );
 };
 
-export { TableViewport, Table, TableHeader, TableBody, TableRow, TableCell };
+const TableStateRow: React.FC<TableStateRowProps> = ({
+  children,
+  colSpan,
+  className = "",
+  variant = "admin",
+}) => (
+  <TableRow>
+    <TableCell
+      colSpan={colSpan}
+      variant={variant}
+      className={`py-8 text-center text-gray-500 dark:text-gray-400 ${className}`}
+    >
+      {children}
+    </TableCell>
+  </TableRow>
+);
+
+export {
+  TableViewport,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableStateRow,
+};

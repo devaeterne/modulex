@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
   TableViewport,
+  TableStateRow,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 
@@ -72,6 +73,7 @@ type InventoryTableProps = {
 
 type BadgeColor = "success" | "error" | "warning" | "light";
 
+const TABLE_COLUMN_COUNT = 8;
 const PAGE_SIZE = 25;
 const EMPTY_FILTERS: InventoryFilters = {
   query: "",
@@ -364,7 +366,7 @@ export default function InventoryTable({ mode = "overview" }: InventoryTableProp
 
       <div aria-busy={isLoading}>
         <TableViewport>
-          <Table variant="admin" className="w-full min-w-[1040px]">
+          <Table variant="admin" minWidth="wide">
             <caption className="sr-only">
               {isShelfMode
                 ? "Shelf inventory by product and location"
@@ -384,17 +386,13 @@ export default function InventoryTable({ mode = "overview" }: InventoryTableProp
             </TableHeader>
             <TableBody variant="admin">
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={8} variant="admin" className="py-8 text-center text-gray-500 dark:text-gray-400">
-                    <span role="status">Loading inventory...</span>
-                  </TableCell>
-                </TableRow>
+                <TableStateRow colSpan={TABLE_COLUMN_COUNT}>
+                  <span role="status">Loading inventory...</span>
+                </TableStateRow>
               ) : rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} variant="admin" className="py-8 text-center text-gray-500 dark:text-gray-400">
-                    No inventory records found.
-                  </TableCell>
-                </TableRow>
+                <TableStateRow colSpan={TABLE_COLUMN_COUNT}>
+                  No inventory records found.
+                </TableStateRow>
               ) : (
                 rows.map((row) => (
                   <TableRow key={row.inventory_id}>
