@@ -1,0 +1,33 @@
+name: UI2D Product Reference Transform
+
+on:
+  push:
+    branches:
+      - fix/admin-ui-full-route-regression
+
+permissions:
+  contents: write
+
+jobs:
+  transform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/admin-ui-full-route-regression
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node modulex-admin/scripts/ui2d-product-reference-transform.mjs
+      - name: Commit transform
+        run: |
+          if git diff --quiet -- modulex-admin/src/components/products/ProductMasterReferenceManager.tsx; then
+            echo "No transform changes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin/src/components/products/ProductMasterReferenceManager.tsx
+          git commit -m "fix(admin): align Product Master reference table contract"
+          git push origin HEAD:fix/admin-ui-full-route-regression
