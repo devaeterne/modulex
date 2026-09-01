@@ -27,14 +27,21 @@
 - [x] Add the migration with snapshot columns and pinned private trigger functions.
 - [x] Override Price Group unit prices and totals at the DB boundary.
 - [x] Reject ordinary Countertop Material Band and No Commercial Pricing lines.
-- [ ] Validate the migration in an explicit transaction and prove rollback.
+- [x] Validate the migration in an explicit transaction and prove rollback.
+
+### Task 2B: DB-boundary hardening
+
+- [x] Record a fresh RED contract for missing immutable code snapshots, canonical-only Stone mutation, and item-level totals reconciliation.
+- [x] Preserve all five semantic snapshots unless `product_id` changes, including rejecting caller snapshot tampering.
+- [x] Gate Stone commercial writes inside the existing private canonical attach function without widening grants.
+- [x] Reconcile both OLD and NEW parents from stored line totals with an initially-deferred item constraint trigger.
 
 ### Task 3: Admin integration
 
 - [x] Load Product Type/UOM/pricing route through the shared order adapter.
 - [x] Show friendly route metadata and disable unsupported picker actions.
 - [x] Preserve the canonical Countertop CTA/attachment flow.
-- [ ] Run targeted contracts, typecheck, lint, UI regression, and production build.
+- [x] Run targeted contracts, typecheck, lint, UI regression, and production build.
 
 ### Task 4: Delivery
 

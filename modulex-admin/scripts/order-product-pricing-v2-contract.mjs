@@ -25,7 +25,7 @@ assert(migration.includes("product_prices") && migration.includes("valid_to is n
 assert(!/v_unit_price\s*:=\s*coalesce\(\(v_item->>'unit_price'\)/.test(migration), "order pricing must not trust client unit_price");
 assert(migration.includes("Countertop Material Band products must be configured in the Countertop workspace"), "Stone ordinary pricing must fail closed with a human-readable error");
 assert(migration.includes("No Commercial Pricing products cannot be added to customer orders"), "pricing_model none must fail closed");
-assert(migration.includes("v_configured") && migration.includes("countertop_configurations") && migration.includes("return new"), "configured countertop history must bypass ordinary repricing and retain the canonical configurator boundary");
+assert(migration.includes("countertop_order_pricing_gate") && migration.includes("return new"), "configured countertop pricing must retain the canonical configurator boundary");
 assert(migration.includes("sku_snapshot") && migration.includes("product_name_snapshot"), "order item SKU/name snapshots must be preserved");
 assert(migration.includes("line_total") && migration.includes("subtotal") && migration.includes("grand_total"), "order totals must remain server-authoritative");
 
@@ -45,6 +45,7 @@ for (const snapshot of ["product_type_code_snapshot", "product_type_name_snapsho
   assert(migration.includes(snapshot), `immutable semantic snapshot missing: ${snapshot}`);
 }
 assert(/tg_op\s*=\s*'INSERT'\s+or\s+new\.product_id\s+is\s+distinct\s+from\s+old\.product_id/i.test(migration), "live Product Type/UOM metadata must only snapshot on INSERT or product identity change");
+assert(/new\.product_type_code_snapshot\s*:=\s*old\.product_type_code_snapshot/i.test(migration), "same-product updates must reject semantic snapshot tampering");
 assert(/update public\.customer_order_items[\s\S]*coalesce\(oi\.product_type_code_snapshot/i.test(migration), "backfill must fill only missing semantic snapshots");
 
 // Hardening: a configured row is not authorization; only the canonical private attach function may open the gate.
@@ -53,7 +54,8 @@ assert(/create or replace function private\.attach_countertop_configuration\(/i.
 assert(/insert into private\.countertop_order_pricing_gate/i.test(migration) && /delete from private\.countertop_order_pricing_gate/i.test(migration), "canonical attach must open and close its transaction gate");
 assert(/exists\s*\(select 1 from private\.countertop_order_pricing_gate/i.test(migration), "Stone pricing trigger must verify the canonical gate");
 assert(!/exists\s*\(select 1 from public\.countertop_configurations where order_item_id/i.test(migration), "configured history alone must not authorize Stone commercial mutation");
-assert(!/grant\s+execute[\s\S]*countertop_order_pricing_gate/i.test(migration), "Countertop gate must not create a browser-callable private API");
+assert(!/create\s+(?:or replace\s+)?function\s+private\.countertop_order_pricing_gate/i.test(migration), "Countertop gate must not create a browser-callable private API");
+assert(/revoke all on table private\.countertop_order_pricing_gate from public, anon, authenticated/i.test(migration), "Countertop gate table must deny browser roles");
 
 // Hardening: stored line totals drive the header projection after every line mutation.
 assert(/create constraint trigger[\s\S]*after insert or update or delete[\s\S]*deferrable initially deferred/i.test(migration), "item INSERT/UPDATE/DELETE must defer parent total reconciliation to transaction end");

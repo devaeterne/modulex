@@ -232,6 +232,7 @@ These rules are mandatory for all future Modulex Admin work:
 
 - [~] Route order products through dynamic Product Type + UOM + `pricing_model`.
   - Price Group lines remain server-authoritative through canonical `product_prices`; ordinary Countertop Material Band and No Commercial Pricing lines fail closed, while configured Stone continues through `calculate_countertop_price` → `attach_countertop_configuration`.
+  - Semantic Product Type/UOM snapshots are immutable unless product identity changes; Stone commercial writes require the private canonical-attach transaction gate; deferred item mutation triggers reconcile header totals from stored line totals.
   - Production migration, deployment, and signed-in browser acceptance remain intentionally pending; do not mark complete before those gates pass.
 
 - [x] Review global and customer-scoped order list consistency. (A1.2A)
