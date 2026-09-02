@@ -124,7 +124,7 @@ $$;
 
 revoke all on function private.apply_vendor_list_price_on_approval() from public;
 
- drop trigger if exists trg_vendor_catalog_items_list_price_on_approval
+drop trigger if exists trg_vendor_catalog_items_list_price_on_approval
 on public.vendor_catalog_items;
 
 create trigger trg_vendor_catalog_items_list_price_on_approval
