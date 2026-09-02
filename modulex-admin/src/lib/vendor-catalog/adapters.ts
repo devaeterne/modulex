@@ -314,7 +314,6 @@ type WooProduct = {
   categories?: Array<{ id?: number | string; name?: string; slug?: string }>;
   is_in_stock?: boolean;
   is_purchasable?: boolean;
-  low_stock_remaining?: number | null;
 };
 
 type WooCategory = {
@@ -325,19 +324,12 @@ type WooCategory = {
 };
 
 function normalizeRuvatiAvailability(product: WooProduct): NormalizedVendorProduct["availability"] {
-  const stockQuantity =
-    typeof product.low_stock_remaining === "number" &&
-    Number.isFinite(product.low_stock_remaining) &&
-    product.low_stock_remaining >= 0
-      ? product.low_stock_remaining
-      : null;
-
   if (product.is_purchasable === false) {
     return {
       status: "UNAVAILABLE",
       available: product.is_in_stock ?? null,
       purchasable: false,
-      stockQuantity,
+      stockQuantity: null,
     };
   }
   if (product.is_purchasable === true && product.is_in_stock === false) {
@@ -345,7 +337,7 @@ function normalizeRuvatiAvailability(product: WooProduct): NormalizedVendorProdu
       status: "OUT_OF_STOCK",
       available: false,
       purchasable: true,
-      stockQuantity,
+      stockQuantity: null,
     };
   }
   if (product.is_purchasable === true && product.is_in_stock === true) {
@@ -353,7 +345,7 @@ function normalizeRuvatiAvailability(product: WooProduct): NormalizedVendorProdu
       status: "AVAILABLE",
       available: true,
       purchasable: true,
-      stockQuantity,
+      stockQuantity: null,
     };
   }
   return unknownAvailability();
