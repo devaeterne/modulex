@@ -33,6 +33,8 @@ type Candidate = {
   vendor_code: string;
   vendor_category_key: string | null;
   vendor_category_label: string | null;
+  catalog_domain: "sink" | "stone";
+  stone_type_id: string | null;
 };
 
 async function handleGet(request: Request) {
@@ -47,6 +49,7 @@ async function handleGet(request: Request) {
   const query = safeSearch(url.searchParams.get("query") || "");
   const availability = (url.searchParams.get("availability") || "all").toUpperCase();
   const changeStates = parseChangeStates(url.searchParams.get("changeStates"));
+  const catalogDomain = url.searchParams.get("catalogDomain") === "stone" ? "stone" : "sink";
 
   if (
     reviewStatus !== "PENDING" ||
@@ -61,7 +64,10 @@ async function handleGet(request: Request) {
   for (let from = 0; ; from += PAGE_SIZE) {
     let dbQuery = supabaseAdmin
       .from("vendor_catalog_items")
-      .select("id,vendor_code,vendor_category_key,vendor_category_label")
+      .select(
+        "id,vendor_code,vendor_category_key,vendor_category_label,catalog_domain,stone_type_id"
+      )
+      .eq("catalog_domain", catalogDomain)
       .eq("review_status", "PENDING")
       .neq("availability_status", "MISSING")
       .in("change_state", changeStates)
@@ -91,6 +97,7 @@ async function handleGet(request: Request) {
   const mappingEligibility = new Map<string, boolean>();
   const uniqueMappings = new Map<string, Candidate>();
   for (const candidate of candidates) {
+    if (candidate.catalog_domain === "stone") continue;
     const key = `${candidate.vendor_code}:${candidate.vendor_category_key ?? ""}`;
     if (!uniqueMappings.has(key)) uniqueMappings.set(key, candidate);
   }
@@ -111,15 +118,17 @@ async function handleGet(request: Request) {
   );
 
   const ids = candidates
-    .filter(
-      (candidate) =>
+    .filter((candidate) => {
+      if (candidate.catalog_domain === "stone") return Boolean(candidate.stone_type_id);
+      return (
         mappingEligibility.get(
           `${candidate.vendor_code}:${candidate.vendor_category_key ?? ""}`
         ) === true
-    )
+      );
+    })
     .map((candidate) => candidate.id);
 
-  return Response.json({ ids, total: ids.length });
+  return Response.json({ ids, total: ids.length, catalogDomain });
 }
 
 export async function GET(request: Request) {

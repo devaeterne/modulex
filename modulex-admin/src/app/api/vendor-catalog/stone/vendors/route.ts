@@ -15,20 +15,38 @@ async function handleGet(request: Request) {
   });
   if (authorization instanceof Response) return authorization;
 
-  const vendors = [];
-  for (const vendorCode of Object.keys(stoneVendorCatalogRegistry) as Array<
+  const url = new URL(request.url);
+  const requestedVendor = url.searchParams.get("vendor")?.trim().toLowerCase() ?? "";
+  const vendorCodes = Object.keys(stoneVendorCatalogRegistry) as Array<
     keyof typeof stoneVendorCatalogRegistry
-  >) {
-    const adapter = stoneVendorCatalogRegistry[vendorCode]();
-    const categories = await adapter.listCategories();
-    vendors.push({
-      vendorCode,
-      label: stoneVendorCatalogLabels[vendorCode],
-      categories,
+  >;
+
+  if (!requestedVendor) {
+    return Response.json({
+      catalogDomain: "stone",
+      vendors: vendorCodes.map((vendorCode) => ({
+        vendorCode,
+        label: stoneVendorCatalogLabels[vendorCode],
+      })),
     });
   }
 
-  return Response.json({ catalogDomain: "stone", vendors });
+  if (!vendorCodes.includes(requestedVendor as keyof typeof stoneVendorCatalogRegistry)) {
+    return Response.json({ error: `Unknown Stone vendor: ${requestedVendor}` }, { status: 400 });
+  }
+
+  const vendorCode = requestedVendor as keyof typeof stoneVendorCatalogRegistry;
+  const adapter = stoneVendorCatalogRegistry[vendorCode]();
+  const categories = await adapter.listCategories();
+
+  return Response.json({
+    catalogDomain: "stone",
+    vendor: {
+      vendorCode,
+      label: stoneVendorCatalogLabels[vendorCode],
+      categories,
+    },
+  });
 }
 
 export async function GET(request: Request) {
