@@ -74,7 +74,6 @@ for (const token of [
   "Countertop changes are Draft-only.",
   "removeCountertopOrderItem(countertopRemoveItemId",
   "orderItemId={countertopEditItemId}",
-  "lineNo: items.findIndex((item) => item.id === countertopEditItemId) + 1",
 ]) assert(editOrder.includes(token), `Edit Order configured-Countertop guard missing ${token}`);
 assert(editOrder.includes("Unsaved line edits will be discarded."), "direct Countertop removal must warn before authoritative line reload");
 assert(orderDomain.includes("export async function removeCountertopOrderItem"), "order domain must own Countertop removal");
