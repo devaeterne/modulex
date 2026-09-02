@@ -11,8 +11,10 @@ on:
       - "modulex-admin/sql/vendor-catalog-sync*.sql"
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
       - "modulex-admin/scripts/vendor-approval-idempotency-contract.mjs"
+      - "modulex-admin/scripts/vendor-availability-contract.mjs"
       - "modulex-admin/docs/VENDOR_CATALOG_SYNC.md"
       - "modulex-store/supabase/migrations/*vendor_catalog_sync*.sql"
+      - "modulex-store/supabase/migrations/*vendor_catalog_availability*.sql"
       - ".github/workflows/admin-vendor-catalog-sync.yml"
   pull_request:
     paths:
@@ -24,8 +26,10 @@ on:
       - "modulex-admin/sql/vendor-catalog-sync*.sql"
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
       - "modulex-admin/scripts/vendor-approval-idempotency-contract.mjs"
+      - "modulex-admin/scripts/vendor-availability-contract.mjs"
       - "modulex-admin/docs/VENDOR_CATALOG_SYNC.md"
       - "modulex-store/supabase/migrations/*vendor_catalog_sync*.sql"
+      - "modulex-store/supabase/migrations/*vendor_catalog_availability*.sql"
       - ".github/workflows/admin-vendor-catalog-sync.yml"
   workflow_dispatch:
 
@@ -48,6 +52,7 @@ jobs:
       - run: npm ci
       - run: node scripts/vendor-catalog-sync-contract.mjs
       - run: node scripts/vendor-approval-idempotency-contract.mjs
+      - run: node scripts/vendor-availability-contract.mjs
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build

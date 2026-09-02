@@ -2,14 +2,21 @@ import "server-only";
 
 import {
   classifyVendorProduct,
+  stableAvailabilityHash,
   stableDiscoveryHash,
+  stableNormalizedAvailabilityHash,
   type NormalizedVendorProduct,
   type VendorCatalogAdapter,
   type VendorCatalogChangeState,
   type VendorCatalogDiscoveryScope,
   type VendorCatalogReviewStatus,
+  type VendorAvailabilityStatus,
 } from "@/lib/vendor-catalog/domain";
 import { loadVendorCatalogCheck } from "@/lib/vendor-catalog/check";
+import {
+  reconcileVendorAvailability,
+  type VendorAvailabilityReconcileItem,
+} from "@/lib/vendor-catalog/availability";
 import {
   isSupabaseAdminConfigured,
   supabaseAdmin,
@@ -21,10 +28,17 @@ type SyncCounts = {
   updated: number;
   unchanged: number;
   failed: number;
+  availabilityChanged: number;
+  available: number;
+  outOfStock: number;
+  unavailable: number;
+  unknown: number;
+  missing: number;
+  canonicalDeactivated: number;
+  canonicalReactivated: number;
 };
 
-type ExistingItem = {
-  id: string;
+type ExistingItem = VendorAvailabilityReconcileItem & {
   external_id: string;
   snapshot_hash: string;
   discovery_hash: string | null;
@@ -35,16 +49,24 @@ type ExistingItem = {
   family_key: string | null;
   variant_code: string | null;
   variant_label: string | null;
+  availability_status: VendorAvailabilityStatus;
+  availability_hash: string | null;
+  availability_changed_at: string | null;
+  missing_success_count: number;
 };
 
 type PreparedProduct = {
   product: NormalizedVendorProduct;
+  existing: ExistingItem | undefined;
   discoveryHash: string;
+  availabilityHash: string;
+  availabilityChanged: boolean;
   snapshotHash: string;
   changeState: VendorCatalogChangeState;
   reviewStatus: VendorCatalogReviewStatus;
   detailsRefreshedAt: string | null;
   classificationBackfillNeeded: boolean;
+  seenResetNeeded: boolean;
 };
 
 export type VendorCatalogSyncOptions = {
@@ -76,6 +98,32 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
+function emptyCounts(): SyncCounts {
+  return {
+    discovered: 0,
+    created: 0,
+    updated: 0,
+    unchanged: 0,
+    failed: 0,
+    availabilityChanged: 0,
+    available: 0,
+    outOfStock: 0,
+    unavailable: 0,
+    unknown: 0,
+    missing: 0,
+    canonicalDeactivated: 0,
+    canonicalReactivated: 0,
+  };
+}
+
+function countAvailability(counts: SyncCounts, status: VendorAvailabilityStatus) {
+  if (status === "AVAILABLE") counts.available += 1;
+  else if (status === "OUT_OF_STOCK") counts.outOfStock += 1;
+  else if (status === "UNAVAILABLE") counts.unavailable += 1;
+  else if (status === "MISSING") counts.missing += 1;
+  else counts.unknown += 1;
+}
+
 async function loadExistingItems(vendorCode: string) {
   const rows: ExistingItem[] = [];
   const pageSize = 500;
@@ -84,7 +132,7 @@ async function loadExistingItems(vendorCode: string) {
     const { data, error } = await supabaseAdmin
       .from("vendor_catalog_items")
       .select(
-        "id,external_id,snapshot_hash,discovery_hash,review_status,details_refreshed_at,vendor_category_key,vendor_category_label,family_key,variant_code,variant_label"
+        "id,external_id,snapshot_hash,discovery_hash,review_status,details_refreshed_at,vendor_category_key,vendor_category_label,family_key,variant_code,variant_label,canonical_product_id,availability_status,availability_hash,availability_changed_at,missing_success_count,canonical_inactivated_by_vendor_at,canonical_status_version_at,reactivation_requires_review"
       )
       .eq("vendor_code", vendorCode)
       .range(from, from + pageSize - 1);
@@ -106,6 +154,8 @@ function prepareProducts(
   return products.map<PreparedProduct>((product) => {
     const existing = existingByExternalId.get(product.externalId);
     const discoveryHash = stableDiscoveryHash(product);
+    const availabilityHash = stableAvailabilityHash(product);
+    const availabilityChanged = existing?.availability_hash !== availabilityHash;
     const changeState =
       forcedStates?.get(product.externalId) ??
       classifyVendorProduct(existing?.discovery_hash, discoveryHash);
@@ -117,7 +167,7 @@ function prepareProducts(
         product.vendorCategoryKey ?? existing?.vendor_category_key ?? null,
       vendorCategoryLabel:
         product.vendorCategoryLabel ?? existing?.vendor_category_label ?? null,
-      familyKey: product.familyKey ?? existing?.family_key ?? null,
+      familyKey: product.familyKey ?? existing?.family_key ?? product.familyKey,
       variantCode: product.variantCode ?? existing?.variant_code ?? null,
       variantLabel: product.variantLabel ?? existing?.variant_label ?? null,
     };
@@ -133,7 +183,10 @@ function prepareProducts(
 
     return {
       product: productWithPreservedScope,
+      existing,
       discoveryHash,
+      availabilityHash,
+      availabilityChanged,
       snapshotHash:
         changeState === "UNCHANGED" && existing?.snapshot_hash
           ? existing.snapshot_hash
@@ -143,8 +196,92 @@ function prepareProducts(
       detailsRefreshedAt:
         changeState === "UNCHANGED" ? existing?.details_refreshed_at ?? null : null,
       classificationBackfillNeeded,
+      seenResetNeeded: Boolean(existing && existing.missing_success_count > 0),
     };
   });
+}
+
+function isAuthoritativeFullDiscovery(
+  adapter: VendorCatalogAdapter,
+  categoryKey: string | null,
+  products: NormalizedVendorProduct[]
+) {
+  if (categoryKey !== null) return false;
+  if (
+    adapter.vendorCode === "ruvati" &&
+    products.some((product) => product.externalId.startsWith("sitemap:"))
+  ) {
+    return false;
+  }
+  return true;
+}
+
+async function reconcileObservedAvailability(
+  entries: PreparedProduct[],
+  counts: SyncCounts,
+  now: string
+) {
+  for (const entry of entries) {
+    if (!entry.existing) continue;
+    const result = await reconcileVendorAvailability(
+      entry.existing,
+      entry.product.availability.status,
+      now
+    );
+    if (result.deactivated) counts.canonicalDeactivated += 1;
+    if (result.reactivated) counts.canonicalReactivated += 1;
+  }
+}
+
+async function reconcileMissingItems(
+  products: NormalizedVendorProduct[],
+  existingByExternalId: Map<string, ExistingItem>,
+  counts: SyncCounts,
+  now: string
+) {
+  const discoveredIds = new Set(products.map((product) => product.externalId));
+  const missingAvailability = {
+    status: "MISSING" as const,
+    available: null,
+    purchasable: null,
+    stockQuantity: null,
+  };
+  const missingHash = stableNormalizedAvailabilityHash(missingAvailability);
+
+  for (const existing of existingByExternalId.values()) {
+    if (discoveredIds.has(existing.external_id)) continue;
+    const nextMissingCount = existing.missing_success_count + 1;
+    const becomesMissing = nextMissingCount >= 2;
+    const availabilityChanged = becomesMissing && existing.availability_status !== "MISSING";
+
+    const { error } = await supabaseAdmin
+      .from("vendor_catalog_items")
+      .update({
+        missing_success_count: nextMissingCount,
+        ...(becomesMissing
+          ? {
+              availability_status: "MISSING",
+              vendor_available: null,
+              vendor_purchasable: null,
+              vendor_stock_quantity: null,
+              availability_hash: missingHash,
+              availability_changed_at: availabilityChanged
+                ? now
+                : existing.availability_changed_at,
+            }
+          : {}),
+      })
+      .eq("id", existing.id);
+    if (error) throw error;
+
+    if (!becomesMissing) continue;
+    counts.missing += 1;
+    if (availabilityChanged) counts.availabilityChanged += 1;
+
+    const result = await reconcileVendorAvailability(existing, "MISSING", now);
+    if (result.deactivated) counts.canonicalDeactivated += 1;
+    if (result.reactivated) counts.canonicalReactivated += 1;
+  }
 }
 
 export async function runVendorCatalogSync(
@@ -156,13 +293,7 @@ export async function runVendorCatalogSync(
   }
 
   const errors: Array<{ externalId?: string; message: string }> = [];
-  const counts: SyncCounts = {
-    discovered: 0,
-    created: 0,
-    updated: 0,
-    unchanged: 0,
-    failed: 0,
-  };
+  const counts = emptyCounts();
 
   let scope: VendorCatalogDiscoveryScope = options.scope ?? {};
   let snapshotProducts: NormalizedVendorProduct[] | null = null;
@@ -205,10 +336,19 @@ export async function runVendorCatalogSync(
     counts.discovered = products.length;
 
     const prepared = prepareProducts(products, existingByExternalId, snapshotStates);
+    for (const entry of prepared) {
+      countAvailability(counts, entry.product.availability.status);
+      if (entry.existing && entry.availabilityChanged) counts.availabilityChanged += 1;
+    }
+
     const candidates =
       options.changedOnly === true
         ? prepared.filter(
-            (entry) => entry.changeState !== "UNCHANGED" || entry.classificationBackfillNeeded
+            (entry) =>
+              entry.changeState !== "UNCHANGED" ||
+              entry.classificationBackfillNeeded ||
+              entry.availabilityChanged ||
+              entry.seenResetNeeded
           )
         : prepared;
     if (options.changedOnly === true) {
@@ -240,6 +380,15 @@ export async function runVendorCatalogSync(
             discovery_hash: entry.discoveryHash,
             change_state: entry.changeState,
             review_status: entry.reviewStatus,
+            availability_status: entry.product.availability.status,
+            vendor_available: entry.product.availability.available,
+            vendor_purchasable: entry.product.availability.purchasable,
+            vendor_stock_quantity: entry.product.availability.stockQuantity,
+            availability_hash: entry.availabilityHash,
+            availability_changed_at: entry.availabilityChanged
+              ? now
+              : entry.existing?.availability_changed_at ?? null,
+            missing_success_count: 0,
             last_seen_run_id: run.id,
             source_payload: entry.product.sourcePayload,
             last_seen_at: now,
@@ -315,6 +464,7 @@ export async function runVendorCatalogSync(
         familyKey: entry.product.familyKey,
         variantCode: entry.product.variantCode,
         variantLabel: entry.product.variantLabel,
+        availability: entry.product.availability,
         assets: entry.product.assets,
       },
       source_payload: entry.product.sourcePayload,
@@ -324,6 +474,14 @@ export async function runVendorCatalogSync(
       if (snapshotBatch.length === 0) continue;
       const { error } = await supabaseAdmin.from("vendor_catalog_snapshots").insert(snapshotBatch);
       if (error) throw error;
+    }
+
+    if (counts.failed === 0) {
+      await reconcileObservedAvailability(prepared, counts, now);
+    }
+
+    if (isAuthoritativeFullDiscovery(adapter, categoryKey, products) && counts.failed === 0) {
+      await reconcileMissingItems(products, existingByExternalId, counts, now);
     }
 
     for (const entry of persisted) {
@@ -343,6 +501,14 @@ export async function runVendorCatalogSync(
         updated_count: counts.updated,
         unchanged_count: counts.unchanged,
         failed_count: counts.failed,
+        availability_changed_count: counts.availabilityChanged,
+        available_count: counts.available,
+        out_of_stock_count: counts.outOfStock,
+        unavailable_count: counts.unavailable,
+        unknown_count: counts.unknown,
+        missing_count: counts.missing,
+        canonical_deactivated_count: counts.canonicalDeactivated,
+        canonical_reactivated_count: counts.canonicalReactivated,
         error_summary: errors.length > 0 ? errors : null,
       })
       .eq("id", run.id);
@@ -370,6 +536,14 @@ export async function runVendorCatalogSync(
         updated_count: counts.updated,
         unchanged_count: counts.unchanged,
         failed_count: counts.failed + 1,
+        availability_changed_count: counts.availabilityChanged,
+        available_count: counts.available,
+        out_of_stock_count: counts.outOfStock,
+        unavailable_count: counts.unavailable,
+        unknown_count: counts.unknown,
+        missing_count: counts.missing,
+        canonical_deactivated_count: counts.canonicalDeactivated,
+        canonical_reactivated_count: counts.canonicalReactivated,
         error_summary: errors,
       })
       .eq("id", run.id);

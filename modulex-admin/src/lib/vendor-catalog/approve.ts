@@ -543,6 +543,12 @@ export async function approveVendorCatalogItem(
     familyKey: typedItem.family_key || safeSku(typedItem),
     variantCode: typedItem.variant_code,
     variantLabel: typedItem.variant_label,
+    availability: {
+      status: "AVAILABLE",
+      available: true,
+      purchasable: true,
+      stockQuantity: null,
+    },
     assets: currentAssets.map<VendorAsset>((asset) => ({
       kind: asset.kind,
       url: asset.url,

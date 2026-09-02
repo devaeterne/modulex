@@ -3,6 +3,19 @@ import { createHash } from "node:crypto";
 export type VendorCatalogChangeState = "NEW" | "UPDATED" | "UNCHANGED";
 export type VendorCatalogReviewStatus = "PENDING" | "APPROVED" | "IGNORED";
 export type VendorAssetKind = "image" | "specification" | "cad" | "document";
+export type VendorAvailabilityStatus =
+  | "AVAILABLE"
+  | "OUT_OF_STOCK"
+  | "UNAVAILABLE"
+  | "UNKNOWN"
+  | "MISSING";
+
+export type NormalizedVendorAvailability = {
+  status: VendorAvailabilityStatus;
+  available: boolean | null;
+  purchasable: boolean | null;
+  stockQuantity: number | null;
+};
 
 export type VendorCatalogCategory = {
   key: string;
@@ -36,6 +49,7 @@ export type NormalizedVendorProduct = {
   familyKey: string;
   variantCode: string | null;
   variantLabel: string | null;
+  availability: NormalizedVendorAvailability;
   assets: VendorAsset[];
   sourcePayload: unknown;
 };
@@ -51,7 +65,6 @@ function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(canonicalize);
   }
-
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
@@ -59,7 +72,6 @@ function canonicalize(value: unknown): unknown {
         .map(([key, child]) => [key, canonicalize(child)])
     );
   }
-
   return value;
 }
 
@@ -118,6 +130,25 @@ export function stableProductHash(product: NormalizedVendorProduct) {
   return hashSnapshot(
     normalizedProductSnapshot(product, { includeDiscoveryScope: true })
   );
+}
+
+export function stableNormalizedAvailabilityHash(
+  availability: NormalizedVendorAvailability
+) {
+  return hashSnapshot({
+    status: availability.status,
+    available: availability.available,
+    purchasable: availability.purchasable,
+    stockQuantity: availability.stockQuantity,
+  });
+}
+
+export function stableAvailabilityHash(product: NormalizedVendorProduct) {
+  return stableNormalizedAvailabilityHash(product.availability);
+}
+
+export function isVendorApprovalEligible(status: VendorAvailabilityStatus) {
+  return status === "AVAILABLE";
 }
 
 export function classifyVendorProduct(

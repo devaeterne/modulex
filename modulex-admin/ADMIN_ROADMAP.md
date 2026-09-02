@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-02
-Main baseline: `5b106d56eb9819db59cb8a8a26ddab4e045d14af`
+Main baseline: `ae25e4303e09e79a6f4291b6e3f6a8a7f6ced313`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
-Current cross-roadmap package: **Vendor Catalog Review v3 is active from current `main`; it extends Product Master + Store draft/media boundaries without widening Store public projections.**
-Current Admin next action: **Finish Vendor Catalog Review v3 review/merge, then apply `20260902093000_vendor_catalog_sync_family_v3`, run post-DDL advisors, deploy Admin, and perform signed-in category-check/sync/mapping/approval acceptance.**
+Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
+Current Admin next action: **Review/merge Vendor Catalog availability/bulk approval, then apply `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval`, run post-DDL advisors, deploy Admin, and perform signed-in sync/mapping/availability/bulk-approval acceptance.**
 
 ## Admin UI standardization program
 
@@ -28,15 +28,20 @@ Current Admin next action: **Finish Vendor Catalog Review v3 review/merge, then 
 
 ## Vendor Catalog Review v3
 
-- [~] Add category-scoped vendor discovery, durable Check Updates snapshots, family/variant grouping, mapping-driven approval, and scalable review controls.
+- [~] Add category-scoped vendor discovery, durable Check Updates snapshots, family/variant grouping, mapping-driven approval, normalized vendor availability, and bounded bulk review controls.
   - Karran supports collection discovery and scoped `/collections/{handle}/products.json`; Ruvati supports Store API categories and scoped category discovery. Unscoped cron remains lightweight and does not download images.
-  - `Check Updates` records short-lived durable snapshots with discovered/new/updated/unchanged counts; `Sync New + Updated` consumes the exact snapshot while Full Rescan performs fresh discovery.
+  - `Check Updates` records short-lived durable snapshots with discovered/new/updated/unchanged counts plus normalized availability counts/change detection. `Sync Changes` consumes the exact snapshot; Full Rescan performs fresh discovery.
+  - Vendor availability is supply-eligibility metadata, not Modulex warehouse inventory. Normalized states are `AVAILABLE`, `OUT_OF_STOCK`, `UNAVAILABLE`, `UNKNOWN`, and `MISSING`; content/discovery hashes remain separate from availability hashes so stock-state changes do not manufacture content edits.
+  - `MISSING` is fail-safe: only an authoritative unscoped full discovery may advance the miss counter, and two successful misses are required before the state becomes `MISSING`. Category-scoped runs and the Ruvati sitemap fallback never mark unrelated catalog rows missing, and canonical products are never auto-deleted.
+  - Linked canonical SKUs can be vendor-deactivated when the vendor is no longer sale-eligible. Automatic reactivation is allowed only when Modulex can prove the canonical status has not been manually changed since the vendor-driven deactivation; otherwise `reactivation_requires_review` preserves the manual-override boundary.
   - Sellable vendor SKU identity remains canonical. Conservative family grouping maps variants such as `SQS200BL/GR/WH` to common `base_product_code=SQS200` while preserving separate canonical SKUs/color identity.
   - Approval requires persistent vendor category → active Modulex Category + Product Type + allowed UOM mapping. Missing mappings fail closed; Admin may select an existing Category or explicitly create one with an editable name, then save the mapping and continue approval.
-  - Approval remains server-only for the `APPROVED` transition and canonical link: authenticated reviewers may use `PENDING`/`IGNORED`, while a DB trigger blocks direct browser approval and authenticated writes to `canonical_product_id`.
+  - Approval is restricted to `AVAILABLE` + review-eligible rows and remains server-only for the `APPROVED` transition and canonical link. Unavailable/unknown/missing rows remain visible for tracking but cannot be imported.
   - Approval downloads all images only at that boundary, optimizes them to WebP in `store-media`, creates/links canonical products, and creates/reuses draft Store family content without setting Modulex selling price or publishing.
-  - `/products/vendor-imports` uses server-side pagination (25/50/100), search, vendor/category/review/change/linked filters, family/SKU approval, legacy Complete Import, shared Alerts, and Product/Store edit links.
-  - Canonical SQL + deploy migration: `sql/vendor-catalog-sync-family-v3.sql` / `20260902093000_vendor_catalog_sync_family_v3.sql`. Migration is intentionally **unapplied before merge**; keep this row `[~]` until post-merge migration, advisor review, deploy, and signed-in production acceptance complete.
+  - `/products/vendor-imports` uses server-side pagination (25/50/100), search, vendor/category/review/change/availability/linked filters, family/SKU approval, legacy Complete Import, shared Alerts, Product/Store edit links, row/header checkboxes, filtered Select All, and `Approve Selected` progress.
+  - Bulk approval resolves eligibility server-side, sends at most 5 products per request, and processes each server batch with concurrency 2. Unavailable, review-ineligible, or unmapped rows are skipped fail-closed instead of being imported.
+  - Fresh branch verification run `33621807160` passed Vendor Catalog, approval-idempotency and availability contracts plus TypeScript, lint, and production build on head `fe4e0b512e41dca2d4eaef37e212b569918dbecf`; current `main` was then merged without Vendor Catalog conflicts.
+  - Canonical migrations: `20260902093000_vendor_catalog_sync_family_v3.sql` and `20260902113500_vendor_catalog_availability_bulk_approval.sql`. Both remain intentionally **unapplied before merge**; keep this row `[~]` until post-merge migration, advisor review, Admin deploy, and signed-in production acceptance complete.
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -658,7 +663,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
   - A3.1 product-master contract permanently protects canonical taxonomy/family/color semantics, lifecycle guards, server-side product list/export behavior, and A1/A2 regression boundaries.
   - Countertop catalog/context regression protects visible Catalog/Setup navigation, Stone/Sink catalog ownership, active-product Order dropdown filtering, order-eligible commercial price-group scope, and canonical Product Master/Product Prices write reuse.
   - Configured Countertop Replace/Remove regression protects Draft-only dedicated actions, same-item replacement, dedicated authenticated removal, stable retained-line pricing/identity, and the generic revision fail-closed guards.
-  - Vendor Catalog Review v3 contract protects scoped adapter discovery, durable check snapshots, mapping-driven approval, family/variant identity, server-only approval state, migration mirrors, and scalable review UI behavior.
+  - Vendor Catalog Review v3 contracts protect scoped adapter discovery, durable check snapshots, mapping-driven approval, family/variant identity, normalized availability and missing detection, safe canonical deactivate/reactivate behavior, AVAILABLE-only approval, server-only approval state, bounded bulk approval, migration mirrors, and scalable review UI behavior.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -787,23 +792,25 @@ Record material decisions here when they affect future phases.
 - [x] Configured Countertop replacement preserves the stable order-item identity through the canonical configurator/attach path; configured Countertop removal is a separate Draft-only transactional RPC and never weakens generic order-revision guards.
 - [x] Vendor catalog discovery may stage vendor categories without creating Modulex master data; approval requires an explicit persistent Category + Product Type + allowed UOM mapping and fails closed when the mapping/master data is unavailable.
 - [x] Vendor SKU remains sellable identity; conservative family grouping sets `base_product_code` and variant/color identity without rewriting vendor SKU.
+- [x] Vendor availability is external supply eligibility only: it never becomes Modulex on-hand inventory. Only `AVAILABLE` rows may be approved; authoritative repeated absence can become `MISSING`; vendor-driven canonical reactivation never overrides a later manual Modulex status change.
 
 ---
 
 # Next Action
 
-Vendor Catalog Review v3 is the active Admin catalog package.
+Vendor Catalog Review v3 availability/bulk approval is the active Admin catalog package.
 
-1. Keep migration `20260902093000_vendor_catalog_sync_family_v3` unapplied until the Vendor Catalog Review v3 PR is merged; branch CI is not production acceptance.
-2. After merge, apply the canonical migration and run Supabase Security + Performance Advisor checks before accepting the feature as production-ready.
-3. Deploy Admin and signed-in smoke **Karran → one category → Check Updates → Sync New + Updated** before broad/full scans.
-4. Verify mapping creation with an existing Category and with an explicitly created editable Category name; Product Type and UOM must come from valid active canonical masters.
-5. Verify one family such as `SQS200` retains separate vendor SKUs while sharing one base product family, then verify Product and Store draft edit links after approval.
-6. Verify legacy `APPROVED + canonical_product_id=null` recovery through Complete Import and confirm direct browser `APPROVED` / canonical-link writes remain DB-blocked.
-7. Do not approve arbitrary production vendor data during acceptance; use an explicitly selected test/review item and keep Store content draft/unpublished.
+1. Keep migrations `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval` unapplied until this Vendor Catalog PR is merged; branch CI is not production acceptance.
+2. Review/merge the Vendor Catalog PR, then apply the canonical migrations in order and run Supabase Security + Performance Advisor checks before accepting the feature as production-ready.
+3. Deploy Admin and signed-in smoke **Karran → one category → Check Updates → Sync Changes**. Verify content counts and availability changes separately before broad/full scans.
+4. Verify availability behavior with one explicit review item: only `AVAILABLE` may approve; `OUT_OF_STOCK` / `UNAVAILABLE` / `UNKNOWN` / `MISSING` remain blocked. Confirm vendor-driven deactivation and safe reactivation do not override a manual Modulex status change.
+5. Verify mapping creation with an existing Category and with an explicitly created editable Category name; Product Type and UOM must come from valid active canonical masters.
+6. Verify one family such as `SQS200` retains separate vendor SKUs while sharing one base product family, then verify filtered Select All + bounded bulk approval and Product/Store draft edit links.
+7. Verify legacy `APPROVED + canonical_product_id=null` recovery through Complete Import and confirm direct browser `APPROVED` / canonical-link writes remain DB-blocked.
+8. Do not approve arbitrary production vendor data during acceptance; use an explicitly selected test/review item and keep Store content draft/unpublished.
 
-**Parallel A1 rollout:** PR #248 is review-ready after branch verification, but migration `20260902114500_countertop_replace_remove` remains intentionally unapplied. After that PR is merged, apply the migration, run Supabase Security + Performance Advisors, deploy Admin, and perform signed-in Replace/Remove acceptance before marking the A1.2 row complete.
+**Parallel A1 rollout:** PR #248 is merged on `main`, but migration `20260902114500_countertop_replace_remove` remains intentionally unapplied. Apply that migration and complete its advisor/deploy/signed-in acceptance separately before marking the A1.2 row complete.
 
-**Cross-roadmap coordination:** Vendor Catalog Review v3 creates canonical Product variants and draft Store product/media through existing boundaries but does not widen public Store/Dealer projections; no functional `STORE_ROADMAP.md` status mutation is required before merge. Countertop Replace/Remove likewise changes no Store runtime/public projection, so no Store roadmap status mutation is required for PR #248.
+**Cross-roadmap coordination:** Vendor Catalog Review v3 creates canonical Product variants and draft Store product/media through existing boundaries but does not widen public Store/Dealer projections; no functional `STORE_ROADMAP.md` status mutation is required before merge. Countertop Replace/Remove likewise changes no Store runtime/public projection.
 
 **Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so newer merges are preserved rather than overwritten.
