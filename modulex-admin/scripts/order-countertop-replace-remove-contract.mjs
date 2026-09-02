@@ -75,6 +75,8 @@ for (const token of [
   "removeCountertopOrderItem(countertopRemoveItemId",
   "orderItemId={countertopEditItemId}",
 ]) assert(editOrder.includes(token), `Edit Order configured-Countertop guard missing ${token}`);
+assert(editOrder.includes("line_no: item.line_no"), "Edit Order must retain the saved line number in Countertop replacement context");
+assert(editOrder.includes("lineNo: countertopEditItem?.line_no"), "Countertop replacement must show the existing order line instead of New countertop");
 assert(editOrder.includes("Unsaved line edits will be discarded."), "direct Countertop removal must warn before authoritative line reload");
 assert(orderDomain.includes("export async function removeCountertopOrderItem"), "order domain must own Countertop removal");
 assert(orderDomain.includes('.rpc("remove_countertop_order_item"'), "order domain must call the dedicated removal RPC");
