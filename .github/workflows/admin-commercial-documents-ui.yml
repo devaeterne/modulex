@@ -1,0 +1,35 @@
+name: Admin Commercial Documents UI
+
+on:
+  pull_request:
+    paths:
+      - "modulex-admin/src/components/documents/**"
+      - "modulex-admin/src/components/customers/CustomerOrderPrint.tsx"
+      - "modulex-admin/src/components/customers/CustomerInvoicePrint.tsx"
+      - "modulex-admin/src/components/settings/DocumentBrandingSettings.tsx"
+      - "modulex-admin/src/app/(admin)/settings/general/documents/**"
+      - "modulex-admin/src/app/(print)/**"
+      - "modulex-admin/src/lib/documents/**"
+      - "modulex-admin/src/lib/settings/types.ts"
+      - "modulex-admin/scripts/commercial-document-contract.mjs"
+      - ".github/workflows/admin-commercial-documents-ui.yml"
+  workflow_dispatch:
+
+jobs:
+  commercial-documents:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: node scripts/commercial-document-contract.mjs
+      - run: npm run lint
+      - run: npm run ui:audit
