@@ -201,7 +201,7 @@ These rules are mandatory for all future Modulex Admin work:
 - [x] Production navigation contains only intentional Modulex business or explicitly decision-pending surfaces.
   - Route/navigation classification is documented in `docs/ADMIN_PRODUCTION_SURFACE.md`; `API Test` was removed from navigation.
 - [x] Unauthorized direct route access is denied consistently.
-  - A0.2 route-permission parity, negative direct-URL cases, and warehouse-structure list mutation UI guards passed in full verification runs `33249988130` and `33251331146`; data authorization remains independently enforced by RLS/RPC/API contracts.
+  - A0.2 route-permission parity, negative direct-URL cases, and warehouse-structure list mutation UI guards passed in full verification runs `33249988130` and `33251372987`; data authorization remains independently enforced by RLS/RPC/API contracts.
 - [x] No known TailAdmin demo/sample route remains exposed unintentionally.
   - Production-surface contract plus the production build guard the removed route set, Modulex-branded global 404, and empty production sign-in state.
 - [x] Phase A0 production acceptance is deployed on current `main`.
