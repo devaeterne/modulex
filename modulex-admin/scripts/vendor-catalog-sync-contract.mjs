@@ -138,7 +138,7 @@ assert.match(approval, /VendorUnavailableError/);
 assert.match(approveRoute, /approveAvailableVendorCatalogItem/);
 assert.match(approveRoute, /authorizeVendorCatalogAdmin/);
 assert.match(approveRoute, /CATEGORY_MAPPING_REQUIRED/);
-assert.match(approveRoute, /VENDOR_UNAVAILABLE/);
+assert.match(approveRoute, /VendorUnavailableError/);
 assert.match(approveRoute, /status:\s*409/);
 
 assert.match(page, /Vendor Import Review/);
