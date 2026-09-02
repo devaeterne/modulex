@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { getVendorCatalogAdapter, vendorCatalogRegistry } from "@/lib/vendor-catalog/adapters";
 import { authorizeVendorCatalogAdmin } from "@/lib/vendor-catalog/auth";
 import { runVendorCatalogCheck } from "@/lib/vendor-catalog/check";
@@ -12,7 +13,7 @@ type CheckBody = {
   categoryLabel?: unknown;
 };
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const authorization = await authorizeVendorCatalogAdmin(request);
   if (authorization instanceof Response) return authorization;
 
@@ -37,4 +38,8 @@ export async function POST(request: Request) {
   });
 
   return Response.json(result, { status: result.status === "SUCCEEDED" ? 200 : 502 });
+}
+
+export async function POST(request: Request) {
+  return withApiTiming({ route: "/api/vendor-catalog/check", method: "POST" }, () => handlePost(request));
 }
