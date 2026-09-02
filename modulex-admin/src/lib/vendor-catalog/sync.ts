@@ -32,6 +32,9 @@ type ExistingItem = {
   details_refreshed_at: string | null;
   vendor_category_key: string | null;
   vendor_category_label: string | null;
+  family_key: string | null;
+  variant_code: string | null;
+  variant_label: string | null;
 };
 
 type PreparedProduct = {
@@ -41,6 +44,7 @@ type PreparedProduct = {
   changeState: VendorCatalogChangeState;
   reviewStatus: VendorCatalogReviewStatus;
   detailsRefreshedAt: string | null;
+  classificationBackfillNeeded: boolean;
 };
 
 export type VendorCatalogSyncOptions = {
@@ -80,7 +84,7 @@ async function loadExistingItems(vendorCode: string) {
     const { data, error } = await supabaseAdmin
       .from("vendor_catalog_items")
       .select(
-        "id,external_id,snapshot_hash,discovery_hash,review_status,details_refreshed_at,vendor_category_key,vendor_category_label"
+        "id,external_id,snapshot_hash,discovery_hash,review_status,details_refreshed_at,vendor_category_key,vendor_category_label,family_key,variant_code,variant_label"
       )
       .eq("vendor_code", vendorCode)
       .range(from, from + pageSize - 1);
@@ -113,7 +117,19 @@ function prepareProducts(
         product.vendorCategoryKey ?? existing?.vendor_category_key ?? null,
       vendorCategoryLabel:
         product.vendorCategoryLabel ?? existing?.vendor_category_label ?? null,
+      familyKey: product.familyKey ?? existing?.family_key ?? null,
+      variantCode: product.variantCode ?? existing?.variant_code ?? null,
+      variantLabel: product.variantLabel ?? existing?.variant_label ?? null,
     };
+    const classificationBackfillNeeded =
+      Boolean(existing) &&
+      ((existing?.vendor_category_key == null &&
+        productWithPreservedScope.vendorCategoryKey != null) ||
+        (existing?.vendor_category_label == null &&
+          productWithPreservedScope.vendorCategoryLabel != null) ||
+        (existing?.family_key == null && productWithPreservedScope.familyKey != null) ||
+        (existing?.variant_code == null && productWithPreservedScope.variantCode != null) ||
+        (existing?.variant_label == null && productWithPreservedScope.variantLabel != null));
 
     return {
       product: productWithPreservedScope,
@@ -126,6 +142,7 @@ function prepareProducts(
       reviewStatus,
       detailsRefreshedAt:
         changeState === "UNCHANGED" ? existing?.details_refreshed_at ?? null : null,
+      classificationBackfillNeeded,
     };
   });
 }
@@ -190,7 +207,9 @@ export async function runVendorCatalogSync(
     const prepared = prepareProducts(products, existingByExternalId, snapshotStates);
     const candidates =
       options.changedOnly === true
-        ? prepared.filter((entry) => entry.changeState !== "UNCHANGED")
+        ? prepared.filter(
+            (entry) => entry.changeState !== "UNCHANGED" || entry.classificationBackfillNeeded
+          )
         : prepared;
     if (options.changedOnly === true) {
       counts.unchanged = prepared.filter((entry) => entry.changeState === "UNCHANGED").length;
@@ -310,7 +329,7 @@ export async function runVendorCatalogSync(
     for (const entry of persisted) {
       if (entry.changeState === "NEW") counts.created += 1;
       else if (entry.changeState === "UPDATED") counts.updated += 1;
-      else counts.unchanged += 1;
+      else if (options.changedOnly !== true) counts.unchanged += 1;
     }
 
     const status = counts.failed > 0 ? "FAILED" : "SUCCEEDED";
