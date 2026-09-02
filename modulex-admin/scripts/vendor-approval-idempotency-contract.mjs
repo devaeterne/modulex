@@ -12,12 +12,13 @@ const approval = readFileSync(
   "utf8"
 );
 
-assert.match(route, /approveAvailableVendorCatalogItem/);
+assert.match(route, /approveReviewableVendorCatalogItem/);
 assert.match(route, /console\.error\(/);
 assert.match(approval, /loadCompletedApproval/);
 assert.match(approval, /waitForConcurrentApproval/);
 assert.match(approval, /alreadyApproved:\s*true/);
 assert.match(approval, /approveVendorCatalogItem/);
-assert.match(approval, /VendorUnavailableError/);
+assert.match(approval, /VendorCatalogMissingError/);
+assert.doesNotMatch(approval, /VendorUnavailableError/);
 
 console.log("vendor approval idempotency contract: ok");
