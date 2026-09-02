@@ -37,6 +37,6 @@ assert(/setErrorMessage\(\s*result\.error\.message \|\|/.test(stockOperationForm
 assert(/stock_in_idempotent/.test(stockOperationForm) && /stock_transfer_idempotent/.test(stockOperationForm) && /stock_out_idempotent/.test(stockOperationForm) && /reserve_stock_idempotent/.test(stockOperationForm) && /release_stock_idempotent/.test(stockOperationForm), "Existing idempotent stock RPC boundaries must remain intact");
 assert(!/\.insert\(|\.update\(|\.delete\(/.test(inventoryTable), "Inventory overview must remain read-only; mutations belong to protected stock operations");
 
-assert(/- \[~\] VAL-4 — Inventory \+ Warehouses \+ Stock Operations/.test(roadmap), "VAL-4 must be marked in progress until production acceptance");
+assert(/- \[x\] VAL-4 — Inventory \+ Warehouses \+ Stock Operations/.test(roadmap), "VAL-4 production acceptance must remain closed in the roadmap");
 
 console.log("VAL-4 Inventory + Warehouses + Stock Operations validation contract: PASS");
