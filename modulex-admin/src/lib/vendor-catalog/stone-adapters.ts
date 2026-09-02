@@ -7,6 +7,10 @@ import {
   type StoneVendorCategory,
   type StoneVendorDiscoveryScope,
 } from "@/lib/vendor-catalog/stone-domain";
+import {
+  MarbleSystemsStoneAdapter,
+  MsiStoneAdapter,
+} from "@/lib/vendor-catalog/stone-adapters-msi-marble-systems";
 
 type FetchLike = typeof fetch;
 type AdapterOptions = { baseUrl?: string; fetchImpl?: FetchLike };
@@ -286,11 +290,15 @@ export class VeneziaStoneAdapter implements StoneVendorAdapter {
 export const stoneVendorCatalogRegistry = {
   ew_marble: () => new EwMarbleStoneAdapter(),
   venezia: () => new VeneziaStoneAdapter(),
+  msi: () => new MsiStoneAdapter(),
+  marble_systems: () => new MarbleSystemsStoneAdapter(),
 } satisfies Record<string, () => StoneVendorAdapter>;
 
 export const stoneVendorCatalogLabels = {
   ew_marble: "East West Marble",
   venezia: "Venezia Surfaces",
+  msi: "MSI Surfaces",
+  marble_systems: "Marble Systems",
 } as const;
 
 export function getStoneVendorCatalogAdapter(vendorCode: string) {
