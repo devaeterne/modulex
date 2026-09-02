@@ -28,7 +28,8 @@ expect(/supabase\.from\("approval_requests"\)\.select\("\*"\)\.order\("created_a
 expect(/supabase\.from\("profiles"\)\.select\("id, full_name, email"\)\.eq\("is_active", true\)/.test(manager), "Approvals must preserve active staff profile resolution");
 expect(/supabase\s*\.from\("customer_orders"\)\s*\.select\("id, customer_id, order_number"\)\s*\.in\("id", orderIds\)/.test(manager), "Approvals must preserve order record link resolution");
 expect(/supabase\s*\.from\("customer_invoices"\)\s*\.select\("id, customer_id, invoice_number"\)\s*\.in\("id", invoiceIds\)/.test(manager), "Approvals must preserve invoice record link resolution");
-expect(manager.includes('const canReview = role === "super_admin" || role === "admin"'), "Approvals must preserve the current admin/super-admin review rule");
+expect(manager.includes('hasPermission(profile.roles, "approvals.review")'), "Approvals review controls must use the shared approvals.review permission");
+expect(!manager.includes('role === "super_admin" || role === "admin"'), "Approvals UI must not duplicate role-name authorization");
 expect(manager.includes('canReview && row.status === "pending"'), "Approvals review controls must remain pending-only and permission-gated");
 
 expect(manager.includes('supabase.rpc("review_approval_request"'), "Approvals must preserve review_approval_request RPC");
