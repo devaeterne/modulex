@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import {
   approveReviewableVendorCatalogItem,
   VendorCatalogMissingError,
@@ -42,7 +43,7 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const authorization = await authorizeVendorCatalogAdmin(request);
   if (authorization instanceof Response) return authorization;
 
@@ -107,4 +108,8 @@ export async function POST(request: Request) {
   );
 
   return Response.json({ results });
+}
+
+export async function POST(request: Request) {
+  return withApiTiming({ route: "/api/vendor-catalog/bulk/approve", method: "POST" }, () => handlePost(request));
 }
