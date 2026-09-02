@@ -1,6 +1,7 @@
 import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
+import { loadCustomerOrderRecord as loadSharedCustomerOrderRecord } from "@/lib/customers/read-dedup";
 import type {
   CountertopLineSummary,
   CountertopOrderContext,
@@ -79,6 +80,10 @@ export type OrderDetailContext = {
   countertopItems: CountertopOrderContext[];
   countertopSummaries: CountertopLineSummary[];
 };
+
+export function loadCustomerOrderRecord(customerId: string, orderId: string) {
+  return loadSharedCustomerOrderRecord(customerId, orderId);
+}
 
 type CreateOrderItemInput = {
   productId: string;
@@ -375,16 +380,11 @@ async function requireViewerProfile() {
 }
 
 export async function loadCustomerOrderRevisionPolicy(customerId: string, orderId: string): Promise<CustomerOrderRevisionPolicy> {
-  const profile = await requireEditorProfile("edit");
-  const { data, error } = await supabase
-    .from("customer_orders")
-    .select("status")
-    .eq("id", orderId)
-    .eq("customer_id", customerId)
-    .single();
-
-  if (error) throw error;
-  return getCustomerOrderRevisionPolicy(data.status as CustomerOrderStatus, profile.role);
+  const [profile, order] = await Promise.all([
+    requireEditorProfile("edit"),
+    loadCustomerOrderRecord(customerId, orderId),
+  ]);
+  return getCustomerOrderRevisionPolicy(order.status, profile.role);
 }
 
 export async function loadCreateOrderContext(customerId: string): Promise<CreateOrderContext> {
@@ -447,11 +447,13 @@ export async function loadEditOrderContext(customerId: string, orderId: string):
 }
 
 export async function loadOrderDetail(customerId: string, orderId: string): Promise<OrderDetailContext> {
-  const profile = await requireViewerProfile();
-
-  const [customerResult, orderResult, itemsResult, historyResult, approvalsResult] = await Promise.all([
+  const [profile, customerResult, orderResult, itemsResult, historyResult, approvalsResult] = await Promise.all([
+    requireViewerProfile(),
     supabase.from("customers").select("*").eq("id", customerId).single(),
-    supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
+    loadCustomerOrderRecord(customerId, orderId).then(
+      (data) => ({ data, error: null }),
+      (error: Error) => ({ data: null, error })
+    ),
     supabase.from("customer_order_items").select("*").eq("order_id", orderId).order("line_no"),
     supabase.from("customer_order_status_history").select("*").eq("order_id", orderId).order("created_at", { ascending: false }),
     supabase.from("approval_requests").select("id", { count: "exact", head: true }).eq("entity_type", "order").eq("entity_id", orderId).eq("status", "pending"),

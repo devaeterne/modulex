@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { loadCustomerRecord } from "@/lib/customers/read-dedup";
 import type { CustomerPortalUser } from "@/lib/customers/types";
 
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
@@ -25,13 +26,13 @@ export default function CustomerPortalAccessCard({ customerId }: { customerId: s
   const [form, setForm] = useState({ full_name: "", login_email: "", portal_role: "buyer" as "admin" | "buyer" | "viewer", is_primary: false });
 
   async function load() {
-    const [{ profile }, customerResult, usersResult] = await Promise.all([
+    const [{ profile }, customer, usersResult] = await Promise.all([
       getCurrentProfile(),
-      supabase.from("customers").select("portal_enabled").eq("id", customerId).single(),
+      loadCustomerRecord(customerId),
       supabase.from("customer_portal_users").select("*").eq("customer_id", customerId).order("is_primary", { ascending: false }).order("created_at"),
     ]);
     setCanManage(["super_admin", "admin"].includes(profile?.role ?? ""));
-    setPortalEnabled(Boolean(customerResult.data?.portal_enabled));
+    setPortalEnabled(Boolean(customer.portal_enabled));
     setUsers((usersResult.data ?? []) as CustomerPortalUser[]);
     setLoading(false);
   }

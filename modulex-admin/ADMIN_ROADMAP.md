@@ -1,10 +1,17 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Main baseline: `2789ffebf147e701682ea97f4f1a09481fa29e45`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current Admin next action: **Review/merge Vendor Catalog availability/bulk approval, then apply `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval`, run post-DDL advisors, deploy Admin, and perform signed-in sync/mapping/availability/bulk-approval acceptance.**
+
+## Customer read performance cleanup
+
+- [~] Deduplicate Customers summary, Customer Detail, and Order Detail initial reads without adding persistent client caching or changing mutation behavior.
+  - Customers summary reuses `get_customer_dashboard` with zero recent-row limits while preserving the directory's exact filtered count and server-side range.
+  - Customer and order detail consumers share only concurrent in-flight reads; settled requests are removed immediately so mutation-driven reloads cannot reuse stale data.
+  - Keep this package `[~]` until the draft PR contracts, full Admin verification, and a post-deploy authenticated production browser re-audit confirm the duplicate calls are removed.
 
 ## Admin UI standardization program
 
