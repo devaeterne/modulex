@@ -44,14 +44,14 @@ Add a public authenticated RPC backed by a private SECURITY DEFINER implementati
 The private function will:
 
 1. Resolve active Admin profile and require an existing authorized Countertop-management role (`super_admin`, `admin`, `sales` as currently used by Countertop configuration functions).
-2. Lock the target order item and parent order.
+2. Resolve the item's parent ID without taking a child lock, then lock the parent order before the target order item. This matches the normal order-update lock order and avoids a child → parent inversion.
 3. Require the parent order to be `draft`; otherwise fail closed.
-4. Require a matching `countertop_configurations` row; ordinary order lines cannot use this RPC.
+4. Require a matching `countertop_configurations` row for both the target item and parent order; ordinary order lines cannot use this RPC.
 5. Capture safe audit metadata before deletion: order/customer IDs, order number, line number, SKU/name snapshot, Countertop pricing snapshot/configuration, and supplied reason.
 6. Delete the `customer_order_items` row. The configuration row is removed by its existing `ON DELETE CASCADE` foreign key.
 7. Allow the existing order-item reservation release trigger to release reserved inventory safely.
-8. Reconcile line numbering for the remaining rows if needed without changing their identity.
-9. Recalculate order item count/subtotal/tax/commission/grand total using the same server-authoritative formulas used by current order/Countertop paths.
+8. Preserve the remaining rows' `line_no` values. Production requires only positive, order-unique line numbers, so gaps are valid; updating retained rows merely to close a gap would fire the global order-item pricing trigger and could reprice unrelated Cabinet lines.
+9. Allow the existing DEFERRABLE order-item totals trigger to recalculate item count/subtotal/tax/commission/grand total using the current canonical formulas; any reconciliation failure rolls the transaction back.
 10. Write `customer_activity` describing the Countertop removal and referencing the removed line snapshot without exposing more data than existing internal activity/audit surfaces.
 11. Return the order ID (or a simple success value) so the UI can reload authoritative state.
 
@@ -63,8 +63,9 @@ In `EditCustomerOrder`:
 
 - A configured Countertop row will no longer show the generic **Remove** action.
 - It will show **Replace Countertop** and **Remove Countertop**.
+- Configured Countertop quantity/discount are not presented as generic editable inputs, avoiding another UI path into the fail-closed generic Countertop mutation guard.
 - Replace opens `CountertopConfigurator` for that specific existing `orderItemId` and line context.
-- Remove requires an explicit confirmation interaction and calls the dedicated RPC. After success the full edit context is reloaded from the server so items, summaries and totals cannot drift from the database.
+- Remove requires an explicit confirmation interaction and calls the dedicated RPC. After success the order-line context is reloaded from the server so items, summaries and totals cannot drift from the database; the confirmation warns that unsaved line edits are discarded by this immediate mutation.
 - Non-Countertop lines keep the current generic Remove behavior.
 - Existing shared UI primitives and Admin theme rules remain mandatory.
 
@@ -92,7 +93,9 @@ TDD sequence:
    - Replace uses existing `order_item_id` + `CountertopConfigurator`,
    - dedicated `remove_countertop_order_item` SQL exists,
    - remove RPC is Draft-only and checks that a configuration exists,
-   - activity/audit and totals reconciliation are included,
+   - existing reservation/totals triggers remain authoritative,
+   - retained order lines are not UPDATEd merely to close a line-number gap,
+   - activity/audit is included,
    - generic `update_customer_order` configured-Countertop guard remains present.
 2. Implement DB and UI until the targeted contract passes.
 3. Run Admin UI strict self-test + strict diff gate, typecheck, lint, and production build.
@@ -102,7 +105,7 @@ TDD sequence:
 ## Acceptance Scenarios
 
 - Draft order + configured Countertop → Replace with a different Stone → same `order_item_id`, new authoritative configuration/snapshot, correct price/totals.
-- Draft order + configured Countertop → Remove → configuration disappears by cascade, reservation is released, totals/item count reconcile, activity is recorded.
+- Draft order + configured Countertop → Remove → configuration disappears by cascade, reservation is released, totals/item count reconcile, remaining line identities/prices stay untouched, activity is recorded.
 - Draft order + ordinary Cabinet/Service → existing generic Remove still works through Save Revision.
 - Confirmed or later order → direct Countertop Replace/Remove is denied; existing lifecycle/approval semantics stay authoritative.
 - Generic `update_customer_order` still rejects attempts to remove configured Countertop rows from a raw revision payload.
