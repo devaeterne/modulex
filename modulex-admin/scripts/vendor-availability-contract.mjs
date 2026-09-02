@@ -45,12 +45,12 @@ assert.match(domain, /NormalizedVendorAvailability/);
 assert.match(domain, /stableAvailabilityHash/);
 assert.match(domain, /stableNormalizedAvailabilityHash/);
 assert.match(domain, /isVendorApprovalEligible/);
+assert.match(domain, /return status !== "MISSING";/);
 assert.match(domain, /availability:\s*NormalizedVendorAvailability/);
 
 assert.match(adapters, /available\?:\s*boolean/);
 assert.match(adapters, /is_in_stock\?:\s*boolean/);
 assert.match(adapters, /is_purchasable\?:\s*boolean/);
-assert.match(adapters, /low_stock_remaining\?:\s*number\s*\|\s*null/);
 assert.match(adapters, /function normalizeKarranAvailability\(\)/);
 assert.match(
   adapters,
@@ -62,6 +62,8 @@ assert.match(adapters, /normalizeRuvatiAvailability/);
 assert.match(adapters, /OUT_OF_STOCK/);
 assert.match(adapters, /UNAVAILABLE/);
 assert.match(adapters, /UNKNOWN/);
+assert.doesNotMatch(adapters, /low_stock_remaining/);
+assert.match(adapters, /stockQuantity:\s*null/);
 assert.match(adapters, /source:\s*"product-sitemap\.xml"/);
 
 assert.match(check, /availabilityChanged/);
@@ -73,33 +75,26 @@ assert.match(sync, /stableAvailabilityHash/);
 assert.match(sync, /availabilityChanged/);
 assert.match(sync, /availability_hash/);
 assert.match(sync, /missing_success_count/);
-assert.match(sync, /reconcileVendorAvailability/);
 assert.match(sync, /nextMissingCount\s*>=\s*2/);
 assert.match(sync, /categoryKey\s*!==\s*null/);
 assert.match(sync, /externalId\.startsWith\("sitemap:"\)/);
-assert.match(sync, /if \(counts\.failed === 0\) \{\s*await reconcileObservedAvailability\(prepared/s);
-assert.match(sync, /if \(!entry\.existing\) continue/);
-assert.doesNotMatch(sync, /!entry\.existing \|\| !entry\.availabilityChanged/);
+assert.doesNotMatch(sync, /reconcileVendorAvailability/);
+assert.doesNotMatch(sync, /reconcileObservedAvailability/);
+assert.ok(!fs.existsSync(availabilityPath), "vendor availability must not mutate canonical product status");
 
-assert.ok(fs.existsSync(availabilityPath), "availability reconciliation helper is required");
-const availability = fs.readFileSync(availabilityPath, "utf8");
-assert.match(availability, /canonical_inactivated_by_vendor_at/);
-assert.match(availability, /canonical_status_version_at/);
-assert.match(availability, /reactivation_requires_review/);
-assert.match(availability, /status:\s*"inactive"/);
-assert.match(availability, /status:\s*"active"/);
-assert.match(availability, /archived/);
-
-assert.match(approval, /availability_status/);
-assert.match(approval, /VendorUnavailableError/);
-assert.match(approval, /VendorReviewNotEligibleError/);
+assert.doesNotMatch(approval, /VendorUnavailableError/);
+assert.match(approval, /VendorCatalogMissingError/);
+assert.match(approval, /VENDOR_CATALOG_MISSING/);
 assert.match(approval, /isVendorApprovalEligible/);
-assert.match(singleApproveRoute, /VendorUnavailableError/);
+assert.match(approval, /approveReviewableVendorCatalogItem/);
+assert.match(singleApproveRoute, /VendorCatalogMissingError/);
 assert.match(singleApproveRoute, /status:\s*409/);
+assert.doesNotMatch(singleApproveRoute, /VENDOR_UNAVAILABLE/);
 
 assert.ok(fs.existsSync(eligibleRoutePath), "bulk eligible resolver route is required");
 const eligibleRoute = fs.readFileSync(eligibleRoutePath, "utf8");
-assert.match(eligibleRoute, /\.eq\("availability_status",\s*"AVAILABLE"\)/);
+assert.match(eligibleRoute, /\.neq\("availability_status",\s*"MISSING"\)/);
+assert.doesNotMatch(eligibleRoute, /\.eq\("availability_status",\s*"AVAILABLE"\)/);
 assert.match(eligibleRoute, /loadVendorCategoryMapping/);
 assert.match(eligibleRoute, /reviewStatus !== "PENDING"/);
 
@@ -107,19 +102,25 @@ assert.ok(fs.existsSync(bulkApproveRoutePath), "bulk approve route is required")
 const bulkApproveRoute = fs.readFileSync(bulkApproveRoutePath, "utf8");
 assert.match(bulkApproveRoute, /itemIds\.length\s*>\s*5/);
 assert.match(bulkApproveRoute, /const concurrency\s*=\s*2/);
-assert.match(bulkApproveRoute, /approveAvailableVendorCatalogItem/);
+assert.match(bulkApproveRoute, /approveReviewableVendorCatalogItem/);
+assert.match(bulkApproveRoute, /VendorCatalogMissingError/);
 assert.match(bulkApproveRoute, /SKIPPED/);
 assert.match(bulkApproveRoute, /CategoryMappingRequiredError/);
+assert.doesNotMatch(bulkApproveRoute, /VendorUnavailableError/);
 
 assert.match(page, /availability_status/);
-assert.match(page, /Stock \/ Availability/);
+assert.match(page, /Vendor status/);
 assert.match(page, /Select all \{eligibleIds\.length\} eligible filtered products/);
 assert.match(page, /Approve Selected/);
 assert.match(page, /Approved \$\{bulkProgress\?\.completed/);
 assert.match(page, /<Checkbox/);
-assert.match(page, /\.eq\("availability_status",\s*"AVAILABLE"\)/);
+assert.doesNotMatch(page, /\.eq\("availability_status",\s*"AVAILABLE"\)/);
+assert.match(page, /\.neq\("availability_status",\s*"MISSING"\)/);
 assert.match(page, /chunk\(ids, 5\)/);
-assert.match(page, /Vendor unavailable/);
+assert.doesNotMatch(page, /Vendor unavailable/);
+assert.match(page, /Stock status does not block approval/);
+assert.doesNotMatch(page, /deactivated ·/);
+assert.doesNotMatch(page, /reactivated ·/);
 
 assert.ok(fs.existsSync(migrationPath), "vendor availability migration is required");
 const migration = fs.readFileSync(migrationPath, "utf8");
