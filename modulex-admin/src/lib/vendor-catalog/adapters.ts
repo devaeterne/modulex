@@ -144,6 +144,27 @@ function inferKarranFamily(
   return { familyKey: normalizedSku, variantCode: null, variantLabel: null };
 }
 
+function unknownAvailability(): NormalizedVendorProduct["availability"] {
+  return {
+    status: "UNKNOWN",
+    available: null,
+    purchasable: null,
+    stockQuantity: null,
+  };
+}
+
+function normalizeKarranAvailability(
+  available: boolean | undefined
+): NormalizedVendorProduct["availability"] {
+  if (available === true) {
+    return { status: "AVAILABLE", available: true, purchasable: true, stockQuantity: null };
+  }
+  if (available === false) {
+    return { status: "UNAVAILABLE", available: false, purchasable: false, stockQuantity: null };
+  }
+  return unknownAvailability();
+}
+
 type ShopifyProduct = {
   id: number | string;
   title?: string;
@@ -155,6 +176,7 @@ type ShopifyProduct = {
     sku?: string | null;
     title?: string | null;
     price?: string | number | null;
+    available?: boolean;
   }>;
 };
 
@@ -244,7 +266,7 @@ export class KarranAdapter implements VendorCatalogAdapter {
         }));
       const variants = product.variants?.length
         ? product.variants
-        : [{ id: product.id, sku: null, title: null, price: null }];
+        : [{ id: product.id, sku: null, title: null, price: null, available: undefined }];
 
       for (const variant of variants) {
         const externalId = `${product.id}:${variant.id}`;
@@ -268,6 +290,7 @@ export class KarranAdapter implements VendorCatalogAdapter {
           familyKey: family.familyKey,
           variantCode: family.variantCode,
           variantLabel: family.variantLabel,
+          availability: normalizeKarranAvailability(variant.available),
           assets: images,
           sourcePayload: { product, variant },
         });
@@ -297,6 +320,9 @@ type WooProduct = {
   };
   images?: Array<{ src?: string; alt?: string | null }>;
   categories?: Array<{ id?: number | string; name?: string; slug?: string }>;
+  is_in_stock?: boolean;
+  is_purchasable?: boolean;
+  low_stock_remaining?: number | null;
 };
 
 type WooCategory = {
@@ -305,6 +331,41 @@ type WooCategory = {
   slug?: string;
   count?: number | null;
 };
+
+function normalizeRuvatiAvailability(product: WooProduct): NormalizedVendorProduct["availability"] {
+  const stockQuantity =
+    typeof product.low_stock_remaining === "number" &&
+    Number.isFinite(product.low_stock_remaining) &&
+    product.low_stock_remaining >= 0
+      ? product.low_stock_remaining
+      : null;
+
+  if (product.is_purchasable === false) {
+    return {
+      status: "UNAVAILABLE",
+      available: product.is_in_stock ?? null,
+      purchasable: false,
+      stockQuantity,
+    };
+  }
+  if (product.is_purchasable === true && product.is_in_stock === false) {
+    return {
+      status: "OUT_OF_STOCK",
+      available: false,
+      purchasable: true,
+      stockQuantity,
+    };
+  }
+  if (product.is_purchasable === true && product.is_in_stock === true) {
+    return {
+      status: "AVAILABLE",
+      available: true,
+      purchasable: true,
+      stockQuantity,
+    };
+  }
+  return unknownAvailability();
+}
 
 function extractSitemapUrls(xml: string) {
   return [...xml.matchAll(/<loc>([\s\S]*?)<\/loc>/gi)]
@@ -432,6 +493,7 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
         familyKey: fallbackFamilyKey(this.vendorCode, externalId, sku),
         variantCode: null,
         variantLabel: null,
+        availability: normalizeRuvatiAvailability(product),
         assets: images,
         sourcePayload: product,
       };
@@ -465,6 +527,7 @@ export class RuvatiAdapter implements VendorCatalogAdapter {
         familyKey: fallbackFamilyKey(this.vendorCode, externalId, null),
         variantCode: null,
         variantLabel: null,
+        availability: unknownAvailability(),
         assets: [],
         sourcePayload: { source: "product-sitemap.xml", productUrl },
       } satisfies NormalizedVendorProduct;
