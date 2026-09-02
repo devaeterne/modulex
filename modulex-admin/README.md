@@ -2,956 +2,141 @@
 
 > **Warehouse, Inventory & Operations Management Platform**
 
-Modulex Admin is a modern warehouse, inventory, product, and operations management platform designed to centralize day-to-day business operations within a single administrative environment.
+Modulex Admin is the operational control plane for Modulex. It manages products, pricing, inventory, warehouses, customers, orders, Store CMS, dealer operations, vendor catalog review, company settings, users, permissions and reporting against the shared Supabase production data model.
 
-It connects physical warehouse operations with structured digital data, allowing teams to manage products, stock, warehouse locations, pricing, customers, orders, QR-based workflows, and operational settings from one system.
+For active delivery status and acceptance requirements, read `ADMIN_ROADMAP.md` first.
 
-Modulex is designed as more than a traditional admin dashboard. Its goal is to provide a scalable operational infrastructure for businesses that need accurate inventory visibility, structured warehouse management, traceable stock movements, and centralized business data.
+## Core boundaries
 
----
+- Product master data, commercial pricing and inventory are separate domains.
+- Modulex warehouse stock is authoritative only through Modulex inventory and movement contracts.
+- External vendor catalog status is reference data and does not become Modulex inventory.
+- Vendor catalog products may be approved without confirmed vendor stock; staff confirms vendor stock with the supplier when required. Only products marked `MISSING` from authoritative vendor discovery are blocked from new/unfinished approval.
+- Vendor status changes do not activate/deactivate canonical Modulex products.
+- Vendor reference prices never become Modulex selling prices automatically.
+- Store publication remains explicit and requires the Store publishing/price contracts.
+- Privileged Supabase credentials stay server-only; browser code uses only browser-safe public configuration.
 
-## Overview
+## Main operational domains
 
-Modulex Admin provides a centralized interface for managing:
+- Product Master — products, brands, categories, Product Types, UOM and QR identity
+- Pricing — price groups, product prices, costs, margins and countertop material bands
+- Warehouses — warehouses, zones, locations and scan-assisted operations
+- Inventory — on-hand/reserved/available snapshots backed by append-safe movement history
+- Customers — master records, addresses, portal lifecycle and documents
+- Orders — product/service/countertop lines, revisions, pricing, fulfillment and documents
+- Store Control Plane — product content, media, pages, projects, marketing, reviews and company content
+- Vendor Catalog — controlled discovery, review, category mapping, family/variant import and bounded bulk approval
+- Users & RBAC — authenticated role/permission enforcement across UI, API/RPC and database boundaries
 
-* Products
-* Brands
-* Categories
-* Warehouses
-* Warehouse zones
-* Shelves and storage locations
-* Inventory
-* Stock movements
-* QR-based warehouse operations
-* Pricing groups
-* Customers
-* Orders
-* Media and product assets
-* Company information
-* Application settings
-* Users and authentication
-* Operational reporting
+## Vendor Catalog
 
-The core principle of Modulex is simple:
+Vendor Catalog adapters currently include Karran and Ruvati. Discovery stages vendor-owned catalog data under `vendor_catalog_*` and never auto-publishes Store content.
 
-> **Know what the product is, where it is located, how much stock is available, and what happened to it over time.**
+Karran public Shopify `variant.available` is retained in raw source payloads but is not treated as dealer/distributor stock. Presence in authoritative Karran discovery is catalog-available; exact vendor quantity is not tracked.
 
----
+Ruvati `is_purchasable` / `is_in_stock` values may be shown as vendor-status reference signals, but they do not block approval and do not mutate canonical product status. `vendor_stock_quantity` is not populated by the current workflow.
 
-# Core Capabilities
+Approval requires valid vendor-category mapping to active Modulex Category + Product Type + UOM. `AVAILABLE`, `OUT_OF_STOCK`, `UNAVAILABLE` and `UNKNOWN` rows may be imported while present in the vendor catalog. `MISSING` requires two successful authoritative full-vendor misses and blocks approval without deleting/deactivating an existing canonical product.
 
-## Product Management
+See `docs/VENDOR_CATALOG_SYNC.md` for the full contract.
 
-Modulex provides a centralized product catalog for managing product master data independently from inventory and pricing.
-
-Products can include:
-
-* SKU
-* Product name
-* Description
-* Brand
-* Category
-* Product variants
-* Internal product codes
-* QR values
-* Product images
-* Media assets
-* Active / inactive status
-* Inventory relationships
-* Metadata
-
-Product information is intentionally separated from pricing and inventory records.
-
-This architecture makes it possible to modify prices or stock levels without changing the core product record.
-
----
-
-## Advanced Pricing Management
-
-Modulex uses a dedicated pricing architecture rather than storing prices directly inside the product table.
-
-This allows the pricing system to evolve independently from product master data.
-
-By default, the platform can support multiple pricing tiers such as:
+## Architecture
 
 ```text
-List Price
-Silver
-Gold
-Platinum
+Modulex Admin (Next.js / React)
+            │
+            ▼
+Supabase Cloud
+├── PostgreSQL
+├── Authentication
+├── Storage
+├── RLS / RPC / database guards
+└── shared operational data
+            │
+            ▼
+Modulex Store / Customer & Dealer Portal
 ```
 
-Pricing group names are configurable.
-
-For example:
-
-```text
-Retail
-Dealer
-Distributor
-VIP
-```
-
-or:
-
-```text
-A
-B
-C
-D
-```
-
-This architecture can later support:
-
-* Customer-specific pricing
-* Pricing groups
-* Multiple price lists
-* Promotional pricing
-* Scheduled prices
-* Price validity periods
-* Multiple currencies
-* Bulk price updates
-* Price history
-* Contract-based pricing
-
----
-
-# Warehouse Management
-
-Modulex digitally models physical warehouse infrastructure using a hierarchical structure.
-
-```text
-Warehouse
-└── Zone
-    └── Location / Shelf
-```
-
-Example:
-
-```text
-Main Warehouse
-│
-├── Zone A
-│   ├── A-01-01
-│   ├── A-01-02
-│   └── A-01-03
-│
-├── Zone B
-│   ├── B-01-01
-│   └── B-01-02
-│
-└── Zone C
-```
-
-This structure allows inventory to be tracked beyond a simple warehouse-level quantity.
-
-Instead of knowing only:
-
-```text
-Product X: 20 units
-```
-
-Modulex can represent:
-
-```text
-Product X
-Main Warehouse
-Zone A
-Location A-01-03
-8 units
-```
-
-This creates significantly better operational visibility inside the warehouse.
-
----
-
-## Warehouses
-
-The system supports one or multiple warehouses.
-
-Each warehouse can have its own:
-
-* Name
-* Code
-* Description
-* Address
-* Zones
-* Locations
-* Inventory
-* QR identifier
-
-Example:
-
-```text
-Main Warehouse
-Secondary Warehouse
-Returns Warehouse
-Showroom Stock
-```
-
----
-
-## Zones
-
-Warehouses can be divided into operational zones.
-
-Examples:
-
-```text
-Zone A
-Zone B
-Receiving
-Dispatch
-Returns
-Quarantine
-Reserved Stock
-```
-
-Zones make it easier to organize large warehouses and define operational areas.
-
----
-
-## Locations & Shelves
-
-Locations represent the most specific physical storage position where inventory can be stored.
-
-Examples:
-
-```text
-A-01-01
-A-01-02
-A-02-05
-B-03-04
-```
-
-Inventory can therefore be tracked at shelf or storage-location level.
-
----
-
-# QR-Based Warehouse Operations
-
-One of the core operational capabilities of Modulex is its QR-driven warehouse workflow.
-
-Products, warehouses, zones, and locations can each have their own QR identity.
-
-When a QR code is scanned, Modulex identifies the type of entity automatically.
-
-### Warehouse
-
-```text
-WH|MAIN
-```
-
-### Zone
-
-```text
-ZONE|MAIN|A
-```
-
-### Location
-
-```text
-LOC|MAIN|A|A-01-01
-```
-
-### Product
-
-Products can be identified using an SKU or a dedicated product QR value.
-
-Product QR codes are generated by the platform and their SVG assets can be stored in Supabase Storage.
-
----
-
-## Example QR Workflow
-
-A warehouse operation can follow a simple scan-driven process:
-
-```text
-1. Scan Warehouse
-        ↓
-2. Scan Zone
-        ↓
-3. Scan Location
-        ↓
-4. Scan Product
-        ↓
-5. Enter Quantity
-        ↓
-6. Confirm Operation
-```
-
-This workflow reduces manual product selection and minimizes data-entry errors during warehouse operations.
-
----
-
-# Inventory Management
-
-Modulex does not treat inventory as a single quantity field attached directly to a product.
-
-Inventory is modeled through relationships between:
-
-```text
-Product
-+
-Warehouse
-+
-Location
-+
-Quantity
-```
-
-This enables detailed physical inventory tracking.
-
-The inventory architecture is designed to support operations such as:
-
-* Stock In
-* Stock Out
-* Warehouse Transfer
-* Location Transfer
-* Stock Adjustment
-* Inventory Count
-* Stock Reservation
-* Order Allocation
-* Returns
-* Damaged Stock
-* Inventory Reconciliation
-
----
-
-## Stock Movement History
-
-Inventory changes should be traceable.
-
-Rather than simply overwriting a stock quantity, Modulex can maintain a movement history describing why inventory changed.
-
-Example:
-
-```text
-Product: MX-001
-Operation: Stock Transfer
-From: Main Warehouse / A-01-01
-To: Main Warehouse / B-02-03
-Quantity: 12
-User: Admin
-Timestamp: 2026-08-26 14:32
-```
-
-This creates an operational audit trail for warehouse activity.
-
----
-
-# QR Code Management
-
-Modulex supports product-specific QR code generation and storage.
-
-Product QR information can include:
-
-```text
-qr_value
-qr_svg_path
-qr_svg_url
-qr_generated_at
-```
-
-Generated QR assets are stored in Supabase Storage.
-
-Example bucket:
-
-```text
-product-qrcodes
-```
-
-QR codes can later be used for:
-
-* Product lookup
-* Warehouse receiving
-* Picking
-* Stock counting
-* Location transfers
-* Warehouse transfers
-* Order preparation
-* Product labels
-* Inventory audits
-
----
-
-# Customer Management
-
-Modulex includes a customer management layer that can be integrated with pricing and order operations.
-
-Customer records can support:
-
-* Company name
-* Contact information
-* Address information
-* Tax information
-* Customer status
-* Pricing group
-* Notes
-* Order history
-
-The pricing architecture allows customers to be associated with specific pricing groups.
-
-Example:
-
-```text
-Customer A → Silver
-Customer B → Gold
-Customer C → Platinum
-```
-
----
-
-# Order Management
-
-Orders are designed to connect customers, products, pricing, and inventory.
-
-The system can support:
-
-* Order creation
-* Customer selection
-* Product selection
-* Pricing resolution
-* Quantity management
-* Order status
-* Inventory allocation
-* Warehouse preparation
-* Picking
-* Dispatch
-* Order history
-
-The long-term goal is to connect the administrative order workflow with a dedicated customer-facing catalog or store application.
-
----
-
-# Company Settings
-
-Business-specific information should be managed centrally instead of being hardcoded throughout the application.
-
-The General Settings area can contain:
-
-* Company name
-* Company logo
-* Legal company name
-* Tax / registration information
-* Address
-* Phone
-* Email
-* Website
-* Support information
-* Currency
-* Locale
-* Time zone
-* Application branding
-
-This allows Modulex to operate as a reusable platform rather than an application tied to one specific company identity.
-
----
-
-# Authentication & User Management
-
-Authentication is powered by Supabase Auth.
-
-The platform architecture supports:
-
-* User authentication
-* Email verification
-* Password reset
-* User invitations
-* Session management
-* Protected application routes
-* Role-based access control
-
-Future access-control structures can include roles such as:
-
-```text
-Super Admin
-Administrator
-Warehouse Manager
-Warehouse Operator
-Sales
-Viewer
-```
-
-Permissions can then be applied at module or action level.
-
-For example:
-
-```text
-Products
-├── View
-├── Create
-├── Edit
-└── Delete
-
-Inventory
-├── View
-├── Stock In
-├── Stock Out
-├── Transfer
-└── Adjustment
-```
-
----
-
-# Dashboard & Reporting
-
-The Modulex dashboard is intended to provide a high-level operational overview.
-
-Possible dashboard metrics include:
-
-* Total products
-* Total inventory
-* Low-stock products
-* Out-of-stock products
-* Warehouse utilization
-* Recent stock movements
-* Incoming inventory
-* Outgoing inventory
-* Orders
-* Customer activity
-* Inventory value
-* Most active products
-
-Reporting can later be expanded into dedicated analytics modules.
-
----
-
-# Architecture
-
-Modulex uses a modern web application architecture.
-
-```text
-┌──────────────────────────────┐
-│        Modulex Admin         │
-│                              │
-│     Next.js / React UI       │
-└───────────────┬──────────────┘
-                │
-                │
-                ▼
-┌──────────────────────────────┐
-│           Supabase           │
-│                              │
-│ PostgreSQL                   │
-│ Authentication               │
-│ Storage                      │
-│ Row Level Security           │
-│ Server-side capabilities     │
-└──────────────────────────────┘
-                │
-                ▼
-┌──────────────────────────────┐
-│        Customer Apps         │
-│                              │
-│ Catalog / Store / Portal     │
-└──────────────────────────────┘
-```
-
----
-
-# Technology Stack
-
-## Frontend
-
-* **Next.js 16**
-* **React 19**
-* **TypeScript**
-* **Tailwind CSS v4**
-* **TailAdmin**
-* React Server Components
-* Next.js App Router
-
-## Backend
-
-* **Supabase Cloud**
-* PostgreSQL
-* Supabase Auth
-* Supabase Storage
-* Row Level Security
-* Database functions and policies
-
-## Deployment
-
-* **Vercel** — frontend hosting and deployment
-* **Supabase Cloud** — database, authentication and storage
-
----
-
-# Application Structure
-
-A simplified project structure may look like:
-
-```text
-modulex-admin/
-│
-├── src/
-│   ├── app/
-│   ├── components/
-│   ├── context/
-│   ├── hooks/
-│   ├── icons/
-│   ├── layout/
-│   ├── lib/
-│   └── types/
-│
-├── public/
-├── .env.local
-├── package.json
-├── next.config.ts
-├── tsconfig.json
-└── README.md
-```
-
----
-
-# Environment Variables
-
-The application requires Supabase environment variables.
-
-Create:
-
-```text
-.env.local
-```
-
-Example:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-Environment variables must also be configured in the Vercel project settings for production deployments.
-
-Never commit private keys or service-role credentials to the repository.
-
----
-
-# Installation
-
-## Requirements
-
-Recommended:
-
-```text
-Node.js 20+
-npm
-```
-
-Clone the repository:
+## Technology stack
+
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS v4
+- TailAdmin shared UI primitives
+- Supabase PostgreSQL/Auth/Storage
+- Vercel deployment
+
+## Local setup
+
+Requirements: Node.js 20+ and npm.
 
 ```bash
 git clone <repository-url>
 cd modulex-admin
-```
-
-Install dependencies:
-
-```bash
 npm install
-```
-
-Create the environment file:
-
-```bash
 cp .env.example .env.local
-```
-
-Add the required Supabase configuration.
-
-Start the development server:
-
-```bash
 npm run dev
 ```
 
-Open:
+Browser-safe Supabase variables belong in `.env.local`. Never commit service-role/secret credentials or expose them through `NEXT_PUBLIC_*` variables.
 
-```text
-http://localhost:3000
-```
+## Verification
 
----
-
-# Production Build
-
-Create a production build:
+Use targeted contracts while developing, then the relevant final gates before claiming completion.
 
 ```bash
+npm run typecheck
+npm run lint
 npm run build
 ```
 
-Run the production server locally:
+General deterministic smoke chain:
 
 ```bash
-npm start
+npm run smoke
 ```
 
----
-
-# Deployment
-
-The recommended production architecture is:
-
-```text
-Frontend
-└── Vercel
-
-Backend
-└── Supabase Cloud
-    ├── PostgreSQL
-    ├── Authentication
-    └── Storage
-```
-
-A dedicated administration subdomain can be used for the platform.
-
-Example:
-
-```text
-admin.example.com
-```
-
-A future customer-facing application can use another domain or subdomain.
-
-Example:
-
-```text
-catalog.example.com
-store.example.com
-portal.example.com
-```
-
----
-
-# Data Architecture Principles
-
-Modulex follows several important architectural principles.
-
-## 1. Product Master Data Is Independent
-
-Products should describe the product itself.
-
-Pricing, inventory, and operational data should live in dedicated structures.
-
----
-
-## 2. Inventory Is Location-Aware
-
-Inventory should be associated with its physical location rather than existing only as a global product quantity.
-
----
-
-## 3. Inventory Changes Are Transactions
-
-Stock movements should generate traceable records instead of silently replacing quantity values.
-
----
-
-## 4. Pricing Is Configurable
-
-Price groups should not be hardcoded into the product model.
-
-Businesses should be able to create and rename pricing structures according to their own commercial model.
-
----
-
-## 5. Business Identity Is Configurable
-
-Company-specific names, logos, addresses, and contact information should come from system settings rather than application source code.
-
----
-
-## 6. Operations Should Be Scan-Friendly
-
-Warehouse workflows should minimize typing and manual selection.
-
-QR scanning is therefore a first-class part of the Modulex operational architecture.
-
----
-
-# Platform Scope
-
-Modulex is being designed around several connected operational domains:
-
-```text
-MODULEX
-│
-├── Product Management
-│
-├── Pricing
-│
-├── Inventory
-│
-├── Warehouses
-│   ├── Zones
-│   └── Locations
-│
-├── QR Operations
-│
-├── Customers
-│
-├── Orders
-│
-├── Reporting
-│
-├── Users & Permissions
-│
-└── General Settings
-```
-
-These modules share a common data model and are designed to work as parts of one operational platform rather than isolated tools.
-
----
-
-# Future Scope
-
-The architecture is designed to support future modules without requiring a complete rewrite of the core platform.
-
-Potential future capabilities include:
-
-* Customer catalog portal
-* B2B ordering
-* Barcode support
-* Purchase orders
-* Suppliers
-* Procurement
-* Goods receiving
-* Picking workflows
-* Packing workflows
-* Shipping integrations
-* Returns management
-* Serial number tracking
-* Batch / lot tracking
-* Expiration dates
-* Inventory forecasting
-* Reorder points
-* Automated replenishment
-* Multi-currency pricing
-* Customer-specific pricing
-* Advanced reporting
-* Notification center
-* Audit logs
-* Mobile warehouse interface
-* Camera-based QR scanning
-* API integrations
-* ERP integrations
-
----
-
-# Development Philosophy
-
-Modulex is developed around four principles:
-
-### Operational Simplicity
-
-Common warehouse actions should require as few steps as possible.
-
-### Data Integrity
-
-Product, inventory, pricing, and operational data must remain logically separated and traceable.
-
-### Scalability
-
-The system should support growth from a single warehouse environment to a larger multi-warehouse operation.
-
-### Extensibility
-
-New business modules should be added without requiring major changes to the existing core architecture.
-
----
-
-# Project Status
-
-Modulex Admin is under active development.
-
-The system is being developed incrementally, with each phase introducing and stabilizing additional operational modules.
-
-Current development areas include:
-
-* Product management
-* Product QR infrastructure
-* Warehouse structures
-* Zone management
-* Location management
-* Inventory architecture
-* Pricing architecture
-* Customer management
-* Orders
-* General settings
-* Authentication
-* User management
-* Operational UI improvements
-
----
-
-# Security
-
-Security-sensitive operations should follow Supabase security best practices.
-
-Important principles include:
-
-* Row Level Security on exposed tables
-* Server-side handling of privileged operations
-* No service-role keys in client-side code
-* Protected administrative routes
-* Role-based authorization
-* Controlled Storage policies
-* Auditable administrative operations
-
----
-
-# Contributing
-
-Modulex is currently developed as a private project.
-
-For development:
+Changed Admin UI surfaces must also pass:
 
 ```bash
-git checkout -b feature/your-feature
+npm run smoke:admin-ui-strict
+npm run smoke:admin-ui
 ```
 
-Commit changes using clear commit messages:
+Vendor Catalog changes must pass the dedicated workflow contracts:
 
 ```bash
-git commit -m "feat: add warehouse location management"
+node scripts/vendor-catalog-sync-contract.mjs
+node scripts/vendor-approval-idempotency-contract.mjs
+node scripts/vendor-availability-contract.mjs
 ```
 
-Push the branch:
+Database/RLS/RPC changes require the appropriate database acceptance plus Supabase Security/Performance Advisor review. Do not run production business-data mutations merely for smoke testing when rollback/read-only acceptance is sufficient.
 
-```bash
-git push origin feature/your-feature
-```
+## Deployment
 
----
+Admin is deployed on Vercel and uses Supabase Cloud as the shared system of record. Environment variables and domain aliases are deployment configuration, not source-code constants.
 
-# License
+Before production acceptance:
 
-Modulex Admin is currently a private project.
+1. verify current `main` and open parallel work;
+2. review/apply required canonical migrations in order;
+3. run relevant Supabase advisors for schema/RLS/RPC changes;
+4. verify Admin CI including typecheck/lint/build and strict UI when applicable;
+5. deploy the merged `main` revision;
+6. run the package-specific signed-in acceptance documented in `ADMIN_ROADMAP.md` and related acceptance docs.
 
-Unless explicitly stated otherwise, the source code, business logic, database architecture, and related assets are proprietary.
+## Security principles
 
-Third-party libraries and components remain subject to their respective licenses.
+- Enable and maintain appropriate RLS on exposed data.
+- Never expose service-role/secret keys to the browser.
+- Protected actions must be authorized through the complete boundary: UI, server route/RPC, grants/RLS and DB lifecycle guards.
+- Sensitive inventory/order/pricing writes use existing validated/idempotent mutation contracts rather than direct browser table writes.
+- Preserve audit/history semantics; physical deletion is not the default for referenced business records.
+- Public Store/Dealer projections must remain narrow and must not leak internal costs, inventory internals or operational metadata.
 
-The administrative interface is based in part on TailAdmin and follows the applicable TailAdmin licensing terms.
+## Working agreement
 
----
-
-# Modulex
-
-**Build smarter inventory operations.**
-
-Modulex connects products, warehouses, inventory, pricing, customers, and operational workflows through one centralized management platform.
-
-```text
-Product
-   +
-Location
-   +
-Inventory
-   +
-Operations
-   =
-Modulex
-```
+`AGENTS.md` is the repository-wide execution contract. `ADMIN_ROADMAP.md` is the Admin operational source of truth. Material Admin work must keep roadmap status, verification evidence, rollout state and next action current in the same workstream.
