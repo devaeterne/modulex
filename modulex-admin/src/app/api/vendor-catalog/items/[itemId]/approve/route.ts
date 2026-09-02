@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import {
   approveReviewableVendorCatalogItem,
   VendorCatalogMissingError,
@@ -14,7 +15,7 @@ type RouteContext = {
   params: Promise<{ itemId: string }>;
 };
 
-export async function POST(request: Request, context: RouteContext) {
+async function handlePost(request: Request, context: RouteContext) {
   const authorization = await authorizeVendorCatalogAdmin(request);
   if (authorization instanceof Response) return authorization;
 
@@ -73,4 +74,11 @@ export async function POST(request: Request, context: RouteContext) {
       { status: 500 }
     );
   }
+}
+
+export async function POST(request: Request, context: RouteContext) {
+  return withApiTiming(
+    { route: "/api/vendor-catalog/items/[itemId]/approve", method: "POST" },
+    () => handlePost(request, context)
+  );
 }
