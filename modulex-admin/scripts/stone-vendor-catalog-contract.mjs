@@ -94,6 +94,9 @@ assert.match(syncRoute, /allowCron:\s*true/);
 assert.match(syncRoute, /runStoneVendorCatalogSync/);
 assert.match(syncRoute, /autoPublished:\s*false/);
 assert.match(vendorsRoute, /listCategories/);
+assert.match(vendorsRoute, /searchParams\.get\("vendor"\)/);
+assert.match(vendorsRoute, /requestedVendor/);
+assert.match(vendorsRoute, /Unknown Stone vendor/);
 
 // Admin Vendor Imports must expose Stone as a first-class review domain without
 // changing the existing Sink workflow.
@@ -103,6 +106,8 @@ assert.match(page, />Sink</);
 assert.match(page, />Stone</);
 assert.match(stonePanel, /\/api\/vendor-catalog\/stone\/vendors/);
 assert.match(stonePanel, /\/api\/vendor-catalog\/stone\/sync/);
+assert.match(stonePanel, /ensureCategories/);
+assert.match(stonePanel, /vendor=\$\{encodeURIComponent\(vendorCode\)\}/);
 assert.match(stonePanel, /catalog_domain/);
 assert.match(stonePanel, /stone_type_id/);
 assert.match(stonePanel, /stone_data/);
