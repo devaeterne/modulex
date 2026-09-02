@@ -23,6 +23,7 @@ const projectDomain = read("src/lib/customers/project-domain.ts");
 const projectsPage = read("src/app/(admin)/projects/page.tsx");
 const projectDetailPage = read("src/app/(admin)/projects/[id]/page.tsx");
 const projectDetail = read("src/components/customers/ProjectDetailWorkspace.tsx");
+const newOrderPage = read("src/app/(admin)/customers/[id]/orders/new/page.tsx");
 const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
 
 assert(permissions.includes('"projects.view"'), "permissions must define projects.view");
@@ -54,8 +55,9 @@ assert(projectDomain.includes('.rpc("create_project_customer_order"'), "Project-
 assert(projectsPage.includes("PageBreadCrumb"), "Projects list must use the shared page heading convention");
 assert(projectDetailPage.includes("PageBreadCrumb"), "Project detail must use the shared page heading convention");
 assert(projectDetail.includes("projectId="), "Project detail must launch new Orders with Project context");
-assert(newOrder.includes("useSearchParams"), "New Order must read Project context from the URL");
+assert(newOrderPage.includes("searchParams"), "New Order page must accept Project query context");
+assert(newOrderPage.includes("projectId={projectId}"), "New Order page must pass projectId into the shared Order form");
 assert(newOrder.includes("createProjectCustomerOrder"), "New Order must use the Project-aware create boundary when projectId is present");
-assert(newOrder.includes("searchParams.get(\"projectId\")"), "New Order must resolve projectId explicitly");
+assert(newOrder.includes("projectId?: string | null"), "New Order form must accept an optional projectId without breaking standalone creation");
 
 console.log("PASS: project-base foundation contract");
