@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { authorizeVendorCatalogAdmin } from "@/lib/vendor-catalog/auth";
 import {
   getVendorCategoryMappingOptions,
@@ -21,7 +22,7 @@ function optionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   const authorization = await authorizeVendorCatalogAdmin(request);
   if (authorization instanceof Response) return authorization;
 
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const authorization = await authorizeVendorCatalogAdmin(request);
   if (authorization instanceof Response) return authorization;
 
@@ -73,4 +74,12 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+}
+
+export async function GET(request: Request) {
+  return withApiTiming({ route: "/api/vendor-catalog/category-mappings", method: "GET" }, () => handleGet(request));
+}
+
+export async function POST(request: Request) {
+  return withApiTiming({ route: "/api/vendor-catalog/category-mappings", method: "POST" }, () => handlePost(request));
 }
