@@ -30,6 +30,7 @@
     "smoke:order-product-pricing-v2": "node scripts/order-product-pricing-v2-contract.mjs",
     "smoke:order-countertop-initiation": "node scripts/order-countertop-initiation-contract.mjs",
     "smoke:order-countertop-context": "node scripts/order-countertop-context-contract.mjs",
+    "smoke:order-manual-service-line": "node scripts/order-manual-service-line-contract.mjs",
     "smoke:order-lifecycle": "node scripts/order-lifecycle-editability-contract.mjs",
     "smoke:a1-core-operations": "node scripts/a1-core-operations-contract.mjs && node scripts/order-product-pricing-v2-contract.mjs && node scripts/order-countertop-initiation-contract.mjs && node scripts/order-countertop-context-contract.mjs",
     "smoke:a2-warehouse-integrity": "node scripts/a2-warehouse-location-integrity-contract.mjs",

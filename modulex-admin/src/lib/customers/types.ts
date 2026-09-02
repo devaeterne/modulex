@@ -63,6 +63,7 @@ export type CustomerOrderStatus =
   | "installation_scheduled" | "installation_in_progress" | "completed" | "cancelled";
 
 export type OrderFulfillmentType = "pickup" | "delivery" | "delivery_installation";
+export type OrderPricingModel = "price_group" | "countertop_material_band" | "manual_service" | "none";
 
 export type CustomerOrder = {
   id: string; order_number: string; customer_id: string; status: CustomerOrderStatus; order_date: string; expected_delivery_date: string | null;
@@ -79,7 +80,8 @@ export type CustomerOrderItem = {
   id: string; order_id: string; product_id: string | null; line_no: number; sku_snapshot: string; product_name_snapshot: string;
   quantity: string | number; unit_price: string | number; discount_percent: string | number; discount_amount: string | number;
   product_type_code_snapshot?: string | null; product_type_name_snapshot?: string | null; uom_code_snapshot?: string | null; uom_name_snapshot?: string | null;
-  pricing_model_snapshot?: "price_group" | "countertop_material_band" | "none" | null;
+  pricing_model_snapshot?: OrderPricingModel | null;
+  line_note?: string | null;
   line_subtotal: string | number; line_total: string | number; price_source: "price_group" | "manual"; created_at: string;
 };
 
@@ -173,5 +175,6 @@ export type CustomerInvoiceItem = {
   discount_amount: string | number;
   line_subtotal: string | number;
   line_total: string | number;
+  line_note?: string | null;
   created_at: string;
 };
