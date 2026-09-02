@@ -58,6 +58,7 @@ Required staging fields:
 - `missing_success_count`: integer used only by successful full-vendor discovery runs
 - `canonical_inactivated_by_vendor_at`: nullable timestamp
 - `canonical_status_version_at`: nullable timestamp of the canonical product row immediately after Modulex applied vendor-driven inactivity
+- `reactivation_requires_review`: boolean, default false
 
 Availability is deliberately excluded from the existing content/discovery hash. A stock/availability change must not reset review status to `PENDING` or make the item look like a content `UPDATED` change.
 
@@ -95,14 +96,17 @@ For an already-approved item linked to a canonical product:
   - if canonical `products.status = active`, change it to `inactive`
   - set `canonical_inactivated_by_vendor_at`
   - record the canonical row's resulting `updated_at` as `canonical_status_version_at`
+  - set `reactivation_requires_review = false`
   - do not delete product, Store content, media, pricing, orders, or history
   - do not change `store_product_content.is_published`
+
+If the canonical product was already `inactive` or `archived` before the vendor transition, do not mark the inactivity as vendor-managed.
 
 Because the public Store queries already include only active canonical variants, one unavailable color disappears while the rest of its family remains available.
 
 ### Recovery
 
-For `OUT_OF_STOCK/UNAVAILABLE -> AVAILABLE`:
+For `OUT_OF_STOCK/UNAVAILABLE/MISSING -> AVAILABLE`:
 
 Automatically reactivate only when:
 
@@ -110,9 +114,14 @@ Automatically reactivate only when:
 - canonical status is still `inactive`, and
 - canonical `updated_at` still matches `canonical_status_version_at`
 
-If the product changed after the vendor applied inactivity, do not auto-reactivate. This is a safe manual-override signal. Clear or retain the vendor marker in a state that surfaces “available again; manual review required” rather than overriding an administrator.
+Outcomes are deterministic:
 
-Never auto-reactivate an `archived` canonical product.
+- conditions match -> set canonical status `active`, clear both vendor-inactivation timestamps, set `reactivation_requires_review = false`
+- canonical is already `active` -> treat this as a manual/independent recovery, clear both vendor-inactivation timestamps, set `reactivation_requires_review = false`
+- canonical is `inactive` but its `updated_at` no longer matches -> leave it inactive, retain the timestamps for audit, set `reactivation_requires_review = true`
+- canonical is `archived` -> never reactivate; clear vendor-inactivation timestamps and set `reactivation_requires_review = false` because archive ownership is canonical/manual, not vendor availability
+
+This means any administrator edit after vendor-driven inactivity prevents automatic reactivation. That is intentionally conservative.
 
 ### Missing products
 
@@ -139,6 +148,7 @@ Extend Check Updates and sync run summaries with availability-specific counts wi
 - `missing`
 - `canonicalDeactivated`
 - `canonicalReactivated`
+- `reactivationReviewRequired`
 
 `willSync` continues to represent content NEW/UPDATED work. Availability-only changes are shown separately and are always persisted by sync.
 
@@ -153,7 +163,7 @@ Add a `Stock / Availability` filter alongside existing Vendor / Category / Revie
 - Unknown
 - Missing
 
-Add an Availability badge/column to the table.
+Add an Availability badge/column to the table. If `reactivation_requires_review = true`, also show a warning badge/alert that the vendor is available again but Modulex kept the canonical product inactive because it changed after vendor deactivation.
 
 Unavailable rows remain visible for tracking but cannot be approved.
 
@@ -163,7 +173,8 @@ Add a shared Checkbox column.
 
 - Row checkbox is enabled only for approval-eligible rows.
 - Header checkbox selects all eligible rows on the current loaded page.
-- When filtered results extend beyond one page, show a secondary action such as `Select all N eligible filtered products` so “Select All” can mean the complete filtered eligible result set, not just the visible page.
+- When filtered results extend beyond one page, show `Select all N eligible filtered products` so “Select All” can mean the complete filtered eligible result set, not just the visible page.
+- Complete-filter selection gathers eligible IDs page-by-page from the same server-side filter contract; it does not change filters or include unavailable rows.
 - Changing search/filter/review scope clears selection to avoid stale accidental approval.
 - Selected count is always visible.
 
@@ -173,17 +184,16 @@ Show `Approve Selected (N)` only when there are selected eligible items.
 
 The bulk workflow must never send unavailable IDs merely because they were selected before a stock refresh. Server-side eligibility is re-checked immediately before each approval.
 
-For large selections, do not execute the entire set inside one long Next.js request. Use a bulk orchestration endpoint/client loop with bounded chunks and progress reporting so image downloads and canonical creation do not hit the 300-second request limit.
+For large selections, do not execute the entire set inside one long Next.js request. Use bounded chunks and progress reporting:
 
-Recommended behavior:
-
-- resolve/filter explicit eligible IDs server-side
-- process bounded batches with low concurrency
-- reuse the existing idempotent single-item approval pipeline rather than duplicate approval logic
-- return per-item success/skip/failure results
-- UI shows progress `Approved X of N`
-- unavailable/stale items are skipped with a reason, not inserted
-- mapping-required items are skipped and surfaced for mapping; bulk processing may continue for independent eligible items
+- bulk approval endpoint accepts at most 5 explicit item IDs per request
+- server processes a chunk with maximum concurrency 2
+- client advances through chunks until selection is exhausted or user navigates away
+- every item still reuses the existing idempotent single-item approval pipeline rather than duplicating approval logic
+- return per-item `approved | skipped | failed` result with reason
+- UI shows progress such as `Approved 37 of 84`
+- unavailable/stale items are `skipped`, not inserted
+- mapping-required items are `skipped` and surfaced for mapping; independent valid items in the chunk may continue
 
 No browser-side direct canonical writes.
 
@@ -240,15 +250,18 @@ Required automated coverage:
 - availability change does not reset review to PENDING
 - single approval rejects OUT_OF_STOCK / UNAVAILABLE / UNKNOWN / MISSING
 - bulk selection excludes unavailable rows
+- complete-filter Select All excludes unavailable rows across pagination
 - server bulk route revalidates stale selections
+- bulk route rejects more than 5 IDs and limits concurrency to 2
 - bulk processing reuses idempotent approval path and reports per-item results
 - category mapping requirement still fail-closed
 - available -> unavailable sets linked canonical active product inactive
 - one inactive family variant is removed from Store results while active sibling remains
 - all inactive variants remove family from Store results without mutating editorial `is_published`
 - vendor-managed inactive product reactivates after availability recovery when canonical row was untouched
-- manually changed/updated inactive product is not auto-reactivated
-- archived product is never auto-reactivated
+- canonical `updated_at` mismatch sets `reactivation_requires_review` and does not auto-reactivate
+- already-active/manual-recovered product clears vendor hold markers
+- archived product is never auto-reactivated and clears vendor hold ownership
 - category-scoped absence does not increment missing count
 - two successful full-vendor absences produce MISSING and canonical inactivity
 - failed full-vendor runs do not advance missing count
@@ -282,8 +295,8 @@ Example:
 
 1. Vendor Imports filter: `Karran / Bathroom Sinks / Available`.
 2. User clicks `Select All` and then `Select all 84 eligible filtered products`.
-3. `Approve Selected (84)` processes only currently AVAILABLE, correctly-mapped items and reports progress/results.
+3. `Approve Selected (84)` processes only currently AVAILABLE, correctly-mapped items and reports progress/results in batches of at most 5.
 4. Tomorrow vendor changes SQS200GR to unavailable.
 5. Daily sync records the availability change and changes only canonical SQS200GR to inactive.
 6. Store family SQS200 remains visible if BL/WH are active; Grey disappears from variants.
-7. Vendor later restores SQS200GR. If no administrator changed the product after vendor deactivation, Modulex reactivates it automatically. If an administrator touched/overrode it, Modulex leaves it inactive and requires review.
+7. Vendor later restores SQS200GR. If no administrator changed the product after vendor deactivation, Modulex reactivates it automatically. If an administrator touched/overrode it, Modulex leaves it inactive and marks it for manual reactivation review.
