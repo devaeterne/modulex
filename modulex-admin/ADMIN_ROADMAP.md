@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-02
-Main baseline: `7af213729f8586a1cdc38d8baac1b47ba60ebee2`
+Main baseline: `6bd39e6abcdd67aafb41d4ab6307f978479ffac7`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current Admin next action: **Review/merge Vendor Catalog availability/bulk approval, then apply `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval`, run post-DDL advisors, deploy Admin, and perform signed-in sync/mapping/availability/bulk-approval acceptance.**
@@ -13,8 +13,10 @@ Current Admin next action: **Review/merge Vendor Catalog availability/bulk appro
 
 ## Product Master UX v2
 
-- [~] Dynamic Product Types, Units of Measure, Product create/edit/list, QR compatibility, Brands/Categories usage-aware UX, and type/UOM-aware Low Stock.
-  - PR #190 and advisor-hardening PR #191 are merged/deployed; production Product Master migrations, DB/runtime acceptance, canonical type/UOM backfill, and post-migration advisor verification are complete. Signed-in browser click-through remains the only unclosed Product Master UX acceptance item, so this row is not marked `[x]` yet.
+- [x] Dynamic Product Types, Units of Measure, Product create/edit/list, QR compatibility, Brands/Categories usage-aware UX, and type/UOM-aware Low Stock.
+  - PR #190 and advisor-hardening PR #191 are merged/deployed; production Product Master migrations, DB/runtime acceptance, canonical type/UOM backfill, and post-migration advisor verification are complete.
+  - Final production closeout on 2026-09-02 verified current-main route bundles, authenticated Product Master v2/Low Stock data boundaries, 1,031 production products with 0 missing Product Type/UOM assignments, fresh Product Master CI, and no Product Master route-family runtime errors in the inspected window.
+  - The project owner completed and accepted the required signed-in browser click-through across Products list/Create/Edit, Product Types, Units of Measure, Brands/Categories, and Low Stock. Detailed evidence: `docs/acceptance/product-master-v2-production.md`.
 
 ## Pricing UI v2 — Product Type routing
 
@@ -134,7 +136,7 @@ These rules are mandatory for all future Modulex Admin work:
   - Removed the explicit `/error-404` TailAdmin template route, rebranded the global Next.js 404 as Modulex Admin, and removed the `info@dasoft.me` sign-in prefill in favor of an empty production login field.
   - `smoke:production-surface` now prevents the explicit template 404 route, TailAdmin branding in the global 404, and the known developer-account prefill from returning.
   - TDD evidence: Actions run `33254287380` failed on the still-present explicit TailAdmin 404 route before implementation; targeted GREEN run `33254350807` passed after the bounded fixes.
-  - Full package verification: Actions run `33254494898` passed production-surface, RBAC, secondary CMS, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
+  - Full package verification: Actions run `33254494898` passed production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
 
 - [x] Add an Admin production-surface contract test.
   - `scripts/admin-production-surface-contract.mjs` blocks the known demo route files and `/api-test` navigation, protects the intentional `/profile` surface, and guards the production 404/login shell against known template/developer residue.
@@ -206,7 +208,7 @@ These rules are mandatory for all future Modulex Admin work:
   - Production-surface contract plus the production build guard the removed route set, Modulex-branded global 404, and empty production sign-in state.
 - [x] Phase A0 production acceptance is deployed on current `main`.
   - PR #114 merged as `978df97c9fd56e75eed2c5d1972d7b86fbc07fcd`; its final Codex review found no major issues.
-  - PR #115 then advanced `main` to `e1bb780b1c5bbaed3bca4a5e82bebecb5c010365`; Admin Vercel production deployment `dpl_47gPYNow2GpAeQwGnLRVBYQBTr61` is `READY` from that exact SHA and serves `admin.oakwellcabinetry.com`.
+  - PR #115 then advanced `main` to `e1bb780b1c5bbaed3bca4a5e82bebec5c010365`; Admin Vercel production deployment `dpl_47gPYNow2GpAeQwGnLRVBYQBTr61` is `READY` from that exact SHA and serves `admin.oakwellcabinetry.com`.
 
 ---
 
@@ -770,6 +772,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] A2.2 inventory/movement production acceptance is complete: server-side inventory discovery, explicit On Hand/Reserved/Available semantics, idempotent mutation RPCs, append-only/reversal audit contracts, production migrations, advisor review, Admin deployment verification, and final application-role TRUNCATE revocation are covered by PR #173 plus closeout PR #174.
 - [x] A2.3 stock operations/scanning acceptance is complete: existing stock writes remain on A2.2 idempotent RPCs; camera repeated-frame suppression and serialized processing, guided confirmation/error handling, QR label printing, hardware/manual fallback, responsive warehouse behavior, and clean production QR/barcode integrity are covered by the permanent A2.3 gate.
 - [x] A3.1 product master production acceptance is complete: canonical family/color/taxonomy enforcement, protected lifecycle mutation, full filtered export, production migrations, mirror reconciliation, advisor review, authenticated DB smoke, and deployed `/products` verification are recorded in `docs/acceptance/a3-1-product-master-data.md`.
+- [x] Product Master UX v2 final production acceptance is complete: current-main Product Master routes/bundles and authenticated v2 boundaries were verified, production has 1,031 products with no missing Product Type/UOM assignments, current CI/runtime checks are clean, and the required signed-in visual click-through was accepted on 2026-09-02. Detailed evidence: `docs/acceptance/product-master-v2-production.md`.
 - [x] A3.3 pricing production acceptance is complete: the pricing hardening migration is applied, base-group/effective-period/audit contracts pass rollback-only production probes, authenticated price mutation acceptance passes, Dealer pricing remains assigned-group/no-fallback, production pricing routes return 200, and no A3.3-specific advisor finding was introduced.
 
 ---
