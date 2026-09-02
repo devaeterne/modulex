@@ -20,9 +20,10 @@ function read(relativePath) {
 const permissions = read("src/lib/auth/permissions.ts");
 const sidebar = read("src/layout/AppSidebar.tsx");
 const projectDomain = read("src/lib/customers/project-domain.ts");
-const orderDomain = read("src/lib/customers/order-domain.ts");
 const projectsPage = read("src/app/(admin)/projects/page.tsx");
 const projectDetailPage = read("src/app/(admin)/projects/[id]/page.tsx");
+const projectDetail = read("src/components/customers/ProjectDetailWorkspace.tsx");
+const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
 
 assert(permissions.includes('"projects.view"'), "permissions must define projects.view");
 assert(permissions.includes('"projects.manage"'), "permissions must define projects.manage");
@@ -35,6 +36,7 @@ for (const exportedName of [
   "getCustomerProject",
   "createCustomerProject",
   "updateCustomerProject",
+  "createProjectCustomerOrder",
 ]) {
   assert(
     new RegExp(`export\\s+(?:async\\s+)?function\\s+${exportedName}\\b`).test(projectDomain),
@@ -48,8 +50,12 @@ assert(projectDomain.includes('.rpc("create_customer_project"'), "Project create
 assert(projectDomain.includes('.rpc("update_customer_project"'), "Project update must use the authoritative RPC");
 assert(projectDomain.includes('.rpc("get_customer_projects_page"'), "Project list must use server-side paging RPC");
 assert(projectDomain.includes('.rpc("get_customer_project"'), "Project detail must use the authoritative detail RPC");
-assert(orderDomain.includes('.rpc("create_project_customer_order"'), "Project-context Order creation must use the project-aware RPC");
+assert(projectDomain.includes('.rpc("create_project_customer_order"'), "Project-context Order creation must use the project-aware RPC");
 assert(projectsPage.includes("PageBreadCrumb"), "Projects list must use the shared page heading convention");
 assert(projectDetailPage.includes("PageBreadCrumb"), "Project detail must use the shared page heading convention");
+assert(projectDetail.includes("projectId="), "Project detail must launch new Orders with Project context");
+assert(newOrder.includes("useSearchParams"), "New Order must read Project context from the URL");
+assert(newOrder.includes("createProjectCustomerOrder"), "New Order must use the Project-aware create boundary when projectId is present");
+assert(newOrder.includes("searchParams.get(\"projectId\")"), "New Order must resolve projectId explicitly");
 
 console.log("PASS: project-base foundation contract");
