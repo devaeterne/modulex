@@ -4,12 +4,14 @@
 
 Vendor Catalog Sync discovers third-party product catalogs into a controlled review layer. Discovery keeps vendor-owned descriptive data, identifiers, reference pricing, external image URLs, category/family metadata and optional vendor status signals without downloading image binaries during cron/sync.
 
-The sync **never auto-publishes** Store products, never treats a vendor price as a Modulex selling price, never copies vendor status into Modulex warehouse inventory, and never changes canonical product active/inactive status because of vendor stock signals.
+The sync **never auto-publishes** Store products, never changes Modulex selling prices during discovery/sync, never copies vendor status into Modulex warehouse inventory, and never changes canonical product active/inactive status because of vendor stock signals. A non-null vendor reference price is promoted to the canonical product's base `List Price` only at the approval boundary by a database trigger.
 
 ## Safety invariants
 
 - Vendor catalog rows live in `vendor_catalog_*` staging tables.
-- `vendor_price_reference` is informational only. It is not a Modulex selling price.
+- `vendor_price_reference` remains staging/reference data during discovery and sync. When an item becomes `APPROVED`, the database trigger copies a non-null reference amount to the canonical product's active base `List Price` in `vendor_currency`.
+- Later vendor sync price changes do not automatically reprice an already-approved product; the trigger listens only to the approval/canonical-link transition.
+- The approval trigger never calculates or writes non-base price groups.
 - Vendor availability/status is informational operational metadata. Staff confirm actual stock with the vendor when required.
 - Vendor stock quantity is not tracked in the current Vendor Catalog workflow; normalized `stockQuantity` remains `null`.
 - Vendor status changes do not create Modulex inventory movements and do not change Modulex `inventory` balances.
@@ -135,7 +137,7 @@ The page header checkbox selects eligible rows on the current page. `Select all 
 
 A product changing from `AVAILABLE` to `OUT_OF_STOCK`, `UNAVAILABLE`, or `UNKNOWN` after selection is still eligible. A product becoming `MISSING` is skipped.
 
-Bulk approval reuses the item-level approval pipeline; it does not create a second canonical-write path. It never auto-creates category/type/UOM mappings, never creates a Modulex selling price, and never auto-publishes Store content.
+Bulk approval reuses the item-level approval pipeline; it does not create a second canonical-write path. It never auto-creates category/type/UOM mappings and never auto-publishes Store content. The approval server code itself does not calculate price groups; the final database `APPROVED` transition invokes the same base `List Price` trigger used by single-item approval.
 
 ### Vendor category mapping
 
@@ -182,9 +184,9 @@ For the selected SKU it:
 9. creates or safely links the canonical product using the mapped masters and family/variant identity;
 10. creates or reuses a **draft** `store_product_content` row for the family;
 11. adds only Modulex Storage URLs to `store_product_media`, tagged with the variant color code when available;
-12. finally stores `canonical_product_id` and marks the vendor item `APPROVED`.
+12. finally stores `canonical_product_id` and marks the vendor item `APPROVED`; that database transition copies a non-null `vendor_price_reference` into the canonical product's active base `List Price` in `vendor_currency`.
 
-The Store product stays draft. Approval does not set a Modulex price and does not publish the product. The database publish guard still rejects publication until a valid current Modulex selling price greater than zero exists.
+The Store product stays draft. Approval writes only the base `List Price` when a vendor price is present; it does not calculate other price groups and does not publish the product. The database publish guard still rejects publication until a valid current Modulex selling price greater than zero exists. Later vendor sync price changes do not re-run the approval trigger, so they do not silently reprice an approved product.
 
 If vendor descriptive content later changes, the staging row returns to `PENDING`; vendor-status-only changes do not reset content review state.
 
@@ -279,6 +281,16 @@ Availability + Bulk Approval migration:
 `modulex-store/supabase/migrations/20260902113500_vendor_catalog_availability_bulk_approval.sql`
 
 The availability migration is additive. Existing staging rows initialize as `UNKNOWN`; it does **not** mutate canonical product status during migration. The current application treats vendor status as informational and leaves `vendor_stock_quantity` null.
+
+Vendor approval List Price canonical SQL:
+
+`modulex-admin/sql/vendor-catalog-sync-list-price-trigger.sql`
+
+Vendor approval List Price migration:
+
+`modulex-store/supabase/migrations/20260902142000_vendor_catalog_sync_list_price_trigger.sql`
+
+The List Price migration installs an approval/canonical-link trigger. For future approvals it copies only `vendor_price_reference` to the active base `List Price` in `vendor_currency`, preserving normal `product_prices` effective-history semantics. Its one-time backfill fills only missing current List Price rows for already-approved linked vendor products; it never overwrites an existing current List Price.
 
 Production schema currently contains the availability objects, while the migration ledger must be verified/repaired separately using the official Supabase migration-history workflow before treating rollout history as clean. Do not invent a replacement migration version merely to hide ledger drift.
 
