@@ -4,6 +4,7 @@ import PermissionVisible from "@/components/auth/PermissionVisible";
 import CustomerOrderDetail from "@/components/customers/CustomerOrderDetail";
 import CustomerOrderEditActions from "@/components/customers/CustomerOrderEditActions";
 import CustomerOrderRevisionHistory from "@/components/customers/CustomerOrderRevisionHistory";
+import CustomerOrderProjectLink from "@/components/customers/CustomerOrderProjectLink";
 import CreateInvoiceFromOrderButton from "@/components/customers/CreateInvoiceFromOrderButton";
 import CreateShipmentFromOrderButton from "@/components/customers/CreateShipmentFromOrderButton";
 import CreateInstallationFromOrder from "@/components/customers/CreateInstallationFromOrder";
@@ -18,6 +19,9 @@ export default function CustomerOrderDetailPage() {
     <div>
       <PageBreadcrumb pageTitle="Order Detail" />
       <div className="mb-5 flex flex-wrap justify-end gap-2">
+        <PermissionVisible permission="projects.view">
+          <CustomerOrderProjectLink />
+        </PermissionVisible>
         <PermissionVisible permission="shipments.manage">
           <CreateShipmentFromOrderButton />
         </PermissionVisible>
