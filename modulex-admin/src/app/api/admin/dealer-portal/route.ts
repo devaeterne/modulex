@@ -1,5 +1,6 @@
 import { jsonError, requireAdmin } from "@/lib/auth/admin-api";
 import { sendDealerPortalInvite } from "@/lib/email/dealer-portal";
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { getStoreActivationUrl } from "@/lib/runtime/store-origin";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
@@ -50,7 +51,7 @@ async function validateLinkedExternalAuth(portalUser:PortalUser,accountType:Exte
   return authUser;
 }
 
-export async function POST(request:Request){
+async function handlePost(request:Request){
   const auth=await requireAdmin(request); if(auth.response)return auth.response;
   let body:Record<string,unknown>; try{body=await request.json() as Record<string,unknown>;}catch{return jsonError("Invalid request body.",400);}
   if(!isUuid(body.customer_id))return jsonError("A valid customer is required.",400); const customerId=body.customer_id; const customer=await getCustomer(customerId); if(!customer)return jsonError("Customer not found.",404);
@@ -62,7 +63,7 @@ export async function POST(request:Request){
   await bestEffortActivity({customerId,actorUserId:auth.actor.user.id,activityType:"portal_user_created",title:"Portal user created",description:loginEmail,portalUserId:data.id}); return Response.json({ok:true,portal_user:data});
 }
 
-export async function PATCH(request:Request){
+async function handlePatch(request:Request){
   const auth=await requireAdmin(request); if(auth.response)return auth.response;
   let body:Record<string,unknown>; try{body=await request.json() as Record<string,unknown>;}catch{return jsonError("Invalid request body.",400);}
   const action=typeof body.action==="string"?body.action:""; if(!ACTIONS.has(action))return jsonError("Invalid dealer portal action.",400); if(!isUuid(body.customer_id))return jsonError("A valid customer is required.",400);
@@ -87,9 +88,21 @@ export async function PATCH(request:Request){
   return jsonError("Unsupported dealer portal action.",400);
 }
 
-export async function DELETE(request:Request){
+async function handleDelete(request:Request){
   const auth=await requireAdmin(request); if(auth.response)return auth.response; const url=new URL(request.url); const customerId=url.searchParams.get("customer_id"); const portalUserId=url.searchParams.get("portal_user_id"); if(!isUuid(customerId)||!isUuid(portalUserId))return jsonError("A valid customer and portal user are required.",400);
   const portalUser=await getPortalUser(customerId,portalUserId); if(!portalUser)return jsonError("Portal user not found for this customer.",404); if(portalUser.status!=="never_invited"||portalUser.auth_user_id)return jsonError("Invited portal users must be suspended instead of deleted.",409);
   const {error}=await supabaseAdmin.from("customer_portal_users").delete().eq("id",portalUserId).eq("customer_id",customerId); if(error)return jsonError(error.message,400);
   await bestEffortActivity({customerId,actorUserId:auth.actor.user.id,activityType:"portal_user_removed",title:"Portal draft user removed",description:portalUser.login_email,portalUserId}); return Response.json({ok:true});
+}
+
+export async function POST(request: Request) {
+  return withApiTiming({ route: "/api/admin/dealer-portal", method: "POST" }, () => handlePost(request));
+}
+
+export async function PATCH(request: Request) {
+  return withApiTiming({ route: "/api/admin/dealer-portal", method: "PATCH" }, () => handlePatch(request));
+}
+
+export async function DELETE(request: Request) {
+  return withApiTiming({ route: "/api/admin/dealer-portal", method: "DELETE" }, () => handleDelete(request));
 }
