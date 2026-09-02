@@ -45,8 +45,14 @@ assert(
   "customer directory filters and pagination must round-trip through URL query state"
 );
 assert(
-  source.includes('head: true') && source.includes("setSummary("),
-  "directory summary cards must use count-only queries instead of page-local customer rows"
+  source.includes('supabase.rpc("get_customer_dashboard"') &&
+    source.includes("p_recent_orders: 0") &&
+    source.includes("p_recent_customers: 0"),
+  "directory summary cards must reuse get_customer_dashboard instead of fanning out four customer count requests"
+);
+assert(
+  !source.includes("head: true"),
+  "customer directory must not fan out count-only customers requests for summary cards"
 );
 
 console.log("PASS: customer directory scalability contract");
