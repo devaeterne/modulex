@@ -2,11 +2,13 @@ import "server-only";
 
 import {
   classifyVendorProduct,
+  stableAvailabilityHash,
   stableDiscoveryHash,
   type NormalizedVendorProduct,
   type VendorCatalogAdapter,
   type VendorCatalogChangeState,
   type VendorCatalogDiscoveryScope,
+  type VendorAvailabilityStatus,
 } from "@/lib/vendor-catalog/domain";
 import {
   isSupabaseAdminConfigured,
@@ -16,6 +18,7 @@ import {
 type ExistingHashRow = {
   external_id: string;
   discovery_hash: string | null;
+  availability_hash: string | null;
 };
 
 type CheckCounts = {
@@ -24,6 +27,12 @@ type CheckCounts = {
   updated: number;
   unchanged: number;
   failed: number;
+  availabilityChanged: number;
+  available: number;
+  outOfStock: number;
+  unavailable: number;
+  unknown: number;
+  missing: number;
 };
 
 type CheckItemRow = {
@@ -69,7 +78,37 @@ function normalizedPayload(product: NormalizedVendorProduct) {
     familyKey: product.familyKey,
     variantCode: product.variantCode,
     variantLabel: product.variantLabel,
+    availability: product.availability,
     assets: product.assets,
+  };
+}
+
+function availabilityFromPayload(payload: Record<string, unknown>): NormalizedVendorProduct["availability"] {
+  const raw = payload.availability;
+  if (!raw || typeof raw !== "object") {
+    return { status: "UNKNOWN", available: null, purchasable: null, stockQuantity: null };
+  }
+  const value = raw as Record<string, unknown>;
+  const allowed = new Set<VendorAvailabilityStatus>([
+    "AVAILABLE",
+    "OUT_OF_STOCK",
+    "UNAVAILABLE",
+    "UNKNOWN",
+    "MISSING",
+  ]);
+  const status =
+    typeof value.status === "string" && allowed.has(value.status as VendorAvailabilityStatus)
+      ? (value.status as VendorAvailabilityStatus)
+      : "UNKNOWN";
+  const stockQuantity =
+    typeof value.stockQuantity === "number" && Number.isFinite(value.stockQuantity)
+      ? value.stockQuantity
+      : null;
+  return {
+    status,
+    available: typeof value.available === "boolean" ? value.available : null,
+    purchasable: typeof value.purchasable === "boolean" ? value.purchasable : null,
+    stockQuantity,
   };
 }
 
@@ -96,6 +135,7 @@ function fromNormalizedPayload(row: CheckItemRow): NormalizedVendorProduct {
     familyKey: String(payload.familyKey),
     variantCode: typeof payload.variantCode === "string" ? payload.variantCode : null,
     variantLabel: typeof payload.variantLabel === "string" ? payload.variantLabel : null,
+    availability: availabilityFromPayload(payload),
     assets: Array.isArray(payload.assets)
       ? (payload.assets as NormalizedVendorProduct["assets"])
       : [],
@@ -109,7 +149,7 @@ async function loadExistingHashes(vendorCode: string) {
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await supabaseAdmin
       .from("vendor_catalog_items")
-      .select("external_id,discovery_hash")
+      .select("external_id,discovery_hash,availability_hash")
       .eq("vendor_code", vendorCode)
       .range(from, from + pageSize - 1);
     if (error) throw error;
@@ -117,7 +157,15 @@ async function loadExistingHashes(vendorCode: string) {
     rows.push(...batch);
     if (batch.length < pageSize) break;
   }
-  return new Map(rows.map((row) => [row.external_id, row.discovery_hash]));
+  return new Map(rows.map((row) => [row.external_id, row]));
+}
+
+function countAvailability(counts: CheckCounts, status: VendorAvailabilityStatus) {
+  if (status === "AVAILABLE") counts.available += 1;
+  else if (status === "OUT_OF_STOCK") counts.outOfStock += 1;
+  else if (status === "UNAVAILABLE") counts.unavailable += 1;
+  else if (status === "MISSING") counts.missing += 1;
+  else counts.unknown += 1;
 }
 
 export async function runVendorCatalogCheck(
@@ -150,6 +198,12 @@ export async function runVendorCatalogCheck(
     updated: 0,
     unchanged: 0,
     failed: 0,
+    availabilityChanged: 0,
+    available: 0,
+    outOfStock: 0,
+    unavailable: 0,
+    unknown: 0,
+    missing: 0,
   };
 
   try {
@@ -161,13 +215,16 @@ export async function runVendorCatalogCheck(
 
     const prepared = products.map((product) => {
       const discoveryHash = stableDiscoveryHash(product);
-      const changeState = classifyVendorProduct(
-        existingHashes.get(product.externalId),
-        discoveryHash
-      );
+      const availabilityHash = stableAvailabilityHash(product);
+      const existing = existingHashes.get(product.externalId);
+      const changeState = classifyVendorProduct(existing?.discovery_hash, discoveryHash);
       if (changeState === "NEW") counts.created += 1;
       else if (changeState === "UPDATED") counts.updated += 1;
       else counts.unchanged += 1;
+      if (existing && existing.availability_hash !== availabilityHash) {
+        counts.availabilityChanged += 1;
+      }
+      countAvailability(counts, product.availability.status);
 
       return {
         check_id: check.id,
@@ -194,6 +251,12 @@ export async function runVendorCatalogCheck(
         updated_count: counts.updated,
         unchanged_count: counts.unchanged,
         failed_count: 0,
+        availability_changed_count: counts.availabilityChanged,
+        available_count: counts.available,
+        out_of_stock_count: counts.outOfStock,
+        unavailable_count: counts.unavailable,
+        unknown_count: counts.unknown,
+        missing_count: counts.missing,
         finished_at: new Date().toISOString(),
       })
       .eq("id", check.id);
@@ -220,6 +283,12 @@ export async function runVendorCatalogCheck(
         updated_count: counts.updated,
         unchanged_count: counts.unchanged,
         failed_count: counts.failed,
+        availability_changed_count: counts.availabilityChanged,
+        available_count: counts.available,
+        out_of_stock_count: counts.outOfStock,
+        unavailable_count: counts.unavailable,
+        unknown_count: counts.unknown,
+        missing_count: counts.missing,
         finished_at: new Date().toISOString(),
         error_summary: [{ message }],
       })
