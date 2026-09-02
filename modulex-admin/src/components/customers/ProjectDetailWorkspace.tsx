@@ -116,7 +116,15 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         ) : null}
       </ComponentCard>
 
-      <ComponentCard title="Orders" desc="Existing Orders remain canonical; Project only groups them at the Job level.">
+      <ComponentCard
+        title="Orders"
+        desc="Existing Orders remain canonical; Project only groups them at the Job level."
+        headerAction={canManageOrders ? (
+          <Button size="sm" onClick={() => router.push(`/customers/${project.customer_id}/orders/new?projectId=${project.id}`)}>
+            New Order
+          </Button>
+        ) : undefined}
+      >
         {project.orders?.length ? (
           <div className="space-y-3">
             {project.orders.map((order) => (
