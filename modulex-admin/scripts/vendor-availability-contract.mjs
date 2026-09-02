@@ -100,7 +100,7 @@ assert.match(eligibleRoute, /reviewStatus !== "PENDING"/);
 assert.ok(fs.existsSync(bulkApproveRoutePath), "bulk approve route is required");
 const bulkApproveRoute = fs.readFileSync(bulkApproveRoutePath, "utf8");
 assert.match(bulkApproveRoute, /itemIds\.length\s*>\s*5/);
-assert.match(bulkApproveRoute, /BULK_CONCURRENCY\s*=\s*2/);
+assert.match(bulkApproveRoute, /const concurrency\s*=\s*2/);
 assert.match(bulkApproveRoute, /approveAvailableVendorCatalogItem/);
 assert.match(bulkApproveRoute, /SKIPPED/);
 assert.match(bulkApproveRoute, /CategoryMappingRequiredError/);
