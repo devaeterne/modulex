@@ -222,7 +222,7 @@ async function reconcileObservedAvailability(
   now: string
 ) {
   for (const entry of entries) {
-    if (!entry.existing || !entry.availabilityChanged) continue;
+    if (!entry.existing) continue;
     const result = await reconcileVendorAvailability(
       entry.existing,
       entry.product.availability.status,
@@ -234,7 +234,6 @@ async function reconcileObservedAvailability(
 }
 
 async function reconcileMissingItems(
-  adapter: VendorCatalogAdapter,
   products: NormalizedVendorProduct[],
   existingByExternalId: Map<string, ExistingItem>,
   counts: SyncCounts,
@@ -477,10 +476,12 @@ export async function runVendorCatalogSync(
       if (error) throw error;
     }
 
-    await reconcileObservedAvailability(persisted, counts, now);
+    if (counts.failed === 0) {
+      await reconcileObservedAvailability(prepared, counts, now);
+    }
 
     if (isAuthoritativeFullDiscovery(adapter, categoryKey, products) && counts.failed === 0) {
-      await reconcileMissingItems(adapter, products, existingByExternalId, counts, now);
+      await reconcileMissingItems(products, existingByExternalId, counts, now);
     }
 
     for (const entry of persisted) {
