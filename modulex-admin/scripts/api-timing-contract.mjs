@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
+import { readdir, readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { join, relative, resolve } from "node:path";
 import ts from "typescript";
 
 const sourcePath = new URL("../src/lib/observability/apiTiming.ts", import.meta.url);
@@ -67,8 +68,77 @@ try {
   assert.equal(events[2].status, 500);
   assert.equal(events[2].route, "/api/fail");
   assert.equal(events[2].method, "POST");
-
-  console.log("api-timing contract passed");
 } finally {
   console.info = originalInfo;
 }
+
+const scriptDir = fileURLToPath(new URL(".", import.meta.url));
+const adminRoot = resolve(scriptDir, "..");
+const apiRoot = join(adminRoot, "src", "app", "api");
+
+async function findRouteFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const fullPath = join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...(await findRouteFiles(fullPath)));
+    if (entry.isFile() && entry.name === "route.ts") files.push(fullPath);
+  }
+
+  return files;
+}
+
+const routeFiles = await findRouteFiles(apiRoot);
+const routeInventory = routeFiles
+  .map((file) => relative(adminRoot, file).replaceAll("\\", "/"))
+  .sort();
+
+const expectedInventory = [
+  "src/app/api/admin/dealer-portal/route.ts",
+  "src/app/api/admin/email-notifications/process/route.ts",
+  "src/app/api/admin/email-notifications/route.ts",
+  "src/app/api/admin/products/qr/route.ts",
+  "src/app/api/admin/store-media/import/route.ts",
+  "src/app/api/admin/store-media/route.ts",
+  "src/app/api/admin/users/route.ts",
+  "src/app/api/requests/notify-created/route.ts",
+  "src/app/api/vendor-catalog/bulk/approve/route.ts",
+  "src/app/api/vendor-catalog/bulk/eligible/route.ts",
+  "src/app/api/vendor-catalog/category-mappings/route.ts",
+  "src/app/api/vendor-catalog/check/route.ts",
+  "src/app/api/vendor-catalog/items/[itemId]/approve/route.ts",
+  "src/app/api/vendor-catalog/sync/route.ts",
+  "src/app/api/vendor-catalog/vendors/route.ts",
+].sort();
+
+assert.equal(routeInventory.length, 15, `Expected 15 API route files, found ${routeInventory.length}`);
+assert.deepEqual(routeInventory, expectedInventory, "API route inventory changed; review timing coverage");
+
+const uninstrumented = [];
+for (const file of routeFiles) {
+  const routeSource = await readFile(file, "utf8");
+  const hasImport = /from\s+["']@\/lib\/observability\/apiTiming["']/.test(routeSource);
+  const hasCall = routeSource.includes("withApiTiming(");
+  if (!hasImport || !hasCall) {
+    uninstrumented.push(relative(adminRoot, file).replaceAll("\\", "/"));
+  }
+}
+
+assert.deepEqual(
+  uninstrumented,
+  [],
+  `Uninstrumented API routes:\n${uninstrumented.map((file) => `- ${file}`).join("\n")}`
+);
+
+const dynamicApprovalSource = await readFile(
+  join(apiRoot, "vendor-catalog", "items", "[itemId]", "approve", "route.ts"),
+  "utf8"
+);
+assert.match(
+  dynamicApprovalSource,
+  /["']\/api\/vendor-catalog\/items\/\[itemId\]\/approve["']/,
+  "Dynamic approval timing must use the route template, not a concrete item ID"
+);
+
+console.log("api-timing contract passed");
