@@ -87,9 +87,6 @@ declare
   v_canonical_name text := btrim(coalesce(nullif(p_canonical_name,''), p_vendor_type_name, ''));
   v_stone_type_id uuid;
 begin
-  if current_user <> 'service_role' then
-    raise exception 'Vendor Stone type resolution is a server-only operation.';
-  end if;
   if v_vendor_code = '' or v_vendor_type_name = '' or v_canonical_name = '' then
     raise exception 'Vendor code and Stone type are required.';
   end if;
