@@ -1,19 +1,42 @@
 name: Admin Commercial Documents UI
 
 on:
+  push:
+    paths:
+      - "modulex-admin/src/components/documents/**"
+      - "modulex-admin/src/components/customers/CustomerOrderPrint.tsx"
+      - "modulex-admin/src/components/customers/CustomerInvoicePrint.tsx"
+      - "modulex-admin/src/components/settings/DocumentBrandingSettings.tsx"
+      - "modulex-admin/src/components/form/input/FileInput.tsx"
+      - "modulex-admin/src/app/(admin)/settings/general/documents/**"
+      - "modulex-admin/src/app/(admin)/customers/*/invoices/*/print/**"
+      - "modulex-admin/src/app/(print)/**"
+      - "modulex-admin/src/lib/documents/**"
+      - "modulex-admin/src/lib/settings/types.ts"
+      - "modulex-admin/scripts/commercial-document-contract.mjs"
+      - "modulex-admin/sql/commercial-document-branding.sql"
+      - "modulex-store/supabase/migrations/*commercial_document_branding.sql"
+      - ".github/workflows/admin-commercial-documents-ui.yml"
   pull_request:
     paths:
       - "modulex-admin/src/components/documents/**"
       - "modulex-admin/src/components/customers/CustomerOrderPrint.tsx"
       - "modulex-admin/src/components/customers/CustomerInvoicePrint.tsx"
       - "modulex-admin/src/components/settings/DocumentBrandingSettings.tsx"
+      - "modulex-admin/src/components/form/input/FileInput.tsx"
       - "modulex-admin/src/app/(admin)/settings/general/documents/**"
+      - "modulex-admin/src/app/(admin)/customers/*/invoices/*/print/**"
       - "modulex-admin/src/app/(print)/**"
       - "modulex-admin/src/lib/documents/**"
       - "modulex-admin/src/lib/settings/types.ts"
       - "modulex-admin/scripts/commercial-document-contract.mjs"
+      - "modulex-admin/sql/commercial-document-branding.sql"
+      - "modulex-store/supabase/migrations/*commercial_document_branding.sql"
       - ".github/workflows/admin-commercial-documents-ui.yml"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   commercial-documents:
@@ -25,11 +48,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
-      - run: npm run typecheck
       - run: node scripts/commercial-document-contract.mjs
+      - run: npm run smoke:admin-ui-strict:self-test
+      - run: npm run smoke:admin-ui-strict
+      - run: npm run typecheck
       - run: npm run lint
-      - run: npm run ui:audit
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build
