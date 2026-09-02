@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-02
-Main baseline: `6bd39e6abcdd67aafb41d4ab6307f978479ffac7`
+Main baseline: `2789ffebf147e701682ea97f4f1a09481fa29e45`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current Admin next action: **Review/merge Vendor Catalog availability/bulk approval, then apply `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval`, run post-DDL advisors, deploy Admin, and perform signed-in sync/mapping/availability/bulk-approval acceptance.**
@@ -491,11 +491,17 @@ A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality
 
 - [x] VAL-1 — Validation & Data Contract Foundation.
   - `docs/ADMIN_VALIDATION_GUIDE.md`, root mutation/authorization guardrails, a reusable validation/data-contract smoke contract, and the domain audit method are established. Legacy form remediation is intentionally deferred. The foundation contract and Admin final gate pass; no schema or production data changes were required.
-- [~] VAL-2 — Products & Pricing.
-  - Targeted audit found decimal precision loss in Product/Pricing input hydration and bulk previews, incomplete numeric preflight for `numeric(12,2)` minimum stock, and a need to keep Cost & Margin read-only visibility separate from `pricing.manage` mutations. Shared decimal validation and the VAL-2 contract are implemented; production acceptance remains pending.
+- [x] VAL-2 — Products & Pricing.
+  - PR #188 is merged and included in the deployed Admin lineage. Production schema confirms `products.min_stock_level` is `numeric(12,2)`, product price/cost amounts are `numeric(18,4)`, and margin settings are `numeric(7,3)`, matching the shared validation contracts.
+  - Authenticated super-admin rollback acceptance exercised the canonical `set_product_price` boundary with `0.0001`; the active row preserved the exact four-decimal value inside the transaction and returned to its original `0.0000` after rollback, leaving no production business-data mutation.
+  - `set_product_price`, `set_product_prices_bulk`, and `set_product_costs_bulk` remain SECURITY INVOKER, authenticated-executable, and anon/PUBLIC-denied. `/products`, `/pricing/products`, and `/pricing/cost-margin` return production HTTP 200 with the expected Modulex bundles, and no runtime errors were found for those routes in the inspected 24-hour window.
+  - Fresh Security + Performance Advisor scans show no VAL-2-specific blocker; existing unrelated project-wide advisor backlog remains separate. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
 - [ ] VAL-3 — Customers / Orders / Invoices.
-- [~] VAL-4 — Inventory + Warehouses + Stock Operations.
-  - PR #224 hardens warehouse and stock-operation field validation against the production DB/RPC contract without changing Orders/Customers, inventory mutation authority, or business data. Production acceptance remains pending until merge/deploy.
+- [x] VAL-4 — Inventory + Warehouses + Stock Operations.
+  - PR #224 is merged and included in the deployed Admin lineage. Production schema confirms inventory on-hand/reserved quantities are `numeric(12,2)`, while warehouse code/name/type constraints match the client-side validation contract.
+  - Authenticated super-admin rollback acceptance exercised `stock_in_idempotent` with quantity `0.01`; the transaction created one idempotent movement and adjusted inventory by exactly `0.01`, then rollback restored the original quantity and left zero acceptance movement rows.
+  - Stock in/out/transfer/reserve/release RPCs remain SECURITY INVOKER, authenticated-executable, and anon/PUBLIC-denied. `/warehouses`, `/stock-operations`, and `/inventory` return production HTTP 200 with the expected Modulex bundles, and no runtime errors were found for those routes in the inspected 24-hour window.
+  - Fresh Security + Performance Advisor scans show no VAL-4-specific blocker; existing unrelated project-wide advisor backlog remains separate. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
 - [ ] VAL-5 — Store CMS / Users / Settings / remaining Admin forms.
 - [ ] VAL-6 — Full validation regression & production acceptance.
 
@@ -778,6 +784,8 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] Product Master UX v2 final production acceptance is complete: current-main Product Master routes/bundles and authenticated v2 boundaries were verified, production has 1,031 products with no missing Product Type/UOM assignments, current CI/runtime checks are clean, and the required signed-in visual click-through was accepted on 2026-09-02. Detailed evidence: `docs/acceptance/product-master-v2-production.md`.
 - [x] A3.3 pricing production acceptance is complete: the pricing hardening migration is applied, base-group/effective-period/audit contracts pass rollback-only production probes, authenticated price mutation acceptance passes, Dealer pricing remains assigned-group/no-fallback, production pricing routes return 200, and no A3.3-specific advisor finding was introduced.
 - [x] Pricing UI v2 final production acceptance is complete: Product Type routing was re-verified under authenticated production role semantics, Stone Price Group writes fail closed, canonical Material Band writes pass rollback-only acceptance, current Product Prices/Material Bands routes are deployed and healthy, and fresh Advisors show no Pricing-specific blocker. Detailed evidence: `docs/acceptance/pricing-ui-v2-production.md`.
+- [x] VAL-2 Products & Pricing production acceptance is complete: DB numeric precision/scale matches the client contract, exact four-decimal price mutation passes authenticated rollback acceptance, relevant RPC grants remain narrow, live Product/Pricing routes are healthy, and no VAL-2-specific Advisor blocker was found. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
+- [x] VAL-4 Inventory/Warehouse production acceptance is complete: warehouse/quantity constraints match the client contract, 0.01 stock-in passes authenticated idempotent rollback acceptance with zero residue, stock RPC grants remain narrow, live warehouse/inventory routes are healthy, and no VAL-4-specific Advisor blocker was found. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
 
 ---
 

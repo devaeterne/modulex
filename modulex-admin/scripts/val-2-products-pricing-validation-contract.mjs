@@ -102,6 +102,6 @@ assert(/pricing\.manage/.test(costMargin), "Cost/margin mutation surface must re
 assert(/pricing\.cost\.view/.test(accessView) && /pricing\.manage/.test(accessView), "Cost/margin view and mutation permissions must remain distinct");
 
 assert(!/::uuid/.test(productForm + productPrices + costMargin), "Product/pricing inputs must not coerce identifiers to UUID");
-assert(/- \[~\] VAL-2 — Products & Pricing/.test(roadmap), "VAL-2 must remain in progress until production acceptance");
+assert(/- \[x\] VAL-2 — Products & Pricing/.test(roadmap), "VAL-2 production acceptance must remain closed in the roadmap");
 
 console.log("VAL-2 Products & Pricing validation contract: PASS");
