@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-02
-Main baseline: `ae25e4303e09e79a6f4291b6e3f6a8a7f6ced313`
+Main baseline: `7af213729f8586a1cdc38d8baac1b47ba60ebee2`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current Admin next action: **Review/merge Vendor Catalog availability/bulk approval, then apply `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval`, run post-DDL advisors, deploy Admin, and perform signed-in sync/mapping/availability/bulk-approval acceptance.**
@@ -311,10 +311,11 @@ These rules are mandatory for all future Modulex Admin work:
 
 - [x] Review current invoice list/detail/print behavior.
   - Existing invoice list/detail/print surfaces and issue/paid/void workflow remain the active A1 financial operations surface; A1 hardening did not widen portal visibility or bypass invoice approval rules.
-- [~] Keep Order/Invoice A4 print and direct-PDF detail aligned with immutable Countertop snapshots.
+- [x] Keep Order/Invoice A4 print and direct-PDF detail aligned with immutable Countertop snapshots.
   - PR #247 reads the existing `countertop_configurations.pricing_snapshot` for Order items and uses Invoice `order_item_id` linkage to render Material/Area/Band, Edge, Sink, Services, and any saved line note in both browser print and direct PDF. PDF line height/pagination now accounts for wrapped detail rows, and Logo 2 uses a dedicated normalized box with whitespace trimming for PDF assets.
   - No schema, RLS, RPC, pricing, or production-data mutation is introduced. Countertop-detail reads remain under the existing RLS boundary and fail soft so an otherwise-authorized document print remains available even when that optional detail projection is not readable for a role.
-  - TDD RED is recorded in Admin Commercial Documents UI run `33610771763`; branch GREEN verification on functional head `a4907086740c1c3c55de2b781c1aac6813075577` passed Commercial Documents `33611901990`, Admin A1 Core Operations `33611901985`, Admin Customers UI `33611901993`, Admin UI Foundation `33611902001`, GC-6 `33611902033`, and GC-7 `33611901999`. Keep `[~]` until PR merge/deploy acceptance.
+  - TDD RED is recorded in Admin Commercial Documents UI run `33610771763`; branch GREEN verification on functional head `a4907086740c1c3c55de2b781c1aac6813075577` passed Commercial Documents `33611901990`, Admin A1 Core Operations `33611901985`, Admin Customers UI `33611901993`, Admin UI Foundation `33611902001`, GC-6 `33611902033`, and GC-7 `33611901999`.
+  - Production acceptance is closed on 2026-09-02: PR #247 and Logo 2 follow-up #251 are merged, current-main Admin deployment is `READY`, the real Countertop Order print route returns HTTP 200, production contains real immutable Countertop snapshot data, and the inspected runtime/advisor results show no Commercial Document-specific blocker. Production currently has no naturally linked Countertop Invoice item, so no synthetic production invoice was created; the Invoice path is accepted through the shared source contract, production `order_item_id` linkage, and passing CI. Detailed evidence: `docs/acceptance/commercial-documents-production.md`.
 - [x] Define whether payment methods/payment records are active scope or intentionally deferred.
   - Payment Methods remain active order/invoice commercial configuration. Invoice `paid_amount`/status remains the current payment-recording boundary; a standalone payment transaction ledger is intentionally deferred beyond A1.
 - [x] Keep portal invoice/payment visibility out of scope until explicitly approved.
@@ -654,7 +655,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
 - [x] Store portal Admin contract exists.
 - [x] Secondary CMS Admin contract exists and protects Pages/Projects routes, RBAC, lifecycle actions, media constraints, and service-role exclusion.
 - [x] GC-2 Media Library Admin contract protects `/store/media`, `store.manage` RBAC, private signed previews, metadata/provenance review, and controlled publish/unpublish/delete behavior; it is part of the permanent Admin smoke chain.
-- [x] GC-3 Company Admin contract protects `/store/company`, `store.manage` RBAC, reuse of the canonical company-profile editor, and structured contact/location/hour management; it is part of the permanent Admin smoke chain.
+- [x] GC-3 Company Admin contract protects `/store/company`, `store.manage` route/sidebar RBAC, reuse of the canonical company-profile editor, and structured contact/location/hour management; it is part of the permanent Admin smoke chain.
 - [x] Auth recovery contract exists.
 - [x] Polling regression contract exists.
 - [x] Production-surface/demo-route contract exists and is part of the Admin smoke chain.
@@ -742,7 +743,7 @@ Keep this section current so future planning does not rediscover completed work.
 
 - [x] Store product CMS surfaces exist.
 - [x] Store color management exists.
-- [x] Store homepage/content settings exist.
+- [x] Store homepage/content settings exists.
 - [x] Store marketing settings exists.
 - [x] Store lead list/detail surfaces exist.
 - [x] Dealer onboarding and portal activation Admin flows have contract coverage.
