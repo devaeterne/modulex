@@ -143,8 +143,7 @@ assert.match(approveRoute, /status:\s*409/);
 
 assert.match(page, /Vendor Import Review/);
 assert.match(page, /vendor_catalog_items/);
-assert.match(page, /VENDOR_CATALOG_SELECT/);
-assert.doesNotMatch(page, /\.join\(","\)/);
+assert.match(page, /const VENDOR_CATALOG_SELECT\s*=\s*\n\s*"[^"]+" as const;/);
 assert.match(page, /PAGE_SIZE_OPTIONS/);
 assert.match(page, /count:\s*"exact"/);
 assert.match(page, /\.range\(/);
