@@ -216,7 +216,8 @@ assert.match(reviewV3, /vendor_catalog_check_items/);
 assert.match(reviewV3, /enable row level security/i);
 assert.match(reviewV3, /unique \(vendor_code, vendor_category_key\)/i);
 assert.match(reviewV3, /guard_vendor_catalog_approval/);
-assert.match(reviewV3, /auth\.role\(\).*service_role/s);
+assert.match(reviewV3, /current_user\s*<>\s*'service_role'/i);
+assert.doesNotMatch(reviewV3, /auth\.role\(\)/);
 assert.match(reviewV3, /grant update \(review_status\) on public\.vendor_catalog_items to authenticated/i);
 assert.doesNotMatch(reviewV3, /grant update \([^)]*canonical_product_id[^)]*\).*authenticated/i);
 assert.equal(
