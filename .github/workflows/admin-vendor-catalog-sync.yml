@@ -10,6 +10,7 @@ on:
       - "modulex-admin/vercel.json"
       - "modulex-admin/sql/vendor-catalog-sync*.sql"
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
+      - "modulex-admin/scripts/vendor-approval-idempotency-contract.mjs"
       - "modulex-admin/docs/VENDOR_CATALOG_SYNC.md"
       - "modulex-store/supabase/migrations/*vendor_catalog_sync*.sql"
       - ".github/workflows/admin-vendor-catalog-sync.yml"
@@ -22,6 +23,7 @@ on:
       - "modulex-admin/vercel.json"
       - "modulex-admin/sql/vendor-catalog-sync*.sql"
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
+      - "modulex-admin/scripts/vendor-approval-idempotency-contract.mjs"
       - "modulex-admin/docs/VENDOR_CATALOG_SYNC.md"
       - "modulex-store/supabase/migrations/*vendor_catalog_sync*.sql"
       - ".github/workflows/admin-vendor-catalog-sync.yml"
@@ -45,6 +47,7 @@ jobs:
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
       - run: node scripts/vendor-catalog-sync-contract.mjs
+      - run: node scripts/vendor-approval-idempotency-contract.mjs
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
