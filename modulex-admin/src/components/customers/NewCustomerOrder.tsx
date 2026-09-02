@@ -25,6 +25,7 @@ import {
   type OrderPriceRow,
   type OrderTaxRule,
 } from "@/lib/customers/order-domain";
+import { createProjectCustomerOrder } from "@/lib/customers/project-domain";
 import type { Customer, CustomerAddress, OrderFulfillmentType, OrderPricingModel, PaymentMethod, PriceGroupLookup } from "@/lib/customers/types";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
 
@@ -76,7 +77,7 @@ function Field({ label, hint, children }: { label: string; hint?: React.ReactNod
   );
 }
 
-export default function NewCustomerOrder() {
+export default function NewCustomerOrder({ projectId = null }: { projectId?: string | null }) {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const customerId = params.id;
@@ -308,8 +309,8 @@ export default function NewCustomerOrder() {
 
   async function createOrder(validItems: ValidatedOrderItem[], status: "draft" | "confirmed") {
     if (!customer) throw new Error("Customer is required.");
-    return createCustomerOrder({
-      customerId: customer.id,
+
+    const sharedInput = {
       items: validItems,
       priceGroupId,
       billingAddressId,
@@ -324,7 +325,13 @@ export default function NewCustomerOrder() {
       paymentCommissionPercent: appliedCommissionPercent,
       initialStatus: status,
       fulfillmentType,
-    });
+    };
+
+    if (projectId) {
+      return createProjectCustomerOrder({ projectId, ...sharedInput });
+    }
+
+    return createCustomerOrder({ customerId: customer.id, ...sharedInput });
   }
 
   async function saveOrder() {
@@ -380,12 +387,13 @@ export default function NewCustomerOrder() {
   return (
     <div className="space-y-5">
       {errorMessageState ? <Alert variant="error" title="Order action failed" message={errorMessageState} /> : null}
+      {projectId ? <Alert variant="info" title="Project Order" message="This Order will be created inside the selected Project." /> : null}
       {selectedPriceGroup?.requires_approval ? <Alert variant="warning" title="Approval required" message={`${selectedPriceGroup.name} is a restricted price level. Sales orders using it require Admin approval before confirmation.`} /> : null}
 
       <ComponentCard
         title="Order Information"
         desc={`${customer.name} · ${customer.customer_code} — choose the commercial, fulfillment and payment context for this order.`}
-        headerAction={<Button variant="outline" onClick={() => router.push(`/customers/${customer.id}/orders`)}>Back to Orders</Button>}
+        headerAction={<Button variant="outline" onClick={() => router.push(projectId ? `/projects/${projectId}` : `/customers/${customer.id}/orders`)}>{projectId ? "Back to Project" : "Back to Orders"}</Button>}
       >
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
           <Field label="Price Group" hint={isLoadingPrices ? "Loading prices…" : undefined}><Select options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} /></Field>
