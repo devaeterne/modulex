@@ -9,11 +9,14 @@ const assert = (condition, message) => {
 };
 const assertExists = (file, message) => assert(fs.existsSync(resolve(file)), message);
 
+const prerequisitePath = "../modulex-store/supabase/migrations/20260901235959_manual_service_category_prerequisite.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260902000000_order_manual_service_line.sql";
 const modalPath = "src/components/customers/ManualServiceLineModal.tsx";
 const detailsPath = "src/components/customers/ServiceLineDetails.tsx";
 
+assertExists(prerequisitePath, "repo must contain the Service category prerequisite migration before the manual Service migration");
 assertExists(migrationPath, "repo must contain the manual Service order-line migration");
+const prerequisite = read(prerequisitePath);
 const migration = read(migrationPath);
 
 for (const token of [
@@ -26,6 +29,11 @@ for (const token of [
   "notify pgrst, 'reload schema'",
 ]) assert(migration.includes(token), `manual Service migration contract missing: ${token}`);
 
+assert(/insert\s+into\s+public\.product_categories\s*\([^)]*name[^)]*status[^)]*\)[\s\S]*values\s*\(\s*'Service'\s*,\s*'active'\s*\)[\s\S]*on\s+conflict\s*\(\s*name\s*\)\s+do\s+nothing/i.test(prerequisite), "Service prerequisite must create a missing active Service category by stable name without rewriting an existing category");
+assert(/product_categories[\s\S]*name\s*=\s*'Service'[\s\S]*status\s*=\s*'active'/i.test(prerequisite), "Service prerequisite must resolve and validate the active Service category after bootstrap");
+assert(!/on\s+conflict\s*\(\s*name\s*\)\s+do\s+update[\s\S]{0,240}status/i.test(prerequisite), "Service prerequisite must not silently reactivate or redefine an existing Service category");
+assert(!/insert\s+into\s+public\.product_categories/i.test(migration), "manual Service migration must consume the already-validated Service category prerequisite rather than redefine taxonomy");
+
 assert(/pricing_model[\s\S]*manual_service/i.test(migration), "Product Type pricing-model domain must include manual_service");
 assert(/units_of_measure[\s\S]*code\s*=\s*'PIECE'/i.test(migration), "Service migration must resolve the existing PIECE UOM by stable code");
 assert(/units_of_measure[\s\S]*is_active\s*=\s*true/i.test(migration), "Service migration must require an active PIECE UOM");
@@ -33,9 +41,6 @@ assert(!/default_uom_id\s*=\s*'[0-9a-f]{8}-[0-9a-f-]{27,}'/i.test(migration), "S
 assert(/product_types[\s\S]*'SERVICE'[\s\S]*'manual_service'/i.test(migration), "Service Product Type must be seeded by stable SERVICE code");
 assert(/products[\s\S]*'SERVICE'[\s\S]*'Service'/i.test(migration), "canonical Service product must be seeded by stable SERVICE SKU/name");
 assert(!/insert\s+into\s+public\.product_prices/i.test(migration), "canonical Service product must not receive a Product Group price");
-assert(/insert\s+into\s+public\.product_categories\s*\([^)]*name[^)]*status[^)]*\)[\s\S]*values\s*\(\s*'Service'\s*,\s*'active'\s*\)[\s\S]*on\s+conflict\s*\(\s*name\s*\)\s+do\s+nothing/i.test(migration), "Service migration must create a missing active Service category by stable name without rewriting an existing category");
-assert(/product_categories[\s\S]*name\s*=\s*'Service'[\s\S]*status\s*=\s*'active'/i.test(migration), "Service migration must resolve and validate the active Service category after bootstrap");
-assert(!/on\s+conflict\s*\(\s*name\s*\)\s+do\s+update[\s\S]{0,240}status/i.test(migration), "Service migration must not silently reactivate or redefine an existing Service category");
 
 for (const token of [
   "private.enforce_customer_order_item_pricing_v2",
