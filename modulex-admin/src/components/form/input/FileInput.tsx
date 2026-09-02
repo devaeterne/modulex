@@ -1,6 +1,6 @@
 import React, { FC } from "react";
 
-interface FileInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {}
+type FileInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type">;
 
 const FileInput: FC<FileInputProps> = ({ className = "", ...inputProps }) => {
   return (
