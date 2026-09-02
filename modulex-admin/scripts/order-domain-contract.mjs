@@ -27,6 +27,7 @@ for (const exportedName of [
   "loadOrderPrices",
   "createCustomerOrder",
   "updateCustomerOrder",
+  "removeCountertopOrderItem",
   "setCustomerOrderStatus",
 ]) {
   assert(
@@ -48,6 +49,7 @@ for (const [name, source] of [
 
 assert(!newOrder.includes('.rpc("create_customer_order"'), "create UI must not call create_customer_order directly");
 assert(!editOrder.includes('.rpc("update_customer_order"'), "edit UI must not call update_customer_order directly");
+assert(!editOrder.includes('.rpc("remove_countertop_order_item"'), "Edit Order must not call configured Countertop removal RPC directly");
 assert(!detailOrder.includes('.rpc("set_customer_order_status"'), "detail UI must not call set_customer_order_status directly");
 
 assert(!newOrder.includes('.from("customers")'), "create UI customer reads must be centralized in the order domain adapter");
@@ -62,6 +64,7 @@ assert(!detailOrder.includes('.from("customer_order_status_history")'), "detail 
 
 assert(domain.includes('.rpc("create_customer_order"'), "order domain adapter must retain create_customer_order as the create boundary");
 assert(domain.includes('.rpc("update_customer_order"'), "order domain adapter must retain update_customer_order as the edit boundary");
+assert(domain.includes('.rpc("remove_countertop_order_item"'), "order domain adapter must own configured Countertop removal");
 assert(domain.includes('.rpc("set_customer_order_status"'), "order domain adapter must retain set_customer_order_status as the status boundary");
 assert(domain.includes("getCurrentProfile"), "order domain adapter must enforce profile-aware access");
 assert(domain.includes("hasPermission"), "order domain adapter must preserve permission-based order detail access");

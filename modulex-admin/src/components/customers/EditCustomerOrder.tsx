@@ -17,6 +17,7 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { PlusIcon } from "@/icons";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -24,6 +25,7 @@ import {
   getCustomerOrderRevisionPolicy,
   loadEditOrderContext,
   loadOrderPrices,
+  removeCountertopOrderItem,
   updateCustomerOrder,
   type OrderPriceRow,
   type OrderTaxRule,
@@ -59,6 +61,15 @@ function money(value: number, currency = "USD") {
   } catch {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number.isFinite(value) ? value : 0);
   }
+}
+
+function operationErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
 }
 
 function pricingModelFor(item: DraftItem, product: Product | undefined): OrderPricingModel | null {
@@ -123,6 +134,10 @@ export default function EditCustomerOrder() {
   const [revisionReason, setRevisionReason] = useState("");
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isCountertopOpen, setIsCountertopOpen] = useState(false);
+  const [countertopEditItemId, setCountertopEditItemId] = useState<string | null>(null);
+  const [countertopRemoveItemId, setCountertopRemoveItemId] = useState<string | null>(null);
+  const [countertopRemoveReason, setCountertopRemoveReason] = useState("");
+  const [isRemovingCountertop, setIsRemovingCountertop] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [serviceEditIndex, setServiceEditIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -160,7 +175,7 @@ export default function EditCustomerOrder() {
         setTaxRate(String(loadedOrder.tax_rate ?? 0));
         setOrderDiscount(String(loadedOrder.discount_amount ?? 0));
       } catch (error) {
-        if (active) setErrorMessage(error instanceof Error ? error.message : "Unable to load editable order.");
+        if (active) setErrorMessage(operationErrorMessage(error, "Unable to load editable order."));
       } finally {
         if (active) setIsLoading(false);
       }
@@ -179,7 +194,7 @@ export default function EditCustomerOrder() {
         const data = await loadOrderPrices(priceGroupId, orderCurrency);
         if (active) setPrices(data);
       } catch (error) {
-        if (active) setErrorMessage(error instanceof Error ? error.message : "Unable to load order prices.");
+        if (active) setErrorMessage(operationErrorMessage(error, "Unable to load order prices."));
       } finally {
         if (active) setIsLoadingPrices(false);
       }
@@ -207,6 +222,9 @@ export default function EditCustomerOrder() {
     [activeProducts],
   );
   const currency = order?.currency_code || "USD";
+  const countertopEditItem = countertopEditItemId ? items.find((item) => item.id === countertopEditItemId) ?? null : null;
+  const countertopRemoveItem = countertopRemoveItemId ? items.find((item) => item.id === countertopRemoveItemId) ?? null : null;
+  const countertopRemoveSummary = countertopRemoveItemId ? summariesByItemId.get(countertopRemoveItemId) ?? null : null;
 
   const preview = useMemo(() => {
     let subtotal = 0;
@@ -281,15 +299,56 @@ export default function EditCustomerOrder() {
     try {
       const context = await loadEditOrderContext(customerId, orderId);
       const createdItem = context.items.find((item) => item.id === createdItemId);
-      if (!createdItem) throw new Error("The new countertop line could not be reloaded.");
+      if (!createdItem) throw new Error("The countertop line could not be reloaded.");
+      setOrder(context.order);
       setProducts(context.products as Product[]);
       setCountertopSummaries(context.countertopSummaries);
       setItems((current) => current.some((item) => item.id === createdItemId)
         ? current.map((item) => item.id === createdItemId ? mapDraftItem(createdItem) : item)
         : [...current, mapDraftItem(createdItem)]);
       setIsCountertopOpen(false);
+      setCountertopEditItemId(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Countertop was attached but the order line could not be refreshed.");
+      setErrorMessage(operationErrorMessage(error, "Countertop was saved but the order line could not be refreshed."));
+    }
+  }
+
+  function openCountertopReplacement(itemId: string) {
+    setErrorMessage(null);
+    setIsCountertopOpen(false);
+    setCountertopEditItemId(itemId);
+  }
+
+  function openCountertopRemoval(itemId: string) {
+    setErrorMessage(null);
+    setCountertopRemoveReason("");
+    setCountertopRemoveItemId(itemId);
+  }
+
+  function closeCountertopRemoval() {
+    if (isRemovingCountertop) return;
+    setCountertopRemoveItemId(null);
+    setCountertopRemoveReason("");
+  }
+
+  async function confirmCountertopRemoval() {
+    if (!countertopRemoveItemId || !order || order.status !== "draft") return;
+    setIsRemovingCountertop(true);
+    setErrorMessage(null);
+    try {
+      const removedFromOrderId = await removeCountertopOrderItem(countertopRemoveItemId, countertopRemoveReason);
+      if (removedFromOrderId !== order.id) throw new Error("Countertop removal returned an unexpected order.");
+      const context = await loadEditOrderContext(customerId, orderId);
+      setOrder(context.order);
+      setProducts(context.products as Product[]);
+      setCountertopSummaries(context.countertopSummaries);
+      setItems(context.items.map(mapDraftItem));
+      setCountertopRemoveItemId(null);
+      setCountertopRemoveReason("");
+    } catch (error) {
+      setErrorMessage(operationErrorMessage(error, "Unable to remove Countertop from this order."));
+    } finally {
+      setIsRemovingCountertop(false);
     }
   }
 
@@ -364,7 +423,7 @@ export default function EditCustomerOrder() {
       }
       router.push(`/customers/${customerId}/orders/${orderId}?revision=${revision}`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to save order revision.");
+      setErrorMessage(operationErrorMessage(error, "Unable to save order revision."));
       setIsSaving(false);
     }
   }
@@ -403,8 +462,8 @@ export default function EditCustomerOrder() {
 
       <ComponentCard
         title="Products"
-        desc="Cabinet prices use the canonical Price Group route. Countertop and Service lines keep their saved authoritative commercial values."
-        headerAction={<div className="flex flex-wrap justify-end gap-2">{canManageCountertop ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} onClick={() => setIsCountertopOpen(true)}>Countertop</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} onClick={() => setIsProductPickerOpen(true)}>Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} onClick={openNewService}>Service</Button></div>}
+        desc="Cabinet prices use the canonical Price Group route. Configured Countertops use dedicated Replace/Remove actions; Service lines keep their saved authoritative commercial values."
+        headerAction={<div className="flex flex-wrap justify-end gap-2">{canManageCountertop && order.status === "draft" ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} onClick={() => { setCountertopEditItemId(null); setIsCountertopOpen(true); }}>Countertop</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} onClick={() => setIsProductPickerOpen(true)}>Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} onClick={openNewService}>Service</Button></div>}
       >
         <TableViewport>
           <Table variant="admin" minWidth="standard">
@@ -417,14 +476,28 @@ export default function EditCustomerOrder() {
                 const resolvedPrice = resolveOrderLineUnitPrice(item, product, priceMap);
                 const total = Number(item.quantity || 0) * Number(resolvedPrice ?? 0) * (1 - Number(item.discount_percent || 0) / 100);
                 const countertopSummary = item.id ? summariesByItemId.get(item.id) : null;
+                const isConfiguredCountertop = Boolean(item.id && countertopSummary);
+                const canMutateConfiguredCountertop = isConfiguredCountertop && canManageCountertop && order.status === "draft";
                 return (
                   <TableRow key={item.id ?? `${item.product_id}-${index}`}>
                     <TableCell variant="admin" className="min-w-[360px]"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{product?.sku ?? "Historical product"}</span>{product?.status === "inactive" ? <Badge size="sm" color="warning">Inactive</Badge> : null}</div><FormHint>{product?.name ?? item.product_id}</FormHint><CountertopLineDetails summary={countertopSummary} /><ServiceLineDetails lineNote={item.line_note} /></TableCell>
-                    <TableCell variant="admin" className="w-28">{isService ? <FormHint>1 · fixed</FormHint> : <Input ariaLabel={`${product?.sku ?? "Product"} quantity`} inputMode="decimal" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} />}</TableCell>
+                    <TableCell variant="admin" className="w-28">{isConfiguredCountertop ? <FormHint>{item.quantity} · configured</FormHint> : isService ? <FormHint>1 · fixed</FormHint> : <Input ariaLabel={`${product?.sku ?? "Product"} quantity`} inputMode="decimal" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} />}</TableCell>
                     <TableCell variant="admin" className="min-w-[180px]"><span className="font-semibold">{resolvedPrice === undefined ? "Unavailable" : money(resolvedPrice, currency)}</span><FormHint>{model === "countertop_material_band" ? "Countertop · configured price" : model === "manual_service" ? "Service · explicit price" : "Price Group · server authoritative"}</FormHint></TableCell>
-                    <TableCell variant="admin" className="w-32"><Input ariaLabel={`${product?.sku ?? "Product"} discount percent`} inputMode="decimal" value={item.discount_percent} onChange={(event) => updateItem(index, { discount_percent: event.target.value })} /></TableCell>
+                    <TableCell variant="admin" className="w-32">{isConfiguredCountertop ? <FormHint>{Number(item.discount_percent || 0).toFixed(2)}% · configured</FormHint> : <Input ariaLabel={`${product?.sku ?? "Product"} discount percent`} inputMode="decimal" value={item.discount_percent} onChange={(event) => updateItem(index, { discount_percent: event.target.value })} />}</TableCell>
                     <TableCell variant="admin" className="font-semibold">{money(total, currency)}</TableCell>
-                    <TableCell variant="admin" className="text-right"><div className="flex flex-wrap justify-end gap-2">{isService ? <Button size="sm" variant="outline" onClick={() => openExistingService(index)}>Edit Service</Button> : null}<Button size="sm" variant="danger" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button></div></TableCell>
+                    <TableCell variant="admin" className="text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {isConfiguredCountertop ? (
+                          canMutateConfiguredCountertop && item.id ? <>
+                            <Button size="sm" variant="outline" onClick={() => openCountertopReplacement(item.id!)}>Replace Countertop</Button>
+                            <Button size="sm" variant="danger" onClick={() => openCountertopRemoval(item.id!)}>Remove Countertop</Button>
+                          </> : <FormHint>Countertop changes are Draft-only.</FormHint>
+                        ) : <>
+                          {isService ? <Button size="sm" variant="outline" onClick={() => openExistingService(index)}>Edit Service</Button> : null}
+                          <Button size="sm" variant="danger" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button>
+                        </>}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -434,6 +507,7 @@ export default function EditCustomerOrder() {
       </ComponentCard>
 
       {isCountertopOpen ? <CountertopConfigurator orderId={order.id} orderContext={{ orderNumber: order.order_number }} onAttached={handleCountertopAttached} onClose={() => setIsCountertopOpen(false)} /> : null}
+      {countertopEditItemId ? <CountertopConfigurator orderId={order.id} orderItemId={countertopEditItemId} orderContext={{ orderNumber: order.order_number, sku: productMap.get(countertopEditItem?.product_id ?? "")?.sku, productName: productMap.get(countertopEditItem?.product_id ?? "")?.name }} onAttached={handleCountertopAttached} onClose={() => setCountertopEditItemId(null)} /> : null}
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="space-y-5 xl:col-span-8"><ComponentCard title="Notes" desc="Customer-facing and internal context for this revision."><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes"><TextArea rows={5} value={customerNotes} onChange={setCustomerNotes} /></Field><Field label="Internal Notes"><TextArea rows={5} value={internalNotes} onChange={setInternalNotes} /></Field></div></ComponentCard><ComponentCard title="Revision Reason" desc="Record why the commercial order changed."><Field label="Reason" hint="Recommended. Sales revisions from Confirmed through Ready for Shipment stay pending until Admin approval; Shipped and later orders are revision-locked."><Input value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} placeholder="e.g. Quantity changed after customer request" /></Field></ComponentCard></div>
@@ -450,6 +524,26 @@ export default function EditCustomerOrder() {
         onClose={() => { setIsServiceModalOpen(false); setServiceEditIndex(null); }}
         onSubmit={saveServiceLine}
       />
+
+      <Modal
+        isOpen={Boolean(countertopRemoveItemId)}
+        onClose={closeCountertopRemoval}
+        className="relative w-full max-w-xl p-6 sm:p-8"
+        ariaLabel="Remove Countertop confirmation"
+      >
+        <div className="space-y-5">
+          <div>
+            <h3 className="text-xl font-semibold">Remove Countertop</h3>
+            <FormHint>This removes the configured Countertop immediately from this Draft order, releases its active reservation, and reloads the authoritative order lines. Unsaved line edits will be discarded.</FormHint>
+          </div>
+          {countertopRemoveItem ? <Alert variant="warning" title="Configured Countertop" message={`${countertopRemoveSummary?.stoneName ?? productMap.get(countertopRemoveItem.product_id)?.name ?? "Countertop"} will be removed from ${order.order_number}.`} /> : null}
+          <Field label="Removal Reason" hint="Optional. The reason is stored with the internal customer activity audit."><Input value={countertopRemoveReason} onChange={(event) => setCountertopRemoveReason(event.target.value)} placeholder="e.g. Customer selected a different countertop" /></Field>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" disabled={isRemovingCountertop} onClick={closeCountertopRemoval}>Cancel</Button>
+            <Button variant="danger" disabled={isRemovingCountertop || !countertopRemoveItemId} onClick={confirmCountertopRemoval}>{isRemovingCountertop ? "Removing…" : "Remove Countertop"}</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

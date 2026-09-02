@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-02
-Main baseline: `66f001f3aa17da37a397e11006354713a6d3a2b9`
+Main baseline: `5b106d56eb9819db59cb8a8a26ddab4e045d14af`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 is active from current `main`; it extends Product Master + Store draft/media boundaries without widening Store public projections.**
 Current Admin next action: **Finish Vendor Catalog Review v3 review/merge, then apply `20260902093000_vendor_catalog_sync_family_v3`, run post-DDL advisors, deploy Admin, and perform signed-in category-check/sync/mapping/approval acceptance.**
@@ -246,6 +246,14 @@ These rules are mandatory for all future Modulex Admin work:
   - Price Group lines remain server-authoritative through canonical `product_prices`; ordinary Countertop Material Band and No Commercial Pricing lines fail closed, while configured Stone continues through `calculate_countertop_price` → `attach_countertop_configuration`.
   - Semantic Product Type/UOM snapshots are immutable unless product identity changes; Stone commercial writes require the private canonical-attach transaction gate; deferred item mutation triggers reconcile header totals from stored line totals.
   - Production migration `20260901130000_order_product_pricing_v2` is applied and structurally/advisor verified. Production Admin still serves the pre-#217 UI, so signed-in feature acceptance and deployment remain pending; do not mark complete before those gates pass.
+
+- [~] Add explicit configured Countertop Replace/Remove workflow to Draft order revisions.
+  - PR #248 makes configured Countertop quantity/discount non-generic, removes the misleading generic Remove path, and exposes dedicated **Replace Countertop** / **Remove Countertop** actions only on Draft orders with `orders.manage`.
+  - Replace preserves the existing `order_item_id` and reuses the canonical `calculate_countertop_price` → `attach_countertop_configuration` path. Remove uses a dedicated authenticated Draft-only RPC backed by a private `SECURITY DEFINER` function, requires a matching `countertop_configurations` row, releases reservation through the existing DELETE trigger, relies on the existing DEFERRABLE totals reconciler, and writes `customer_activity` atomically.
+  - Production prerequisite review confirmed `countertop_configurations.order_item_id` is `ON DELETE CASCADE`, the reservation-release and totals triggers are present, and `customer_order_items.line_no` requires only positive order-unique values. Remaining line numbers therefore stay stable after removal so unrelated Cabinet rows are not UPDATEd and accidentally repriced by the global pricing trigger.
+  - Generic `update_customer_order` errors for configured Countertop mutation/removal remain unchanged and fail closed. Store public/Customer/Dealer projections are unchanged; the Store migration directory contains only the shared DB deployment mirror.
+  - TDD RED is recorded in Admin A1 Core Operations run `33617490217`. Functional GREEN evidence on head `7f0eff31fd8b35b6a98564d13c57b16a442f9fe2`: Admin A1 Core Operations `33618763836`, Admin Customers UI `33618763728`, and Admin UI Foundation `33618763854`; strict changed-file UI, Countertop domain/UI, order Countertop context/initiation, order domain/lifecycle, RBAC, typecheck, lint, Store portal boundaries, and production builds passed.
+  - Migration `20260902114500_countertop_replace_remove` is source-controlled but intentionally **unapplied before merge**. Keep this row `[~]` until PR merge, production migration, Supabase Security + Performance Advisor review, Admin deploy, and signed-in Replace/Remove acceptance are complete.
 
 - [x] Review global and customer-scoped order list consistency. (A1.2A)
   - Both `/customers/orders` and `/customers/[id]/orders` use the shared `CustomerOrdersList` contract with server-side search/status filtering, exact filtered count, page windows, URL state, and route-scope summary aggregation.
@@ -649,6 +657,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
   - A2.1 warehouse/location integrity, A2.2 inventory/movement, and A2.3 stock-operations/scanning contracts are permanent Admin workflow gates. A2.3 protects scanner duplicate handling, guided confirmation/error recovery, QR label printing, mobile fallback behavior, and continued use of the A2.2 idempotent write boundary.
   - A3.1 product-master contract permanently protects canonical taxonomy/family/color semantics, lifecycle guards, server-side product list/export behavior, and A1/A2 regression boundaries.
   - Countertop catalog/context regression protects visible Catalog/Setup navigation, Stone/Sink catalog ownership, active-product Order dropdown filtering, order-eligible commercial price-group scope, and canonical Product Master/Product Prices write reuse.
+  - Configured Countertop Replace/Remove regression protects Draft-only dedicated actions, same-item replacement, dedicated authenticated removal, stable retained-line pricing/identity, and the generic revision fail-closed guards.
   - Vendor Catalog Review v3 contract protects scoped adapter discovery, durable check snapshots, mapping-driven approval, family/variant identity, server-only approval state, migration mirrors, and scalable review UI behavior.
 - [ ] Document what each smoke suite protects.
 
@@ -775,6 +784,7 @@ Record material decisions here when they affect future phases.
 - [x] Product Type is dynamic master data and selects a controlled pricing behavior; it does not store price amounts. UOM is dynamic quantity/measurement master data and does not select pricing behavior.
 - [x] Pricing UI v2 keeps Stone material rates in canonical `countertop_material_price_bands`, Sink/Standard Price Group amounts in canonical `product_prices`, and unsupported `none` Product Types without an editable commercial amount.
 - [x] Countertop Catalog keeps Stone catalog pricing on Material Bands and Sink catalog pricing on order-eligible commercial `price_groups`; manual Stone $/sq ft remains an Order configuration override, not a second stored Stone price source.
+- [x] Configured Countertop replacement preserves the stable order-item identity through the canonical configurator/attach path; configured Countertop removal is a separate Draft-only transactional RPC and never weakens generic order-revision guards.
 - [x] Vendor catalog discovery may stage vendor categories without creating Modulex master data; approval requires an explicit persistent Category + Product Type + allowed UOM mapping and fails closed when the mapping/master data is unavailable.
 - [x] Vendor SKU remains sellable identity; conservative family grouping sets `base_product_code` and variant/color identity without rewriting vendor SKU.
 
@@ -792,6 +802,8 @@ Vendor Catalog Review v3 is the active Admin catalog package.
 6. Verify legacy `APPROVED + canonical_product_id=null` recovery through Complete Import and confirm direct browser `APPROVED` / canonical-link writes remain DB-blocked.
 7. Do not approve arbitrary production vendor data during acceptance; use an explicitly selected test/review item and keep Store content draft/unpublished.
 
-**Cross-roadmap coordination:** Vendor Catalog Review v3 creates canonical Product variants and draft Store product/media through existing boundaries but does not widen public Store/Dealer projections; no functional `STORE_ROADMAP.md` status mutation is required before merge.
+**Parallel A1 rollout:** PR #248 is review-ready after branch verification, but migration `20260902114500_countertop_replace_remove` remains intentionally unapplied. After that PR is merged, apply the migration, run Supabase Security + Performance Advisors, deploy Admin, and perform signed-in Replace/Remove acceptance before marking the A1.2 row complete.
+
+**Cross-roadmap coordination:** Vendor Catalog Review v3 creates canonical Product variants and draft Store product/media through existing boundaries but does not widen public Store/Dealer projections; no functional `STORE_ROADMAP.md` status mutation is required before merge. Countertop Replace/Remove likewise changes no Store runtime/public projection, so no Store roadmap status mutation is required for PR #248.
 
 **Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so newer merges are preserved rather than overwritten.
