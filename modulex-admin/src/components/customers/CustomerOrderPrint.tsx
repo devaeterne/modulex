@@ -90,12 +90,9 @@ export default function CustomerOrderPrint() {
 
       const itemRows = (itemsResult.data ?? []) as CustomerOrderItem[];
       try {
-        const summaries = await loadCountertopLineSummaries(itemRows.map((item) => item.id));
-        setCountertopSummaries(summaries);
-      } catch (countertopError) {
-        setErrorMessage(countertopError instanceof Error ? countertopError.message : "Countertop details could not be loaded.");
-        setIsLoading(false);
-        return;
+        setCountertopSummaries(await loadCountertopLineSummaries(itemRows.map((item) => item.id)));
+      } catch {
+        setCountertopSummaries([]);
       }
 
       setCustomer(customerResult.data as Customer);
