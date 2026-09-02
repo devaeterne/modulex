@@ -8,6 +8,8 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 
 const canonicalSqlPath = "sql/countertop-replace-remove.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260902114500_countertop_replace_remove.sql";
+const attachGateSqlPath = "sql/countertop-attach-pricing-gate.sql";
+const attachGateMigrationPath = "../modulex-store/supabase/migrations/20260902131000_countertop_attach_pricing_gate.sql";
 const editOrder = read("src/components/customers/EditCustomerOrder.tsx");
 const orderDomain = read("src/lib/customers/order-domain.ts");
 const orderEditing = read("sql/customer-order-editing.sql");
@@ -15,6 +17,8 @@ const revisionMigration = read("../modulex-store/supabase/migrations/20260901090
 
 assert(exists(canonicalSqlPath), "canonical Countertop replace/remove SQL is required");
 assert(exists(migrationPath), "shared Supabase migration mirror is required");
+assert(exists(attachGateSqlPath), "canonical Countertop attach pricing-gate hotfix SQL is required");
+assert(exists(attachGateMigrationPath), "shared Countertop attach pricing-gate migration mirror is required");
 
 for (const sqlPath of [canonicalSqlPath, migrationPath]) {
   const sql = read(sqlPath);
@@ -38,6 +42,28 @@ for (const sqlPath of [canonicalSqlPath, migrationPath]) {
   assert(sql.indexOf("from public.customer_orders o") < sql.indexOf("and oi.order_id = v_order.id\n  for update"), `${sqlPath} must lock the parent order before the target item`);
 }
 
+for (const sqlPath of [attachGateSqlPath, attachGateMigrationPath]) {
+  const sql = read(sqlPath);
+  for (const token of [
+    "private.attach_countertop_configuration",
+    "p_material_price_band_id uuid",
+    "private.countertop_order_pricing_gate",
+    "insert into private.countertop_order_pricing_gate",
+    "pg_backend_pid()",
+    "txid_current()",
+    "update public.customer_order_items",
+    "delete from private.countertop_order_pricing_gate",
+  ]) assert(sql.includes(token), `${sqlPath} missing ${token}`);
+  assert(
+    sql.indexOf("insert into private.countertop_order_pricing_gate") < sql.indexOf("update public.customer_order_items"),
+    `${sqlPath} must open the pricing gate before mutating the configured Countertop line`,
+  );
+  assert(
+    sql.indexOf("update public.customer_order_items") < sql.lastIndexOf("delete from private.countertop_order_pricing_gate"),
+    `${sqlPath} must close the pricing gate after the authoritative Countertop mutation`,
+  );
+}
+
 for (const token of ["Replace Countertop", "Remove Countertop", "CountertopConfigurator", "orderItemId", "Modal", "removeCountertopOrderItem"]) {
   assert(editOrder.includes(token), `Edit Order Countertop workflow missing ${token}`);
 }
@@ -48,6 +74,7 @@ for (const token of [
   "Countertop changes are Draft-only.",
   "removeCountertopOrderItem(countertopRemoveItemId",
   "orderItemId={countertopEditItemId}",
+  "lineNo: items.findIndex((item) => item.id === countertopEditItemId) + 1",
 ]) assert(editOrder.includes(token), `Edit Order configured-Countertop guard missing ${token}`);
 assert(editOrder.includes("Unsaved line edits will be discarded."), "direct Countertop removal must warn before authoritative line reload");
 assert(orderDomain.includes("export async function removeCountertopOrderItem"), "order domain must own Countertop removal");
