@@ -26,6 +26,8 @@ export type Permission =
   | "pricing.manage"
   | "customers.view"
   | "customers.manage"
+  | "projects.view"
+  | "projects.manage"
   | "orders.view"
   | "orders.manage"
   | "approvals.view"
@@ -71,6 +73,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "pricing.manage": "Manage prices & price groups",
   "customers.view": "View customers",
   "customers.manage": "Manage customer records",
+  "projects.view": "View customer projects",
+  "projects.manage": "Create & change customer projects",
   "orders.view": "View customer orders",
   "orders.manage": "Create & change customer orders",
   "approvals.view": "View approval requests",
@@ -116,6 +120,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "pricing.view",
     "customers.view",
     "customers.manage",
+    "projects.view",
+    "projects.manage",
     "orders.view",
     "orders.manage",
     "approvals.view",
@@ -136,6 +142,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "products.view",
     "pricing.view",
     "pricing.cost.view",
+    "projects.view",
     "orders.view",
     "approvals.view",
     "invoices.view",
@@ -184,8 +191,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Full system access, including protected Super Admin account management.",
   admin: "Full business and system administration, except protected Super Admin account actions.",
-  sales: "Customer, website lead, dealer application, order, invoice, shipment and installation workflows. Financial exceptions remain subject to approval.",
-  finance: "Invoices, collections, cost/margin visibility and payroll processing. Compensation setup is read-only; employee HR master data stays restricted.",
+  sales: "Customer, project, website lead, dealer application, order, invoice, shipment and installation workflows. Financial exceptions remain subject to approval.",
+  finance: "Projects, invoices, collections, cost/margin visibility and payroll processing. Compensation setup is read-only; employee HR master data stays restricted.",
   hr: "Full personnel lifecycle management including attendance, leave, compensation, payroll, benefits, documents, compliance, onboarding/offboarding and performance.",
   warehouse: "Stock, shipment and QR operations with read access to warehouse structure. Warehouse master data remains Admin-managed.",
   shipping: "Shipment execution with inventory, warehouse-location and QR-label visibility. General stock operations, customer commercial data and order-financial screens stay restricted.",
@@ -218,6 +225,7 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
   { match: (path) => path === "/users" || path.startsWith("/users/"), permission: "users.view" },
+  { match: (path) => path === "/projects" || path.startsWith("/projects/"), permission: "projects.view" },
   { match: (path) => path === "/store/leads", permission: "leads.view" },
   { match: (path) => path.startsWith("/store/leads/"), permission: "leads.manage" },
   {
