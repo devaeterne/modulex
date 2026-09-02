@@ -1,6 +1,7 @@
 import "server-only";
 
 import { approveVendorCatalogItem } from "@/lib/vendor-catalog/approve";
+import { approveStoneVendorCatalogItem } from "@/lib/vendor-catalog/stone-approve";
 import {
   isVendorApprovalEligible,
   type VendorAvailabilityStatus,
@@ -40,7 +41,7 @@ type CompletedApproval = {
 async function loadApprovalState(itemId: string) {
   const { data, error } = await supabaseAdmin
     .from("vendor_catalog_items")
-    .select("review_status,canonical_product_id,availability_status")
+    .select("review_status,canonical_product_id,availability_status,catalog_domain")
     .eq("id", itemId)
     .maybeSingle();
   if (error) throw error;
@@ -49,6 +50,7 @@ async function loadApprovalState(itemId: string) {
     review_status: "PENDING" | "APPROVED" | "IGNORED";
     canonical_product_id: string | null;
     availability_status: VendorAvailabilityStatus;
+    catalog_domain: "sink" | "stone";
   };
 }
 
@@ -66,7 +68,7 @@ async function loadCompletedApproval(
   const baseProductCode = product?.base_product_code ?? product?.sku ?? null;
 
   let storeProductContentId: string | null = null;
-  if (baseProductCode) {
+  if (state.catalog_domain !== "stone" && baseProductCode) {
     const { data: storeContent, error: storeError } = await supabaseAdmin
       .from("store_product_content")
       .select("id")
@@ -114,7 +116,9 @@ export async function approveReviewableVendorCatalogItem(
   if (completed) return completed;
 
   try {
-    const result = await approveVendorCatalogItem(itemId, authorization);
+    const result = state.catalog_domain === "stone"
+      ? await approveStoneVendorCatalogItem(itemId, authorization)
+      : await approveVendorCatalogItem(itemId, authorization);
     return { ...result, alreadyApproved: false };
   } catch (error) {
     const recovered = await waitForConcurrentApproval(itemId);
