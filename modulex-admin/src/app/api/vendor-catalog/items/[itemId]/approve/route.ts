@@ -1,5 +1,6 @@
 import {
   approveAvailableVendorCatalogItem,
+  VendorReviewNotEligibleError,
   VendorUnavailableError,
 } from "@/lib/vendor-catalog/approval";
 import { authorizeVendorCatalogAdmin } from "@/lib/vendor-catalog/auth";
@@ -33,6 +34,13 @@ export async function POST(request: Request, context: RouteContext) {
           availabilityStatus: error.availabilityStatus,
           error: error.message,
         },
+        { status: 409 }
+      );
+    }
+
+    if (error instanceof VendorReviewNotEligibleError) {
+      return Response.json(
+        { code: error.code, error: error.message },
         { status: 409 }
       );
     }
