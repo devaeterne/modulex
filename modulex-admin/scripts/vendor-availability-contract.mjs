@@ -51,7 +51,13 @@ assert.match(adapters, /available\?:\s*boolean/);
 assert.match(adapters, /is_in_stock\?:\s*boolean/);
 assert.match(adapters, /is_purchasable\?:\s*boolean/);
 assert.match(adapters, /low_stock_remaining\?:\s*number\s*\|\s*null/);
-assert.match(adapters, /normalizeKarranAvailability/);
+assert.match(adapters, /function normalizeKarranAvailability\(\)/);
+assert.match(
+  adapters,
+  /return \{ status: "AVAILABLE", available: true, purchasable: true, stockQuantity: null \};/
+);
+assert.doesNotMatch(adapters, /available === false/);
+assert.match(adapters, /availability:\s*normalizeKarranAvailability\(\)/);
 assert.match(adapters, /normalizeRuvatiAvailability/);
 assert.match(adapters, /OUT_OF_STOCK/);
 assert.match(adapters, /UNAVAILABLE/);
