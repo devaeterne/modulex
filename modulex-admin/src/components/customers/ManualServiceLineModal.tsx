@@ -67,7 +67,7 @@ export default function ManualServiceLineModal({
     <Modal isOpen={isOpen} onClose={onClose} className="mx-4 w-full max-w-xl p-6" ariaLabel="Service line">
       <div className="space-y-5">
         <div>
-          <h3 className="text-xl font-semibold">Service</h3>
+          <h3 className="text-base font-medium text-gray-800 dark:text-white/90">Service</h3>
           <FormHint>Enter the customer-facing service detail and the explicit amount for this order line.</FormHint>
         </div>
 

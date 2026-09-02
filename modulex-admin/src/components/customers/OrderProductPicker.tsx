@@ -109,7 +109,7 @@ export default function OrderProductPicker({
       <div className="flex max-h-[90vh] flex-col">
         <div className="space-y-4 p-5 pr-16 sm:p-6 sm:pr-16">
           <div>
-            <h3 className="text-xl font-semibold">Cabinet Products</h3>
+            <h3 className="text-base font-medium text-gray-800 dark:text-white/90">Cabinet Products</h3>
             <FormHint>Search eligible Price Group products and add them to the order.</FormHint>
           </div>
 
