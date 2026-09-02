@@ -1,9 +1,9 @@
 # Modulex Store Roadmap
 
-Last reviewed: 2026-08-31
-Main baseline: `d41f7c19ce81016b6a1a05166d0a4089104bfe52`
+Last reviewed: 2026-09-02
+Main baseline: `ceaa85699120fa3c3ff8b60231fe799199d0a543`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
-Current Granite migration status: **GC-5, GC-6, GC-7 and GC-8A are production-accepted. GC-8A live acceptance is recorded after PR #169 / merge commit `d41f7c19ce81016b6a1a05166d0a4089104bfe52`; managed public chrome, portal coexistence and technical SEO are verified live. GC-8B — accessibility + performance acceptance — is the active next package.**
+Current Granite migration status: **GC-0 through GC-8 are production-accepted. GC-8B accessibility/performance migration QA closed on 2026-09-02 with fresh production Lighthouse Performance 93 / Accessibility 94 / SEO 100 / LCP 2.950 s / CLS 0 / TBT 39 ms. Residual Store-wide accessibility/Core Web Vitals cleanup remains normal Phase 2.6 debt and does not reopen the completed Granite migration workstream.**
 
 ## Countertop / Stone / Sink cross-roadmap completion
 
@@ -380,6 +380,8 @@ The broader Granite migration now has an approved dynamic-content architecture a
 
 **Goal:** Reduce template-era frontend debt and make Store fast, accessible, and maintainable.
 
+GC-8B closed the Granite migration QA subset of this phase on 2026-09-02. It does not close the broader frontend-cleanup/Core Web Vitals phase. Acceptance: `docs/granite-center/GC8B_PRODUCTION_ACCEPTANCE.md`.
+
 ## 2.6.1 Dependency and asset cleanup
 
 - [ ] Verify and remove unused `@emailjs/browser` dependency.
@@ -398,18 +400,24 @@ The broader Granite migration now has an approved dynamic-content architecture a
 
 ## 2.6.3 Accessibility
 
-- [ ] Keyboard audit for Navbar, filters, lightbox, product gallery, consent manager, and portal sidebar.
+- [~] Keyboard audit for Navbar, filters, lightbox, product gallery, consent manager, and portal sidebar.
+  - GC-8B permanently covers Navbar/lightbox focus, Escape/Tab behavior and live auth/public semantics; filter/consent/portal-sidebar interactive depth remains broader Phase 2.6 work.
 - [ ] Focus-state audit.
 - [ ] Heading hierarchy audit.
-- [ ] Form label/error announcement audit.
+- [x] Form label/error announcement audit.
+  - GC-8B contract and live Contact/Account/Dealer markup verification cover explicit labels/required state plus lead alert/status announcements.
 - [ ] Color contrast audit for public and portal themes.
-- [ ] Confirm reduced-motion behavior for animated/360 surfaces.
+- [x] Confirm reduced-motion behavior for animated/360 surfaces.
+  - `src/app/globals.css` uses `prefers-reduced-motion: reduce` to disable smooth scrolling and collapse repeated animation/transition timing; GC-8B now guards this permanently.
 
 ## 2.6.4 Performance
 
-- [ ] Capture Lighthouse baseline for Home, Products, Product Detail, Contact, Account Login, and Dealer Portal.
-- [ ] Optimize LCP hero media.
-- [ ] Review font loading and unused CSS/JS.
+- [~] Capture Lighthouse baseline for Home, Products, Product Detail, Contact, Account Login, and Dealer Portal.
+  - Production route health/DOM was verified across all six surfaces; the permanent Lighthouse job currently records the Home mobile lab baseline, so multi-page Lighthouse automation remains open.
+- [~] Optimize LCP hero media.
+  - Home mobile lab LCP improved from 4.887 s in the earlier GC-8B baseline to 2.950 s in fresh run `33680809587`; this remains above the common 2.5 s good threshold.
+- [~] Review font loading and unused CSS/JS.
+  - Google Fonts/Bootstrap Icons render paths were removed and Next local font delivery is verified. Fresh Lighthouse still estimates 28 KiB unused JS and 52 KiB unused CSS, so broader cleanup remains open.
 - [ ] Review Supabase public RPC caching/revalidation strategy.
 - [ ] Remove unnecessary client components where server components are sufficient.
 
@@ -588,7 +596,7 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 - [x] GC-5 — Projects / Gallery migration.
 - [x] GC-6 — Cabinet content / customer journey.
 - [x] GC-7 — Reviews / social proof.
-- [~] GC-8 — Navigation/footer, SEO, accessibility & performance QA. GC-8A is production-accepted; GC-8B accessibility/performance acceptance remains the final GC-8 package.
+- [x] GC-8 — Navigation/footer, SEO, accessibility & performance QA. GC-8A and GC-8B are production-accepted; detailed GC-8B evidence: `docs/granite-center/GC8B_PRODUCTION_ACCEPTANCE.md`.
 
 **GC-0 truth lock:** Granite Center source content must never override canonical Oakwell company-profile data automatically. Unconfirmed hours, service area, installation/design SLAs, promotional claims, and other parent-site business claims fail closed and stay unpublished until explicitly approved in the controlled source/workstream.
 
@@ -630,6 +638,6 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 
 # Next Action
 
-1. Execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from latest `main`.
-2. Keep GC-8 `[~]` until accessibility, performance, indexing and final live acceptance all pass; then close the overall GC-8 exit gate.
+1. Granite migration **GC-0 through GC-8 is closed**. Keep residual accessibility/performance cleanup in Phase 2.6 without reopening the migration acceptance.
+2. The next Store product package is **Phase 2.2 — Catalog Discovery** when Store implementation resumes; the broader cross-project sequence may handle Admin work first.
 3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend.
