@@ -143,6 +143,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CountertopPriceResult | null>(null);
+  const [resolvedLineNo, setResolvedLineNo] = useState<number | null>(orderContext?.lineNo ?? null);
 
   const hasOrderPricingContext = Boolean(orderId || orderItemId);
 
@@ -159,8 +160,8 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
         supabase.from("countertop_services").select("id,name,pricing_method,unit_price").eq("is_active", true).order("name"),
       ]);
 
-      const orderItemContext = !orderId && orderItemId
-        ? await supabase.from("customer_order_items").select("order_id").eq("id", orderItemId).maybeSingle()
+      const orderItemContext = orderItemId
+        ? await supabase.from("customer_order_items").select("order_id,line_no").eq("id", orderItemId).maybeSingle()
         : { data: null, error: null };
       const contextOrderId = orderId ?? orderItemContext.data?.order_id ?? null;
       const [orderPricing, existingConfigurationResult] = await Promise.all([
@@ -173,6 +174,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
       ]);
 
       if (!mounted) return;
+      setResolvedLineNo(orderContext?.lineNo ?? orderItemContext.data?.line_no ?? null);
       const referenceError = [typeResult, edgeResult, sinkResult, profileResult, bandResult, priceGroupResult, serviceResult].find((entry) => entry.error)?.error
         ?? orderItemContext.error
         ?? orderPricing.error
@@ -237,7 +239,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
       setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [orderId, orderItemId]);
+  }, [orderId, orderItemId, orderContext?.lineNo]);
 
   const filteredStones = useMemo(() => stones.filter((row) => !stoneTypeId || row.stone_type_id === stoneTypeId), [stones, stoneTypeId]);
   const selectedStone = stones.find((row) => row.id === stoneProductId);
@@ -325,7 +327,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
               {orderContext ? (
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Badge color="info">Order {orderContext.orderNumber}</Badge>
-                  <Badge color="light">{orderContext.lineNo ? `Line ${orderContext.lineNo}` : "New countertop"}</Badge>
+                  <Badge color="light">{resolvedLineNo ? `Line ${resolvedLineNo}` : "New countertop"}</Badge>
                   {(orderContext.sku || orderContext.productName) ? (
                     <Badge color="light">{[orderContext.sku, orderContext.productName].filter(Boolean).join(" · ")}</Badge>
                   ) : null}
