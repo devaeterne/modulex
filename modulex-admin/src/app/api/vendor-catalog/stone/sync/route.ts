@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { authorizeVendorCatalogRequest } from "@/lib/vendor-catalog/auth";
 import { stoneVendorCatalogRegistry } from "@/lib/vendor-catalog/stone-adapters";
 import { runStoneVendorCatalogSync } from "@/lib/vendor-catalog/stone-sync";
@@ -14,7 +15,7 @@ type SyncBody = {
   categoryLabel?: string | null;
 };
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const authorization = await authorizeVendorCatalogRequest(request, {
     allowCron: true,
     allowAdmin: true,
@@ -33,10 +34,15 @@ export async function POST(request: Request) {
     : body.vendor
       ? [body.vendor]
       : Object.keys(stoneVendorCatalogRegistry);
-  const unique = [...new Set(requested.map((value) => value.trim().toLowerCase()).filter(Boolean))];
+  const unique = [
+    ...new Set(requested.map((value) => value.trim().toLowerCase()).filter(Boolean)),
+  ];
   const unknown = unique.filter((vendor) => !(vendor in stoneVendorCatalogRegistry));
   if (unknown.length) {
-    return Response.json({ error: `Unknown Stone vendor(s): ${unknown.join(", ")}` }, { status: 400 });
+    return Response.json(
+      { error: `Unknown Stone vendor(s): ${unknown.join(", ")}` },
+      { status: 400 }
+    );
   }
 
   const results = [];
@@ -54,4 +60,11 @@ export async function POST(request: Request) {
     autoPublished: false,
     results,
   });
+}
+
+export async function POST(request: Request) {
+  return withApiTiming(
+    { route: "/api/vendor-catalog/stone/sync", method: "POST" },
+    () => handlePost(request)
+  );
 }
