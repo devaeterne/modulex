@@ -37,12 +37,22 @@ for (const sqlPath of [canonicalSqlPath, migrationPath]) {
 for (const token of ["Replace Countertop", "Remove Countertop", "CountertopConfigurator", "orderItemId", "Modal", "removeCountertopOrderItem"]) {
   assert(editOrder.includes(token), `Edit Order Countertop workflow missing ${token}`);
 }
+for (const token of [
+  "isConfiguredCountertop",
+  "canMutateConfiguredCountertop",
+  'order.status === "draft"',
+  "Countertop changes are Draft-only.",
+  "removeCountertopOrderItem(countertopRemoveItemId",
+  "orderItemId={countertopEditItemId}",
+]) assert(editOrder.includes(token), `Edit Order configured-Countertop guard missing ${token}`);
+assert(editOrder.includes("Unsaved line edits will be discarded."), "direct Countertop removal must warn before authoritative line reload");
 assert(orderDomain.includes("export async function removeCountertopOrderItem"), "order domain must own Countertop removal");
 assert(orderDomain.includes('.rpc("remove_countertop_order_item"'), "order domain must call the dedicated removal RPC");
 assert(!editOrder.includes('.rpc("remove_countertop_order_item"'), "Edit Order must not bypass the order domain adapter");
 
 for (const source of [orderEditing, revisionMigration]) {
   assert(source.includes("Configured countertop lines cannot be removed in a generic revision."), "generic configured-Countertop removal guard must remain fail-closed");
+  assert(source.includes("Configured countertop lines must be changed in the countertop configurator."), "generic configured-Countertop change guard must remain fail-closed");
 }
 
 console.log("Order Countertop replace/remove contract: PASS");
