@@ -4,6 +4,10 @@ import type { CommercialDocument, CommercialDocumentLine } from "@/lib/documents
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN = 42;
+const PRIMARY_LOGO_BOX = { x: 238, y: 755, maxWidth: 112, maxHeight: 45 } as const;
+const SECONDARY_LOGO_BOX = { x: 397, y: 746, maxWidth: 140, maxHeight: 62 } as const;
+const FIRST_PAGE_LINE_HEIGHT = 270;
+const CONTINUATION_PAGE_LINE_HEIGHT = 370;
 const encoder = new TextEncoder();
 
 type PdfImage = { bytes: Uint8Array; width: number; height: number };
@@ -49,7 +53,9 @@ function imageCommand(name: string, image: PdfImage | null, x: number, y: number
   const ratio = Math.min(maxWidth / image.width, maxHeight / image.height);
   const width = image.width * ratio;
   const height = image.height * ratio;
-  return `q ${width.toFixed(2)} 0 0 ${height.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /${name} Do Q\n`;
+  const centeredX = x + (maxWidth - width) / 2;
+  const centeredY = y + (maxHeight - height) / 2;
+  return `q ${width.toFixed(2)} 0 0 ${height.toFixed(2)} ${centeredX.toFixed(2)} ${centeredY.toFixed(2)} cm /${name} Do Q\n`;
 }
 
 function wrap(value: string, maxChars: number) {
@@ -68,6 +74,49 @@ function wrap(value: string, maxChars: number) {
   }
   if (current) rows.push(current);
   return rows;
+}
+
+function cropWhiteMargins(source: HTMLCanvasElement) {
+  const context = source.getContext("2d");
+  if (!context) return source;
+  const { width, height } = source;
+  const pixels = context.getImageData(0, 0, width, height).data;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const alpha = pixels[index + 3];
+      const isNearWhite = pixels[index] > 247 && pixels[index + 1] > 247 && pixels[index + 2] > 247;
+      if (alpha > 12 && !isNearWhite) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+
+  if (maxX < minX || maxY < minY) return source;
+  const padding = Math.max(2, Math.round(Math.min(width, height) * 0.015));
+  const sx = Math.max(0, minX - padding);
+  const sy = Math.max(0, minY - padding);
+  const sw = Math.min(width - sx, maxX - minX + 1 + padding * 2);
+  const sh = Math.min(height - sy, maxY - minY + 1 + padding * 2);
+  if (sw >= width * 0.96 && sh >= height * 0.96) return source;
+
+  const cropped = document.createElement("canvas");
+  cropped.width = Math.max(1, sw);
+  cropped.height = Math.max(1, sh);
+  const croppedContext = cropped.getContext("2d");
+  if (!croppedContext) return source;
+  croppedContext.fillStyle = "#ffffff";
+  croppedContext.fillRect(0, 0, cropped.width, cropped.height);
+  croppedContext.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
+  return cropped;
 }
 
 async function loadImage(url: string | null | undefined): Promise<PdfImage | null> {
@@ -91,9 +140,10 @@ async function loadImage(url: string | null | undefined): Promise<PdfImage | nul
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    const normalizedCanvas = cropWhiteMargins(canvas);
+    const blob = await new Promise<Blob | null>((resolve) => normalizedCanvas.toBlob(resolve, "image/jpeg", 0.9));
     if (!blob) return null;
-    return { bytes: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height };
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), width: normalizedCanvas.width, height: normalizedCanvas.height };
   } catch {
     return null;
   }
@@ -119,8 +169,8 @@ function renderHeader(settings: GeneralSettings, primary: PdfImage | null, secon
     commands += text(entry, MARGIN, y, y === 794 ? 9.5 : 8, y === 794);
     y -= 12;
   }
-  commands += imageCommand("ImPrimary", primary, 238, 755, 112, 45);
-  commands += imageCommand("ImSecondary", secondary, 410, 755, 112, 45);
+  commands += imageCommand("ImPrimary", primary, PRIMARY_LOGO_BOX.x, PRIMARY_LOGO_BOX.y, PRIMARY_LOGO_BOX.maxWidth, PRIMARY_LOGO_BOX.maxHeight);
+  commands += imageCommand("ImSecondary", secondary, SECONDARY_LOGO_BOX.x, SECONDARY_LOGO_BOX.y, SECONDARY_LOGO_BOX.maxWidth, SECONDARY_LOGO_BOX.maxHeight);
   commands += line(MARGIN, 720, PAGE_WIDTH - MARGIN, 720, 0.8);
   return commands;
 }
@@ -150,32 +200,70 @@ function renderTableHeader(y: number) {
   return commands;
 }
 
+function descriptionRows(item: CommercialDocumentLine) {
+  return wrap(item.description, 42).slice(0, 2);
+}
+
+function detailRows(item: CommercialDocumentLine) {
+  if (!item.detail) return [];
+  return item.detail
+    .split(/\r?\n/)
+    .flatMap((entry) => wrap(entry, 42))
+    .slice(0, 8);
+}
+
+function rowHeight(item: CommercialDocumentLine) {
+  const descriptionCount = Math.max(1, descriptionRows(item).length);
+  const details = detailRows(item).length;
+  return Math.max(29, 13 + descriptionCount * 10 + details * 9);
+}
+
 function renderLine(item: CommercialDocumentLine, y: number) {
+  const height = rowHeight(item);
+  const descriptions = descriptionRows(item);
+  const details = detailRows(item);
   let commands = text(item.lineNo, MARGIN + 2, y, 7.5);
   commands += text(item.sku, MARGIN + 22, y, 7.5, true);
-  const description = wrap(item.description, 42);
-  commands += text(description[0] ?? "", MARGIN + 92, y, 7.5);
-  if (item.detail) commands += text(wrap(item.detail, 42)[0] ?? "", MARGIN + 92, y - 10, 6.8);
+
+  const visibleDescriptions = descriptions.length ? descriptions : [""];
+  visibleDescriptions.forEach((row, index) => {
+    commands += text(row, MARGIN + 92, y - index * 10, 7.5);
+  });
+  const detailStartY = y - visibleDescriptions.length * 10;
+  details.forEach((row, index) => {
+    commands += text(row, MARGIN + 92, detailStartY - index * 9, 6.8);
+  });
+
   commands += text(item.quantity, 377, y, 7.5);
   commands += text(item.unitPrice, 410, y, 7.5);
   commands += text(item.discount, 476, y, 7.5);
   commands += text(item.total, 522, y, 7.5, true);
-  commands += line(MARGIN, y - 15, PAGE_WIDTH - MARGIN, y - 15, 0.35);
-  return commands;
+  commands += line(MARGIN, y - height + 7, PAGE_WIDTH - MARGIN, y - height + 7, 0.35);
+  return { commands, height };
 }
 
 function pageChunks(lines: CommercialDocumentLine[]) {
+  if (lines.length === 0) return [[]];
   const chunks: CommercialDocumentLine[][] = [];
-  const firstCapacity = 10;
-  const nextCapacity = 13;
-  let cursor = 0;
-  chunks.push(lines.slice(cursor, cursor + firstCapacity));
-  cursor += firstCapacity;
-  while (cursor < lines.length) {
-    chunks.push(lines.slice(cursor, cursor + nextCapacity));
-    cursor += nextCapacity;
+  let current: CommercialDocumentLine[] = [];
+  let usedHeight = 0;
+  let pageIndex = 0;
+
+  for (const item of lines) {
+    const height = rowHeight(item);
+    const limit = pageIndex === 0 ? FIRST_PAGE_LINE_HEIGHT : CONTINUATION_PAGE_LINE_HEIGHT;
+    if (current.length > 0 && usedHeight + height > limit) {
+      chunks.push(current);
+      current = [];
+      usedHeight = 0;
+      pageIndex += 1;
+    }
+    current.push(item);
+    usedHeight += height;
   }
-  return chunks.length ? chunks : [[]];
+
+  if (current.length > 0) chunks.push(current);
+  return chunks;
 }
 
 function buildPageContents(document: CommercialDocument, settings: GeneralSettings, primary: PdfImage | null, secondary: PdfImage | null) {
@@ -209,8 +297,9 @@ function buildPageContents(document: CommercialDocument, settings: GeneralSettin
     commands += renderTableHeader(tableY);
     let rowY = tableY - 27;
     for (const item of items) {
-      commands += renderLine(item, rowY);
-      rowY -= 29;
+      const rendered = renderLine(item, rowY);
+      commands += rendered.commands;
+      rowY -= rendered.height;
     }
 
     const lastPage = pageIndex === chunks.length - 1;
