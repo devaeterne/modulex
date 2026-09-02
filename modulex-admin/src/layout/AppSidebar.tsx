@@ -77,6 +77,7 @@ const navItems: NavItem[] = [
       { name: "Installations", path: "/customers/installations", permission: "installations.view" },
     ],
   },
+  { icon: <PageIcon />, name: "Projects", path: "/projects", permission: "projects.view" },
   {
     icon: <TableIcon />,
     name: "Inventory",
