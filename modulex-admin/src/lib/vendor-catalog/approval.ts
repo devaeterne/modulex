@@ -18,6 +18,15 @@ export class VendorUnavailableError extends Error {
   }
 }
 
+export class VendorReviewNotEligibleError extends Error {
+  readonly code = "VENDOR_REVIEW_NOT_ELIGIBLE";
+
+  constructor() {
+    super("Ignored vendor products cannot be approved until they are returned to review.");
+    this.name = "VendorReviewNotEligibleError";
+  }
+}
+
 type Authorization = { userId: string; accessToken: string };
 
 type CompletedApproval = {
@@ -80,6 +89,7 @@ async function loadCompletedApproval(
 async function waitForConcurrentApproval(itemId: string) {
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const state = await loadApprovalState(itemId);
+    if (state.review_status === "IGNORED") throw new VendorReviewNotEligibleError();
     if (!isVendorApprovalEligible(state.availability_status)) {
       throw new VendorUnavailableError(state.availability_status);
     }
@@ -95,6 +105,7 @@ export async function approveAvailableVendorCatalogItem(
   authorization: Authorization
 ): Promise<CompletedApproval> {
   const state = await loadApprovalState(itemId);
+  if (state.review_status === "IGNORED") throw new VendorReviewNotEligibleError();
   if (!isVendorApprovalEligible(state.availability_status)) {
     throw new VendorUnavailableError(state.availability_status);
   }
