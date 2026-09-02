@@ -1,8 +1,10 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState } from "react";
 import Button from "@/components/ui/button/Button";
 import FileInput from "@/components/form/input/FileInput";
+import { ADMIN_BRANDING_STYLES } from "@/components/ui/theme/adminTheme";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { supabase } from "@/lib/supabase/client";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettings } from "@/lib/settings/types";
@@ -118,18 +120,18 @@ export default function DocumentBrandingSettings() {
   }
 
   if (loading) {
-    return <section className="rounded-2xl border border-gray-200 bg-white p-6 text-sm text-gray-500 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">Loading document branding...</section>;
+    return <section className={`p-6 text-sm ${ADMIN_BRANDING_STYLES.loading}`}>Loading document branding...</section>;
   }
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+    <section className={`p-5 sm:p-6 ${ADMIN_BRANDING_STYLES.card}`}>
       <div>
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Document Branding</h2>
-        <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">Configure the primary company and secondary brand marks once. Order and Invoice share the same A4 identity. Printed documents and direct PDF downloads always use the <strong>on light</strong> variants because the paper surface is white.</p>
+        <h2 className={`text-lg font-semibold ${ADMIN_BRANDING_STYLES.heading}`}>Document Branding</h2>
+        <p className={`mt-1 max-w-3xl text-sm ${ADMIN_BRANDING_STYLES.muted}`}>Configure the primary company and secondary brand marks once. Order and Invoice share the same A4 identity. Printed documents and direct PDF downloads always use the <strong>on light</strong> variants because the paper surface is white.</p>
       </div>
 
-      {error ? <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">{error}</div> : null}
-      {success ? <div className="mt-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300">{success}</div> : null}
+      {error ? <div className={`mt-4 px-4 py-3 text-sm ${ADMIN_BRANDING_STYLES.error}`}>{error}</div> : null}
+      {success ? <div className={`mt-4 px-4 py-3 text-sm ${ADMIN_BRANDING_STYLES.success}`}>{success}</div> : null}
 
       <div className="mt-6 grid gap-4 xl:grid-cols-2">
         {slots.map((slot) => {
@@ -137,19 +139,21 @@ export default function DocumentBrandingSettings() {
           const isDark = slot.context === "on dark";
           const busy = busyField === slot.field;
           const legacyFallback = slot.field === "primary_logo_on_light_url" && !settings.primary_logo_on_light_url && Boolean(settings.logo_url);
+          const previewClass = `flex min-h-36 items-center justify-center p-6 ${isDark ? ADMIN_BRANDING_STYLES.previewDark : ADMIN_BRANDING_STYLES.previewLight}`;
+          const emptyClass = `text-sm ${isDark ? ADMIN_BRANDING_STYLES.emptyDark : ADMIN_BRANDING_STYLES.emptyLight}`;
           return (
-            <article key={slot.field} className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800">
-              <div className={`flex min-h-36 items-center justify-center p-6 ${isDark ? "bg-gray-950" : "bg-white"}`}>
-                {url ? <>{/* eslint-disable-next-line @next/next/no-img-element */}<img src={url} alt={`${slot.title} ${slot.context}`} className="max-h-20 max-w-[260px] object-contain" /></> : <span className={isDark ? "text-sm text-gray-600" : "text-sm text-gray-400"}>No logo configured</span>}
+            <article key={slot.field} className={`overflow-hidden ${ADMIN_BRANDING_STYLES.slot}`}>
+              <div className={previewClass}>
+                {url ? <img src={url} alt={`${slot.title} ${slot.context}`} className="max-h-20 max-w-[260px] object-contain" /> : <span className={emptyClass}>No logo configured</span>}
               </div>
-              <div className="border-t border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/80">
+              <div className={`border-t p-4 ${ADMIN_BRANDING_STYLES.slotBody}`}>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">{slot.title}</h3>
-                  <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">{slot.context}</span>
-                  {slot.primary ? <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">Primary</span> : <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600 dark:bg-gray-800 dark:text-gray-300">Secondary</span>}
-                  {legacyFallback ? <span className="rounded-full bg-warning-50 px-2 py-0.5 text-[10px] font-semibold text-warning-700 dark:bg-warning-500/10 dark:text-warning-300">Legacy fallback</span> : null}
+                  <h3 className={`text-sm font-semibold ${ADMIN_BRANDING_STYLES.slotTitle}`}>{slot.title}</h3>
+                  <span className={`px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${ADMIN_BRANDING_STYLES.contextBadge}`}>{slot.context}</span>
+                  {slot.primary ? <span className={`px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${ADMIN_BRANDING_STYLES.primaryBadge}`}>Primary</span> : <span className={`px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${ADMIN_BRANDING_STYLES.secondaryBadge}`}>Secondary</span>}
+                  {legacyFallback ? <span className={`px-2 py-0.5 text-xs font-semibold ${ADMIN_BRANDING_STYLES.legacyBadge}`}>Legacy fallback</span> : null}
                 </div>
-                <p className="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{slot.description}</p>
+                <p className={`mt-1 text-xs leading-5 ${ADMIN_BRANDING_STYLES.description}`}>{slot.description}</p>
                 <div className="mt-4 space-y-3">
                   <FileInput accept="image/png,image/jpeg,image/webp,image/svg+xml" disabled={!canEdit || Boolean(busyField)} onChange={(event) => void upload(slot, event.target.files?.[0])} aria-label={`Upload ${slot.title} ${slot.context}`} />
                   {canEdit && settings[slot.field] ? <Button size="sm" variant="outline" disabled={Boolean(busyField)} onClick={() => void remove(slot)}>{busy ? "Working..." : "Remove"}</Button> : null}
@@ -160,7 +164,7 @@ export default function DocumentBrandingSettings() {
         })}
       </div>
 
-      {!canEdit ? <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">You have read-only access. Admin or Super Admin permission is required to change document branding.</p> : null}
+      {!canEdit ? <p className={`mt-4 text-xs ${ADMIN_BRANDING_STYLES.readonly}`}>You have read-only access. Admin or Super Admin permission is required to change document branding.</p> : null}
     </section>
   );
 }
