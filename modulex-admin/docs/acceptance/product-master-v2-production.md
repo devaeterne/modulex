@@ -1,7 +1,7 @@
 # Product Master UX v2 Production Acceptance
 
 Date: 2026-09-02
-Status: AUTOMATED PRODUCTION GATES PASS / SIGNED-IN VISUAL CLICK-THROUGH PENDING
+Status: COMPLETE
 
 ## Scope
 
@@ -71,23 +71,25 @@ The Product Master workflow on post-closeout main commit `1bfa677d8254b408f0482b
 
 The permanent Product Master workflow continues to run Product Master v2, product-list UI, products/pricing, A1/A2 regression, RBAC, typecheck, lint, and production build contracts.
 
-## Remaining gate
+## Signed-in visual acceptance
 
-The repository roadmap explicitly requires a literal **signed-in browser click-through** before marking Product Master UX v2 `[x]`.
+The final signed-in browser click-through was completed on 2026-09-02 and accepted by the project owner.
 
-This execution environment can verify production routes, deployed client bundles, Vercel runtime health, and authenticated Supabase application-role behavior, but it does not expose a reusable logged-in Admin browser session. No password reset, auth-session extraction, fake login bypass, or synthetic production auth user was used merely to satisfy the visual gate.
+The visual gate covered the roadmap surfaces:
 
-Manual visual acceptance should confirm the following while already signed in to Modulex Admin:
+1. Products list and Product Type/UOM filters.
+2. Create Product Product Type and allowed UOM behavior.
+3. Edit Product existing Product Type/UOM and QR state.
+4. Product Types and Units of Measure master pages.
+5. Brands and Categories usage-aware management UI.
+6. Low Stock Product Type/UOM-aware filtering.
 
-1. Products list loads and Product Type/UOM filters are usable.
-2. Create Product shows Product Type and only allowed UOM choices.
-3. Edit Product loads existing Product Type/UOM and QR state correctly.
-4. Product Types and Units of Measure master pages load and are usable.
-5. Brands and Categories show their usage-aware management UI.
-6. Low Stock exposes Product Type/UOM-aware filtering without a UI error.
+No visual blocker was reported, so the final manual gate is closed.
 
 ## Result
 
 **Automated and production-contract acceptance: PASS.**
 
-**Roadmap closeout: PENDING only the literal signed-in visual click-through required by the existing done criterion.**
+**Signed-in visual acceptance: PASS.**
+
+**Product Master UX v2 roadmap closeout: COMPLETE.**
