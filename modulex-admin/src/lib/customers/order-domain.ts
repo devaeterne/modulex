@@ -11,6 +11,7 @@ import type {
   CustomerOrderStatus,
   CustomerOrderStatusHistory,
   OrderFulfillmentType,
+  OrderPricingModel,
   PaymentMethod,
   PriceGroupLookup,
 } from "@/lib/customers/types";
@@ -25,8 +26,9 @@ export type OrderDomainProduct = {
   category: string | null;
   brand_id: string | null;
   category_id: string | null;
+  product_type_code: string;
   product_type_name: string;
-  pricing_model: "price_group" | "countertop_material_band" | "none";
+  pricing_model: OrderPricingModel;
   uom_code: string;
   uom_name: string;
 };
@@ -34,6 +36,7 @@ export type OrderDomainProduct = {
 export function pricingModelLabel(model: OrderDomainProduct["pricing_model"] | string | null | undefined) {
   if (model === "price_group") return "Price Group";
   if (model === "countertop_material_band") return "Countertop Material Band";
+  if (model === "manual_service") return "Manual Service";
   if (model === "none") return "No Commercial Pricing";
   return "Historical Snapshot";
 }
@@ -81,6 +84,9 @@ type CreateOrderItemInput = {
   productId: string;
   quantity: string | number;
   discountPercent: string | number;
+  pricingModel?: OrderPricingModel | null;
+  unitPrice?: string | number | null;
+  lineNote?: string | null;
 };
 
 export type CreateCustomerOrderInput = {
@@ -107,6 +113,8 @@ type UpdateOrderItemInput = {
   quantity: string | number;
   unitPrice: string | number;
   discountPercent: string | number;
+  pricingModel?: OrderPricingModel | null;
+  lineNote?: string | null;
 };
 
 export type UpdateCustomerOrderInput = {
@@ -151,6 +159,7 @@ const ORDER_REVISION_EDITABLE_FIELDS = [
   "items.quantity",
   "items.unit_price",
   "items.discount_percent",
+  "items.line_note",
   "price_group_id",
   "fulfillment_type",
   "payment_method_id",
@@ -204,10 +213,10 @@ const ORDER_REVISION_IMMUTABLE_FIELDS = [
 ] as const;
 const PRICE_GROUP_COLUMNS = "id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only";
 const PAYMENT_METHOD_COLUMNS = "id, system_key, name, commission_percent, sort_order, is_active";
-const PRODUCT_COLUMNS = "id, sku, name, barcode, status, brand, category, brand_id, category_id, product_types(name, pricing_model), units_of_measure(code, name)";
+const PRODUCT_COLUMNS = "id, sku, name, barcode, status, brand, category, brand_id, category_id, product_types(code, name, pricing_model), units_of_measure(code, name)";
 
-type ProductQueryRow = Omit<OrderDomainProduct, "product_type_name" | "pricing_model" | "uom_code" | "uom_name"> & {
-  product_types: { name: string; pricing_model: OrderDomainProduct["pricing_model"] } | null;
+type ProductQueryRow = Omit<OrderDomainProduct, "product_type_code" | "product_type_name" | "pricing_model" | "uom_code" | "uom_name"> & {
+  product_types: { code: string; name: string; pricing_model: OrderDomainProduct["pricing_model"] } | null;
   units_of_measure: { code: string; name: string } | null;
 };
 
@@ -219,6 +228,7 @@ type CountertopConfigurationRow = {
 function mapOrderProducts(rows: ProductQueryRow[]): OrderDomainProduct[] {
   return rows.map(({ product_types, units_of_measure, ...product }) => ({
     ...product,
+    product_type_code: product_types?.code ?? "UNKNOWN",
     product_type_name: product_types?.name ?? "Unknown Product Type",
     pricing_model: product_types?.pricing_model ?? "none",
     uom_code: units_of_measure?.code ?? "UNKNOWN",
@@ -496,14 +506,37 @@ export async function loadOrderPrices(priceGroupId: string, currencyCode: string
   return (data ?? []) as OrderPriceRow[];
 }
 
+function serializeCreateOrderItem(item: CreateOrderItemInput) {
+  const base = {
+    product_id: item.productId,
+    quantity: numeric(item.quantity),
+    discount_percent: numeric(item.discountPercent),
+  };
+
+  if (item.pricingModel !== "manual_service") return base;
+
+  return {
+    ...base,
+    unit_price: numeric(item.unitPrice),
+    line_note: nullableText(item.lineNote),
+  };
+}
+
+function serializeUpdateOrderItem(item: UpdateOrderItemInput) {
+  return {
+    ...(item.id ? { id: item.id } : {}),
+    product_id: item.productId,
+    quantity: numeric(item.quantity),
+    unit_price: numeric(item.unitPrice),
+    discount_percent: numeric(item.discountPercent),
+    ...(item.pricingModel === "manual_service" ? { line_note: nullableText(item.lineNote) } : {}),
+  };
+}
+
 export async function createCustomerOrder(input: CreateCustomerOrderInput): Promise<string> {
   const { data, error } = await supabase.rpc("create_customer_order", {
     p_customer_id: input.customerId,
-    p_items: input.items.map((item) => ({
-      product_id: item.productId,
-      quantity: numeric(item.quantity),
-      discount_percent: numeric(item.discountPercent),
-    })),
+    p_items: input.items.map(serializeCreateOrderItem),
     p_price_group_id: input.priceGroupId,
     p_billing_address_id: nullableId(input.billingAddressId),
     p_shipping_address_id: nullableId(input.shippingAddressId),
@@ -526,13 +559,7 @@ export async function createCustomerOrder(input: CreateCustomerOrderInput): Prom
 export async function updateCustomerOrder(input: UpdateCustomerOrderInput): Promise<number> {
   const { data, error } = await supabase.rpc("update_customer_order", {
     p_order_id: input.orderId,
-    p_items: input.items.map((item) => ({
-      ...(item.id ? { id: item.id } : {}),
-      product_id: item.productId,
-      quantity: numeric(item.quantity),
-      unit_price: numeric(item.unitPrice),
-      discount_percent: numeric(item.discountPercent),
-    })),
+    p_items: input.items.map(serializeUpdateOrderItem),
     p_price_group_id: input.priceGroupId,
     p_billing_address_id: nullableId(input.billingAddressId),
     p_shipping_address_id: nullableId(input.shippingAddressId),

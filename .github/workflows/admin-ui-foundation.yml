@@ -16,12 +16,14 @@ on:
       - "modulex-admin/scripts/countertop-material-band-selection-contract.mjs"
       - "modulex-admin/scripts/order-countertop-context-contract.mjs"
       - "modulex-admin/scripts/order-countertop-initiation-contract.mjs"
+      - "modulex-admin/scripts/order-manual-service-line-contract.mjs"
       - "modulex-admin/scripts/admin-table-system-contract.mjs"
       - "modulex-admin/scripts/admin-theme-design-contract.mjs"
       - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
       - "modulex-admin/scripts/admin-resolution-matrix-contract.mjs"
       - "modulex-admin/package.json"
       - "modulex-store/supabase/migrations/*countertop*.sql"
+      - "modulex-store/supabase/migrations/*manual_service*.sql"
       - ".github/workflows/admin-ui-foundation.yml"
   push:
     paths:
@@ -38,12 +40,14 @@ on:
       - "modulex-admin/scripts/countertop-material-band-selection-contract.mjs"
       - "modulex-admin/scripts/order-countertop-context-contract.mjs"
       - "modulex-admin/scripts/order-countertop-initiation-contract.mjs"
+      - "modulex-admin/scripts/order-manual-service-line-contract.mjs"
       - "modulex-admin/scripts/admin-table-system-contract.mjs"
       - "modulex-admin/scripts/admin-theme-design-contract.mjs"
       - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
       - "modulex-admin/scripts/admin-resolution-matrix-contract.mjs"
       - "modulex-admin/package.json"
       - "modulex-store/supabase/migrations/*countertop*.sql"
+      - "modulex-store/supabase/migrations/*manual_service*.sql"
       - ".github/workflows/admin-ui-foundation.yml"
 
 permissions:
@@ -76,6 +80,7 @@ jobs:
       - run: node scripts/countertop-material-band-selection-contract.mjs
       - run: npm run smoke:order-countertop-context
       - run: npm run smoke:order-countertop-initiation
+      - run: npm run smoke:order-manual-service-line
       - run: node scripts/admin-table-system-contract.mjs
       - run: node scripts/admin-theme-design-contract.mjs
       - run: node scripts/admin-full-route-regression-contract.mjs
