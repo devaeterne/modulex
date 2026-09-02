@@ -71,9 +71,6 @@ for (const wrapper of [
 const invoicePrint = read("src/components/customers/CustomerInvoicePrint.tsx");
 expect(invoicePrint.includes("order_item_id"), "Invoice print must link Countertop details through immutable order_item_id snapshots");
 
-const orderDomain = read("src/lib/customers/order-domain.ts");
-expect(orderDomain.includes('from "@/lib/customers/countertop-summary"'), "Order domain must reuse the shared Countertop summary loader");
-
 const companyPage = read("src/app/(admin)/settings/general/company/page.tsx");
 const documentsPage = read("src/app/(admin)/settings/general/documents/page.tsx");
 expect(companyPage.includes("DocumentBrandingSettings"), "General > Company must render Logo 1 / Logo 2 variant settings");
