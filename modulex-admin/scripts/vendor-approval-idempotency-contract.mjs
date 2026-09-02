@@ -21,4 +21,12 @@ assert.match(approval, /approveVendorCatalogItem/);
 assert.match(approval, /VendorCatalogMissingError/);
 assert.doesNotMatch(approval, /VendorUnavailableError/);
 
+assert.match(approval, /vendor_price_reference/);
+assert.match(approval, /vendor_currency/);
+assert.match(approval, /is_base_price/);
+assert.match(approval, /product_prices/);
+assert.match(approval, /writeVendorListPrice/);
+assert.match(approval, /price_group_id/);
+assert.doesNotMatch(approval, /tier_1|tier_2|tier_3|pickup_level/);
+
 console.log("vendor approval idempotency contract: ok");
