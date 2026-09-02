@@ -153,16 +153,8 @@ function unknownAvailability(): NormalizedVendorProduct["availability"] {
   };
 }
 
-function normalizeKarranAvailability(
-  available: boolean | undefined
-): NormalizedVendorProduct["availability"] {
-  if (available === true) {
-    return { status: "AVAILABLE", available: true, purchasable: true, stockQuantity: null };
-  }
-  if (available === false) {
-    return { status: "UNAVAILABLE", available: false, purchasable: false, stockQuantity: null };
-  }
-  return unknownAvailability();
+function normalizeKarranAvailability(): NormalizedVendorProduct["availability"] {
+  return { status: "AVAILABLE", available: true, purchasable: true, stockQuantity: null };
 }
 
 type ShopifyProduct = {
@@ -290,7 +282,7 @@ export class KarranAdapter implements VendorCatalogAdapter {
           familyKey: family.familyKey,
           variantCode: family.variantCode,
           variantLabel: family.variantLabel,
-          availability: normalizeKarranAvailability(variant.available),
+          availability: normalizeKarranAvailability(),
           assets: images,
           sourcePayload: { product, variant },
         });
