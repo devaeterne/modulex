@@ -43,6 +43,8 @@ assert.doesNotMatch(listPriceTriggerSql, /after update of[^\n]*vendor_price_refe
 assert.match(listPriceTriggerSql, /new\.review_status\s*=\s*'APPROVED'/i);
 assert.match(listPriceTriggerSql, /old\.review_status is distinct from new\.review_status/i);
 assert.match(listPriceTriggerSql, /old\.canonical_product_id is distinct from new\.canonical_product_id/i);
+assert.match(listPriceTriggerSql, /with candidates as/i);
+assert.match(listPriceTriggerSql, /where not exists\s*\([\s\S]*public\.product_prices/i);
 assert.doesNotMatch(listPriceTriggerSql, /silver|gold|platinum|pickup|fob/i);
 assert.doesNotMatch(approval, /product_prices|is_base_price|vendor_price_reference/);
 
