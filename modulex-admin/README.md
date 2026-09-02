@@ -13,7 +13,7 @@ For active delivery status and acceptance requirements, read `ADMIN_ROADMAP.md` 
 - External vendor catalog status is reference data and does not become Modulex inventory.
 - Vendor catalog products may be approved without confirmed vendor stock; staff confirms vendor stock with the supplier when required. Only products marked `MISSING` from authoritative vendor discovery are blocked from new/unfinished approval.
 - Vendor status changes do not activate/deactivate canonical Modulex products.
-- Vendor reference prices never become Modulex selling prices automatically.
+- A vendor reference price is copied to the canonical product's active base `List Price` only when the vendor item is approved; later vendor sync price changes do not automatically reprice the product.
 - Store publication remains explicit and requires the Store publishing/price contracts.
 - Privileged Supabase credentials stay server-only; browser code uses only browser-safe public configuration.
 
@@ -38,6 +38,8 @@ Karran public Shopify `variant.available` is retained in raw source payloads but
 Ruvati `is_purchasable` / `is_in_stock` values may be shown as vendor-status reference signals, but they do not block approval and do not mutate canonical product status. `vendor_stock_quantity` is not populated by the current workflow.
 
 Approval requires valid vendor-category mapping to active Modulex Category + Product Type + UOM. `AVAILABLE`, `OUT_OF_STOCK`, `UNAVAILABLE` and `UNKNOWN` rows may be imported while present in the vendor catalog. `MISSING` requires two successful authoritative full-vendor misses and blocks approval without deleting/deactivating an existing canonical product.
+
+If an approved vendor row has `vendor_price_reference`, the database approval trigger writes that amount, in `vendor_currency`, to the canonical product's active base `List Price` price group. It preserves normal `product_prices` effective-history semantics and does not calculate or write any non-base price group.
 
 See `docs/VENDOR_CATALOG_SYNC.md` for the full contract.
 
