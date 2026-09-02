@@ -110,7 +110,7 @@ as $$
 begin
   if new.review_status = 'APPROVED'
      and new.review_status is distinct from old.review_status
-     and coalesce(auth.role(), '') <> 'service_role' then
+     and current_user <> 'service_role' then
     raise exception 'Vendor catalog approval must use the server approval workflow';
   end if;
   return new;
