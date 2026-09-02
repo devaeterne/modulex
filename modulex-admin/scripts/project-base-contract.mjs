@@ -25,6 +25,7 @@ const projectDetailPage = read("src/app/(admin)/projects/[id]/page.tsx");
 const projectDetail = read("src/components/customers/ProjectDetailWorkspace.tsx");
 const newOrderPage = read("src/app/(admin)/customers/[id]/orders/new/page.tsx");
 const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
+const orderDetailPage = read("src/app/(admin)/customers/[id]/orders/[orderId]/page.tsx");
 
 assert(permissions.includes('"projects.view"'), "permissions must define projects.view");
 assert(permissions.includes('"projects.manage"'), "permissions must define projects.manage");
@@ -59,5 +60,6 @@ assert(newOrderPage.includes("searchParams"), "New Order page must accept Projec
 assert(newOrderPage.includes("projectId={projectId}"), "New Order page must pass projectId into the shared Order form");
 assert(newOrder.includes("createProjectCustomerOrder"), "New Order must use the Project-aware create boundary when projectId is present");
 assert(newOrder.includes("projectId?: string | null"), "New Order form must accept an optional projectId without breaking standalone creation");
+assert(orderDetailPage.includes("CustomerOrderProjectLink"), "Order detail must expose its Project when linked");
 
 console.log("PASS: project-base foundation contract");
