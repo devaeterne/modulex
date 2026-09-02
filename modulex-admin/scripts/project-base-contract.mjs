@@ -42,6 +42,8 @@ for (const exportedName of [
   );
 }
 
+assert(projectDomain.includes('hasPermission(profile.role, "projects.view")'), "Project reads must use projects.view");
+assert(projectDomain.includes('hasPermission(profile.role, "projects.manage")'), "Project mutations must use projects.manage");
 assert(projectDomain.includes('.rpc("create_customer_project"'), "Project create must use the authoritative RPC");
 assert(projectDomain.includes('.rpc("update_customer_project"'), "Project update must use the authoritative RPC");
 assert(projectDomain.includes('.rpc("get_customer_projects_page"'), "Project list must use server-side paging RPC");
