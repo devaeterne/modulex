@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import {
   getVendorCatalogAdapter,
   vendorCatalogRegistry,
@@ -106,11 +107,19 @@ async function handle(
   );
 }
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   return handle(request, undefined, false);
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const body = (await request.json().catch(() => undefined)) as SyncBody | undefined;
   return handle(request, body, true);
+}
+
+export async function GET(request: Request) {
+  return withApiTiming({ route: "/api/vendor-catalog/sync", method: "GET" }, () => handleGet(request));
+}
+
+export async function POST(request: Request) {
+  return withApiTiming({ route: "/api/vendor-catalog/sync", method: "POST" }, () => handlePost(request));
 }

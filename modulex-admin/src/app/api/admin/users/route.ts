@@ -4,6 +4,7 @@ import {
   jsonError,
   requireAdmin,
 } from "@/lib/auth/admin-api";
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 import { isValidEmail, isValidPhone } from "@/lib/validation";
 
@@ -155,7 +156,7 @@ async function setUserRoles(
   });
 }
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   const auth = await requireAdmin(request);
 
   if (auth.response) {
@@ -256,7 +257,7 @@ export async function GET(request: Request) {
   });
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const auth = await requireAdmin(request);
 
   if (auth.response) {
@@ -373,7 +374,7 @@ export async function POST(request: Request) {
   );
 }
 
-export async function PATCH(request: Request) {
+async function handlePatch(request: Request) {
   const auth = await requireAdmin(request);
 
   if (auth.response) {
@@ -558,7 +559,7 @@ export async function PATCH(request: Request) {
   });
 }
 
-export async function DELETE(request: Request) {
+async function handleDelete(request: Request) {
   const auth = await requireAdmin(request);
 
   if (auth.response) {
@@ -601,4 +602,20 @@ export async function DELETE(request: Request) {
   }
 
   return Response.json({ success: true });
+}
+
+export async function GET(request: Request) {
+  return withApiTiming({ route: "/api/admin/users", method: "GET" }, () => handleGet(request));
+}
+
+export async function POST(request: Request) {
+  return withApiTiming({ route: "/api/admin/users", method: "POST" }, () => handlePost(request));
+}
+
+export async function PATCH(request: Request) {
+  return withApiTiming({ route: "/api/admin/users", method: "PATCH" }, () => handlePatch(request));
+}
+
+export async function DELETE(request: Request) {
+  return withApiTiming({ route: "/api/admin/users", method: "DELETE" }, () => handleDelete(request));
 }

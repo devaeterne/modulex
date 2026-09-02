@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import {
   getVendorCatalogAdapter,
   vendorCatalogLabels,
@@ -9,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   const authorization = await authorizeVendorCatalogAdmin(request);
   if (authorization instanceof Response) return authorization;
 
@@ -36,4 +37,8 @@ export async function GET(request: Request) {
       categories,
     },
   });
+}
+
+export async function GET(request: Request) {
+  return withApiTiming({ route: "/api/vendor-catalog/vendors", method: "GET" }, () => handleGet(request));
 }

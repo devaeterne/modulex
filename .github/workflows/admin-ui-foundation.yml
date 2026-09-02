@@ -21,6 +21,7 @@ on:
       - "modulex-admin/scripts/admin-theme-design-contract.mjs"
       - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
       - "modulex-admin/scripts/admin-resolution-matrix-contract.mjs"
+      - "modulex-admin/scripts/api-timing-contract.mjs"
       - "modulex-admin/package.json"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
@@ -45,6 +46,7 @@ on:
       - "modulex-admin/scripts/admin-theme-design-contract.mjs"
       - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
       - "modulex-admin/scripts/admin-resolution-matrix-contract.mjs"
+      - "modulex-admin/scripts/api-timing-contract.mjs"
       - "modulex-admin/package.json"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
@@ -69,6 +71,8 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
+      - name: API timing contract
+        run: npm run smoke:api-timing
       - name: Admin UI strict self-test
         run: npm run smoke:admin-ui-strict:self-test
       - name: Admin UI strict changed-file gate

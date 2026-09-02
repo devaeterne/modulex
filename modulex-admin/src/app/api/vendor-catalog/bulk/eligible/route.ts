@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { authorizeVendorCatalogAdmin } from "@/lib/vendor-catalog/auth";
 import { loadVendorCategoryMapping } from "@/lib/vendor-catalog/mappings";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
@@ -34,7 +35,7 @@ type Candidate = {
   vendor_category_label: string | null;
 };
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   const authorization = await authorizeVendorCatalogAdmin(request);
   if (authorization instanceof Response) return authorization;
 
@@ -119,4 +120,8 @@ export async function GET(request: Request) {
     .map((candidate) => candidate.id);
 
   return Response.json({ ids, total: ids.length });
+}
+
+export async function GET(request: Request) {
+  return withApiTiming({ route: "/api/vendor-catalog/bulk/eligible", method: "GET" }, () => handleGet(request));
 }

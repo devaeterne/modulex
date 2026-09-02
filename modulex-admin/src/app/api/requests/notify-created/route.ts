@@ -1,3 +1,4 @@
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { isSupabaseAdminConfigured, supabaseAdmin } from "@/lib/supabase/server-admin";
 
 function jsonError(message: string, status: number) {
@@ -24,7 +25,7 @@ function requestUrl(requestId: string) {
   return `${base}/requests?request=${encodeURIComponent(requestId)}`;
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   if (!isSupabaseAdminConfigured) {
     return jsonError("Server email delivery is not configured.", 503);
   }
@@ -267,4 +268,8 @@ export async function POST(request: Request) {
   }
 
   return Response.json({ success: true, status: "sent", sent, processing });
+}
+
+export async function POST(request: Request) {
+  return withApiTiming({ route: "/api/requests/notify-created", method: "POST" }, () => handlePost(request));
 }

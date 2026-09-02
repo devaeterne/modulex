@@ -1,4 +1,5 @@
 import { jsonError, requireAdmin } from "@/lib/auth/admin-api";
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
 const VALID_STATUSES = ["pending", "processing", "sent", "failed", "skipped"] as const;
@@ -14,7 +15,7 @@ async function countStatus(status: string) {
   return count ?? 0;
 }
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   const auth = await requireAdmin(request);
   if (auth.response) return auth.response;
 
@@ -48,7 +49,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+async function handlePatch(request: Request) {
   const auth = await requireAdmin(request);
   if (auth.response) return auth.response;
 
@@ -77,4 +78,18 @@ export async function PATCH(request: Request) {
   const { data, error } = await supabaseAdmin.from("email_notifications").update({ status: "skipped", processed_at: now, last_error: `Skipped manually by ${actor}`, updated_at: now }).eq("id", id).select("*").single();
   if (error) return jsonError(error.message, 500);
   return Response.json({ success: true, notification: data });
+}
+
+export async function GET(request: Request) {
+  return withApiTiming(
+    { route: "/api/admin/email-notifications", method: "GET" },
+    () => handleGet(request)
+  );
+}
+
+export async function PATCH(request: Request) {
+  return withApiTiming(
+    { route: "/api/admin/email-notifications", method: "PATCH" },
+    () => handlePatch(request)
+  );
 }

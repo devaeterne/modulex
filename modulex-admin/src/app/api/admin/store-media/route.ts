@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { jsonError, requireAdmin } from "@/lib/auth/admin-api";
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import type { StoreMediaAsset } from "@/lib/store/mediaLibrary";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
@@ -191,7 +192,7 @@ function errorResponse(error: unknown) {
   return jsonError("Media lifecycle operation failed.", 500);
 }
 
-export async function PATCH(request: Request) {
+async function handlePatch(request: Request) {
   const authorization = await requireAdmin(request);
   if (authorization.response) return authorization.response;
   try {
@@ -204,7 +205,7 @@ export async function PATCH(request: Request) {
   } catch (error) { return errorResponse(error); }
 }
 
-export async function DELETE(request: Request) {
+async function handleDelete(request: Request) {
   const authorization = await requireAdmin(request);
   if (authorization.response) return authorization.response;
   try {
@@ -213,4 +214,12 @@ export async function DELETE(request: Request) {
     await hardDeleteAsset(asset);
     return Response.json({ deleted: true });
   } catch (error) { return errorResponse(error); }
+}
+
+export async function PATCH(request: Request) {
+  return withApiTiming({ route: "/api/admin/store-media", method: "PATCH" }, () => handlePatch(request));
+}
+
+export async function DELETE(request: Request) {
+  return withApiTiming({ route: "/api/admin/store-media", method: "DELETE" }, () => handleDelete(request));
 }

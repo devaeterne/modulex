@@ -1,4 +1,5 @@
 import { processPendingEmailNotifications } from "@/lib/email/transactional";
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { isSupabaseAdminConfigured, supabaseAdmin } from "@/lib/supabase/server-admin";
 
 function jsonError(message: string, status: number) {
@@ -51,7 +52,7 @@ async function requireActiveStaff(request: Request) {
   return { response: null };
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const auth = await requireActiveStaff(request);
   if (auth.response) return auth.response;
 
@@ -73,4 +74,11 @@ export async function POST(request: Request) {
       500
     );
   }
+}
+
+export async function POST(request: Request) {
+  return withApiTiming(
+    { route: "/api/admin/email-notifications/process", method: "POST" },
+    () => handlePost(request)
+  );
 }

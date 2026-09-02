@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import QRCode from "qrcode";
 import { requireAdmin } from "@/lib/auth/admin-api";
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const auth = await requireAdmin(request);
     if ("response" in auth && auth.response) return auth.response;
@@ -29,4 +30,8 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ ok: true, actor: actor.profile.id, qr_value: value, qr_svg_path: path, qr_svg_url: urlData.publicUrl, qr_generated_at: new Date().toISOString() });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to generate QR" }, { status: 403 }); }
+}
+
+export async function POST(request: Request) {
+  return withApiTiming({ route: "/api/admin/products/qr", method: "POST" }, () => handlePost(request));
 }
