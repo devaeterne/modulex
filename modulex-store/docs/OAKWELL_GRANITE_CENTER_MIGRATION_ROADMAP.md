@@ -1,7 +1,7 @@
 # Oakwell Cabinetry — Granite & Cabinet Center Content / Media Migration Roadmap
 
-Last reviewed: 2026-08-30
-Status: **APPROVED — execute sequentially via reviewed PRs**
+Last reviewed: 2026-09-02
+Status: **COMPLETE — GC-0 through GC-8 production-accepted**
 Primary source: https://granitecenterva.com/
 Target: `devaeterne/modulex` → `modulex-store` + controlled CMS in `modulex-admin`
 
@@ -15,6 +15,7 @@ GC-3 production acceptance: `modulex-store/docs/granite-center/GC3_PRODUCTION_AC
 GC-4 production acceptance: `modulex-store/docs/granite-center/GC4_PRODUCTION_ACCEPTANCE.md`
 GC-8A design: `modulex-store/docs/superpowers/specs/2026-08-30-gc8a-store-chrome-seo-design.md`
 GC-8A implementation plan: `modulex-store/docs/superpowers/plans/2026-08-30-gc8a-store-chrome-seo.md`
+GC-8B production acceptance: `modulex-store/docs/granite-center/GC8B_PRODUCTION_ACCEPTANCE.md`
 GC-1 manifest: `modulex-store/docs/granite-center/GC1_SOURCE_CONTENT_MEDIA_MANIFEST.md` + `gc1-source-manifest.json`
 
 > Purpose: identify which verified Granite & Cabinet Center business data, media, social proof, forms, showroom information, and cabinet-related content should be adapted into Oakwell Cabinetry without cloning the parent website or importing stale/irrelevant WordPress content.
@@ -574,14 +575,16 @@ Status: `[x]` production-accepted on 2026-08-30 after PR #169 merge/deploy and l
 
 ### GC-8B — Accessibility + performance acceptance
 
-- `[ ]` alt-text/accessibility audit;
-- `[ ]` keyboard/mobile/lightbox/form QA;
-- `[ ]` Lighthouse/Core Web Vitals baseline vs post-migration;
-- `[ ]` LCP/CLS media verification;
-- `[ ]` final sitemap/indexing verification;
-- `[ ]` final lint/build/smoke/live checks after tuning.
+Status: `[x]` production-accepted on 2026-09-02. Acceptance record: `docs/granite-center/GC8B_PRODUCTION_ACCEPTANCE.md`.
 
-**GC-8 exit gate:** migration is production-verified; mutable business content is managed through Admin/Supabase and Store contains behavior/layout rather than production content constants.
+- `[x]` alt-text/accessibility audit — production media semantics, decorative icon/logo handling and fail-closed CMS alt-text contracts verified;
+- `[x]` keyboard/mobile/lightbox/form QA — deterministic focus/Escape/Tab/mobile-nav/form contracts plus live public/auth DOM verification passed; no separate physical device-farm certification is claimed;
+- `[x]` Lighthouse/Core Web Vitals baseline vs post-migration — Home mobile lab baseline improved from Performance 70 / LCP 4.887 s to fresh closeout Performance 93 / LCP 2.950 s, with Accessibility 94, SEO 100, CLS 0.000 and TBT 39 ms in Actions run `33680809587`;
+- `[x]` LCP/CLS media verification — CLS is clean in the sampled run; LCP is materially improved but remains above the common 2.5 s good threshold and is retained as general Store Phase 2.6 optimization debt rather than hidden;
+- `[x]` final sitemap/indexing verification — robots/sitemap are live, public production routes are indexed intentionally, and Account/Dealer namespaces remain excluded/noindex;
+- `[x]` final lint/build/smoke/live checks after tuning — GC-8B run `33680809587` passed accessibility/performance, GC-8A/GC-5 regressions, public/portal/showroom contracts, scoped lint, production build, optimized-build checks and production Lighthouse.
+
+**GC-8 exit gate:** `[x]` Granite migration is production-verified through GC-8A + GC-8B; mutable business content is managed through Admin/Supabase and Store contains behavior/layout rather than production content constants. Residual Store-wide Core Web Vitals/accessibility cleanup remains tracked under the broader Phase 2.6 roadmap and does not reopen the completed migration workstream.
 
 ---
 
@@ -620,6 +623,6 @@ Status: `[x]` production-accepted on 2026-08-30 after PR #169 merge/deploy and l
 
 # 10. Next Action
 
-1. Execute **GC-8B — accessibility/mobile/keyboard + Lighthouse/Core Web Vitals baseline/tuning** from latest `main`.
-2. Close overall GC-8 only after accessibility, performance, indexing and final production verification pass.
+1. Granite Center migration **GC-0 through GC-8 is complete and production-accepted**; preserve the acceptance records and permanent data-ownership boundary.
+2. Return new Store implementation work to `STORE_ROADMAP.md` product priorities rather than extending this migration roadmap. Residual LCP/accessibility/frontend cleanup remains normal Phase 2.6 debt, not a Granite migration blocker.
 3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend.
