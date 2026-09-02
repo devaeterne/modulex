@@ -19,6 +19,7 @@ The sync **never auto-publishes** Store products and never treats a vendor price
 - Store publication still requires a current Modulex selling price greater than zero for at least one active variant.
 - Cron/service sync writes use the server-side Supabase admin client; browser clients cannot insert or delete vendor source records.
 - RLS limits review visibility to active `admin` / `super_admin` profiles.
+- Authenticated reviewers may move rows between `PENDING` and `IGNORED`, but the database trigger rejects direct browser transitions to `APPROVED`; only the service-role server approval pipeline may complete approval and write `canonical_product_id`.
 - Vendor SKU identity is preserved. Family grouping controls `base_product_code`; it does not rewrite sellable SKUs.
 
 ## Current adapters
@@ -41,7 +42,7 @@ As with Karran, product detail enrichment is deferred until approval instead of 
 
 ## Change detection, Check Updates and performance
 
-`stableDiscoveryHash()` hashes normalized catalog fields, category identity, family/variant identity and discovery assets. `stableProductHash()` is used after approval/detail enrichment.
+`stableDiscoveryHash()` hashes normalized vendor product fields, family/variant identity and discovery assets. Vendor category scope is stored separately and intentionally excluded from the product hash so an unscoped cron does not manufacture an `UPDATED` state merely because the same product was previously discovered through a category-scoped run. `stableProductHash()` is used after approval/detail enrichment.
 
 Each discovery classifies an item as:
 
@@ -106,7 +107,7 @@ Approving a family processes the pending SKUs in that family through the same it
 
 ### Approval
 
-Approval is server-side and fail-closed. `review_status=APPROVED` is written only after the full pipeline succeeds.
+Approval is server-side and fail-closed. `review_status=APPROVED` is written only after the full pipeline succeeds. The V3 database guard uses the active Postgres role (`current_user`) to reject direct authenticated approval while allowing the server-only `service_role` approval mutation.
 
 For the selected SKU it:
 
