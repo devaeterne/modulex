@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Button from "@/components/ui/button/Button";
 import SinkVendorImportsPanel from "./SinkVendorImportsPanel";
 import StoneVendorImportsPanel from "./StoneVendorImportsPanel";
@@ -12,6 +13,8 @@ export default function VendorImportsPage() {
 
   return (
     <div className="space-y-6">
+      {catalogDomain === "stone" ? <PageBreadcrumb pageTitle="Vendor Import Review · Stone" /> : null}
+
       <div className="flex flex-wrap gap-2" aria-label="Vendor catalog domain">
         <Button
           size="sm"
