@@ -27,7 +27,12 @@ type VendorAvailabilityStatus = "AVAILABLE" | "OUT_OF_STOCK" | "UNAVAILABLE" | "
 type AvailabilityFilter = "all" | VendorAvailabilityStatus;
 
 type StoneVendorCategory = { key: string; label: string; productCount: number | null };
-type StoneVendorOption = { code: string; label: string; categories: StoneVendorCategory[] };
+type StoneVendorOption = {
+  code: string;
+  label: string;
+  categories: StoneVendorCategory[];
+  categoriesLoaded: boolean;
+};
 type StoneVariant = {
   vendorSku?: string | null;
   form?: string | null;
@@ -221,12 +226,51 @@ export default function StoneVendorImportsPanel() {
           code: vendor.vendorCode,
           label: vendor.label,
           categories: vendor.categories ?? [],
+          categoriesLoaded: Array.isArray(vendor.categories),
         })));
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : String(loadError));
       }
     })();
   }, [getAccessToken]);
+
+  const ensureCategories = useCallback(async (vendorCode: string) => {
+    if (!vendorCode || vendorCode === "all") return;
+    const existing = vendors.find((vendor) => vendor.code === vendorCode);
+    if (existing?.categoriesLoaded) return;
+
+    const accessToken = await getAccessToken();
+    const response = await fetch(
+      `/api/vendor-catalog/stone/vendors?vendor=${encodeURIComponent(vendorCode)}`,
+      { headers: { authorization: `Bearer ${accessToken}` } }
+    );
+    const payload = (await response.json().catch(() => ({}))) as {
+      vendor?: { vendorCode: string; label: string; categories?: StoneVendorCategory[] };
+      error?: string;
+    };
+    if (!response.ok || !payload.vendor) {
+      throw new Error(payload.error || "Unable to load Stone vendor categories.");
+    }
+    setVendors((current) => current.map((vendor) =>
+      vendor.code === vendorCode
+        ? { ...vendor, categories: payload.vendor?.categories ?? [], categoriesLoaded: true }
+        : vendor
+    ));
+  }, [getAccessToken, vendors]);
+
+  useEffect(() => {
+    if (!syncVendor) return;
+    void ensureCategories(syncVendor).catch((categoryError) =>
+      setError(categoryError instanceof Error ? categoryError.message : String(categoryError))
+    );
+  }, [ensureCategories, syncVendor]);
+
+  useEffect(() => {
+    if (tableVendor === "all") return;
+    void ensureCategories(tableVendor).catch((categoryError) =>
+      setError(categoryError instanceof Error ? categoryError.message : String(categoryError))
+    );
+  }, [ensureCategories, tableVendor]);
 
   const loadItems = useCallback(async () => {
     const requestId = ++requestIdRef.current;
