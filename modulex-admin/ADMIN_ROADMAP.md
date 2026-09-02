@@ -1,10 +1,10 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-09-01
-Main baseline: `1bf1a987a2c4499db4348f10d3c975ef7574b376`
+Last reviewed: 2026-09-02
+Main baseline: `8ce65dbde84be7350f90984db7d0edacf5786248`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
-Current cross-roadmap package: **Granite GC-8B accessibility/performance hardening is merged to `main` through PR #172. Admin A3 work must preserve Store canonical product-taxonomy/public-projection boundaries.**
-Current Admin next action: **Countertop Product Catalog is active in draft PR #230 on current `main` baseline `1bf1a987a2c4499db4348f10d3c975ef7574b376`; its additive catalog RPC migration remains source-controlled and unapplied until merge. VAL-4 validation hardening remains an independent parallel workstream.**
+Current cross-roadmap package: **Vendor Catalog Review v3 is active from current `main`; it extends Product Master + Store draft/media boundaries without widening Store public projections.**
+Current Admin next action: **Finish Vendor Catalog Review v3 review/merge, then apply `20260902093000_vendor_catalog_sync_family_v3`, run post-DDL advisors, deploy Admin, and perform signed-in category-check/sync/mapping/approval acceptance.**
 
 ## Admin UI standardization program
 
@@ -25,6 +25,18 @@ Current Admin next action: **Countertop Product Catalog is active in draft PR #2
   - Fresh post-`main` sync Admin Products Pricing workflow run `33451480069` passed Product/Pricing UI contract, Product Type pricing contract, production-surface regression, RBAC, lint, and production build on branch head `016cccdc94aec8ab0fd19c7a889f48c8e3d69ae6`.
   - Production contains the Product Type pricing routing migration and the exact #206 merge-SHA Admin deployment is READY. This row remains `[~]` only because authenticated Product Prices/Material Bands acceptance and post-DDL Security + Performance Advisor closeout were not independently reproduced in this session; do not re-run the migration or re-invent pricing behavior.
   - Store public/Dealer projection behavior is unchanged by this package; the migration lives in the shared Supabase migration directory but does not widen Store data exposure, so `STORE_ROADMAP.md` requires no functional status change for this package.
+
+## Vendor Catalog Review v3
+
+- [~] Add category-scoped vendor discovery, durable Check Updates snapshots, family/variant grouping, mapping-driven approval, and scalable review controls.
+  - Karran supports collection discovery and scoped `/collections/{handle}/products.json`; Ruvati supports Store API categories and scoped category discovery. Unscoped cron remains lightweight and does not download images.
+  - `Check Updates` records short-lived durable snapshots with discovered/new/updated/unchanged counts; `Sync New + Updated` consumes the exact snapshot while Full Rescan performs fresh discovery.
+  - Sellable vendor SKU identity remains canonical. Conservative family grouping maps variants such as `SQS200BL/GR/WH` to common `base_product_code=SQS200` while preserving separate canonical SKUs/color identity.
+  - Approval requires persistent vendor category → active Modulex Category + Product Type + allowed UOM mapping. Missing mappings fail closed; Admin may select an existing Category or explicitly create one with an editable name, then save the mapping and continue approval.
+  - Approval remains server-only for the `APPROVED` transition and canonical link: authenticated reviewers may use `PENDING`/`IGNORED`, while a DB trigger blocks direct browser approval and authenticated writes to `canonical_product_id`.
+  - Approval downloads all images only at that boundary, optimizes them to WebP in `store-media`, creates/links canonical products, and creates/reuses draft Store family content without setting Modulex selling price or publishing.
+  - `/products/vendor-imports` uses server-side pagination (25/50/100), search, vendor/category/review/change/linked filters, family/SKU approval, legacy Complete Import, shared Alerts, and Product/Store edit links.
+  - Canonical SQL + deploy migration: `sql/vendor-catalog-sync-family-v3.sql` / `20260902093000_vendor_catalog_sync_family_v3.sql`. Migration is intentionally **unapplied before merge**; keep this row `[~]` until post-merge migration, advisor review, deploy, and signed-in production acceptance complete.
 
 This document is the operational source of truth for `modulex-admin` delivery planning and status. It is designed to survive chat/session boundaries and must be kept current as implementation progresses.
 
@@ -633,6 +645,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
   - A2.1 warehouse/location integrity, A2.2 inventory/movement, and A2.3 stock-operations/scanning contracts are permanent Admin workflow gates. A2.3 protects scanner duplicate handling, guided confirmation/error recovery, QR label printing, mobile fallback behavior, and continued use of the A2.2 idempotent write boundary.
   - A3.1 product-master contract permanently protects canonical taxonomy/family/color semantics, lifecycle guards, server-side product list/export behavior, and A1/A2 regression boundaries.
   - Countertop catalog/context regression protects visible Catalog/Setup navigation, Stone/Sink catalog ownership, active-product Order dropdown filtering, order-eligible commercial price-group scope, and canonical Product Master/Product Prices write reuse.
+  - Vendor Catalog Review v3 contract protects scoped adapter discovery, durable check snapshots, mapping-driven approval, family/variant identity, server-only approval state, migration mirrors, and scalable review UI behavior.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -758,20 +771,23 @@ Record material decisions here when they affect future phases.
 - [x] Product Type is dynamic master data and selects a controlled pricing behavior; it does not store price amounts. UOM is dynamic quantity/measurement master data and does not select pricing behavior.
 - [x] Pricing UI v2 keeps Stone material rates in canonical `countertop_material_price_bands`, Sink/Standard Price Group amounts in canonical `product_prices`, and unsupported `none` Product Types without an editable commercial amount.
 - [x] Countertop Catalog keeps Stone catalog pricing on Material Bands and Sink catalog pricing on order-eligible commercial `price_groups`; manual Stone $/sq ft remains an Order configuration override, not a second stored Stone price source.
+- [x] Vendor catalog discovery may stage vendor categories without creating Modulex master data; approval requires an explicit persistent Category + Product Type + allowed UOM mapping and fails closed when the mapping/master data is unavailable.
+- [x] Vendor SKU remains sellable identity; conservative family grouping sets `base_product_code` and variant/color identity without rewriting vendor SKU.
 
 ---
 
 # Next Action
 
-Countertop Product Catalog is active in **draft PR #230** while existing validation workstreams continue independently.
+Vendor Catalog Review v3 is the active Admin catalog package.
 
-1. Keep migration `20260901152500_countertop_catalog_product` unapplied until PR #230 is merged; branch CI is not production acceptance.
-2. After merge, apply the canonical migration, run Supabase Security + Performance Advisor checks, deploy Admin, and perform signed-in Add/Edit/Activate/Deactivate acceptance for Stone and Sink.
-3. Verify a newly added active Stone appears only under its selected Stone Type in Add Countertop and displays its Material Band; verify inactive Stone/Sink products disappear from Order dropdowns.
-4. Verify Sink saves require one USD price for every active order-eligible non-internal commercial price group and Order pricing uses the saved Order price-group context.
-5. Preserve B1–R22 as the canonical Stone band catalog; do not create an 8-band replacement or a parallel Stone price table.
-6. Keep VAL-4/remaining validation work independent from this catalog package unless execution-time `main` shows a real conflict.
+1. Keep migration `20260902093000_vendor_catalog_sync_family_v3` unapplied until the Vendor Catalog Review v3 PR is merged; branch CI is not production acceptance.
+2. After merge, apply the canonical migration and run Supabase Security + Performance Advisor checks before accepting the feature as production-ready.
+3. Deploy Admin and signed-in smoke **Karran → one category → Check Updates → Sync New + Updated** before broad/full scans.
+4. Verify mapping creation with an existing Category and with an explicitly created editable Category name; Product Type and UOM must come from valid active canonical masters.
+5. Verify one family such as `SQS200` retains separate vendor SKUs while sharing one base product family, then verify Product and Store draft edit links after approval.
+6. Verify legacy `APPROVED + canonical_product_id=null` recovery through Complete Import and confirm direct browser `APPROVED` / canonical-link writes remain DB-blocked.
+7. Do not approve arbitrary production vendor data during acceptance; use an explicitly selected test/review item and keep Store content draft/unpublished.
 
-**Cross-roadmap coordination:** PR #230 changes the Admin management surface and shared operational RPC only; it does not widen Store public/Dealer projections, so no functional `STORE_ROADMAP.md` status mutation is required before merge.
+**Cross-roadmap coordination:** Vendor Catalog Review v3 creates canonical Product variants and draft Store product/media through existing boundaries but does not widen public Store/Dealer projections; no functional `STORE_ROADMAP.md` status mutation is required before merge.
 
 **Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so newer merges are preserved rather than overwritten.

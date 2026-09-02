@@ -14,6 +14,10 @@ import {
   type VendorAsset,
 } from "@/lib/vendor-catalog/domain";
 import { createVendorCatalogUserClient } from "@/lib/vendor-catalog/auth";
+import {
+  loadVendorCategoryMapping,
+  type ResolvedVendorCategoryMapping,
+} from "@/lib/vendor-catalog/mappings";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
 const STORE_MEDIA_BUCKET = "store-media";
@@ -38,6 +42,11 @@ type VendorCatalogItemRow = {
   product_url: string;
   vendor_price_reference: number | null;
   vendor_currency: string | null;
+  vendor_category_key: string | null;
+  vendor_category_label: string | null;
+  family_key: string | null;
+  variant_code: string | null;
+  variant_label: string | null;
   source_payload: unknown;
   canonical_product_id: string | null;
 };
@@ -78,9 +87,8 @@ function slugify(value: string) {
     .replace(/-+/g, "-") || "vendor-product";
 }
 
-function safeSku(item: VendorCatalogItemRow) {
-  const raw = item.sku?.trim() || `${item.vendor_code}-${item.external_id}`;
-  return raw
+function normalizedCode(value: string, fallback: string) {
+  const normalized = value
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase()
@@ -88,6 +96,22 @@ function safeSku(item: VendorCatalogItemRow) {
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 100);
+  return normalized || fallback;
+}
+
+function safeSku(item: VendorCatalogItemRow) {
+  const raw = item.sku?.trim() || `${item.vendor_code}-${item.external_id}`;
+  return normalizedCode(raw, `${item.vendor_code.toUpperCase()}-${item.id.slice(0, 8)}`);
+}
+
+function safeFamilyKey(item: VendorCatalogItemRow, sku: string) {
+  return normalizedCode(item.family_key?.trim() || sku, sku);
+}
+
+function safeVariantCode(item: VendorCatalogItemRow) {
+  return item.variant_code?.trim()
+    ? normalizedCode(item.variant_code, "DEFAULT")
+    : "DEFAULT";
 }
 
 function isAllowedImageUrl(vendorCode: string, value: string) {
@@ -278,46 +302,35 @@ async function ensureVendorBrand(vendorCode: string) {
   return created;
 }
 
-async function resolveSinkMasters() {
-  const [{ data: category, error: categoryError }, { data: type, error: typeError }] =
-    await Promise.all([
-      supabaseAdmin
-        .from("product_categories")
-        .select("id,name")
-        .eq("status", "active")
-        .ilike("name", "Sink")
-        .maybeSingle(),
-      supabaseAdmin
-        .from("product_types")
-        .select("id,name,default_uom_id")
-        .eq("code", "SINK")
-        .eq("is_active", true)
-        .maybeSingle(),
-    ]);
+async function assertSafeCanonicalReuse(
+  item: VendorCatalogItemRow,
+  productId: string,
+  sku: string
+) {
+  const { data, error } = await supabaseAdmin
+    .from("vendor_catalog_items")
+    .select("id,vendor_code,sku,family_key")
+    .eq("canonical_product_id", productId)
+    .neq("id", item.id)
+    .limit(5);
+  if (error) throw error;
 
-  if (categoryError || !category) {
-    throw categoryError ?? new Error("Active Sink product category is required.");
+  const conflicts = (data ?? []).filter((row) => {
+    const sameVendor = row.vendor_code === item.vendor_code;
+    const sameSku = row.sku?.trim().toUpperCase() === sku;
+    return !sameVendor || !sameSku;
+  });
+  if (conflicts.length > 0) {
+    throw new Error(
+      "This canonical product is already linked to a different vendor catalog identity. Resolve the duplicate before approval."
+    );
   }
-  if (typeError || !type?.default_uom_id) {
-    throw typeError ?? new Error("Active SINK product type with a default UOM is required.");
-  }
-
-  const { data: uom, error: uomError } = await supabaseAdmin
-    .from("units_of_measure")
-    .select("id,code")
-    .eq("id", type.default_uom_id)
-    .eq("is_active", true)
-    .maybeSingle();
-  if (uomError || !uom) {
-    throw uomError ?? new Error("Active default UOM for SINK product type is required.");
-  }
-
-  return { category, type, uom };
 }
 
 async function ensureCanonicalProduct(
   item: VendorCatalogItemRow,
-  userAccessToken: string
+  userAccessToken: string,
+  mapping: ResolvedVendorCategoryMapping
 ) {
   if (item.canonical_product_id) {
     const { data: linked, error } = await supabaseAdmin
@@ -336,12 +349,14 @@ async function ensureCanonicalProduct(
     .ilike("sku", sku)
     .maybeSingle();
   if (existingError) throw existingError;
-  if (existing) return existing;
+  if (existing) {
+    await assertSafeCanonicalReuse(item, existing.id, sku);
+    return existing;
+  }
 
-  const [brand, masters] = await Promise.all([
-    ensureVendorBrand(item.vendor_code),
-    resolveSinkMasters(),
-  ]);
+  const brand = await ensureVendorBrand(item.vendor_code);
+  const familyKey = safeFamilyKey(item, sku);
+  const variantCode = safeVariantCode(item);
   const userClient = createVendorCatalogUserClient(userAccessToken);
   const { data: savedId, error: saveError } = await userClient.rpc("save_product_master_v2", {
     p_product: {
@@ -351,15 +366,15 @@ async function ensureCanonicalProduct(
       name: item.title,
       description: item.description,
       brand_id: brand.id,
-      category_id: masters.category.id,
-      base_product_code: sku,
-      color_code: "DEFAULT",
-      color_name: null,
+      category_id: mapping.category.id,
+      base_product_code: familyKey,
+      color_code: variantCode,
+      color_name: item.variant_label,
       brand: brand.name,
-      category: masters.category.name,
-      unit: masters.uom.code.toLowerCase(),
-      product_type_id: masters.type.id,
-      uom_id: masters.uom.id,
+      category: mapping.category.name,
+      unit: mapping.uom.code.toLowerCase(),
+      product_type_id: mapping.productType.id,
+      uom_id: mapping.uom.id,
       min_stock_level: 0,
       status: "active",
       metadata: {
@@ -367,6 +382,11 @@ async function ensureCanonicalProduct(
         vendor_code: item.vendor_code,
         vendor_external_id: item.external_id,
         vendor_product_url: item.product_url,
+        vendor_category_key: item.vendor_category_key,
+        vendor_category_label: item.vendor_category_label,
+        vendor_family_key: item.family_key,
+        vendor_variant_code: item.variant_code,
+        vendor_variant_label: item.variant_label,
       },
     },
     p_stone_profile: null,
@@ -383,7 +403,13 @@ async function ensureCanonicalProduct(
 }
 
 async function ensureStoreProductContent(
-  product: { id: string; sku: string; base_product_code: string | null; name: string; description: string | null },
+  product: {
+    id: string;
+    sku: string;
+    base_product_code: string | null;
+    name: string;
+    description: string | null;
+  },
   item: VendorCatalogItemRow,
   userId: string
 ) {
@@ -396,7 +422,7 @@ async function ensureStoreProductContent(
   if (existingError) throw existingError;
   if (existing) return existing;
 
-  const slug = slugify(`${item.vendor_code}-${product.sku}-${item.id.slice(0, 8)}`);
+  const slug = slugify(`${item.vendor_code}-${baseProductCode}-${item.id.slice(0, 8)}`);
   const { data: created, error: createError } = await supabaseAdmin
     .from("store_product_content")
     .insert({
@@ -436,6 +462,9 @@ async function attachStoreImages(
       .map((row) => `${row.storage_bucket}:${row.storage_path}`)
   );
   let hasPrimary = (existingMedia ?? []).some((row) => row.is_primary);
+  const variantCode = item.variant_code?.trim()
+    ? normalizedCode(item.variant_code, "DEFAULT")
+    : null;
 
   for (const image of images) {
     const identity = `${image.storageBucket}:${image.storagePath}`;
@@ -444,7 +473,7 @@ async function attachStoreImages(
     const makePrimary = !hasPrimary;
     const { error } = await supabaseAdmin.from("store_product_media").insert({
       product_content_id: productContent.id,
-      color_code: null,
+      color_code: variantCode,
       media_type: "image",
       url: image.publicUrl,
       alt_text: image.label?.trim() || item.title,
@@ -476,11 +505,18 @@ export async function approveVendorCatalogItem(
   const { data: item, error: itemError } = await supabaseAdmin
     .from("vendor_catalog_items")
     .select(
-      "id,vendor_code,external_id,sku,title,description,product_url,vendor_price_reference,vendor_currency,source_payload,canonical_product_id"
+      "id,vendor_code,external_id,sku,title,description,product_url,vendor_price_reference,vendor_currency,vendor_category_key,vendor_category_label,family_key,variant_code,variant_label,source_payload,canonical_product_id"
     )
     .eq("id", itemId)
     .maybeSingle();
   if (itemError || !item) throw itemError ?? new Error("Vendor catalog item was not found.");
+
+  const typedItem = item as VendorCatalogItemRow;
+  const mapping = await loadVendorCategoryMapping({
+    vendorCode: typedItem.vendor_code,
+    vendorCategoryKey: typedItem.vendor_category_key,
+    vendorCategoryLabel: typedItem.vendor_category_label,
+  });
 
   const { data: assetRows, error: assetsError } = await supabaseAdmin
     .from("vendor_catalog_assets")
@@ -493,25 +529,30 @@ export async function approveVendorCatalogItem(
 
   const currentAssets = (assetRows ?? []) as VendorAssetRow[];
   const normalized: NormalizedVendorProduct = {
-    vendorCode: item.vendor_code,
-    externalId: item.external_id,
-    sku: item.sku,
-    title: item.title,
-    description: item.description,
-    productUrl: item.product_url,
+    vendorCode: typedItem.vendor_code,
+    externalId: typedItem.external_id,
+    sku: typedItem.sku,
+    title: typedItem.title,
+    description: typedItem.description,
+    productUrl: typedItem.product_url,
     vendorPriceReference:
-      item.vendor_price_reference === null ? null : Number(item.vendor_price_reference),
-    vendorCurrency: item.vendor_currency,
+      typedItem.vendor_price_reference === null ? null : Number(typedItem.vendor_price_reference),
+    vendorCurrency: typedItem.vendor_currency,
+    vendorCategoryKey: typedItem.vendor_category_key,
+    vendorCategoryLabel: typedItem.vendor_category_label,
+    familyKey: typedItem.family_key || safeSku(typedItem),
+    variantCode: typedItem.variant_code,
+    variantLabel: typedItem.variant_label,
     assets: currentAssets.map<VendorAsset>((asset) => ({
       kind: asset.kind,
       url: asset.url,
       label: asset.label,
       fileType: asset.file_type,
     })),
-    sourcePayload: item.source_payload,
+    sourcePayload: typedItem.source_payload,
   };
 
-  const adapter = getVendorCatalogAdapter(item.vendor_code);
+  const adapter = getVendorCatalogAdapter(typedItem.vendor_code);
   const enriched = adapter.enrich ? await adapter.enrich(normalized) : normalized;
 
   if (enriched.assets.length > 0) {
@@ -519,7 +560,7 @@ export async function approveVendorCatalogItem(
       .from("vendor_catalog_assets")
       .upsert(
         enriched.assets.map((asset, sortOrder) => ({
-          item_id: item.id,
+          item_id: typedItem.id,
           kind: asset.kind,
           url: asset.url,
           label: asset.label ?? null,
@@ -536,7 +577,7 @@ export async function approveVendorCatalogItem(
     .select(
       "id,item_id,kind,url,label,file_type,sort_order,storage_bucket,storage_path,storage_sha256,storage_bytes"
     )
-    .eq("item_id", item.id)
+    .eq("item_id", typedItem.id)
     .order("sort_order", { ascending: true });
   if (refreshedAssetsError) throw refreshedAssetsError;
 
@@ -550,22 +591,23 @@ export async function approveVendorCatalogItem(
   const archivedImages = await mapWithConcurrency(
     images,
     ARCHIVE_CONCURRENCY,
-    (asset) => downloadAndArchiveImage(item as VendorCatalogItemRow, asset)
+    (asset) => downloadAndArchiveImage(typedItem, asset)
   );
 
   const canonicalProduct = await ensureCanonicalProduct(
-    item as VendorCatalogItemRow,
-    authorization.accessToken
+    typedItem,
+    authorization.accessToken,
+    mapping
   );
   const storeContent = await ensureStoreProductContent(
     canonicalProduct,
-    item as VendorCatalogItemRow,
+    typedItem,
     authorization.userId
   );
   await attachStoreImages(
     storeContent,
     archivedImages,
-    item as VendorCatalogItemRow,
+    typedItem,
     authorization.userId
   );
 
@@ -577,12 +619,13 @@ export async function approveVendorCatalogItem(
       snapshot_hash: stableProductHash(enriched),
       details_refreshed_at: new Date().toISOString(),
     })
-    .eq("id", item.id);
+    .eq("id", typedItem.id);
   if (itemUpdateError) throw itemUpdateError;
 
   return {
     productId: canonicalProduct.id,
     storeProductContentId: storeContent.id,
     archivedImageCount: archivedImages.length,
+    baseProductCode: canonicalProduct.base_product_code,
   };
 }

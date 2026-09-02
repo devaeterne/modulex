@@ -9,31 +9,45 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-function requestedVendors(request: Request, body?: unknown) {
+type SyncBody = {
+  vendors?: unknown;
+  vendor?: unknown;
+  categoryKey?: unknown;
+  categoryLabel?: unknown;
+  checkId?: unknown;
+  changedOnly?: unknown;
+};
+
+function requestedVendors(request: Request, body?: SyncBody) {
   const url = new URL(request.url);
   const queryVendors = url.searchParams.get("vendors")
     ?.split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
 
-  const bodyVendors =
-    body && typeof body === "object" && Array.isArray((body as { vendors?: unknown }).vendors)
-      ? ((body as { vendors: unknown[] }).vendors)
-          .filter((value): value is string => typeof value === "string")
-          .map((value) => value.trim().toLowerCase())
-          .filter(Boolean)
+  const singleVendor =
+    typeof body?.vendor === "string" && body.vendor.trim()
+      ? [body.vendor.trim().toLowerCase()]
       : undefined;
+  const bodyVendors = Array.isArray(body?.vendors)
+    ? body.vendors
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean)
+    : undefined;
 
-  return bodyVendors?.length
-    ? bodyVendors
-    : queryVendors?.length
-      ? queryVendors
-      : Object.keys(vendorCatalogRegistry);
+  return singleVendor?.length
+    ? singleVendor
+    : bodyVendors?.length
+      ? bodyVendors
+      : queryVendors?.length
+        ? queryVendors
+        : Object.keys(vendorCatalogRegistry);
 }
 
 async function handle(
   request: Request,
-  body: unknown,
+  body: SyncBody | undefined,
   allowAdminSession: boolean
 ) {
   const authorization = await authorizeVendorCatalogRequest(request, {
@@ -51,8 +65,34 @@ async function handle(
     );
   }
 
+  const categoryKey =
+    typeof body?.categoryKey === "string" && body.categoryKey.trim()
+      ? body.categoryKey.trim()
+      : null;
+  const categoryLabel =
+    typeof body?.categoryLabel === "string" && body.categoryLabel.trim()
+      ? body.categoryLabel.trim()
+      : categoryKey;
+  const checkId =
+    typeof body?.checkId === "string" && body.checkId.trim() ? body.checkId.trim() : null;
+  const changedOnly = body?.changedOnly === true;
+
+  if ((categoryKey || checkId) && vendors.length !== 1) {
+    return Response.json(
+      { error: "Category-scoped or checked sync requires exactly one vendor." },
+      { status: 400 }
+    );
+  }
+
   const results = await Promise.all(
-    vendors.map((vendor) => runVendorCatalogSync(getVendorCatalogAdapter(vendor)))
+    vendors.map((vendor) =>
+      runVendorCatalogSync(getVendorCatalogAdapter(vendor), {
+        scope: { categoryKey, categoryLabel },
+        checkId,
+        changedOnly,
+        userId: authorization.kind === "admin" ? authorization.userId : null,
+      })
+    )
   );
   const failed = results.some((result) => result.status === "FAILED");
 
@@ -71,6 +111,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => undefined);
+  const body = (await request.json().catch(() => undefined)) as SyncBody | undefined;
   return handle(request, body, true);
 }
