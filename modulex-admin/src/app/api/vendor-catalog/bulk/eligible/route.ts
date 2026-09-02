@@ -37,10 +37,14 @@ export async function GET(request: Request) {
   const reviewStatus = (url.searchParams.get("reviewStatus") || "PENDING").toUpperCase();
   const linked = url.searchParams.get("linked") || "all";
   const query = safeSearch(url.searchParams.get("query") || "");
-  const availability = (url.searchParams.get("availability") || "AVAILABLE").toUpperCase();
+  const availability = (url.searchParams.get("availability") || "all").toUpperCase();
   const changeStates = parseChangeStates(url.searchParams.get("changeStates"));
 
-  if (reviewStatus !== "PENDING" || availability !== "AVAILABLE" || changeStates.length === 0) {
+  if (
+    reviewStatus !== "PENDING" ||
+    (availability !== "ALL" && availability !== "AVAILABLE") ||
+    changeStates.length === 0
+  ) {
     return Response.json({ ids: [], total: 0 });
   }
 
@@ -97,10 +101,11 @@ export async function GET(request: Request) {
   );
 
   const ids = candidates
-    .filter((candidate) =>
-      mappingEligibility.get(
-        `${candidate.vendor_code}:${candidate.vendor_category_key ?? ""}`
-      ) === true
+    .filter(
+      (candidate) =>
+        mappingEligibility.get(
+          `${candidate.vendor_code}:${candidate.vendor_category_key ?? ""}`
+        ) === true
     )
     .map((candidate) => candidate.id);
 
