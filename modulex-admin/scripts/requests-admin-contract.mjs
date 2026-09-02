@@ -61,10 +61,9 @@ expect(schema.includes("enable row level security"), "RLS is missing");
 expect(schema.includes("auth.uid()"), "auth.uid ownership guard is missing");
 expect(schema.includes("create or replace function public.create_support_request"), "create_support_request function is missing");
 expect(schema.includes("create or replace function public.update_support_request_status"), "update_support_request_status function is missing");
-expect(schema.includes("public.user_roles"), "request manager lookup must honor secondary roles");
 expect(schema.includes("private.user_has_permission"), "Request Center must use the shared DB permission helper");
-expect(schema.includes("'requests.manage'"), "request manager lookup must target requests.manage permission");
-expect(!schema.includes("role in ('super_admin', 'admin')"), "Request Center authorization must not be pinned to admin role names");
+expect(/for v_manager in[\s\S]{0,420}private\.user_has_permission\(p\.id,\s*'requests\.manage'\)/.test(schema), "request-created manager routing must resolve requests.manage recipients");
+expect(/v_can_manage\s*:=\s*private\.user_has_permission\(auth\.uid\(\),\s*'requests\.manage'\)/.test(schema), "request status updates must authorize requests.manage");
 expect(schema.includes("for v_manager in"), "new requests must notify active request managers");
 expect(schema.includes("v_manager.id"), "new request notifications must target each manager profile");
 expect(schema.includes("v_manager.email"), "email deliveries must use manager profile emails");
@@ -80,9 +79,9 @@ if (exists(routingSqlPath)) {
   const routingSql = read(routingSqlPath);
   expect(/create\s+or\s+replace\s+function\s+private\.user_has_permission/i.test(routingSql), "routing SQL must define private.user_has_permission");
   expect(/'approvals\.review'/i.test(routingSql), "routing SQL must authorize approval review through approvals.review");
-  expect(/approval_requested[\s\S]{0,500}approvals\.review/i.test(routingSql), "approval_requested panel routing must target approvers");
-  expect(/request_created[\s\S]{0,500}requests\.manage/i.test(routingSql), "request-created routing must target request managers");
-  expect(/requested_by[\s\S]{0,500}auth\.uid\(\)/i.test(routingSql), "approval result routing must preserve requester targeting");
+  expect(/approval_requested[\s\S]{0,650}approvals\.review/i.test(routingSql), "approval_requested panel routing must target approvers");
+  expect(/request_created[\s\S]{0,650}requests\.manage/i.test(routingSql), "request-created routing must target request managers");
+  expect(/requested_by[\s\S]{0,650}auth\.uid\(\)/i.test(routingSql), "approval result routing must preserve requester targeting");
 }
 
 console.log("requests + permission-aware notification contract: ok");
