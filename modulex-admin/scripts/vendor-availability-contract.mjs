@@ -88,7 +88,7 @@ assert.match(approval, /availability_status/);
 assert.match(approval, /VendorUnavailableError/);
 assert.match(approval, /VendorReviewNotEligibleError/);
 assert.match(approval, /isVendorApprovalEligible/);
-assert.match(singleApproveRoute, /VENDOR_UNAVAILABLE/);
+assert.match(singleApproveRoute, /VendorUnavailableError/);
 assert.match(singleApproveRoute, /status:\s*409/);
 
 assert.ok(fs.existsSync(eligibleRoutePath), "bulk eligible resolver route is required");
