@@ -26,7 +26,7 @@ for (const field of logoFields) {
 expect(exists("src/components/documents/CommercialDocument.tsx"), "Shared CommercialDocument component is required");
 expect(exists("src/lib/documents/types.ts"), "Shared commercial document types are required");
 expect(exists("src/lib/documents/pdf.ts"), "Direct PDF generator is required");
-expect(exists("src/components/settings/DocumentBrandingSettings.tsx"), "Document branding settings UI is required");
+expect(exists("src/components/settings/DocumentBrandingSettings.tsx"), "Company logo variant settings UI is required");
 expect(exists("src/app/(print)/customers/[id]/orders/[orderId]/print/page.tsx"), "Order print route must use the clean print route group");
 expect(exists("src/app/(print)/customers/[id]/invoices/[invoiceId]/print/page.tsx"), "Invoice print route must use the clean print route group");
 expect(!exists("src/app/(admin)/customers/[id]/invoices/[invoiceId]/print/page.tsx"), "Invoice print route must not render inside the Admin shell");
@@ -50,15 +50,19 @@ for (const wrapper of [
   expect(source.includes("CommercialDocument"), `${wrapper} must use the shared CommercialDocument renderer`);
 }
 
+const companyPage = read("src/app/(admin)/settings/general/company/page.tsx");
 const documentsPage = read("src/app/(admin)/settings/general/documents/page.tsx");
-expect(documentsPage.includes("DocumentBrandingSettings"), "General > Documents must render branding settings");
+expect(companyPage.includes("DocumentBrandingSettings"), "General > Company must render Logo 1 / Logo 2 variant settings");
+expect(!documentsPage.includes("DocumentBrandingSettings"), "General > Documents must not duplicate company-owned logo settings");
 
 if (exists("src/components/settings/DocumentBrandingSettings.tsx")) {
   const branding = read("src/components/settings/DocumentBrandingSettings.tsx");
-  expect(!/<button\b/.test(branding), "DocumentBrandingSettings must use the shared Button primitive");
-  expect(branding.includes("on light"), "Branding UI must explain light-background logo slots");
-  expect(branding.includes("on dark"), "Branding UI must explain dark-background logo slots");
-  expect(branding.includes("dark:bg-gray-900"), "Branding settings shell must support dark theme");
+  expect(!/<button\b/.test(branding), "Logo variant settings must use the shared Button primitive");
+  expect(branding.includes('title: "Logo 1"'), "Branding UI must expose Logo 1");
+  expect(branding.includes('title: "Logo 2"'), "Branding UI must expose Logo 2");
+  expect(branding.includes("on light"), "Branding UI must expose a light-background variant");
+  expect(branding.includes("on dark"), "Branding UI must expose a dark-background variant");
+  expect(branding.includes("ADMIN_BRANDING_STYLES"), "Branding UI must use shared dark/light appearance tokens");
 }
 
 if (exists("src/lib/documents/pdf.ts")) {
