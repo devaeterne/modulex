@@ -59,8 +59,6 @@ type VendorCatalogItem = {
   availability_status: VendorAvailabilityStatus;
   vendor_available: boolean | null;
   vendor_purchasable: boolean | null;
-  vendor_stock_quantity: number | null;
-  reactivation_requires_review: boolean;
   change_state: ChangeState;
   review_status: ReviewStatus;
   canonical_product_id: string | null;
@@ -136,7 +134,7 @@ type ApproveResponse = {
   productId?: string;
   storeProductContentId?: string;
   archivedImageCount?: number;
-  code?: "CATEGORY_MAPPING_REQUIRED" | "VENDOR_UNAVAILABLE" | "VENDOR_REVIEW_NOT_ELIGIBLE";
+  code?: "CATEGORY_MAPPING_REQUIRED" | "VENDOR_CATALOG_MISSING" | "VENDOR_REVIEW_NOT_ELIGIBLE";
   availabilityStatus?: VendorAvailabilityStatus;
   vendorCode?: string;
   vendorCategoryKey?: string | null;
@@ -171,7 +169,7 @@ type MappingRequest = {
 };
 
 const VENDOR_CATALOG_SELECT =
-  "id,vendor_code,external_id,sku,title,product_url,vendor_price_reference,vendor_currency,vendor_category_key,vendor_category_label,family_key,variant_code,variant_label,availability_status,vendor_available,vendor_purchasable,vendor_stock_quantity,reactivation_requires_review,change_state,review_status,canonical_product_id,last_seen_at" as const;
+  "id,vendor_code,external_id,sku,title,product_url,vendor_price_reference,vendor_currency,vendor_category_key,vendor_category_label,family_key,variant_code,variant_label,availability_status,vendor_available,vendor_purchasable,change_state,review_status,canonical_product_id,last_seen_at" as const;
 const VENDOR_IMAGE_SELECT = "item_id,url,sort_order,storage_bucket,storage_path" as const;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const REVIEW_STATUSES: ReviewStatus[] = ["PENDING", "APPROVED", "IGNORED"];
@@ -182,7 +180,7 @@ const CHANGE_FILTERS: Array<{ state: ChangeState; label: string }> = [
   { state: "UNCHANGED", label: "Synced / Unchanged" },
 ];
 const AVAILABILITY_OPTIONS = [
-  { value: "all", label: "All stock states" },
+  { value: "all", label: "All vendor states" },
   { value: "AVAILABLE", label: "Available" },
   { value: "OUT_OF_STOCK", label: "Out of stock" },
   { value: "UNAVAILABLE", label: "Unavailable" },
@@ -520,9 +518,6 @@ export default function VendorImportsPage() {
       availability_status: row.availability_status as VendorAvailabilityStatus,
       vendor_available: row.vendor_available,
       vendor_purchasable: row.vendor_purchasable,
-      vendor_stock_quantity:
-        row.vendor_stock_quantity === null ? null : Number(row.vendor_stock_quantity),
-      reactivation_requires_review: Boolean(row.reactivation_requires_review),
       change_state: row.change_state as ChangeState,
       review_status: row.review_status as ReviewStatus,
       canonical_product_id: row.canonical_product_id,
@@ -822,7 +817,7 @@ export default function VendorImportsPage() {
       setNotice({
         variant: "info",
         title: "Update check complete",
-        message: `${totals.discovered} found · ${totals.created} new · ${totals.updated} updated · ${totals.unchanged} unchanged · ${totals.availabilityChanged} availability changes.`,
+        message: `${totals.discovered} found · ${totals.created} new · ${totals.updated} updated · ${totals.unchanged} unchanged · ${totals.availabilityChanged} vendor status changes.`,
       });
     } catch (checkError) {
       setError(checkError instanceof Error ? checkError.message : String(checkError));
@@ -870,8 +865,6 @@ export default function VendorImportsPage() {
           failed: sum.failed + result.counts.failed,
           availabilityChanged:
             sum.availabilityChanged + result.counts.availabilityChanged,
-          deactivated: sum.deactivated + result.counts.canonicalDeactivated,
-          reactivated: sum.reactivated + result.counts.canonicalReactivated,
         }),
         {
           discovered: 0,
@@ -880,14 +873,12 @@ export default function VendorImportsPage() {
           unchanged: 0,
           failed: 0,
           availabilityChanged: 0,
-          deactivated: 0,
-          reactivated: 0,
         }
       );
       setNotice({
         variant: totals.failed > 0 ? "warning" : "success",
         title: "Vendor sync complete",
-        message: `${totals.discovered} checked · ${totals.created} new · ${totals.updated} updated · ${totals.availabilityChanged} availability changes · ${totals.deactivated} deactivated · ${totals.reactivated} reactivated · ${totals.failed} failed.`,
+        message: `${totals.discovered} checked · ${totals.created} new · ${totals.updated} updated · ${totals.availabilityChanged} vendor status changes · ${totals.failed} failed.`,
       });
       setCheckResults([]);
       clearSelection();
@@ -943,7 +934,7 @@ export default function VendorImportsPage() {
       setNotice({
         variant: totals.failed > 0 ? "warning" : "success",
         title: "Full rescan complete",
-        message: `${totals.discovered} found · ${totals.availabilityChanged} availability changes · ${totals.failed} failed.`,
+        message: `${totals.discovered} found · ${totals.availabilityChanged} vendor status changes · ${totals.failed} failed.`,
       });
       setCheckResults([]);
       clearSelection();
@@ -1003,11 +994,11 @@ export default function VendorImportsPage() {
           });
           return;
         }
-        if (response.status === 409 && payload.code === "VENDOR_UNAVAILABLE") {
+        if (response.status === 409 && payload.code === "VENDOR_CATALOG_MISSING") {
           setNotice({
             variant: "warning",
-            title: "Vendor product is unavailable",
-            message: payload.error || "The vendor no longer allows this product to be approved.",
+            title: "Vendor product is missing",
+            message: payload.error || "The product is no longer present in the authoritative vendor catalog.",
           });
           await Promise.all([loadItems(), loadEligibility()]);
           return;
@@ -1046,7 +1037,7 @@ export default function VendorImportsPage() {
         .eq("vendor_code", item.vendor_code)
         .eq("family_key", item.family_key)
         .eq("review_status", "PENDING")
-        .eq("availability_status", "AVAILABLE")
+        .neq("availability_status", "MISSING")
         .order("sku", { ascending: true });
       if (familyError) throw familyError;
       await approveIds((data ?? []).map((row) => row.id));
@@ -1091,7 +1082,7 @@ export default function VendorImportsPage() {
       setNotice({
         variant: skipped > 0 || failed > 0 ? "warning" : "success",
         title: "Bulk approval complete",
-        message: `${approved} approved · ${skipped} skipped · ${failed} failed. Unavailable or unmapped products were not imported.`,
+        message: `${approved} approved · ${skipped} skipped · ${failed} failed. Missing catalog rows or unmapped products were not imported.`,
       });
       clearSelection();
       await Promise.all([loadItems(), loadEligibility()]);
@@ -1213,8 +1204,8 @@ export default function VendorImportsPage() {
 
       <Alert
         variant="warning"
-        title="Pricing and publication boundary"
-        message="Vendor availability controls approval eligibility, but it is not Modulex warehouse inventory. Vendor prices are reference data only and Store publication still requires a valid Modulex selling price greater than zero."
+        title="Pricing, stock and publication boundary"
+        message="Vendor status is reference data only. Stock status does not block approval; staff confirm vendor stock separately. Vendor prices are reference data only and Store publication still requires a valid Modulex selling price greater than zero."
       />
 
       {notice ? <Alert variant={notice.variant} title={notice.title} message={notice.message} /> : null}
@@ -1222,7 +1213,7 @@ export default function VendorImportsPage() {
 
       <ComponentCard
         title="Vendor sync controls"
-        desc="Choose a website and optional vendor category. Availability changes are tracked separately from content changes and can deactivate or safely reactivate linked canonical SKUs."
+        desc="Choose a website and optional vendor category. Vendor status changes are tracked separately from content changes and never alter canonical product status."
       >
         <div className="grid gap-4 lg:grid-cols-2">
           <div>
@@ -1279,7 +1270,7 @@ export default function VendorImportsPage() {
             <Badge size="sm" color="success">New {checkTotals.created}</Badge>
             <Badge size="sm" color="warning">Updated {checkTotals.updated}</Badge>
             <Badge size="sm" color="light">Unchanged {checkTotals.unchanged}</Badge>
-            <Badge size="sm" color="primary">Availability changed {checkTotals.availabilityChanged}</Badge>
+            <Badge size="sm" color="primary">Vendor status changed {checkTotals.availabilityChanged}</Badge>
             <Badge size="sm" color="success">Available {checkTotals.available}</Badge>
             <Badge size="sm" color="error">Out of stock {checkTotals.outOfStock}</Badge>
             <Badge size="sm" color="error">Unavailable {checkTotals.unavailable}</Badge>
@@ -1393,7 +1384,7 @@ export default function VendorImportsPage() {
 
       <ComponentCard
         title="Vendor catalog review"
-        desc="Filter by vendor availability, select approval-eligible rows, and approve in bounded batches. Unavailable products remain visible for tracking but cannot be imported."
+        desc="Filter vendor status for reference, select review-eligible rows, and approve in bounded batches. Stock status does not block approval; only products missing from the vendor catalog remain blocked."
       >
         <form
           onSubmit={handleSearch}
@@ -1446,7 +1437,7 @@ export default function VendorImportsPage() {
             />
           </div>
           <div>
-            <Label htmlFor="vendor-review-availability">Stock / Availability</Label>
+            <Label htmlFor="vendor-review-availability">Vendor status</Label>
             <Select
               id="vendor-review-availability"
               value={availabilityFilter}
@@ -1455,7 +1446,7 @@ export default function VendorImportsPage() {
                 setAvailabilityFilter(value as AvailabilityFilter);
                 resetReviewScope();
               }}
-              ariaLabel="Filter vendor imports by availability"
+              ariaLabel="Filter vendor imports by vendor status"
             />
           </div>
           <div>
@@ -1588,7 +1579,7 @@ export default function VendorImportsPage() {
                 <TableCell isHeader variant="admin">Image</TableCell>
                 <TableCell isHeader variant="admin">Vendor / Category</TableCell>
                 <TableCell isHeader variant="admin">State</TableCell>
-                <TableCell isHeader variant="admin">Availability</TableCell>
+                <TableCell isHeader variant="admin">Vendor status</TableCell>
                 <TableCell isHeader variant="admin">Family / Variant</TableCell>
                 <TableCell isHeader variant="admin">SKU</TableCell>
                 <TableCell isHeader variant="admin">Product</TableCell>
@@ -1612,7 +1603,7 @@ export default function VendorImportsPage() {
                   const incompleteApproval =
                     item.review_status === "APPROVED" && !item.canonical_product_id;
                   const approvalEligible = eligibleSet.has(item.id);
-                  const vendorAvailable = item.availability_status === "AVAILABLE";
+                  const catalogPresent = item.availability_status !== "MISSING";
                   return (
                     <TableRow key={item.id} className="align-middle">
                       <TableCell variant="admin">
@@ -1650,19 +1641,9 @@ export default function VendorImportsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell variant="admin">
-                        <div className="flex flex-col items-start gap-1">
-                          <Badge size="sm" color={availabilityBadgeColor(item.availability_status)}>
-                            {availabilityLabel(item.availability_status)}
-                          </Badge>
-                          {item.vendor_stock_quantity !== null ? (
-                            <span className="text-xs opacity-70">
-                              Vendor qty ref: {item.vendor_stock_quantity}
-                            </span>
-                          ) : null}
-                          {item.reactivation_requires_review ? (
-                            <Badge size="sm" color="warning">Reactivation review</Badge>
-                          ) : null}
-                        </div>
+                        <Badge size="sm" color={availabilityBadgeColor(item.availability_status)}>
+                          {availabilityLabel(item.availability_status)}
+                        </Badge>
                       </TableCell>
                       <TableCell variant="admin">
                         <span className="block font-mono text-xs">{item.family_key ?? "—"}</span>
@@ -1726,7 +1707,7 @@ export default function VendorImportsPage() {
                           {incompleteApproval ? (
                             <Button
                               size="sm"
-                              disabled={updatingId === item.id || !vendorAvailable || bulkApproving}
+                              disabled={updatingId === item.id || !catalogPresent || bulkApproving}
                               onClick={() => void approveIds([item.id])}
                             >
                               Complete Import
@@ -1735,11 +1716,11 @@ export default function VendorImportsPage() {
                           {reviewStatus !== "APPROVED" ? (
                             <Button
                               size="sm"
-                              disabled={updatingId === item.id || !vendorAvailable || bulkApproving}
+                              disabled={updatingId === item.id || !catalogPresent || bulkApproving}
                               onClick={() => void setStatus(item.id, "APPROVED")}
                             >
-                              {!vendorAvailable
-                                ? "Vendor unavailable"
+                              {!catalogPresent
+                                ? "Missing from catalog"
                                 : updatingId === item.id
                                   ? "Approving…"
                                   : "Approve SKU"}
@@ -1749,10 +1730,10 @@ export default function VendorImportsPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              disabled={updatingId === item.id || !vendorAvailable || bulkApproving}
+                              disabled={updatingId === item.id || !catalogPresent || bulkApproving}
                               onClick={() => void approveFamily(item)}
                             >
-                              Approve Available Family
+                              Approve Family
                             </Button>
                           ) : null}
                           {reviewStatus !== "IGNORED" ? (

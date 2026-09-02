@@ -7,13 +7,13 @@ import {
 } from "@/lib/vendor-catalog/domain";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
-export class VendorUnavailableError extends Error {
-  readonly code = "VENDOR_UNAVAILABLE";
+export class VendorCatalogMissingError extends Error {
+  readonly code = "VENDOR_CATALOG_MISSING";
   readonly availabilityStatus: VendorAvailabilityStatus;
 
   constructor(status: VendorAvailabilityStatus) {
-    super(`Vendor product is not approval-eligible while availability is ${status}.`);
-    this.name = "VendorUnavailableError";
+    super("Vendor product is no longer present in the authoritative vendor catalog.");
+    this.name = "VendorCatalogMissingError";
     this.availabilityStatus = status;
   }
 }
@@ -91,7 +91,7 @@ async function waitForConcurrentApproval(itemId: string) {
     const state = await loadApprovalState(itemId);
     if (state.review_status === "IGNORED") throw new VendorReviewNotEligibleError();
     if (!isVendorApprovalEligible(state.availability_status)) {
-      throw new VendorUnavailableError(state.availability_status);
+      throw new VendorCatalogMissingError(state.availability_status);
     }
     const completed = await loadCompletedApproval(state);
     if (completed) return completed;
@@ -100,14 +100,14 @@ async function waitForConcurrentApproval(itemId: string) {
   return null;
 }
 
-export async function approveAvailableVendorCatalogItem(
+export async function approveReviewableVendorCatalogItem(
   itemId: string,
   authorization: Authorization
 ): Promise<CompletedApproval> {
   const state = await loadApprovalState(itemId);
   if (state.review_status === "IGNORED") throw new VendorReviewNotEligibleError();
   if (!isVendorApprovalEligible(state.availability_status)) {
-    throw new VendorUnavailableError(state.availability_status);
+    throw new VendorCatalogMissingError(state.availability_status);
   }
 
   const completed = await loadCompletedApproval(state);

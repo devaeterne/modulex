@@ -14,10 +14,6 @@ import {
 } from "@/lib/vendor-catalog/domain";
 import { loadVendorCatalogCheck } from "@/lib/vendor-catalog/check";
 import {
-  reconcileVendorAvailability,
-  type VendorAvailabilityReconcileItem,
-} from "@/lib/vendor-catalog/availability";
-import {
   isSupabaseAdminConfigured,
   supabaseAdmin,
 } from "@/lib/supabase/server-admin";
@@ -38,7 +34,8 @@ type SyncCounts = {
   canonicalReactivated: number;
 };
 
-type ExistingItem = VendorAvailabilityReconcileItem & {
+type ExistingItem = {
+  id: string;
   external_id: string;
   snapshot_hash: string;
   discovery_hash: string | null;
@@ -132,7 +129,7 @@ async function loadExistingItems(vendorCode: string) {
     const { data, error } = await supabaseAdmin
       .from("vendor_catalog_items")
       .select(
-        "id,external_id,snapshot_hash,discovery_hash,review_status,details_refreshed_at,vendor_category_key,vendor_category_label,family_key,variant_code,variant_label,canonical_product_id,availability_status,availability_hash,availability_changed_at,missing_success_count,canonical_inactivated_by_vendor_at,canonical_status_version_at,reactivation_requires_review"
+        "id,external_id,snapshot_hash,discovery_hash,review_status,details_refreshed_at,vendor_category_key,vendor_category_label,family_key,variant_code,variant_label,availability_status,availability_hash,availability_changed_at,missing_success_count"
       )
       .eq("vendor_code", vendorCode)
       .range(from, from + pageSize - 1);
@@ -216,23 +213,6 @@ function isAuthoritativeFullDiscovery(
   return true;
 }
 
-async function reconcileObservedAvailability(
-  entries: PreparedProduct[],
-  counts: SyncCounts,
-  now: string
-) {
-  for (const entry of entries) {
-    if (!entry.existing) continue;
-    const result = await reconcileVendorAvailability(
-      entry.existing,
-      entry.product.availability.status,
-      now
-    );
-    if (result.deactivated) counts.canonicalDeactivated += 1;
-    if (result.reactivated) counts.canonicalReactivated += 1;
-  }
-}
-
 async function reconcileMissingItems(
   products: NormalizedVendorProduct[],
   existingByExternalId: Map<string, ExistingItem>,
@@ -277,10 +257,6 @@ async function reconcileMissingItems(
     if (!becomesMissing) continue;
     counts.missing += 1;
     if (availabilityChanged) counts.availabilityChanged += 1;
-
-    const result = await reconcileVendorAvailability(existing, "MISSING", now);
-    if (result.deactivated) counts.canonicalDeactivated += 1;
-    if (result.reactivated) counts.canonicalReactivated += 1;
   }
 }
 
@@ -474,10 +450,6 @@ export async function runVendorCatalogSync(
       if (snapshotBatch.length === 0) continue;
       const { error } = await supabaseAdmin.from("vendor_catalog_snapshots").insert(snapshotBatch);
       if (error) throw error;
-    }
-
-    if (counts.failed === 0) {
-      await reconcileObservedAvailability(prepared, counts, now);
     }
 
     if (isAuthoritativeFullDiscovery(adapter, categoryKey, products) && counts.failed === 0) {

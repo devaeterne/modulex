@@ -148,7 +148,7 @@ export function stableAvailabilityHash(product: NormalizedVendorProduct) {
 }
 
 export function isVendorApprovalEligible(status: VendorAvailabilityStatus) {
-  return status === "AVAILABLE";
+  return status !== "MISSING";
 }
 
 export function classifyVendorProduct(

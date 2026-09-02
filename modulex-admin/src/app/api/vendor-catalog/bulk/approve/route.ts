@@ -1,7 +1,7 @@
 import {
-  approveAvailableVendorCatalogItem,
+  approveReviewableVendorCatalogItem,
+  VendorCatalogMissingError,
   VendorReviewNotEligibleError,
-  VendorUnavailableError,
 } from "@/lib/vendor-catalog/approval";
 import { authorizeVendorCatalogAdmin } from "@/lib/vendor-catalog/auth";
 import { CategoryMappingRequiredError } from "@/lib/vendor-catalog/mappings";
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     concurrency,
     async (itemId) => {
       try {
-        const approved = await approveAvailableVendorCatalogItem(itemId, authorization);
+        const approved = await approveReviewableVendorCatalogItem(itemId, authorization);
         return {
           itemId,
           status: "APPROVED",
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
           storeProductContentId: approved.storeProductContentId,
         };
       } catch (error) {
-        if (error instanceof VendorUnavailableError) {
+        if (error instanceof VendorCatalogMissingError) {
           return {
             itemId,
             status: "SKIPPED",

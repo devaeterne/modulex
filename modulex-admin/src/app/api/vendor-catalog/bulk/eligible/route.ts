@@ -7,6 +7,13 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 500;
 const CHANGE_STATES = new Set(["NEW", "UPDATED", "UNCHANGED"]);
+const AVAILABILITY_STATES = new Set([
+  "AVAILABLE",
+  "OUT_OF_STOCK",
+  "UNAVAILABLE",
+  "UNKNOWN",
+  "MISSING",
+]);
 
 function safeSearch(value: string) {
   return value.trim().replace(/[,%()]/g, " ").replace(/\s+/g, " ");
@@ -42,7 +49,8 @@ export async function GET(request: Request) {
 
   if (
     reviewStatus !== "PENDING" ||
-    (availability !== "ALL" && availability !== "AVAILABLE") ||
+    (availability !== "ALL" && !AVAILABILITY_STATES.has(availability)) ||
+    availability === "MISSING" ||
     changeStates.length === 0
   ) {
     return Response.json({ ids: [], total: 0 });
@@ -54,11 +62,12 @@ export async function GET(request: Request) {
       .from("vendor_catalog_items")
       .select("id,vendor_code,vendor_category_key,vendor_category_label")
       .eq("review_status", "PENDING")
-      .eq("availability_status", "AVAILABLE")
+      .neq("availability_status", "MISSING")
       .in("change_state", changeStates)
       .order("last_seen_at", { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
 
+    if (availability !== "ALL") dbQuery = dbQuery.eq("availability_status", availability);
     if (vendor !== "all") dbQuery = dbQuery.eq("vendor_code", vendor);
     if (category !== "all") dbQuery = dbQuery.eq("vendor_category_key", category);
     if (linked === "linked") dbQuery = dbQuery.not("canonical_product_id", "is", null);
