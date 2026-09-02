@@ -7,13 +7,14 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const read = (relative) => readFile(path.join(root, relative), "utf8");
 
-const [globalLightbox, projectGallery, navbar, leadForm, contentQueries, storeIcon] = await Promise.all([
+const [globalLightbox, projectGallery, navbar, leadForm, contentQueries, storeIcon, globalStyles] = await Promise.all([
   read("src/components/GalleryLightbox.tsx"),
   read("src/components/gallery/StoreProjectsGallery.tsx"),
   read("src/components/Navbar.tsx"),
   read("src/components/leads/LeadForm.tsx"),
   read("src/lib/store/content/queries.ts"),
   read("src/components/StoreIcon.tsx"),
+  read("src/css/style.css"),
 ]);
 
 // Global legacy lightbox must not expose inactive controls to assistive tech/focus order.
@@ -60,5 +61,12 @@ assert.match(contentQueries, /if\s*\(\s*!altText\s*\)\s*return\s+null/, "Project
 assert.match(leadForm, /role="alert"/, "Lead form errors must remain announced");
 assert.match(leadForm, /role="status"\s+aria-live="polite"/, "Lead form success state must remain announced");
 assert.match(leadForm, /htmlFor=\{`\$\{type\}-email`\}/, "Lead form email input must retain an explicit label association");
+
+// Motion-heavy legacy styling must respect the user's OS-level reduced-motion preference.
+assert.match(globalStyles, /@media\s*\(prefers-reduced-motion:\s*reduce\)/, "Global Store styles must provide a reduced-motion media query");
+assert.match(globalStyles, /animation-duration:\s*0\.01ms\s*!important/, "Reduced-motion mode must collapse animation duration");
+assert.match(globalStyles, /animation-iteration-count:\s*1\s*!important/, "Reduced-motion mode must prevent repeated animation loops");
+assert.match(globalStyles, /transition-duration:\s*0\.01ms\s*!important/, "Reduced-motion mode must collapse transition duration");
+assert.match(globalStyles, /scroll-behavior:\s*auto\s*!important/, "Reduced-motion mode must disable smooth scrolling behavior");
 
 console.log("GC-8B accessibility contract: PASS");
