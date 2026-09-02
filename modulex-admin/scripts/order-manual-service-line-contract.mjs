@@ -33,7 +33,9 @@ assert(!/default_uom_id\s*=\s*'[0-9a-f]{8}-[0-9a-f-]{27,}'/i.test(migration), "S
 assert(/product_types[\s\S]*'SERVICE'[\s\S]*'manual_service'/i.test(migration), "Service Product Type must be seeded by stable SERVICE code");
 assert(/products[\s\S]*'SERVICE'[\s\S]*'Service'/i.test(migration), "canonical Service product must be seeded by stable SERVICE SKU/name");
 assert(!/insert\s+into\s+public\.product_prices/i.test(migration), "canonical Service product must not receive a Product Group price");
-assert(!/insert\s+into\s+public\.product_categories/i.test(migration), "Service migration must resolve the existing active Service category and fail closed instead of creating or reactivating categories");
+assert(/insert\s+into\s+public\.product_categories\s*\([^)]*name[^)]*status[^)]*\)[\s\S]*values\s*\(\s*'Service'\s*,\s*'active'\s*\)[\s\S]*on\s+conflict\s*\(\s*name\s*\)\s+do\s+nothing/i.test(migration), "Service migration must create a missing active Service category by stable name without rewriting an existing category");
+assert(/product_categories[\s\S]*name\s*=\s*'Service'[\s\S]*status\s*=\s*'active'/i.test(migration), "Service migration must resolve and validate the active Service category after bootstrap");
+assert(!/on\s+conflict\s*\(\s*name\s*\)\s+do\s+update[\s\S]{0,240}status/i.test(migration), "Service migration must not silently reactivate or redefine an existing Service category");
 
 for (const token of [
   "private.enforce_customer_order_item_pricing_v2",
