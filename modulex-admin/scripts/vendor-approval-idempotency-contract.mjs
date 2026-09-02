@@ -39,6 +39,7 @@ assert.match(listPriceTriggerSql, /pg_advisory_xact_lock/i);
 assert.match(listPriceTriggerSql, /set is_active\s*=\s*false[\s\S]*valid_to\s*=\s*v_now/i);
 assert.match(listPriceTriggerSql, /insert into public\.product_prices/i);
 assert.match(listPriceTriggerSql, /after update of review_status, canonical_product_id/i);
+assert.doesNotMatch(listPriceTriggerSql, /after update of[^\n]*vendor_price_reference/i);
 assert.match(listPriceTriggerSql, /new\.review_status\s*=\s*'APPROVED'/i);
 assert.match(listPriceTriggerSql, /old\.review_status is distinct from new\.review_status/i);
 assert.match(listPriceTriggerSql, /old\.canonical_product_id is distinct from new\.canonical_product_id/i);
