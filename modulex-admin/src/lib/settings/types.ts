@@ -3,6 +3,10 @@ export type GeneralSettings = {
   company_name: string;
   legal_name: string | null;
   logo_url: string | null;
+  primary_logo_on_light_url: string | null;
+  primary_logo_on_dark_url: string | null;
+  secondary_logo_on_light_url: string | null;
+  secondary_logo_on_dark_url: string | null;
   tax_number: string | null;
   registration_number: string | null;
   email: string | null;
@@ -30,6 +34,10 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   company_name: "Your Company",
   legal_name: null,
   logo_url: null,
+  primary_logo_on_light_url: null,
+  primary_logo_on_dark_url: null,
+  secondary_logo_on_light_url: null,
+  secondary_logo_on_dark_url: null,
   tax_number: null,
   registration_number: null,
   email: null,
