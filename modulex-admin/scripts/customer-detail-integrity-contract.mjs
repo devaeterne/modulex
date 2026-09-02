@@ -5,9 +5,11 @@ import process from "node:process";
 const root = process.cwd();
 const pagePath = path.join(root, "src/app/(admin)/customers/[id]/page.tsx");
 const cardPath = path.join(root, "src/components/customers/CustomerCard.tsx");
+const documentsPanelPath = path.join(root, "src/components/customers/CustomerDocumentsPanel.tsx");
 const orderActionsPath = path.join(root, "src/components/customers/CustomerOrderActions.tsx");
 const customerInstallationsPath = path.join(root, "src/app/(admin)/customers/[id]/installations/page.tsx");
 const portalCardPath = path.join(root, "src/components/customers/CustomerPortalAccessCard.tsx");
+const readDedupPath = path.join(root, "src/lib/customers/read-dedup.ts");
 const sqlPath = path.join(root, "sql/customer-address-integrity.sql");
 const packagePath = path.join(root, "package.json");
 
@@ -25,9 +27,11 @@ function requireNoMatch(source, pattern, message) {
 
 const page = read(pagePath);
 const card = read(cardPath);
+const documentsPanel = read(documentsPanelPath);
 const orderActions = read(orderActionsPath);
 const customerInstallations = read(customerInstallationsPath);
 const portalCard = read(portalCardPath);
+const readDedup = read(readDedupPath);
 const sql = read(sqlPath);
 const pkg = JSON.parse(read(packagePath));
 
@@ -41,6 +45,15 @@ requireNoMatch(card, /\.from\(["']customer_portal_users["']\)\.(insert|update|de
 requireNoMatch(card, /saveCustomer\s*\(\s*\{\s*portal_enabled/, "CustomerCard must not toggle portal_enabled through a generic customer update.");
 requireMatch(portalCard, /\/api\/admin\/dealer-portal/, "The dedicated portal card must use the secure Admin lifecycle API.");
 requireMatch(portalCard, />Store Portal Access</, "The secure lifecycle surface must use customer-type-neutral portal wording.");
+
+requireMatch(readDedup, /export\s+function\s+loadCustomerRecord\b/, "Customer detail must expose a shared in-flight customer read helper.");
+requireMatch(readDedup, /export\s+function\s+loadCustomerDocuments\b/, "Customer detail must expose a shared in-flight document read helper.");
+requireMatch(card, /loadCustomerRecord\(customerId\)/, "CustomerCard must consume the shared customer read helper.");
+requireMatch(card, /loadCustomerDocuments\(customerId\)/, "CustomerCard must consume the shared document read helper.");
+requireMatch(portalCard, /loadCustomerRecord\(customerId\)/, "CustomerPortalAccessCard must reuse the shared customer read helper.");
+requireNoMatch(portalCard, /from\(["']customers["']\)[\s\S]{0,120}select\(["']portal_enabled["']\)/, "Portal card must not issue a second customer read on initial detail load.");
+requireMatch(documentsPanel, /loadCustomerDocuments\(customerId\)/, "CustomerDocumentsPanel must reuse the shared document read helper.");
+requireNoMatch(documentsPanel, /from\(["']customer_documents["']\)[\s\S]{0,120}select\(["']\*["']\)/, "CustomerDocumentsPanel must not issue an independent active-document read.");
 
 requireMatch(card, /supabase\.rpc\(\s*["']create_customer_address["']/, "Address creation must use the atomic create_customer_address RPC.");
 requireMatch(card, /supabase\.rpc\(\s*["']set_customer_address_default["']/, "Existing addresses must support atomic default assignment through set_customer_address_default.");
