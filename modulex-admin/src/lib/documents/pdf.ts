@@ -166,8 +166,8 @@ function renderLine(item: CommercialDocumentLine, y: number) {
 
 function pageChunks(lines: CommercialDocumentLine[]) {
   const chunks: CommercialDocumentLine[][] = [];
-  const firstCapacity = 16;
-  const nextCapacity = 25;
+  const firstCapacity = 10;
+  const nextCapacity = 13;
   let cursor = 0;
   chunks.push(lines.slice(cursor, cursor + firstCapacity));
   cursor += firstCapacity;
