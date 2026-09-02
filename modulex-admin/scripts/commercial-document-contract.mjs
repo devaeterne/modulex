@@ -35,12 +35,16 @@ if (exists("src/components/documents/CommercialDocument.tsx")) {
   const component = read("src/components/documents/CommercialDocument.tsx");
   expect(component.includes("Print"), "CommercialDocument must expose Print");
   expect(component.includes("Download PDF"), "CommercialDocument must expose Download PDF");
-  expect(component.includes("dark:"), "Commercial document viewer must support dark theme chrome");
   expect(component.includes("print:"), "CommercialDocument must contain print-specific styling");
-  expect(component.includes("dark:bg-white"), "A4 sheet must remain white in dark mode");
+  expect(component.includes("ADMIN_DOCUMENT_STYLES"), "CommercialDocument must use shared dark/light document appearance tokens");
   expect(component.includes("primary_logo_on_light_url"), "A4 renderer must use the primary on-light logo slot");
   expect(component.includes("secondary_logo_on_light_url"), "A4 renderer must use the secondary on-light logo slot");
 }
+
+const adminTheme = read("src/components/ui/theme/adminTheme.ts");
+expect(adminTheme.includes("ADMIN_DOCUMENT_STYLES"), "Shared document appearance tokens must exist");
+expect(adminTheme.includes("dark:bg-gray-950"), "Document viewer theme must support dark mode");
+expect(adminTheme.includes("dark:bg-white"), "A4 sheet must remain white in dark mode");
 
 for (const wrapper of [
   "src/components/customers/CustomerOrderPrint.tsx",
