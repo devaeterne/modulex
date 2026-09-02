@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-02
-Main baseline: `7af213729f8586a1cdc38d8baac1b47ba60ebee2`
+Main baseline: `6bd39e6abcdd67aafb41d4ab6307f978479ffac7`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current Admin next action: **Review/merge Vendor Catalog availability/bulk approval, then apply `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval`, run post-DDL advisors, deploy Admin, and perform signed-in sync/mapping/availability/bulk-approval acceptance.**
@@ -13,17 +13,22 @@ Current Admin next action: **Review/merge Vendor Catalog availability/bulk appro
 
 ## Product Master UX v2
 
-- [~] Dynamic Product Types, Units of Measure, Product create/edit/list, QR compatibility, Brands/Categories usage-aware UX, and type/UOM-aware Low Stock.
-  - PR #190 and advisor-hardening PR #191 are merged/deployed; production Product Master migrations, DB/runtime acceptance, canonical type/UOM backfill, and post-migration advisor verification are complete. Signed-in browser click-through remains the only unclosed Product Master UX acceptance item, so this row is not marked `[x]` yet.
+- [x] Dynamic Product Types, Units of Measure, Product create/edit/list, QR compatibility, Brands/Categories usage-aware UX, and type/UOM-aware Low Stock.
+  - PR #190 and advisor-hardening PR #191 are merged/deployed; production Product Master migrations, DB/runtime acceptance, canonical type/UOM backfill, and post-migration advisor verification are complete.
+  - Final production closeout on 2026-09-02 verified current-main route bundles, authenticated Product Master v2/Low Stock data boundaries, 1,031 production products with 0 missing Product Type/UOM assignments, fresh Product Master CI, and no Product Master route-family runtime errors in the inspected window.
+  - The project owner completed and accepted the required signed-in browser click-through across Products list/Create/Edit, Product Types, Units of Measure, Brands/Categories, and Low Stock. Detailed evidence: `docs/acceptance/product-master-v2-production.md`.
 
 ## Pricing UI v2 — Product Type routing
 
-- [~] Route Admin pricing workspaces through `product_types.pricing_model` without moving price amounts into Product Type or UOM.
+- [x] Route Admin pricing workspaces through `product_types.pricing_model` without moving price amounts into Product Type or UOM.
   - `price_group` remains canonical on `product_prices + price_groups`; `countertop_material_band` remains canonical on Stone profile → `countertop_material_price_bands`; `none` exposes no editable commercial product price. UOM remains quantity/measurement semantics only.
   - PR #206 adds Product Type/UOM-aware server-side Product Prices filtering, the focused `/pricing/material-bands` rate workspace, and a DB-authoritative guard that rejects new Price Group amounts for non-`price_group` Product Types while retaining an explicit null-cleanup path for legacy rows.
-  - Rollback-only production-schema acceptance passed before merge: only `price_group` products are returned by the v2 directory, sort order is preserved, Stone price writes fail closed, canonical Material Band mutation works, rollback leaves the v2 function unapplied, and production B1–R22 values remain unchanged. No production business data mutation persisted.
-  - Fresh post-`main` sync Admin Products Pricing workflow run `33451480069` passed Product/Pricing UI contract, Product Type pricing contract, production-surface regression, RBAC, lint, and production build on branch head `016cccdc94aec8ab0fd19c7a889f48c8e3d69ae6`.
-  - Production contains the Product Type pricing routing migration and the exact #206 merge-SHA Admin deployment is READY. This row remains `[~]` only because authenticated Product Prices/Material Bands acceptance and post-DDL Security + Performance Advisor closeout were not independently reproduced in this session; do not re-run the migration or re-invent pricing behavior.
+  - Fresh production closeout on 2026-09-02 reproduced the authenticated application-role acceptance after merge: `get_product_prices_page_v2` returned 1,029 routable `price_group` products, with routing reconciliation of 1,029 `price_group`, 1 `countertop_material_band`, and 0 `none` products; sampled rows and Product Type/UOM filters matched the routing contract.
+  - Rollback-only authenticated mutation acceptance proved a Stone/material-band product is rejected by `set_product_price` with `This Product Type does not use Price Group pricing.`, while the canonical `upsert_countertop_reference('material_band', ...)` path succeeds for existing B1. Rollback left B1 unchanged at $34 and persisted no business-data mutation.
+  - Production migration history contains `pricing_product_type_routing` (`20260831235918`). Relevant public RPCs remain `SECURITY INVOKER`, authenticated-executable, and anon-denied; the private Material Band mutation core remains role-checked with a pinned search path.
+  - Current-main Admin deployment `dpl_Pn56aQhDGKAXprs7K2bUXJdKwFNg` is `READY`; `/pricing/products` and `/pricing/material-bands` both return HTTP 200 with the expected Modulex bundles/titles, and no runtime errors were found for either route in the inspected 24-hour window.
+  - Fresh Security + Performance Advisor scans show no Pricing UI v2-specific finding. Existing Store/support/security and unrelated FK/index/policy backlog remains separate and does not block this closeout.
+  - Permanent CI evidence remains green from PR #206 (`33451480069`) and final Pricing workspace polish PR #211 (`33453776288`). Detailed evidence: `docs/acceptance/pricing-ui-v2-production.md`.
   - Store public/Dealer projection behavior is unchanged by this package; the migration lives in the shared Supabase migration directory but does not widen Store data exposure, so `STORE_ROADMAP.md` requires no functional status change for this package.
 
 ## Vendor Catalog Review v3
@@ -134,7 +139,7 @@ These rules are mandatory for all future Modulex Admin work:
   - Removed the explicit `/error-404` TailAdmin template route, rebranded the global Next.js 404 as Modulex Admin, and removed the `info@dasoft.me` sign-in prefill in favor of an empty production login field.
   - `smoke:production-surface` now prevents the explicit template 404 route, TailAdmin branding in the global 404, and the known developer-account prefill from returning.
   - TDD evidence: Actions run `33254287380` failed on the still-present explicit TailAdmin 404 route before implementation; targeted GREEN run `33254350807` passed after the bounded fixes.
-  - Full package verification: Actions run `33254494898` passed production-surface, RBAC, secondary CMS, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
+  - Full package verification: Actions run `33254494898` passed production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
 
 - [x] Add an Admin production-surface contract test.
   - `scripts/admin-production-surface-contract.mjs` blocks the known demo route files and `/api-test` navigation, protects the intentional `/profile` surface, and guards the production 404/login shell against known template/developer residue.
@@ -206,7 +211,7 @@ These rules are mandatory for all future Modulex Admin work:
   - Production-surface contract plus the production build guard the removed route set, Modulex-branded global 404, and empty production sign-in state.
 - [x] Phase A0 production acceptance is deployed on current `main`.
   - PR #114 merged as `978df97c9fd56e75eed2c5d1972d7b86fbc07fcd`; its final Codex review found no major issues.
-  - PR #115 then advanced `main` to `e1bb780b1c5bbaed3bca4a5e82bebecb5c010365`; Admin Vercel production deployment `dpl_47gPYNow2GpAeQwGnLRVBYQBTr61` is `READY` from that exact SHA and serves `admin.oakwellcabinetry.com`.
+  - PR #115 then advanced `main` to `e1bb780b1c5bbaed3bca4a5e82bebec5c010365`; Admin Vercel production deployment `dpl_47gPYNow2GpAeQwGnLRVBYQBTr61` is `READY` from that exact SHA and serves `admin.oakwellcabinetry.com`.
 
 ---
 
@@ -770,7 +775,9 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] A2.2 inventory/movement production acceptance is complete: server-side inventory discovery, explicit On Hand/Reserved/Available semantics, idempotent mutation RPCs, append-only/reversal audit contracts, production migrations, advisor review, Admin deployment verification, and final application-role TRUNCATE revocation are covered by PR #173 plus closeout PR #174.
 - [x] A2.3 stock operations/scanning acceptance is complete: existing stock writes remain on A2.2 idempotent RPCs; camera repeated-frame suppression and serialized processing, guided confirmation/error handling, QR label printing, hardware/manual fallback, responsive warehouse behavior, and clean production QR/barcode integrity are covered by the permanent A2.3 gate.
 - [x] A3.1 product master production acceptance is complete: canonical family/color/taxonomy enforcement, protected lifecycle mutation, full filtered export, production migrations, mirror reconciliation, advisor review, authenticated DB smoke, and deployed `/products` verification are recorded in `docs/acceptance/a3-1-product-master-data.md`.
+- [x] Product Master UX v2 final production acceptance is complete: current-main Product Master routes/bundles and authenticated v2 boundaries were verified, production has 1,031 products with no missing Product Type/UOM assignments, current CI/runtime checks are clean, and the required signed-in visual click-through was accepted on 2026-09-02. Detailed evidence: `docs/acceptance/product-master-v2-production.md`.
 - [x] A3.3 pricing production acceptance is complete: the pricing hardening migration is applied, base-group/effective-period/audit contracts pass rollback-only production probes, authenticated price mutation acceptance passes, Dealer pricing remains assigned-group/no-fallback, production pricing routes return 200, and no A3.3-specific advisor finding was introduced.
+- [x] Pricing UI v2 final production acceptance is complete: Product Type routing was re-verified under authenticated production role semantics, Stone Price Group writes fail closed, canonical Material Band writes pass rollback-only acceptance, current Product Prices/Material Bands routes are deployed and healthy, and fresh Advisors show no Pricing-specific blocker. Detailed evidence: `docs/acceptance/pricing-ui-v2-production.md`.
 
 ---
 
