@@ -21,7 +21,7 @@ const sync = read("src/lib/vendor-catalog/sync.ts");
 const check = read("src/lib/vendor-catalog/check.ts");
 const approval = read("src/lib/vendor-catalog/approval.ts");
 const singleApproveRoute = read("src/app/api/vendor-catalog/items/[itemId]/approve/route.ts");
-const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
+const page = read("src/app/(admin)/products/vendor-imports/SinkVendorImportsPanel.tsx");
 const workflow = readRepo(".github/workflows/admin-vendor-catalog-sync.yml");
 const migrationPath = path.resolve(
   repoRoot,
