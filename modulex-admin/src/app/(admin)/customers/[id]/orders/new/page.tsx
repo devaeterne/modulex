@@ -7,11 +7,17 @@ export const metadata: Metadata = {
   description: "Create a customer order",
 };
 
-export default function NewCustomerOrderPage() {
+export default async function NewCustomerOrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ projectId?: string }>;
+}) {
+  const { projectId = null } = await searchParams;
+
   return (
     <div>
       <PageBreadcrumb pageTitle="New Customer Order" />
-      <NewCustomerOrder />
+      <NewCustomerOrder projectId={projectId} />
     </div>
   );
 }
