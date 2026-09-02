@@ -27,11 +27,15 @@ for (const sqlPath of [canonicalSqlPath, migrationPath]) {
     "customer_activity",
     "Countertop removed",
     "authenticated",
+    "lock order is parent order -> order item",
+    "Remaining line numbers deliberately stay stable",
   ]) assert(sql.includes(token), `${sqlPath} missing ${token}`);
   assert(/status\s*<>\s*'draft'/i.test(sql), `${sqlPath} must reject non-Draft removal`);
   assert(/security definer/i.test(sql), `${sqlPath} must keep the privileged mutation private`);
   assert(/revoke all on function public\.remove_countertop_order_item[\s\S]*from public, anon/i.test(sql), `${sqlPath} must revoke public/anon execute`);
   assert(/grant execute on function public\.remove_countertop_order_item[\s\S]*to authenticated/i.test(sql), `${sqlPath} must grant the reviewed wrapper to authenticated`);
+  assert(!/set\s+line_no\s*=/i.test(sql), `${sqlPath} must not UPDATE retained line numbers and accidentally trigger repricing`);
+  assert(sql.indexOf("from public.customer_orders o") < sql.indexOf("and oi.order_id = v_order.id\n  for update"), `${sqlPath} must lock the parent order before the target item`);
 }
 
 for (const token of ["Replace Countertop", "Remove Countertop", "CountertopConfigurator", "orderItemId", "Modal", "removeCountertopOrderItem"]) {
