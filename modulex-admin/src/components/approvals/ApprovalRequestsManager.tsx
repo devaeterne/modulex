@@ -9,9 +9,8 @@ import TextArea from "@/components/form/input/TextArea";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
-import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
-import { getCurrentProfile } from "@/lib/supabase/profile";
+import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
 
 type ApprovalStatus = "pending" | "approved" | "rejected" | "cancelled";
 type ApprovalBadgeColor = "success" | "error" | "warning" | "light";
@@ -100,7 +99,7 @@ function proposedSummary(row: ApprovalRow) {
 }
 
 export default function ApprovalRequestsManager() {
-  const [canReview, setCanReview] = useState(false);
+  const [role, setRole] = useState<UserRole | null>(null);
   const [rows, setRows] = useState<ApprovalRow[]>([]);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [links, setLinks] = useState<Record<string, EntityLink>>({});
@@ -121,7 +120,7 @@ export default function ApprovalRequestsManager() {
       setIsLoading(false);
       return;
     }
-    setCanReview(hasPermission(profile.roles, "approvals.review"));
+    setRole(profile.role);
 
     const [requestsResult, profilesResult] = await Promise.all([
       supabase.from("approval_requests").select("*").order("created_at", { ascending: false }).limit(150),
@@ -202,6 +201,7 @@ export default function ApprovalRequestsManager() {
       ),
     [profiles]
   );
+  const canReview = role === "super_admin" || role === "admin";
   const types = useMemo(() => [...new Set(rows.map((row) => row.request_type))], [rows]);
   const filtered = useMemo(
     () =>

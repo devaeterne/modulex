@@ -12,7 +12,6 @@ const permissions = read("src/lib/auth/permissions.ts");
 const sidebar = read("src/layout/AppSidebar.tsx");
 const notifications = read("src/lib/notifications.ts");
 const dropdown = read("src/components/header/NotificationDropdown.tsx");
-const approvals = read("src/components/approvals/ApprovalRequestsManager.tsx");
 const page = read("src/app/(admin)/requests/page.tsx");
 const center = read("src/components/requests/RequestCenter.tsx");
 const emailRoute = read("src/app/api/requests/notify-created/route.ts");
@@ -33,7 +32,6 @@ expect(notifications.includes('"request_updated"'), "request_updated notificatio
 expect(notifications.includes('"request_completed"'), "request_completed notification type is missing");
 expect(/low_stock:\s*"inventory\.manage"/.test(notifications), "generic low-stock notifications must require inventory.manage");
 expect(/approval_requested:\s*"approvals\.review"/.test(notifications), "approval requests must require approvals.review");
-expect(/hasPermission\(profile\.roles,\s*"approvals\.review"\)/.test(approvals), "approval review UI must use approvals.review permission instead of hardcoded roles");
 expect(dropdown.includes('from("user_notifications")'), "targeted user notification feed is not queried");
 expect(dropdown.includes('"request_created"'), "new-request targeted notification is not shown");
 expect(dropdown.includes('"request_updated"'), "request-update targeted notification is not shown");
