@@ -65,7 +65,6 @@ function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(canonicalize);
   }
-
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>)
@@ -73,7 +72,6 @@ function canonicalize(value: unknown): unknown {
         .map(([key, child]) => [key, canonicalize(child)])
     );
   }
-
   return value;
 }
 
@@ -134,13 +132,19 @@ export function stableProductHash(product: NormalizedVendorProduct) {
   );
 }
 
-export function stableAvailabilityHash(product: NormalizedVendorProduct) {
+export function stableNormalizedAvailabilityHash(
+  availability: NormalizedVendorAvailability
+) {
   return hashSnapshot({
-    status: product.availability.status,
-    available: product.availability.available,
-    purchasable: product.availability.purchasable,
-    stockQuantity: product.availability.stockQuantity,
+    status: availability.status,
+    available: availability.available,
+    purchasable: availability.purchasable,
+    stockQuantity: availability.stockQuantity,
   });
+}
+
+export function stableAvailabilityHash(product: NormalizedVendorProduct) {
+  return stableNormalizedAvailabilityHash(product.availability);
 }
 
 export function isVendorApprovalEligible(status: VendorAvailabilityStatus) {
