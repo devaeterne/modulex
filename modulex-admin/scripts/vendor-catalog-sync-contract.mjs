@@ -74,6 +74,8 @@ assert.match(sync, /variant_code/);
 assert.match(sync, /sync_mode/);
 assert.match(sync, /loadVendorCatalogCheck/);
 assert.match(sync, /changedOnly/);
+assert.match(sync, /classificationBackfillNeeded/);
+assert.match(sync, /entry\.changeState !== "UNCHANGED" \|\| entry\.classificationBackfillNeeded/);
 assert.doesNotMatch(sync, /\.enrich\(/);
 assert.doesNotMatch(sync, /store.*publish/i);
 
