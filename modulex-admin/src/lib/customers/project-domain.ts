@@ -197,7 +197,7 @@ export async function createProjectCustomerOrder(input: CreateProjectOrderInput)
       product_id: item.productId,
       quantity: numberValue(item.quantity),
       discount_percent: numberValue(item.discountPercent),
-      ...(item.pricingModel === "manual_service" ? { manual_unit_price: numberValue(item.unitPrice), line_note: nullableText(item.lineNote) } : {}),
+      ...(item.pricingModel === "manual_service" ? { unit_price: numberValue(item.unitPrice), line_note: nullableText(item.lineNote) } : {}),
     })),
     p_price_group_id: input.priceGroupId,
     p_billing_address_id: nullableId(input.billingAddressId),
