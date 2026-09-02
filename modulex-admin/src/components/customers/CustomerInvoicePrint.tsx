@@ -79,12 +79,9 @@ export default function CustomerInvoicePrint() {
       const itemRows = (itemsResult.data ?? []) as CustomerInvoiceItem[];
       const orderItemIds = itemRows.map((item) => item.order_item_id).filter((id): id is string => Boolean(id));
       try {
-        const summaries = await loadCountertopLineSummaries(orderItemIds);
-        setCountertopSummaries(summaries);
-      } catch (countertopError) {
-        setErrorMessage(countertopError instanceof Error ? countertopError.message : "Countertop details could not be loaded.");
-        setIsLoading(false);
-        return;
+        setCountertopSummaries(await loadCountertopLineSummaries(orderItemIds));
+      } catch {
+        setCountertopSummaries([]);
       }
 
       setCustomer(customerResult.data as Customer);
