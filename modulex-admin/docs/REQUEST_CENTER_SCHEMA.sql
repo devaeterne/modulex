@@ -1,7 +1,9 @@
 -- Modulex Admin Request Center
 -- Apply through the normal Supabase deployment flow after review.
+-- Requires docs/NOTIFICATION_ROUTING_V2.sql for private.user_has_permission(...).
 -- New request: panel notifications for active request managers and email delivery for managers with an email address.
--- Admin action: panel notification only for the original requester.
+-- Request manager resolution is permission-based through requests.manage.
+-- Manager action: panel notification only for the original requester.
 
 create table if not exists public.support_requests (
   id uuid primary key default gen_random_uuid(),
@@ -162,14 +164,10 @@ begin
   returning * into v_request;
 
   for v_manager in
-    select distinct p.id, p.email
+    select p.id, p.email
     from public.profiles p
-    left join public.user_roles ur on ur.user_id = p.id
     where p.is_active = true
-      and (
-        p.role in ('super_admin', 'admin')
-        or ur.role in ('super_admin', 'admin')
-      )
+      and private.user_has_permission(p.id, 'requests.manage')
   loop
     v_manager_count := v_manager_count + 1;
 
@@ -235,24 +233,10 @@ begin
     raise exception 'Authentication required';
   end if;
 
-  select exists (
-    select 1
-    from public.profiles p
-    where p.id = auth.uid()
-      and p.is_active = true
-      and (
-        p.role in ('super_admin', 'admin')
-        or exists (
-          select 1
-          from public.user_roles ur
-          where ur.user_id = p.id
-            and ur.role in ('super_admin', 'admin')
-        )
-      )
-  ) into v_can_manage;
+  v_can_manage := private.user_has_permission(auth.uid(), 'requests.manage');
 
   if not coalesce(v_can_manage, false) then
-    raise exception 'Admin access required';
+    raise exception 'Request management permission required';
   end if;
 
   if p_status is null or p_status not in ('open', 'in_progress', 'completed') then
