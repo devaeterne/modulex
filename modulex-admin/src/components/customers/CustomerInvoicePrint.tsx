@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import CommercialDocument from "@/components/documents/CommercialDocument";
-import type { Customer, CustomerInvoice, CustomerInvoiceItem } from "@/lib/customers/types";
+import { ADMIN_DOCUMENT_STYLES } from "@/components/ui/theme/adminTheme";
+import { formatCountertopPrintDetail, loadCountertopLineSummaries } from "@/lib/customers/countertop-summary";
+import type { CountertopLineSummary, Customer, CustomerInvoice, CustomerInvoiceItem } from "@/lib/customers/types";
 import type { CommercialDocument as CommercialDocumentModel } from "@/lib/documents/types";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettings } from "@/lib/settings/types";
 import { supabase } from "@/lib/supabase/client";
@@ -43,11 +45,17 @@ function snapshotLines(snapshot: Record<string, unknown> | null) {
   ].filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
 }
 
+function lineDetail(summary: CountertopLineSummary | undefined, lineNote: string | null | undefined) {
+  const values = [formatCountertopPrintDetail(summary), lineNote?.trim() || null].filter((value): value is string => Boolean(value));
+  return values.length ? values.join("\n") : null;
+}
+
 export default function CustomerInvoicePrint() {
   const params = useParams<{ id: string; invoiceId: string }>();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [invoice, setInvoice] = useState<CustomerInvoice | null>(null);
   const [items, setItems] = useState<CustomerInvoiceItem[]>([]);
+  const [countertopSummaries, setCountertopSummaries] = useState<CountertopLineSummary[]>([]);
   const [settings, setSettings] = useState<GeneralSettings>(DEFAULT_GENERAL_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -68,17 +76,25 @@ export default function CustomerInvoicePrint() {
         return;
       }
 
+      const itemRows = (itemsResult.data ?? []) as CustomerInvoiceItem[];
+      const orderItemIds = itemRows.map((item) => item.order_item_id).filter((id): id is string => Boolean(id));
+      try {
+        setCountertopSummaries(await loadCountertopLineSummaries(orderItemIds));
+      } catch {
+        setCountertopSummaries([]);
+      }
+
       setCustomer(customerResult.data as Customer);
       setInvoice(invoiceResult.data as CustomerInvoice);
-      setItems((itemsResult.data ?? []) as CustomerInvoiceItem[]);
+      setItems(itemRows);
       if (!settingsResult.error && settingsResult.data) setSettings(settingsResult.data as GeneralSettings);
       setIsLoading(false);
     }
     void load();
   }, [params.id, params.invoiceId]);
 
-  if (isLoading) return <div className="min-h-screen bg-gray-100 p-10 text-center text-sm text-gray-500 dark:bg-gray-950 dark:text-gray-400">Preparing printable invoice...</div>;
-  if (!customer || !invoice) return <div className="min-h-screen bg-gray-100 p-10 text-center text-sm text-error-600 dark:bg-gray-950 dark:text-error-400">{errorMessage || "Invoice not found."}</div>;
+  if (isLoading) return <div className={`min-h-screen p-10 text-center text-sm ${ADMIN_DOCUMENT_STYLES.loading}`}>Preparing printable invoice...</div>;
+  if (!customer || !invoice) return <div className={`min-h-screen p-10 text-center text-sm ${ADMIN_DOCUMENT_STYLES.loadError}`}>{errorMessage || "Invoice not found."}</div>;
 
   const locale = settings.locale || "en-US";
   const timezone = settings.timezone || "UTC";
@@ -86,6 +102,7 @@ export default function CustomerInvoicePrint() {
   const formatMoney = (value: string | number | null | undefined) => money(value, currency, locale);
   const formatDate = (value: string | null | undefined) => date(value, locale, timezone);
   const balance = Math.max(Number(invoice.total_amount ?? 0) - Number(invoice.paid_amount ?? 0), 0);
+  const summariesByOrderItemId = new Map(countertopSummaries.map((summary) => [summary.orderItemId, summary]));
   const billTo = [
     customer.name,
     customer.legal_name && customer.legal_name !== customer.name ? customer.legal_name : null,
@@ -113,7 +130,7 @@ export default function CustomerInvoicePrint() {
       lineNo: String(item.line_no),
       sku: item.sku_snapshot,
       description: item.product_name_snapshot,
-      detail: item.line_note,
+      detail: lineDetail(item.order_item_id ? summariesByOrderItemId.get(item.order_item_id) : undefined, item.line_note),
       quantity: String(Number(item.quantity)),
       unitPrice: formatMoney(item.unit_price),
       discount: `${Number(item.discount_percent).toFixed(2)}%`,

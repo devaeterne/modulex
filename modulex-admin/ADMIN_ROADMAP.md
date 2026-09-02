@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-02
-Main baseline: `8ce65dbde84be7350f90984db7d0edacf5786248`
+Main baseline: `66f001f3aa17da37a397e11006354713a6d3a2b9`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 is active from current `main`; it extends Product Master + Store draft/media boundaries without widening Store public projections.**
 Current Admin next action: **Finish Vendor Catalog Review v3 review/merge, then apply `20260902093000_vendor_catalog_sync_family_v3`, run post-DDL advisors, deploy Admin, and perform signed-in category-check/sync/mapping/approval acceptance.**
@@ -298,6 +298,10 @@ These rules are mandatory for all future Modulex Admin work:
 
 - [x] Review current invoice list/detail/print behavior.
   - Existing invoice list/detail/print surfaces and issue/paid/void workflow remain the active A1 financial operations surface; A1 hardening did not widen portal visibility or bypass invoice approval rules.
+- [~] Keep Order/Invoice A4 print and direct-PDF detail aligned with immutable Countertop snapshots.
+  - PR #247 reads the existing `countertop_configurations.pricing_snapshot` for Order items and uses Invoice `order_item_id` linkage to render Material/Area/Band, Edge, Sink, Services, and any saved line note in both browser print and direct PDF. PDF line height/pagination now accounts for wrapped detail rows, and Logo 2 uses a dedicated normalized box with whitespace trimming for PDF assets.
+  - No schema, RLS, RPC, pricing, or production-data mutation is introduced. Countertop-detail reads remain under the existing RLS boundary and fail soft so an otherwise-authorized document print remains available even when that optional detail projection is not readable for a role.
+  - TDD RED is recorded in Admin Commercial Documents UI run `33610771763`; branch GREEN verification on functional head `a4907086740c1c3c55de2b781c1aac6813075577` passed Commercial Documents `33611901990`, Admin A1 Core Operations `33611901985`, Admin Customers UI `33611901993`, Admin UI Foundation `33611902001`, GC-6 `33611902033`, and GC-7 `33611901999`. Keep `[~]` until PR merge/deploy acceptance.
 - [x] Define whether payment methods/payment records are active scope or intentionally deferred.
   - Payment Methods remain active order/invoice commercial configuration. Invoice `paid_amount`/status remains the current payment-recording boundary; a standalone payment transaction ledger is intentionally deferred beyond A1.
 - [x] Keep portal invoice/payment visibility out of scope until explicitly approved.

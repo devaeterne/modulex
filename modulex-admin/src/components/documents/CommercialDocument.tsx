@@ -89,8 +89,8 @@ export default function CommercialDocument({ document, settings }: Props) {
           <div className="flex min-h-16 items-center justify-start sm:justify-center">
             {primaryLogo ? <img src={primaryLogo} alt={`${settings.company_name} primary logo`} className="max-h-16 max-w-[180px] object-contain" /> : <span className={`text-lg font-semibold tracking-tight ${ADMIN_DOCUMENT_STYLES.logoFallback}`}>{settings.company_name}</span>}
           </div>
-          <div className="flex min-h-16 items-center justify-start sm:justify-end">
-            {secondaryLogo ? <img src={secondaryLogo} alt="Secondary brand logo" className="max-h-16 max-w-[180px] object-contain" /> : null}
+          <div className="commercial-document-secondary-logo flex h-20 items-center justify-start overflow-hidden sm:justify-end">
+            {secondaryLogo ? <img src={secondaryLogo} alt="Secondary brand logo" className="max-h-20 max-w-[150px] origin-center scale-[1.12] object-contain" /> : null}
           </div>
         </header>
 
@@ -136,7 +136,7 @@ export default function CommercialDocument({ document, settings }: Props) {
                 <TableRow key={`${item.lineNo}-${item.sku}`} className={`border-b align-top ${ADMIN_DOCUMENT_STYLES.tableRow}`}>
                   <TableCell variant="plain" className={`py-3 pr-2 ${ADMIN_DOCUMENT_STYLES.lineNo}`}>{item.lineNo}</TableCell>
                   <TableCell variant="plain" className={`py-3 pr-2 font-medium ${ADMIN_DOCUMENT_STYLES.sku}`}>{item.sku}</TableCell>
-                  <TableCell variant="plain" className={`py-3 pr-2 ${ADMIN_DOCUMENT_STYLES.description}`}><p>{item.description}</p>{item.detail ? <p className={`mt-1 text-xs leading-4 ${ADMIN_DOCUMENT_STYLES.detail}`}>{item.detail}</p> : null}</TableCell>
+                  <TableCell variant="plain" className={`py-3 pr-2 ${ADMIN_DOCUMENT_STYLES.description}`}><p>{item.description}</p>{item.detail ? <p className={`mt-1 whitespace-pre-line text-xs leading-4 ${ADMIN_DOCUMENT_STYLES.detail}`}>{item.detail}</p> : null}</TableCell>
                   <TableCell variant="plain" className={`py-3 pr-2 text-right ${ADMIN_DOCUMENT_STYLES.numeric}`}>{item.quantity}</TableCell>
                   <TableCell variant="plain" className={`py-3 pr-2 text-right ${ADMIN_DOCUMENT_STYLES.numeric}`}>{item.unitPrice}</TableCell>
                   <TableCell variant="plain" className={`py-3 pr-2 text-right ${ADMIN_DOCUMENT_STYLES.numeric}`}>{item.discount}</TableCell>
