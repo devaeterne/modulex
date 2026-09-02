@@ -17,17 +17,41 @@ type LogoField =
 
 type LogoSlot = {
   field: LogoField;
-  title: string;
+  title: "Logo 1" | "Logo 2";
   context: "on light" | "on dark";
   description: string;
   primary: boolean;
 };
 
 const slots: LogoSlot[] = [
-  { field: "primary_logo_on_light_url", title: "Primary Logo", context: "on light", description: "Cabinet Center / main company mark used on white A4 documents.", primary: true },
-  { field: "primary_logo_on_dark_url", title: "Primary Logo", context: "on dark", description: "Main company mark for dark UI surfaces and future branded dark layouts.", primary: true },
-  { field: "secondary_logo_on_light_url", title: "Secondary Logo", context: "on light", description: "Oakwell / secondary brand mark shown on white A4 documents.", primary: false },
-  { field: "secondary_logo_on_dark_url", title: "Secondary Logo", context: "on dark", description: "Secondary brand mark for dark UI surfaces and future branded dark layouts.", primary: false },
+  {
+    field: "primary_logo_on_light_url",
+    title: "Logo 1",
+    context: "on light",
+    description: "Primary company logo for white/light surfaces and A4 Order/Invoice documents.",
+    primary: true,
+  },
+  {
+    field: "primary_logo_on_dark_url",
+    title: "Logo 1",
+    context: "on dark",
+    description: "Primary company logo optimized for dark application surfaces.",
+    primary: true,
+  },
+  {
+    field: "secondary_logo_on_light_url",
+    title: "Logo 2",
+    context: "on light",
+    description: "Secondary brand logo for white/light surfaces and A4 Order/Invoice documents.",
+    primary: false,
+  },
+  {
+    field: "secondary_logo_on_dark_url",
+    title: "Logo 2",
+    context: "on dark",
+    description: "Secondary brand logo optimized for dark application surfaces.",
+    primary: false,
+  },
 ];
 
 function previewUrl(settings: GeneralSettings, slot: LogoSlot) {
@@ -87,7 +111,7 @@ export default function DocumentBrandingSettings() {
     setSuccess(null);
     try {
       const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
-      const storagePath = `branding/documents/${slot.field}-${Date.now()}.${extension}`;
+      const storagePath = `branding/company/${slot.field}-${Date.now()}.${extension}`;
       const { error: uploadError } = await supabase.storage.from("company-assets").upload(storagePath, file, {
         cacheControl: "3600",
         contentType: file.type,
@@ -120,14 +144,16 @@ export default function DocumentBrandingSettings() {
   }
 
   if (loading) {
-    return <section className={`p-6 text-sm ${ADMIN_BRANDING_STYLES.loading}`}>Loading document branding...</section>;
+    return <section className={`p-6 text-sm ${ADMIN_BRANDING_STYLES.loading}`}>Loading company logos...</section>;
   }
 
   return (
     <section className={`p-5 sm:p-6 ${ADMIN_BRANDING_STYLES.card}`}>
       <div>
-        <h2 className={`text-lg font-semibold ${ADMIN_BRANDING_STYLES.heading}`}>Document Branding</h2>
-        <p className={`mt-1 max-w-3xl text-sm ${ADMIN_BRANDING_STYLES.muted}`}>Configure the primary company and secondary brand marks once. Order and Invoice share the same A4 identity. Printed documents and direct PDF downloads always use the <strong>on light</strong> variants because the paper surface is white.</p>
+        <h2 className={`text-lg font-semibold ${ADMIN_BRANDING_STYLES.heading}`}>Company Logos</h2>
+        <p className={`mt-1 max-w-3xl text-sm ${ADMIN_BRANDING_STYLES.muted}`}>
+          Configure two logo identities, each with light and dark variants. <strong>Logo 1</strong> is the primary company logo and <strong>Logo 2</strong> is the secondary brand logo. Order and Invoice use the <strong>on light</strong> variants because the A4/PDF paper surface is white.
+        </p>
       </div>
 
       {error ? <div className={`mt-4 px-4 py-3 text-sm ${ADMIN_BRANDING_STYLES.error}`}>{error}</div> : null}
@@ -164,7 +190,7 @@ export default function DocumentBrandingSettings() {
         })}
       </div>
 
-      {!canEdit ? <p className={`mt-4 text-xs ${ADMIN_BRANDING_STYLES.readonly}`}>You have read-only access. Admin or Super Admin permission is required to change document branding.</p> : null}
+      {!canEdit ? <p className={`mt-4 text-xs ${ADMIN_BRANDING_STYLES.readonly}`}>You have read-only access. Admin or Super Admin permission is required to change company logos.</p> : null}
     </section>
   );
 }
