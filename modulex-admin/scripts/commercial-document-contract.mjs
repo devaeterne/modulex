@@ -51,6 +51,8 @@ if (exists("src/components/documents/CommercialDocument.tsx")) {
   expect(component.includes("secondary_logo_on_light_url"), "A4 renderer must use the secondary on-light logo slot");
   expect(component.includes("whitespace-pre-line"), "CommercialDocument must preserve multi-line Countertop detail text");
   expect(component.includes("commercial-document-secondary-logo"), "CommercialDocument must give Logo 2 a dedicated normalized visual box");
+  expect(component.includes("commercial-document-secondary-logo flex h-24"), "A4 preview must enlarge the Logo 2 visual box");
+  expect(component.includes("max-h-24 max-w-[188px]"), "A4 preview must enlarge Logo 2 by about 25 percent without stretching it");
 }
 
 const adminTheme = read("src/components/ui/theme/adminTheme.ts");
@@ -95,6 +97,7 @@ if (exists("src/lib/documents/pdf.ts")) {
   expect(pdf.includes("detailRows"), "PDF renderer must preserve multiple wrapped Countertop detail rows");
   expect(pdf.includes("rowHeight"), "PDF pagination must account for variable commercial line height");
   expect(pdf.includes("SECONDARY_LOGO_BOX"), "PDF must use a dedicated normalized Logo 2 box");
+  expect(pdf.includes("SECONDARY_LOGO_BOX = { x: 378, y: 738, maxWidth: 175, maxHeight: 78 }"), "Downloaded PDF must enlarge Logo 2 by about 25 percent while keeping it inside the A4 header");
 }
 
 const canonicalSqlPath = "sql/commercial-document-branding.sql";
