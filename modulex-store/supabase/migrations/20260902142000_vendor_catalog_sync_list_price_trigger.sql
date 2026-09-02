@@ -141,4 +141,85 @@ when (
 )
 execute function private.apply_vendor_list_price_on_approval();
 
+do $$
+declare
+  v_base_group_id uuid;
+  v_base_group_count integer;
+  v_now timestamptz := clock_timestamp();
+begin
+  select count(*)
+  into v_base_group_count
+  from public.price_groups
+  where is_base_price = true
+    and is_active = true;
+
+  if v_base_group_count <> 1 then
+    raise exception 'Exactly one active base List Price group is required for vendor price backfill.';
+  end if;
+
+  select id
+  into v_base_group_id
+  from public.price_groups
+  where is_base_price = true
+    and is_active = true;
+
+  with candidates as (
+    select distinct on (
+      v.canonical_product_id,
+      upper(btrim(v.vendor_currency))
+    )
+      v.canonical_product_id as product_id,
+      round(v.vendor_price_reference, 4) as amount,
+      upper(btrim(v.vendor_currency))::varchar(3) as currency_code,
+      v.reviewed_by
+    from public.vendor_catalog_items v
+    join public.products p on p.id = v.canonical_product_id
+    join public.product_types pt on pt.id = p.product_type_id
+    where v.review_status = 'APPROVED'
+      and v.canonical_product_id is not null
+      and v.vendor_price_reference is not null
+      and v.vendor_price_reference >= 0
+      and upper(btrim(coalesce(v.vendor_currency, ''))) ~ '^[A-Z]{3}$'
+      and p.status <> 'archived'
+      and pt.pricing_model = 'price_group'
+    order by
+      v.canonical_product_id,
+      upper(btrim(v.vendor_currency)),
+      v.reviewed_at desc nulls last,
+      v.updated_at desc
+  )
+  insert into public.product_prices (
+    product_id,
+    price_group_id,
+    amount,
+    currency_code,
+    valid_from,
+    valid_to,
+    is_active,
+    created_by,
+    updated_by
+  )
+  select
+    c.product_id,
+    v_base_group_id,
+    c.amount,
+    c.currency_code,
+    v_now,
+    null,
+    true,
+    c.reviewed_by,
+    c.reviewed_by
+  from candidates c
+  where not exists (
+    select 1
+    from public.product_prices pp
+    where pp.product_id = c.product_id
+      and pp.price_group_id = v_base_group_id
+      and pp.currency_code = c.currency_code
+      and pp.is_active = true
+      and pp.valid_to is null
+  );
+end;
+$$;
+
 commit;
