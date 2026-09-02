@@ -7,6 +7,9 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 
 const domain = read("src/lib/vendor-catalog/stone-domain.ts");
 const adapters = read("src/lib/vendor-catalog/stone-adapters.ts");
+const msiMarbleSystemsAdapters = read(
+  "src/lib/vendor-catalog/stone-adapters-msi-marble-systems.ts"
+);
 const sync = read("src/lib/vendor-catalog/stone-sync.ts");
 const approval = read("src/lib/vendor-catalog/approval.ts");
 const stoneApproval = read("src/lib/vendor-catalog/stone-approve.ts");
@@ -20,6 +23,8 @@ assert.match(domain, /vendorInventory/);
 assert.match(domain, /StoneVendorVariant/);
 assert.match(domain, /normalizeStoneTypeName/);
 assert.match(domain, /"Semiprecious"/);
+assert.match(domain, /"msi"/);
+assert.match(domain, /"marble_systems"/);
 assert.doesNotMatch(domain, /vendorPriceReference/);
 
 assert.match(adapters, /class EwMarbleStoneAdapter/);
@@ -28,9 +33,34 @@ assert.match(adapters, /parseEwMarbleDetail/);
 assert.match(adapters, /parseVeneziaDetail/);
 assert.match(adapters, /Lot Number/);
 assert.match(adapters, /Thickness/);
+assert.match(adapters, /MsiStoneAdapter/);
+assert.match(adapters, /MarbleSystemsStoneAdapter/);
+assert.match(adapters, /msi:\s*\(\)\s*=>\s*new MsiStoneAdapter/);
+assert.match(adapters, /marble_systems:\s*\(\)\s*=>\s*new MarbleSystemsStoneAdapter/);
 assert.match(adapters, /stoneVendorCatalogRegistry/);
 assert.doesNotMatch(adapters, /0\.00 EUR/);
 assert.doesNotMatch(adapters, /vendorPriceReference/);
+
+assert.match(msiMarbleSystemsAdapters, /class MsiStoneAdapter/);
+assert.match(msiMarbleSystemsAdapters, /parseMsiDetailVariants/);
+assert.match(msiMarbleSystemsAdapters, /ID#:/);
+assert.match(msiMarbleSystemsAdapters, /QSL-/);
+assert.match(msiMarbleSystemsAdapters, /NSL-/);
+assert.match(msiMarbleSystemsAdapters, /PSL-/);
+assert.match(msiMarbleSystemsAdapters, /variant\.form === "SLAB"/);
+assert.match(msiMarbleSystemsAdapters, /Material Type/);
+assert.match(msiMarbleSystemsAdapters, /Book Match/);
+assert.match(msiMarbleSystemsAdapters, /Dimensions/);
+assert.match(msiMarbleSystemsAdapters, /unknownAvailability\(\)/);
+assert.match(msiMarbleSystemsAdapters, /class MarbleSystemsStoneAdapter/);
+assert.match(msiMarbleSystemsAdapters, /parseMarbleSystemsDetail/);
+assert.match(msiMarbleSystemsAdapters, /Item Code/);
+assert.match(msiMarbleSystemsAdapters, /Available Quantity/);
+assert.match(msiMarbleSystemsAdapters, /Location/);
+assert.match(msiMarbleSystemsAdapters, /stockQuantity:\s*quantity/);
+assert.match(msiMarbleSystemsAdapters, /\/page\/\$\{page\}\//);
+assert.doesNotMatch(msiMarbleSystemsAdapters, /vendorPriceReference/);
+assert.doesNotMatch(msiMarbleSystemsAdapters, /\.from\(["']inventory["']\)/);
 
 assert.match(sync, /catalog_domain:\s*"stone"/);
 assert.match(sync, /stone_type_id/);
