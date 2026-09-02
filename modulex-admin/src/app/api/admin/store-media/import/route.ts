@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { Gc2dIntakeError, importGc2dRepresentativeCandidate } from "@/lib/store/gc2MediaIntake";
 
 export const runtime = "nodejs";
@@ -11,7 +12,7 @@ function bearerToken(request: Request) {
   return token || null;
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const accessToken = bearerToken(request);
   if (!accessToken) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
 
@@ -34,4 +35,8 @@ export async function POST(request: Request) {
     console.error("Controlled media intake failed", error);
     return NextResponse.json({ error: "Controlled media intake failed." }, { status: 500 });
   }
+}
+
+export async function POST(request: Request) {
+  return withApiTiming({ route: "/api/admin/store-media/import", method: "POST" }, () => handlePost(request));
 }
