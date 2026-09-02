@@ -1,7 +1,7 @@
 import {
-  approveAvailableVendorCatalogItem,
+  approveReviewableVendorCatalogItem,
+  VendorCatalogMissingError,
   VendorReviewNotEligibleError,
-  VendorUnavailableError,
 } from "@/lib/vendor-catalog/approval";
 import { authorizeVendorCatalogAdmin } from "@/lib/vendor-catalog/auth";
 import { CategoryMappingRequiredError } from "@/lib/vendor-catalog/mappings";
@@ -24,10 +24,10 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const result = await approveAvailableVendorCatalogItem(itemId, authorization);
+    const result = await approveReviewableVendorCatalogItem(itemId, authorization);
     return Response.json({ status: "APPROVED", ...result });
   } catch (error) {
-    if (error instanceof VendorUnavailableError) {
+    if (error instanceof VendorCatalogMissingError) {
       return Response.json(
         {
           code: error.code,
