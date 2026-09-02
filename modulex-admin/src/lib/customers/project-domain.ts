@@ -113,14 +113,14 @@ function numberValue(value: string | number | null | undefined) {
 async function requireProjectViewer() {
   const { profile, error } = await getCurrentProfile();
   if (error) throw error;
-  if (!profile || !hasPermission(profile.role, "customers.view")) throw new Error("You do not have permission to view projects.");
+  if (!profile || !hasPermission(profile.role, "projects.view")) throw new Error("You do not have permission to view projects.");
   return profile;
 }
 
 async function requireProjectManager() {
   const { profile, error } = await getCurrentProfile();
   if (error) throw error;
-  if (!profile || !hasPermission(profile.role, "customers.manage")) throw new Error("You do not have permission to manage projects.");
+  if (!profile || !hasPermission(profile.role, "projects.manage")) throw new Error("You do not have permission to manage projects.");
   return profile;
 }
 
