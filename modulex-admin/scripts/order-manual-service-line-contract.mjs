@@ -30,7 +30,8 @@ for (const token of [
 ]) assert(migration.includes(token), `manual Service migration contract missing: ${token}`);
 
 assert(/insert\s+into\s+public\.product_categories\s*\([^)]*name[^)]*status[^)]*\)[\s\S]*values\s*\(\s*'Service'\s*,\s*'active'\s*\)[\s\S]*on\s+conflict\s*\(\s*name\s*\)\s+do\s+nothing/i.test(prerequisite), "Service prerequisite must create a missing active Service category by stable name without rewriting an existing category");
-assert(/product_categories[\s\S]*name\s*=\s*'Service'[\s\S]*status\s*=\s*'active'/i.test(prerequisite), "Service prerequisite must resolve and validate the active Service category after bootstrap");
+assert(/from\s+public\.product_categories[\s\S]*where\s+c\.name\s*=\s*'Service'/i.test(prerequisite), "Service prerequisite must resolve the Service category by stable name after bootstrap");
+assert(/v_service_category\.status::text\s*<>\s*'active'/i.test(prerequisite), "Service prerequisite must fail closed when an existing Service category is not active");
 assert(!/on\s+conflict\s*\(\s*name\s*\)\s+do\s+update[\s\S]{0,240}status/i.test(prerequisite), "Service prerequisite must not silently reactivate or redefine an existing Service category");
 assert(!/insert\s+into\s+public\.product_categories/i.test(migration), "manual Service migration must consume the already-validated Service category prerequisite rather than redefine taxonomy");
 
