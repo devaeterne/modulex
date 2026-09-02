@@ -4,6 +4,13 @@ import { resolve } from "node:path";
 
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
+const readOptional = (path) => {
+  try {
+    return read(path);
+  } catch {
+    return "";
+  }
+};
 
 const domain = read("src/lib/vendor-catalog/stone-domain.ts");
 const adapters = read("src/lib/vendor-catalog/stone-adapters.ts");
@@ -15,6 +22,11 @@ const approval = read("src/lib/vendor-catalog/approval.ts");
 const stoneApproval = read("src/lib/vendor-catalog/stone-approve.ts");
 const syncRoute = read("src/app/api/vendor-catalog/stone/sync/route.ts");
 const vendorsRoute = read("src/app/api/vendor-catalog/stone/vendors/route.ts");
+const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
+const stonePanel = readOptional(
+  "src/app/(admin)/products/vendor-imports/StoneVendorImportsPanel.tsx"
+);
+const bulkEligibleRoute = read("src/app/api/vendor-catalog/bulk/eligible/route.ts");
 const sql = read("sql/stone-vendor-catalog-foundation.sql");
 const migration = read("../modulex-store/supabase/migrations/20260902213000_stone_vendor_catalog_foundation.sql");
 
@@ -82,6 +94,30 @@ assert.match(syncRoute, /allowCron:\s*true/);
 assert.match(syncRoute, /runStoneVendorCatalogSync/);
 assert.match(syncRoute, /autoPublished:\s*false/);
 assert.match(vendorsRoute, /listCategories/);
+
+// Admin Vendor Imports must expose Stone as a first-class review domain without
+// changing the existing Sink workflow.
+assert.match(page, /CatalogDomain/);
+assert.match(page, /StoneVendorImportsPanel/);
+assert.match(page, />Sink</);
+assert.match(page, />Stone</);
+assert.match(stonePanel, /\/api\/vendor-catalog\/stone\/vendors/);
+assert.match(stonePanel, /\/api\/vendor-catalog\/stone\/sync/);
+assert.match(stonePanel, /catalog_domain/);
+assert.match(stonePanel, /stone_type_id/);
+assert.match(stonePanel, /stone_data/);
+assert.match(stonePanel, /Stone Type/);
+assert.match(stonePanel, /Thickness/);
+assert.match(stonePanel, /Finish/);
+assert.match(stonePanel, /Location/);
+assert.match(stonePanel, /Select one Stone vendor/);
+
+// Generic bulk approval remains shared, but Stone eligibility must not depend
+// on Sink category mappings. A resolved Stone Type is the fail-closed gate.
+assert.match(bulkEligibleRoute, /catalog_domain/);
+assert.match(bulkEligibleRoute, /stone_type_id/);
+assert.match(bulkEligibleRoute, /candidate\.catalog_domain === "stone"/);
+assert.match(bulkEligibleRoute, /Boolean\(candidate\.stone_type_id\)/);
 
 assert.match(sql, /alter column material_price_band_id drop not null/i);
 assert.match(sql, /vendor_stone_type_mappings/);
