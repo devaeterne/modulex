@@ -11,6 +11,7 @@ const migrationPath = "../modulex-store/supabase/migrations/20260902114500_count
 const attachGateSqlPath = "sql/countertop-attach-pricing-gate.sql";
 const attachGateMigrationPath = "../modulex-store/supabase/migrations/20260902131000_countertop_attach_pricing_gate.sql";
 const editOrder = read("src/components/customers/EditCustomerOrder.tsx");
+const countertopConfigurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const orderDomain = read("src/lib/customers/order-domain.ts");
 const orderEditing = read("sql/customer-order-editing.sql");
 const revisionMigration = read("../modulex-store/supabase/migrations/20260901090000_customer_order_revision_identity.sql");
@@ -75,8 +76,9 @@ for (const token of [
   "removeCountertopOrderItem(countertopRemoveItemId",
   "orderItemId={countertopEditItemId}",
 ]) assert(editOrder.includes(token), `Edit Order configured-Countertop guard missing ${token}`);
-assert(editOrder.includes("line_no: item.line_no"), "Edit Order must retain the saved line number in Countertop replacement context");
-assert(editOrder.includes("lineNo: countertopEditItem?.line_no"), "Countertop replacement must show the existing order line instead of New countertop");
+assert(countertopConfigurator.includes('.select("order_id,line_no")'), "Existing Countertop replacement must load the saved order line number");
+assert(countertopConfigurator.includes("setResolvedLineNo(orderContext?.lineNo ?? orderItemContext.data?.line_no ?? null)"), "Existing Countertop replacement must resolve Line N from the saved item when the caller does not pass it");
+assert(countertopConfigurator.includes('resolvedLineNo ? `Line ${resolvedLineNo}` : "New countertop"'), "Countertop replacement must show the existing order line instead of New countertop");
 assert(editOrder.includes("Unsaved line edits will be discarded."), "direct Countertop removal must warn before authoritative line reload");
 assert(orderDomain.includes("export async function removeCountertopOrderItem"), "order domain must own Countertop removal");
 assert(orderDomain.includes('.rpc("remove_countertop_order_item"'), "order domain must call the dedicated removal RPC");
