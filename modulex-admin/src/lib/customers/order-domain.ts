@@ -579,6 +579,16 @@ export async function updateCustomerOrder(input: UpdateCustomerOrderInput): Prom
   return Number(data);
 }
 
+export async function removeCountertopOrderItem(orderItemId: string, reason?: string | null): Promise<string> {
+  const { data, error } = await supabase.rpc("remove_countertop_order_item", {
+    p_order_item_id: orderItemId,
+    p_reason: nullableText(reason),
+  });
+
+  if (error) throw error;
+  return String(data);
+}
+
 export async function setCustomerOrderStatus(input: SetCustomerOrderStatusInput): Promise<string | null> {
   const { data, error } = await supabase.rpc("set_customer_order_status", {
     p_order_id: input.orderId,
