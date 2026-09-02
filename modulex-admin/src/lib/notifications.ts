@@ -1,5 +1,4 @@
-import type { UserRole } from "@/lib/supabase/profile";
-import { hasPermission, type Permission } from "@/lib/auth/permissions";
+import { hasPermission, type Permission, type RoleInput } from "@/lib/auth/permissions";
 
 export type NotificationEventType =
   | "low_stock"
@@ -40,7 +39,7 @@ const NOTIFICATION_PERMISSION_POLICY: Record<
   NotificationEventType,
   Permission
 > = {
-  low_stock: "inventory.view",
+  low_stock: "inventory.manage",
   new_order_request: "orders.view",
   new_store_lead: "leads.view",
   new_dealer_application: "leads.view",
@@ -50,7 +49,7 @@ const NOTIFICATION_PERMISSION_POLICY: Record<
   order_status_changed: "orders.view",
   price_review_required: "pricing.view",
   invoice_issued: "invoices.view",
-  approval_requested: "approvals.view",
+  approval_requested: "approvals.review",
   approval_approved: "approvals.view",
   approval_rejected: "approvals.view",
   request_created: "requests.manage",
@@ -59,10 +58,10 @@ const NOTIFICATION_PERMISSION_POLICY: Record<
 };
 
 export function canRoleSeeNotification(
-  role: UserRole,
+  roles: RoleInput,
   type: NotificationEventType
 ) {
-  return hasPermission(role, NOTIFICATION_PERMISSION_POLICY[type]);
+  return hasPermission(roles, NOTIFICATION_PERMISSION_POLICY[type]);
 }
 
 export const NOTIFICATION_LABELS: Record<NotificationEventType, string> = {
