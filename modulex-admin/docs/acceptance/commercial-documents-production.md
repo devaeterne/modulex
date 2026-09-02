@@ -32,7 +32,7 @@ The accepted contract is:
 - Acceptance baseline: `main` = `7af213729f8586a1cdc38d8baac1b47ba60ebee2`.
 - Admin Vercel project `modulex` latest production deployment `dpl_GbsGW59xZ7QLVzLvwaB4nuTeTQrg` is `READY` from that current-main baseline.
 - Production history contains READY deployments for both #247 and #251.
-- `https://admin.oakwellcabinetry.com/customers/6bbfdbbf-c7be-40c3-b93e-72ceeb0f4bd2/orders/5c93479d-bc1b-457d-8603-c58ab6bf237d/print` returns HTTP 200 and resolves to `/customers/[id]/orders/[orderId]/print` on production.
+- A real production Order print URL returned HTTP 200 and resolved to `/customers/[id]/orders/[orderId]/print`.
 - The print surface loads document data client-side under the signed-in Supabase session; this acceptance run did not fabricate or bypass an application login solely to obtain a visual screenshot.
 
 ## Production database evidence
