@@ -19,6 +19,7 @@ function read(relativePath) {
 
 const migration = read("../modulex-store/supabase/migrations/20260903150000_project_financial_rollup.sql");
 const runtimeFix = read("../modulex-store/supabase/migrations/20260903151500_project_financial_rollup_runtime_fix.sql");
+const advisorHardening = read("../modulex-store/supabase/migrations/20260903153000_project_financial_rollup_advisor_hardening.sql");
 const domain = read("src/lib/customers/project-financial.ts");
 const summaryUi = read("src/components/customers/ProjectFinancialSummary.tsx");
 const detailUi = read("src/components/customers/ProjectDetailWorkspace.tsx");
@@ -28,21 +29,24 @@ assert(
   "PB-2 must expose one canonical Project financial summary RPC"
 );
 assert(
-  migration.includes("private.get_customer_project_financial_summary") && /security\s+definer/i.test(migration),
-  "PB-2 privileged implementation must live in private schema behind SECURITY DEFINER"
+  /security\s+definer/i.test(migration) && migration.includes("set search_path"),
+  "PB-2 financial implementation must use a pinned privileged boundary"
 );
 assert(
-  /create\s+or\s+replace\s+function\s+public\.get_customer_project_financial_summary[\s\S]*?language\s+sql[\s\S]*?set\s+search_path\s*=\s*pg_catalog,\s*private/i.test(migration),
-  "PB-2 public RPC must be a SECURITY INVOKER SQL wrapper over the private implementation"
+  advisorHardening.includes("private.get_customer_project_financial_summary") && /security\s+definer/i.test(advisorHardening),
+  "PB-2 privileged implementation must end in private schema behind SECURITY DEFINER"
 );
 assert(
-  !/create\s+or\s+replace\s+function\s+public\.get_customer_project_financial_summary[\s\S]{0,300}?security\s+definer/i.test(migration),
-  "PB-2 public RPC must not be SECURITY DEFINER because authenticated browser EXECUTE would trigger the exposed-definer advisor"
+  /create\s+or\s+replace\s+function\s+public\.get_customer_project_financial_summary[\s\S]*?language\s+sql[\s\S]*?set\s+search_path\s*=\s*pg_catalog,\s*private/i.test(advisorHardening),
+  "PB-2 public RPC must end as a SECURITY INVOKER SQL wrapper over the private implementation"
 );
 assert(
-  runtimeFix.includes("private.get_customer_project_financial_summary") &&
-    runtimeFix.includes("select private.get_customer_project_financial_summary($1)"),
-  "PB-2 production runtime fix must preserve the private-definer/public-invoker boundary"
+  !/create\s+or\s+replace\s+function\s+public\.get_customer_project_financial_summary[\s\S]{0,300}?security\s+definer/i.test(advisorHardening),
+  "PB-2 public RPC must not remain SECURITY DEFINER because authenticated browser EXECUTE would trigger the exposed-definer advisor"
+);
+assert(
+  advisorHardening.includes("select private.get_customer_project_financial_summary($1)"),
+  "PB-2 exposed wrapper must delegate only to the private guarded implementation"
 );
 assert(
   migration.includes("super_admin") && migration.includes("admin") && migration.includes("finance"),
@@ -75,8 +79,9 @@ assert(
   "PB-2 must expose currency consistency instead of inventing FX conversion"
 );
 assert(
-  migration.includes("(select s.default_currency from settings s)"),
-  "PB-2 currency fallback must bind the settings CTE alias so the RPC executes at runtime"
+  migration.includes("(select s.default_currency from settings s)") &&
+    runtimeFix.includes("(select s.default_currency from settings s)"),
+  "PB-2 currency fallback and production forward fix must bind the settings CTE alias"
 );
 
 assert(
