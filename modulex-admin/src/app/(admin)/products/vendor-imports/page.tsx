@@ -4,6 +4,7 @@ import { useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Button from "@/components/ui/button/Button";
 import SinkVendorImportsPanel from "./SinkVendorImportsPanel";
+import StoneContentBackfill from "./StoneContentBackfill";
 import StoneVendorImportsPanel from "./StoneVendorImportsPanel";
 
 export type CatalogDomain = "sink" | "stone";
@@ -30,7 +31,14 @@ export default function VendorImportsPage() {
         >Stone</Button>
       </div>
 
-      {catalogDomain === "sink" ? <SinkVendorImportsPanel /> : <StoneVendorImportsPanel />}
+      {catalogDomain === "sink" ? (
+        <SinkVendorImportsPanel />
+      ) : (
+        <>
+          <StoneContentBackfill />
+          <StoneVendorImportsPanel />
+        </>
+      )}
     </div>
   );
 }
