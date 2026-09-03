@@ -46,10 +46,11 @@ assert(financePermissions.includes('"project_payments.manage"'), "Finance must r
 
 assert(paymentDomain.includes('.rpc("get_customer_project_payment_ledger"'), "Finance/Admin must use authoritative Project payment ledger RPC");
 assert(paymentDomain.includes('.rpc("create_customer_project_payment_requirement"'), "Project payment domain must create requirements through RPC");
-assert(paymentDomain.includes('.rpc("record_customer_project_payment"'), "Project payment domain must record actual payments through RPC");
-assert(paymentDomain.includes('.rpc("allocate_customer_project_payment"'), "Project payment domain must allocate payments through RPC");
-assert(paymentDomain.includes('.rpc("reverse_customer_project_payment"'), "Project payment domain must reverse payments through RPC");
+assert(paymentDomain.includes('.rpc("record_customer_project_payment"'), "Project payment domain must retain canonical actual-payment RPC support");
+assert(paymentDomain.includes('.rpc("allocate_customer_project_payment"'), "Project payment domain must retain canonical allocation RPC support");
+assert(paymentDomain.includes('.rpc("reverse_customer_project_payment"'), "Project payment domain must retain canonical reversal RPC support");
 assert(paymentDomain.includes("allocated: number"), "Project payment currency summary must expose canonical allocated cash separately from received cash");
+assert(paymentDomain.includes("unallocatedCredit: number"), "Project payment currency summary must preserve canonical unallocated Project credit");
 assert(paymentStatusDomain.includes('.rpc("get_customer_project_payment_status"'), "Sales must use sanitized Project payment status RPC");
 
 for (const forbidden of ["amount", "paid_amount", "balance", "cost", "margin", "profit", "vendor_price", "expense_amount"]) {
@@ -60,19 +61,19 @@ for (const tab of ["Overview", "Orders", "Finance", "Procurement", "Fulfillment"
 assert(projectDetail.includes('role="tablist"'), "Project detail tabs must expose tablist semantics");
 assert(projectDetail.includes('role="tab"'), "Project detail tabs must expose tab semantics");
 assert(projectDetail.includes("useSearchParams") && projectDetail.includes('searchParams.get("tab")'), "Project detail must honor ?tab= deep links from related workflows");
-assert(projectDetail.includes("orderTotals="), "Project Finance must receive active Order totals as a reconciliation reference without coupling milestones to Orders");
+assert(projectDetail.includes("orderTotals="), "Project Finance must receive active Order totals as a commercial reference without coupling Payment Plans to Orders");
 assert(invoiceDetail.includes("?tab=Finance"), "Ledger-managed Invoice must deep-link directly to Project Finance");
 assert(financeTab.includes("loadProjectPaymentStatus"), "Project Finance must support Sales-safe payment status");
 assert(financeTab.includes("loadProjectPaymentLedger"), "Project Finance must support Admin/Finance ledger detail");
-assert(financeTab.includes("ProjectFinancialSummary"), "Project Finance must preserve PB-2 profitability separately");
+assert(financeTab.includes("ProjectFinancialSummary"), "Project Finance must preserve PB-2 profitability behind a secondary disclosure");
 
-for (const label of ["Order Value", "Payment Plan", "Collected", "Applied", "Unallocated Credit", "Open Requirements", "Customer Balance"]) {
-  assert(financeTab.includes(label), `Project Finance commercial overview must expose ${label}`);
+for (const label of ["Order Value", "Collected", "Balance", "Credit"]) {
+  assert(financeTab.includes(`label=\"${label}\"`), `Simplified Project Finance overview must expose ${label}`);
 }
-assert(financeTab.includes("Math.max(summary.expected - summary.received, 0)"), "Customer Balance must reflect money still owed by the customer, not unallocated milestone balance");
-assert(financeTab.includes("summary.allocated"), "Applied metric must use canonical allocation total");
-assert(financeTab.includes('TableCell isHeader variant="admin">Applied</TableCell>'), "Payment Plan must label milestone allocation as Applied rather than Received");
-assert(financeTab.includes("Payment plan is") && financeTab.includes("current Project Order value"), "Finance must warn when Payment Plan and Order Value are not reconciled without blocking the workflow");
+assert(financeTab.includes("Math.max(orderValue - summary.received, 0)"), "Project Balance must reflect current Order value less actual collected cash");
+assert(financeTab.includes("summary.unallocatedCredit"), "Project Credit must use canonical unallocated customer cash");
+assert(financeTab.includes('TableCell isHeader variant="admin">Paid</TableCell>'), "Payment Plan must expose paid progress without leaking allocation mechanics into the primary flow");
+assert(financeTab.includes('TableCell isHeader variant="admin">Remaining</TableCell>'), "Payment Plan must expose remaining expected cash");
 
 assert(invoiceDetail.includes("ledger_managed"), "Invoice detail must distinguish legacy and ledger-managed invoices");
 assert(invoiceDetail.includes("Legacy payment tracking") || invoiceDetail.includes("ledgerManaged"), "Invoice detail must preserve an explicit legacy compatibility path");

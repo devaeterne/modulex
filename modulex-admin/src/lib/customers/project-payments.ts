@@ -289,3 +289,33 @@ export async function deleteProjectPayment(input: { paymentId: string; reason: s
   if (error) throw error;
   return data as string;
 }
+
+export async function recordAndAllocateProjectPayment(input: {
+  requirementId: string;
+  amount: number;
+  transactionDate?: string;
+  paymentMethodId?: string | null;
+  referenceNo?: string | null;
+  notes?: string | null;
+}) {
+  await requireProjectPaymentManage();
+  const { data, error } = await supabase.rpc("record_and_allocate_customer_project_payment", {
+    p_requirement_id: input.requirementId,
+    p_amount: input.amount,
+    p_transaction_date: input.transactionDate ?? new Date().toISOString().slice(0, 10),
+    p_payment_method_id: input.paymentMethodId ?? null,
+    p_reference_no: input.referenceNo ?? null,
+    p_notes: input.notes ?? null,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function deleteProjectPaymentRequirement(input: { requirementId: string }) {
+  await requireProjectPaymentManage();
+  const { data, error } = await supabase.rpc("delete_customer_project_payment_requirement", {
+    p_requirement_id: input.requirementId,
+  });
+  if (error) throw error;
+  return data as string;
+}

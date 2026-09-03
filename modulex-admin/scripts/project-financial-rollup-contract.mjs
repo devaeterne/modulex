@@ -54,8 +54,9 @@ assert(
 );
 assert(
   projectFinanceUi.includes("ProjectFinancialSummary") &&
-    projectFinanceUi.includes("canViewCostMargin ? <ProjectFinancialSummary"),
-  "Project Finance tab must not render PB-2 cost/margin without the parent pricing.cost.view gate"
+    projectFinanceUi.includes("canViewCostMargin ? (") &&
+    projectFinanceUi.includes("showProfitability ? <ProjectFinancialSummary"),
+  "Project Finance tab must keep PB-2 cost/margin behind pricing.cost.view even when profitability is collapsed"
 );
 
 console.log("PASS: PB-2 Project financial rollup contract");
