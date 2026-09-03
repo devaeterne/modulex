@@ -13,8 +13,10 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { loadOrderDetail, pricingModelLabel, setCustomerOrderStatus } from "@/lib/customers/order-domain";
+import { supabase } from "@/lib/supabase/client";
 import type {
   CountertopLineSummary,
   CountertopOrderContext,
@@ -38,23 +40,25 @@ const STATUSES: CustomerOrderStatus[] = [
   "cancelled",
 ];
 
+type StatusActor = { id: string; full_name: string | null; email: string | null };
+
 function money(value: string | number | null | undefined, currency = "USD") {
   const amount = Number(value ?? 0);
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number.isFinite(amount) ? amount : 0);
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Number.isFinite(amount) ? amount : 0);
   } catch {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number.isFinite(amount) ? amount : 0);
+    return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(Number.isFinite(amount) ? amount : 0);
   }
 }
 
 function date(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
 }
 
 function dateTime(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function titleCase(value: string) {
@@ -69,6 +73,23 @@ function statusColor(status: CustomerOrderStatus): "success" | "error" | "info" 
   return "light";
 }
 
+function orderDiscount(value: string | number | null | undefined, currency: string) {
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount) || amount === 0) return money(0, currency);
+  return `-${money(Math.abs(amount), currency)}`;
+}
+
+function describeOrderStatusActivity(entry: CustomerOrderStatusHistory) {
+  if (!entry.from_status) return `Order created with ${titleCase(entry.to_status)} status.`;
+  return `Order status changed from ${titleCase(entry.from_status)} to ${titleCase(entry.to_status)}.`;
+}
+
+function orderStatusActor(entry: CustomerOrderStatusHistory, actors: Map<string, StatusActor>) {
+  if (!entry.changed_by) return "System";
+  const actor = actors.get(entry.changed_by);
+  return actor?.full_name || actor?.email || "Modulex user";
+}
+
 function AddressCard({ title, data }: { title: string; data: Record<string, string | null> | null }) {
   const lines = data
     ? [data.company_name, data.contact_name, data.address_line_1, data.address_line_2, [data.postal_code, data.city].filter(Boolean).join(" "), data.state_region, data.country_code, data.phone]
@@ -77,7 +98,7 @@ function AddressCard({ title, data }: { title: string; data: Record<string, stri
 
   return (
     <ComponentCard title={title}>
-      <div className="space-y-1">
+      <div className={`space-y-1 ${ADMIN_TEXT_STYLES.body}`}>
         {lines.length ? lines.map((line, index) => <p key={`${line}-${index}`} className="text-sm">{line}</p>) : <FormHint>—</FormHint>}
       </div>
     </ComponentCard>
@@ -87,8 +108,8 @@ function AddressCard({ title, data }: { title: string; data: Record<string, stri
 function InfoBlock({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <p className="text-sm font-medium">{label}</p>
-      <p className="mt-1 whitespace-pre-wrap text-sm">{value || "—"}</p>
+      <p className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>{label}</p>
+      <p className={`mt-1 whitespace-pre-wrap text-sm ${ADMIN_TEXT_STYLES.body}`}>{value || "—"}</p>
     </div>
   );
 }
@@ -103,6 +124,7 @@ export default function CustomerOrderDetail() {
   const [order, setOrder] = useState<CustomerOrder | null>(null);
   const [items, setItems] = useState<CustomerOrderItem[]>([]);
   const [history, setHistory] = useState<CustomerOrderStatusHistory[]>([]);
+  const [statusActors, setStatusActors] = useState<StatusActor[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [canManage, setCanManage] = useState(false);
   const [contextCanManageCountertop, setContextCanManageCountertop] = useState(false);
@@ -118,12 +140,20 @@ export default function CustomerOrderDetail() {
 
   async function load() {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
       const context = await loadOrderDetail(customerId, orderId);
+      const actorIds = Array.from(new Set(context.history.map((entry) => entry.changed_by).filter((value): value is string => Boolean(value))));
+      let nextActors: StatusActor[] = [];
+      if (actorIds.length > 0) {
+        const actorsResult = await supabase.from("profiles").select("id, full_name, email").in("id", actorIds);
+        if (!actorsResult.error) nextActors = (actorsResult.data ?? []) as StatusActor[];
+      }
       setCustomer(context.customer);
       setOrder(context.order);
       setItems(context.items);
       setHistory(context.history);
+      setStatusActors(nextActors);
       setPendingApprovals(context.pendingApprovals);
       setCanManage(context.canManage);
       setContextCanManageCountertop(context.canManageCountertop);
@@ -161,9 +191,17 @@ export default function CustomerOrderDetail() {
 
   const countertopItemsById = useMemo(() => new Map(countertopItems.map((item) => [item.orderItemId, item])), [countertopItems]);
   const summariesByItemId = useMemo(() => new Map(countertopSummaries.map((summary) => [summary.orderItemId, summary])), [countertopSummaries]);
+  const statusActorsById = useMemo(() => new Map(statusActors.map((actor) => [actor.id, actor])), [statusActors]);
 
   if (isLoading) return <ComponentCard title="Order Detail" desc="Loading order, pricing and fulfillment context…"><FormHint>Loading order…</FormHint></ComponentCard>;
-  if (!customer || !order) return <Alert variant="error" title="Unable to load order" message={errorMessage || "Order not found."} />;
+  if (!customer || !order) {
+    return (
+      <div className="space-y-3">
+        <Alert variant="error" title="Unable to load order" message={errorMessage || "Order not found."} />
+        <Button variant="outline" size="sm" onClick={() => void load()}>Retry</Button>
+      </div>
+    );
+  }
 
   const billing = order.billing_address_snapshot as Record<string, string | null> | null;
   const shipping = order.shipping_address_snapshot as Record<string, string | null> | null;
@@ -254,36 +292,63 @@ export default function CustomerOrderDetail() {
         />
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-12">
-        <div className="space-y-5 xl:col-span-8">
-          <div className="grid gap-5 md:grid-cols-2"><AddressCard title="Billing Address" data={billing} /><AddressCard title="Shipping Address" data={shipping} /></div>
-          <ComponentCard title="Notes & References"><div className="grid gap-4 md:grid-cols-3"><InfoBlock label="Customer Reference" value={order.customer_reference} /><InfoBlock label="Customer Notes" value={order.customer_notes} /><InfoBlock label="Internal Notes" value={order.internal_notes} /></div></ComponentCard>
-        </div>
-        <div className="space-y-5 xl:col-span-4">
-          <ComponentCard title="Totals & Payment">
-            <div className="space-y-3">
-              <SummaryRow label="Subtotal" value={money(order.subtotal, currency)} />
-              <SummaryRow label="Order Discount" value={`-${money(order.discount_amount, currency)}`} />
-              <SummaryRow label={`Tax (${Number(order.tax_rate).toFixed(1)}%)`} value={money(order.tax_amount, currency)} />
-              <SummaryRow label="Order Total" value={money(order.total_amount, currency)} />
-              <SummaryRow label="Payment Method" value={order.payment_method_name_snapshot || "—"} />
-              {Number(order.payment_commission_amount ?? 0) > 0 ? <SummaryRow label={`Commission (${Number(order.payment_commission_percent).toFixed(2)}%)`} value={money(order.payment_commission_amount, currency)} /> : null}
-              <SummaryRow label="Grand Total" value={money(grandTotal, currency)} strong divider />
-            </div>
-          </ComponentCard>
-          <ComponentCard title="Status Timeline">
-            <div className="space-y-4">
-              {history.length === 0 ? <FormHint>No status history yet.</FormHint> : history.map((entry) => (
-                <div key={entry.id} className="space-y-1">
-                  <Badge size="sm" color={statusColor(entry.to_status)}>{entry.from_status ? `${titleCase(entry.from_status)} → ${titleCase(entry.to_status)}` : titleCase(entry.to_status)}</Badge>
-                  {entry.note ? <p className="text-sm">{entry.note}</p> : null}
-                  <FormHint>{dateTime(entry.created_at)}</FormHint>
-                </div>
-              ))}
-            </div>
-          </ComponentCard>
-        </div>
+      <div className="grid gap-5 xl:grid-cols-3">
+        <AddressCard title="Billing Address" data={billing} />
+        <AddressCard title="Shipping Address" data={shipping} />
+        <ComponentCard title="Totals & Payment">
+          <div className="space-y-3">
+            <SummaryRow label="Subtotal" value={money(order.subtotal, currency)} />
+            <SummaryRow label="Order Discount" value={orderDiscount(order.discount_amount, currency)} />
+            <SummaryRow label={`Tax (${Number(order.tax_rate).toFixed(1)}%)`} value={money(order.tax_amount, currency)} />
+            <SummaryRow label="Order Total" value={money(order.total_amount, currency)} />
+            <SummaryRow label="Payment Method" value={order.payment_method_name_snapshot || "—"} />
+            {Number(order.payment_commission_amount ?? 0) > 0 ? <SummaryRow label={`Commission (${Number(order.payment_commission_percent).toFixed(2)}%)`} value={money(order.payment_commission_amount, currency)} /> : null}
+            <SummaryRow label="Grand Total" value={money(grandTotal, currency)} strong divider />
+          </div>
+        </ComponentCard>
       </div>
+
+      <ComponentCard title="Notes & References">
+        <div className="grid gap-4 md:grid-cols-3">
+          <InfoBlock label="Customer Reference" value={order.customer_reference} />
+          <InfoBlock label="Customer Notes" value={order.customer_notes} />
+          <InfoBlock label="Internal Notes" value={order.internal_notes} />
+        </div>
+      </ComponentCard>
+
+      <ComponentCard title="Status Timeline" desc="A readable Order lifecycle history, newest first.">
+        <TableViewport>
+          <Table variant="admin" minWidth="standard">
+            <TableHeader variant="admin">
+              <TableRow>
+                <TableCell isHeader variant="admin">When</TableCell>
+                <TableCell isHeader variant="admin">Activity</TableCell>
+                <TableCell isHeader variant="admin">By</TableCell>
+                <TableCell isHeader variant="admin">Note</TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody variant="admin">
+              {history.length === 0 ? <TableStateRow colSpan={4}>No status history yet.</TableStateRow> : history.map((entry) => (
+                <TableRow key={entry.id}>
+                  <TableCell variant="admin">{dateTime(entry.created_at)}</TableCell>
+                  <TableCell variant="admin">
+                    <div className="space-y-1">
+                      <p className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{describeOrderStatusActivity(entry)}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {entry.from_status ? <Badge size="sm" color={statusColor(entry.from_status)}>{titleCase(entry.from_status)}</Badge> : <Badge size="sm" color="light">Created</Badge>}
+                        <span aria-hidden="true">→</span>
+                        <Badge size="sm" color={statusColor(entry.to_status)}>{titleCase(entry.to_status)}</Badge>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell variant="admin">{orderStatusActor(entry, statusActorsById)}</TableCell>
+                  <TableCell variant="admin">{entry.note || "—"}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableViewport>
+      </ComponentCard>
     </div>
   );
 }
