@@ -9,6 +9,7 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { ADMIN_SURFACE_CARD, ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   Table,
   TableBody,
@@ -176,7 +177,7 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
           {!loading && status ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Overall</span>
+                <span className={`text-sm font-medium ${ADMIN_TEXT_STYLES.body}`}>Overall</span>
                 <Badge color={collectionBadge(status.overallStatus)}>{statusLabel(status.overallStatus)}</Badge>
               </div>
               <TableViewport>
@@ -228,7 +229,7 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
             </div>
           ))}
           {!loading && (ledger?.currencies.length ?? 0) === 0 ? (
-            <p className="text-sm text-gray-600 dark:text-gray-300">No customer payment plan or payment transaction has been recorded yet.</p>
+            <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>No customer payment plan or payment transaction has been recorded yet.</p>
           ) : null}
         </div>
       </ComponentCard>
@@ -370,9 +371,9 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{value}</p>
+    <div className={`${ADMIN_SURFACE_CARD} p-4`}>
+      <p className={`text-xs font-medium uppercase tracking-wide ${ADMIN_TEXT_STYLES.muted}`}>{label}</p>
+      <p className={`mt-2 text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>{value}</p>
     </div>
   );
 }
