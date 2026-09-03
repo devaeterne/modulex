@@ -137,6 +137,17 @@ async function fetchHtml(fetchImpl: FetchLike, url: string) {
   return response.text();
 }
 
+async function fetchPaginationHtml(fetchImpl: FetchLike, url: string, page: number) {
+  const response = await fetchImpl(url, {
+    headers: { accept: "text/html,application/xhtml+xml" },
+    cache: "no-store",
+  });
+  if (page > 1 && response.status === 404) return null;
+  if (page > 2 && response.status >= 500) return null;
+  if (!response.ok) throw new Error(`Stone vendor request failed (${response.status}): ${url}`);
+  return response.text();
+}
+
 async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,
@@ -351,7 +362,8 @@ export class MsiStoneAdapter implements StoneVendorAdapter {
       for (let page = 1; page <= 6; page += 1) {
         const separator = category.path.includes("?") ? "&" : "?";
         const listUrl = `${this.baseUrl}${category.path}${page > 1 ? `${separator}page=${page}` : ""}`;
-        const html = await fetchHtml(this.fetchImpl, listUrl);
+        const html = await fetchPaginationHtml(this.fetchImpl, listUrl, page);
+        if (html === null) break;
         const pageLinks = discoverLinks(
           html,
           this.baseUrl,
@@ -494,7 +506,8 @@ export class MarbleSystemsStoneAdapter implements StoneVendorAdapter {
         const path = page === 1
           ? `/slabs/${encodeURIComponent(category.key)}/`
           : `/slabs/${encodeURIComponent(category.key)}/page/${page}/`;
-        const html = await fetchHtml(this.fetchImpl, `${this.baseUrl}${path}`);
+        const html = await fetchPaginationHtml(this.fetchImpl, `${this.baseUrl}${path}`, page);
+        if (html === null) break;
         const pageLinks = discoverLinks(
           html,
           this.baseUrl,
