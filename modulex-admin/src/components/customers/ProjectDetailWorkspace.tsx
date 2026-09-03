@@ -35,7 +35,9 @@ type ProjectStatusHistory = {
   from_status: ProjectStatus | null;
   to_status: ProjectStatus;
   note: string | null;
+  changed_by: string | null;
   created_at: string;
+  actor: { full_name: string | null; email: string | null } | null;
 };
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
 
@@ -81,6 +83,18 @@ function displayDateTime(value: string | null | undefined) {
 
 function dateInputValue(value: string | null | undefined) {
   return value ? value.slice(0, 10) : "";
+}
+
+function describeProjectActivity(entry: ProjectStatusHistory) {
+  if (!entry.from_status) {
+    return `Project created with ${statusLabel(entry.to_status)} status.`;
+  }
+  return `Project status changed from ${statusLabel(entry.from_status)} to ${statusLabel(entry.to_status)}.`;
+}
+
+function projectActivityActor(entry: ProjectStatusHistory) {
+  if (!entry.changed_by) return "System";
+  return entry.actor?.full_name || entry.actor?.email || "Modulex user";
 }
 
 function money(value: string | number, currency: string) {
@@ -146,7 +160,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
           .order("order_date", { ascending: false }),
         supabase
           .from("customer_project_status_history")
-          .select("id, from_status, to_status, note, created_at")
+          .select("id, from_status, to_status, note, changed_by, created_at, actor:profiles!customer_project_status_history_changed_by_fkey(full_name, email)")
           .eq("project_id", projectId)
           .order("created_at", { ascending: false })
           .limit(50),
@@ -361,14 +375,14 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         ) : null}
       </ComponentCard>
 
-      <ComponentCard title="Activity" desc="Project lifecycle history is append-only and shown newest first.">
+      <ComponentCard title="Activity" desc="A readable Project lifecycle timeline, newest first.">
         <TableViewport>
           <Table variant="admin" minWidth="standard">
             <TableHeader variant="admin">
               <TableRow>
                 <TableCell isHeader variant="admin">When</TableCell>
-                <TableCell isHeader variant="admin">From</TableCell>
-                <TableCell isHeader variant="admin">To</TableCell>
+                <TableCell isHeader variant="admin">Activity</TableCell>
+                <TableCell isHeader variant="admin">By</TableCell>
                 <TableCell isHeader variant="admin">Note</TableCell>
               </TableRow>
             </TableHeader>
@@ -378,8 +392,17 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
               {!loading ? projectActivity.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell variant="admin">{displayDateTime(entry.created_at)}</TableCell>
-                  <TableCell variant="admin">{entry.from_status ? <Badge color={badgeColor(entry.from_status)}>{statusLabel(entry.from_status)}</Badge> : "Created"}</TableCell>
-                  <TableCell variant="admin"><Badge color={badgeColor(entry.to_status)}>{statusLabel(entry.to_status)}</Badge></TableCell>
+                  <TableCell variant="admin">
+                    <div className="space-y-1">
+                      <p className="font-medium text-gray-800 dark:text-white/90">{describeProjectActivity(entry)}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {entry.from_status ? <Badge color={badgeColor(entry.from_status)}>{statusLabel(entry.from_status)}</Badge> : <Badge color="light">Created</Badge>}
+                        <span aria-hidden="true">→</span>
+                        <Badge color={badgeColor(entry.to_status)}>{statusLabel(entry.to_status)}</Badge>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell variant="admin">{projectActivityActor(entry)}</TableCell>
                   <TableCell variant="admin">{entry.note || "—"}</TableCell>
                 </TableRow>
               )) : null}
