@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { ADMIN_BUTTON_VARIANTS, ADMIN_FOCUS_RING } from "@/components/ui/theme/adminTheme";
 import {
   loadCustomerOrderRevisionPolicy,
   type CustomerOrderRevisionPolicy,
@@ -31,14 +32,12 @@ export default function CustomerOrderEditActions() {
   if (!policy?.canEdit) return null;
 
   return (
-    <div className="mb-4 flex justify-end">
-      <Link
-        href={`/customers/${params.id}/orders/${params.orderId}/edit`}
-        title={policy.reason}
-        className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]"
-      >
-        Edit Order
-      </Link>
-    </div>
+    <Link
+      href={`/customers/${params.id}/orders/${params.orderId}/edit`}
+      title={policy.reason}
+      className={`inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-medium transition ${ADMIN_BUTTON_VARIANTS.outline} ${ADMIN_FOCUS_RING}`}
+    >
+      Edit Order
+    </Link>
   );
 }
