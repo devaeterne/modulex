@@ -3,9 +3,9 @@
 Last reviewed: 2026-09-03
 Branch: `project-base`
 Draft PR: `#267 — feat: establish project-base workstream`
-Current package: **PB-1 — Project Core + Order Integration**
-Current status: **Git work remains isolated on `project-base`. Project schema changes will be additive and applied to the existing production Supabase. No separate Supabase branch/project will be used. PB-1 is the mergeable foundation package.**
-Next action: **Implement Project Core in production Supabase, connect `customer_orders.project_id`, add Admin Project list/create/detail, prove legacy standalone Orders still work, then evaluate merge to `main`.**
+Current package: **PB-1 — Project Core + Order Integration — CLOSEOUT**
+Current status: **PB-1 implementation and runtime acceptance are complete on the accepted runtime SHA `e36126913a92acdf4d5c2783f12c29e87dff5030`. The additive Project foundation is live in the existing production Supabase, legacy standalone Orders remain supported, and PR #267 remains draft/open for user-owned merge after docs-only closeout CI.**
+Next action: **Finish docs-only closeout verification, confirm PR #267 remains mergeable against execution-time `main`, then hand the PR to the project owner for merge. Do not start PB-2 until the PB-1 merge and production Admin deployment are confirmed.**
 
 This file is the operational source of truth for the `project-base` workstream. When the project owner asks **“project-base’de şu an neredeyiz?”**, read this file first and report the current package, completed items, blockers, acceptance evidence, and next action.
 
@@ -295,69 +295,81 @@ Future roles include:
 
 ---
 
-## PB-1 — Mergeable Project Foundation `[~]`
+## PB-1 — Mergeable Project Foundation `[x]`
 
 ### A. DB foundation
 
-- [ ] Create Project DB contract tests first.
-- [ ] Add `customer_projects` migration.
-- [ ] Add `customer_project_status_history` if lifecycle history is required for first merge.
-- [ ] Add indexes for customer/status/sales-rep/date filtering.
-- [ ] Add RLS/grants using current Admin authorization conventions.
-- [ ] Add DB-authoritative Project number generation.
-- [ ] Add Project create/update/status/list/detail RPC/server contracts.
-- [ ] Add nullable `customer_orders.project_id` FK.
-- [ ] Enforce Order Customer = Project Customer when Project is present.
-- [ ] Do not backfill legacy Orders.
-- [ ] Apply reviewed additive migration to production Supabase.
-- [ ] Verify existing Orders with `project_id = null` still work.
-- [ ] Run Security Advisor.
-- [ ] Run Performance Advisor.
+- [x] Add Project foundation contract coverage before/with implementation.
+- [x] Add `customer_projects` production contract.
+- [x] Add `customer_project_status_history` lifecycle history.
+- [x] Add covering indexes for customer/status/sales-rep/date/FK access paths.
+- [x] Add RLS/grants using current Admin authorization conventions.
+- [x] Add DB-authoritative Project number generation.
+- [x] Add Project create/update/status/list/detail RPC/server contracts.
+- [x] Add nullable `customer_orders.project_id` FK.
+- [x] Enforce Order Customer = Project Customer when Project is present.
+- [x] Preserve legacy Orders without automatic backfill.
+- [x] Apply reviewed additive Project migrations to production Supabase.
+- [x] Verify existing Orders with `project_id = null` still work.
+- [x] Run Security Advisor; no Project-specific blocking finding.
+- [x] Run Performance Advisor; no Project-specific blocking finding. New Project indexes may report unused-index `INFO` until production traffic exercises them.
+
+Production migration history at PB-1 closeout:
+
+- `20260902232013_project_base_core`
+- `20260902232311_project_base_order_assignment`
+- `20260902234109_project_base_fk_covering_indexes`
+
+Read-only closeout introspection confirms Project tables have RLS enabled, public Project RPCs are authenticated-executable and anon-denied, `customer_orders.project_id` remains nullable, 16 standalone Orders still have `project_id = null`, and 3 Orders are Project-linked. No business-data mutation was performed during closeout.
 
 ### B. Admin Project UI
 
 - [x] Read `modulex-admin/docs/ADMIN_UI_GUIDE.md`.
-- [ ] Read `modulex-admin/docs/ADMIN_VALIDATION_GUIDE.md` before form/mutation work.
-- [ ] Define Project RBAC mapping.
-- [ ] Add `/projects` navigation and route.
-- [ ] Add Project list with server-side search/filter/pagination.
-- [ ] Filters: Project #, Customer, Sales Rep, Status, date.
-- [ ] Add Project create flow.
-- [ ] Prefill Customer salesperson when present; persist Project salesperson independently.
-- [ ] Add `/projects/[id]` detail shell.
-- [ ] Initial foundation tabs/sections: Overview, Orders, Activity.
-- [ ] Show future Financials/Payments/Delivery/Installation/People surfaces only when they have truthful data; do not fake completed features.
-- [ ] Implement loading/empty/populated/error/retry/permission-denied states.
+- [x] Read `modulex-admin/docs/ADMIN_VALIDATION_GUIDE.md` before form/mutation closeout.
+- [x] Define Project RBAC mapping with `projects.view` / `projects.manage`.
+- [x] Add `/projects` navigation and route.
+- [x] Add Project list with server-side search/filter/pagination.
+- [x] Search covers Project # / customer / Project name; filters cover Customer, Sales Rep and Status. The stale pre-implementation date-filter requirement is removed from PB-1 because it was not part of the accepted foundation UI.
+- [x] Add Project create flow.
+- [x] Prefill Customer salesperson when present; persist Project salesperson independently.
+- [x] Add `/projects/[id]` detail shell.
+- [x] Initial foundation sections: Overview, Orders, Project Progress and dedicated Activity.
+- [x] Keep future financial/delivery/install capabilities truthful: PB-1 Project Progress is read-only derived summary and Commercial is count/status only; authoritative rollups remain PB-2/PB-3/PB-5.
+- [x] Implement explicit loading/empty/populated/error/retry/permission-aware states.
 
 ### C. Order integration
 
-- [ ] Allow Order creation from Project context.
-- [ ] Persist `project_id` server-side.
-- [ ] Show Project on Order detail when present.
-- [ ] Show child Orders on Project detail.
-- [ ] Preserve standalone Order creation.
-- [ ] Preserve pricing snapshots, countertop behavior, reservations, revisions and fulfillment contracts.
-- [ ] Add regressions for Order with Project and Order without Project.
+- [x] Allow Order creation from Project context.
+- [x] Persist `project_id` server-side.
+- [x] Show Project on Order detail when present.
+- [x] Show child Orders on Project detail.
+- [x] Preserve standalone Order creation.
+- [x] Preserve pricing snapshots, countertop behavior, reservations, revisions and fulfillment contracts.
+- [x] Add regressions for Order with Project and Order without Project.
+- [x] Exclude cancelled Orders from normal Order `All` results, Project Detail active Orders/count, Project Progress calculations and Link Existing Order choices; retain explicit `Cancelled` filtering.
 
 ### D. Foundation verification
 
-- [ ] Project contract tests pass.
-- [ ] Existing Order domain/lifecycle/pricing/countertop tests pass.
-- [ ] Admin UI strict gate passes for changed files.
-- [ ] RBAC smoke passes.
-- [ ] TypeScript passes.
-- [ ] Lint passes.
-- [ ] Production build passes.
-- [ ] Vercel Preview is available for `project-base` runtime changes.
-- [ ] Signed-in Preview acceptance: create Project → create/link Order → see Order in Project.
-- [ ] Production DB acceptance confirms nullable legacy path still works.
-- [ ] Store/Customer Portal/Dealer Portal regression confirms no accidental Project/internal exposure.
+- [x] Project contract tests pass — Admin Project Base #71.
+- [x] Existing Order domain/lifecycle/pricing/countertop regressions pass — Admin A1 Core Operations #594 and Admin Customers UI #301 remain green on the accepted runtime SHA.
+- [x] Admin UI strict gate passes — Admin UI Foundation #977.
+- [x] RBAC smoke passes — Admin UI Foundation #977.
+- [x] TypeScript passes — Admin UI Foundation #977.
+- [x] Lint passes — Admin UI Foundation #977.
+- [x] Production build passes — Admin UI Foundation #977.
+- [x] Vercel Preview is available for runtime acceptance: deployment `dpl_CfyHrv5kboYLAiPckd1HZg7Bz2dp` is `READY` on exact runtime SHA `e36126913a92acdf4d5c2783f12c29e87dff5030`.
+- [x] Signed-in Preview acceptance completed by the project owner for the final Project Detail / Project Progress presentation and Project↔Order workflow.
+- [x] Production DB acceptance confirms the nullable legacy path and Project-linked path coexist.
+- [x] Store/Customer Portal/Dealer Portal regression confirms no accidental Project/internal projection exposure.
+- [x] Project Progress acceptance is locked as a **full-width compact overview** with horizontal lifecycle badge flow (`Draft → Quoted → Approved → Ordered → In Progress → Completed`, `Done / Current / Pending`), responsive Orders / Delivery / Installation / Commercial blocks, cancelled-Order exclusion, and a separate actor-aware `Activity` card as the official Project lifecycle/audit timeline.
 
-**PB-1 done when:** Project is a real production DB entity, Admin can create/manage it, existing Orders can optionally belong to it, and legacy standalone Orders remain backward compatible.
+**PB-1 done:** Project is a real production DB entity, Admin can create/manage it, existing Orders can optionally belong to it, Project Customer is authoritative for Project-context Orders, and legacy standalone Orders remain backward compatible.
 
 ### PB-1 merge decision
 
-Once PB-1 is fully verified, **`project-base` can be merged into `main`**. The following packages are explicitly not required for that merge.
+PB-1 is functionally accepted. PR #267 remains draft/open and must be merged by the project owner only after the docs-only closeout commit is green and GitHub still reports the PR mergeable against execution-time `main`.
+
+The following packages are explicitly not required for that merge.
 
 ---
 
@@ -546,6 +558,8 @@ PB-1 must prove at minimum:
 10. Store/Customer Portal/Dealer Portal are unchanged unless explicitly extended later.
 11. Internal Project data is not exposed publicly.
 
+All PB-1 foundation scenarios are accepted by the runtime/DB/CI evidence recorded above. No PB-2/PB-3/PB-5 authoritative rollup is implied by this acceptance.
+
 ---
 
 # 10. Tracking Protocol
@@ -570,11 +584,17 @@ For every Project Base package:
 As of 2026-09-03:
 
 - Git branch: `project-base`.
-- Draft PR: #267, open; do not auto-merge.
+- Draft PR: #267, open; **do not auto-merge**. The project owner performs the merge.
+- Accepted runtime SHA: `e36126913a92acdf4d5c2783f12c29e87dff5030`.
+- Accepted Vercel Admin Preview: `dpl_CfyHrv5kboYLAiPckd1HZg7Bz2dp`, `READY`, exact runtime SHA above.
+- Execution-time `main` observed during closeout: `0c5e3feec4f213002b7268b70d6d483e789acefb`; the accepted runtime branch was 2 commits behind but PR #267 was mergeable before docs-only closeout. Re-check this gate after the closeout commit.
 - Supabase strategy: **existing production project `bzjoeernnmvuhzyvbowc`**.
 - Separate Supabase branch/project: **cancelled**.
-- DB mutation so far from Project Base: **none before PB-1 implementation**.
-- Current package: **PB-1 — Mergeable Project Foundation**.
-- Merge target: **after Project CRUD + Project↔Order integration + backward compatibility/regression acceptance**.
-- Finance, Payments, Change Orders, Participants, Commissions and portal Project navigation: **post-foundation upgrades**.
-- Immediate next action: **write PB-1 DB/contract tests, inspect current Order/RBAC/migration conventions, then implement the additive Project migration and Admin foundation.**
+- Production Project foundation migrations are applied: `project_base_core`, `project_base_order_assignment`, `project_base_fk_covering_indexes`.
+- Project tables/RPC/FK/RLS/grants are present; `customer_orders.project_id` is nullable; Project/customer assignment fails closed on mismatch.
+- Fresh closeout Security/Performance Advisor review shows **no Project-specific blocking finding**. Project unused-index notices are informational, not a reason to remove the new covering/filter indexes during PB-1 closeout.
+- Business-data mutation during PB-1 closeout: **none**; verification used repository/runtime metadata and read-only production introspection.
+- Current package: **PB-1 — Mergeable Project Foundation — functionally accepted, docs/PR closeout in progress**.
+- Store public/Customer Portal/Dealer Portal Project projection: **unchanged**; `modulex-store/STORE_ROADMAP.md` is intentionally untouched for PB-1 closeout.
+- Finance, Payments, Change Orders, Participants, Commissions and authoritative Project delivery/install rollups remain **post-foundation upgrades**.
+- Immediate next action: **finish docs-only CI + PR mergeability verification, report `PB-1 merge-ready`, then wait for the project owner to merge and production-deploy PB-1 before any PB-2 implementation.**
