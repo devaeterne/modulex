@@ -18,6 +18,8 @@ import { DEFAULT_GENERAL_SETTINGS, type GeneralSettings } from "@/lib/settings/t
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 
+type LedgerAwareInvoice = CustomerInvoice & { ledger_managed?: boolean };
+
 function money(value: string | number | null | undefined, currency = "USD", locale = "en-US") {
   const amount = Number(value ?? 0);
   try {
@@ -65,11 +67,13 @@ function addressLines(snapshot: Record<string, unknown> | null) {
 export default function CustomerInvoiceDetail() {
   const params = useParams<{ id: string; invoiceId: string }>();
   const router = useRouter();
-  const [invoice, setInvoice] = useState<CustomerInvoice | null>(null);
+  const [invoice, setInvoice] = useState<LedgerAwareInvoice | null>(null);
   const [items, setItems] = useState<CustomerInvoiceItem[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [settings, setSettings] = useState<GeneralSettings>(DEFAULT_GENERAL_SETTINGS);
   const [canManage, setCanManage] = useState(false);
+  const [canManagePayments, setCanManagePayments] = useState(false);
   const [paidAmount, setPaidAmount] = useState("");
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,6 +97,7 @@ export default function CustomerInvoiceDetail() {
       return;
     }
     setCanManage(hasPermission(profile.role, "invoices.manage"));
+    setCanManagePayments(hasPermission(profile.role, "project_payments.manage"));
 
     const [invoiceResult, itemsResult, customerResult, settingsResult, approvalsResult] = await Promise.all([
       supabase.from("customer_invoices").select("*").eq("id", params.invoiceId).eq("customer_id", params.id).single(),
@@ -109,10 +114,21 @@ export default function CustomerInvoiceDetail() {
       return;
     }
 
-    const loadedInvoice = invoiceResult.data as CustomerInvoice;
+    const loadedInvoice = invoiceResult.data as LedgerAwareInvoice;
+    let nextProjectId: string | null = null;
+    if (loadedInvoice.order_id) {
+      const orderProjectResult = await supabase
+        .from("customer_orders")
+        .select("project_id")
+        .eq("id", loadedInvoice.order_id)
+        .maybeSingle();
+      if (!orderProjectResult.error) nextProjectId = orderProjectResult.data?.project_id ?? null;
+    }
+
     setInvoice(loadedInvoice);
     setItems((itemsResult.data ?? []) as CustomerInvoiceItem[]);
     setCustomer(customerResult.data as Customer);
+    setProjectId(nextProjectId);
     if (!settingsResult.error && settingsResult.data) setSettings(settingsResult.data as GeneralSettings);
     setPaidAmount(String(Number(loadedInvoice.paid_amount ?? 0)));
     setPendingApprovals(approvalsResult.error ? 0 : approvalsResult.count ?? 0);
@@ -134,7 +150,9 @@ export default function CustomerInvoiceDetail() {
     setSuccessMessage(null);
     setIsSaving(true);
 
-    const amount = explicitPaid ?? (paidAmount.trim() ? Number(paidAmount) : null);
+    const amount = invoice.ledger_managed || !canManagePayments
+      ? null
+      : explicitPaid ?? (paidAmount.trim() ? Number(paidAmount) : null);
     if (amount !== null && (!Number.isFinite(amount) || amount < 0 || amount > Number(invoice.total_amount))) {
       setErrorMessage("Paid amount must be between zero and invoice total.");
       setIsSaving(false);
@@ -161,6 +179,7 @@ export default function CustomerInvoiceDetail() {
   if (isLoading) return <ComponentCard title="Invoice Detail" desc="Loading invoice and payment context…"><FormHint>Loading invoice…</FormHint></ComponentCard>;
   if (!invoice || !customer) return <Alert variant="error" title="Unable to load invoice" message={errorMessage || "Invoice not found."} />;
 
+  const ledgerManaged = Boolean(invoice.ledger_managed);
   const locale = settings.locale || "en-US";
   const timezone = settings.timezone || "UTC";
   const formatMoney = (value: string | number | null | undefined) => money(value, invoice.currency_code, locale);
@@ -197,6 +216,20 @@ export default function CustomerInvoiceDetail() {
           <SummaryRow label="Currency" value={invoice.currency_code || "USD"} />
         </div>
       </ComponentCard>
+
+      {ledgerManaged ? (
+        <ComponentCard
+          title="Project Payment Ledger"
+          desc="This Invoice is ledger-managed. Paid amount and payment status are derived from Project payment allocations."
+          headerAction={projectId ? <Button size="sm" onClick={() => router.push(`/projects/${projectId}?tab=Finance`)}>Open Project Finance</Button> : undefined}
+        >
+          <FormHint>Record, allocate, reverse or refund customer cash from the Project Finance tab. Invoice payment values are read-only here.</FormHint>
+        </ComponentCard>
+      ) : (
+        <ComponentCard title="Legacy payment tracking" desc="This existing Invoice retains its pre-ledger paid amount history until it is explicitly linked to Project payment requirements." collapsed>
+          <FormHint>No historical payment transaction was fabricated during the PB-3A migration. New payment entry is restricted to Finance and Admin.</FormHint>
+        </ComponentCard>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <ComponentCard title="Seller">
@@ -262,16 +295,23 @@ export default function CustomerInvoiceDetail() {
       </div>
 
       {canManage ? (
-        <ComponentCard title="Invoice Controls" desc="Issue invoices, record payment progress, mark paid or void. Approval rules remain database-authoritative.">
+        <ComponentCard
+          title="Invoice Controls"
+          desc={ledgerManaged
+            ? "Invoice issue/void remains an Invoice workflow. Customer payment truth is managed from Project Finance."
+            : "Invoice lifecycle actions stay here. Customer payment entry is restricted to Finance and Admin."}
+        >
           <div className="flex flex-wrap items-end gap-3">
             {invoice.status === "draft" ? <Button disabled={isSaving} onClick={() => void updateState("issued")}>Issue Invoice</Button> : null}
-            {!['draft', 'void'].includes(invoice.status) ? (
+            {!ledgerManaged && canManagePayments && !["draft", "void"].includes(invoice.status) ? (
               <>
                 <div className="w-44"><Label htmlFor="invoice-paid-amount">Paid amount</Label><Input id="invoice-paid-amount" type="number" min="0" max={Number(invoice.total_amount)} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} /></div>
                 <Button variant="outline" disabled={isSaving} onClick={() => void updateState()}>Save Payment</Button>
                 {invoice.status !== "paid" ? <Button disabled={isSaving} onClick={() => void updateState("paid", Number(invoice.total_amount))}>Mark Paid</Button> : null}
               </>
             ) : null}
+            {!ledgerManaged && !canManagePayments && !["draft", "void"].includes(invoice.status) ? <FormHint>Customer payment entry is Finance/Admin-only.</FormHint> : null}
+            {ledgerManaged && projectId ? <Button variant="outline" disabled={isSaving} onClick={() => router.push(`/projects/${projectId}?tab=Finance`)}>Project Finance</Button> : null}
             {invoice.status !== "void" ? <Button variant="danger" disabled={isSaving} onClick={() => void updateState("void")}>Void</Button> : null}
           </div>
         </ComponentCard>

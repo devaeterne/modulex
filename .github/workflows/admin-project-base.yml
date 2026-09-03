@@ -29,5 +29,7 @@ jobs:
         run: node scripts/project-progress-layout-contract.mjs
       - name: Project Financial rollup contract
         run: node scripts/project-financial-rollup-contract.mjs
+      - name: Project Payment Ledger contract
+        run: node scripts/project-payment-ledger-contract.mjs
       - name: Countertop Sink fallback contract
         run: node scripts/countertop-sink-fallback-contract.mjs

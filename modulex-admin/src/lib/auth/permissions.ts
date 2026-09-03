@@ -28,6 +28,8 @@ export type Permission =
   | "customers.manage"
   | "projects.view"
   | "projects.manage"
+  | "project_payments.view"
+  | "project_payments.manage"
   | "orders.view"
   | "orders.manage"
   | "approvals.view"
@@ -75,6 +77,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "customers.manage": "Manage customer records",
   "projects.view": "View customer projects",
   "projects.manage": "Create & change customer projects",
+  "project_payments.view": "View Project customer collection status",
+  "project_payments.manage": "Manage Project customer payments & allocations",
   "orders.view": "View customer orders",
   "orders.manage": "Create & change customer orders",
   "approvals.view": "View approval requests",
@@ -122,6 +126,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "customers.manage",
     "projects.view",
     "projects.manage",
+    "project_payments.view",
     "orders.view",
     "orders.manage",
     "approvals.view",
@@ -143,6 +148,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "pricing.view",
     "pricing.cost.view",
     "projects.view",
+    "project_payments.view",
+    "project_payments.manage",
     "orders.view",
     "approvals.view",
     "invoices.view",
@@ -191,8 +198,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Full system access, including protected Super Admin account management.",
   admin: "Full business and system administration, except protected Super Admin account actions.",
-  sales: "Customer, project, website lead, dealer application, order, invoice, shipment and installation workflows. Financial exceptions remain subject to approval.",
-  finance: "Projects, invoices, collections, cost/margin visibility and payroll processing. Compensation setup is read-only; employee HR master data stays restricted.",
+  sales: "Customer, project, website lead, dealer application, order, invoice, shipment and installation workflows. Customer collection status is visible, while payment entry, cost and internal finance remain restricted.",
+  finance: "Projects, invoices, customer payment ledger, collections, cost/margin visibility and payroll processing. Compensation setup is read-only; employee HR master data stays restricted.",
   hr: "Full personnel lifecycle management including attendance, leave, compensation, payroll, benefits, documents, compliance, onboarding/offboarding and performance.",
   warehouse: "Stock, shipment and QR operations with read access to warehouse structure. Warehouse master data remains Admin-managed.",
   shipping: "Shipment execution with inventory, warehouse-location and QR-label visibility. General stock operations, customer commercial data and order-financial screens stay restricted.",
