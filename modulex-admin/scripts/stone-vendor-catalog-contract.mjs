@@ -66,12 +66,13 @@ assert.doesNotMatch(adapters, /vendorPriceReference/);
 // East West moved from numeric category routes to /products/<stone-type>, and
 // product detail URLs are nested under that stone-type route.
 assert.match(adapters, /\/products\/\$\{encodeURIComponent\(category\.key\)\}/);
-assert.match(adapters, /product\\\/view\\\/\\d\+\\\/\\d\+/);
+assert.match(adapters, /product\/view\/\\d\+\/\\d\+/);
 assert.doesNotMatch(adapters, /\/products\/category\/view\//);
 
 // Venezia has stale/dead catalog links in secondary navigation. A 404 category
 // must be skipped instead of aborting the complete vendor run.
 assert.match(adapters, /status\s*===\s*404/);
+assert.match(adapters, /html\s*===\s*null/);
 assert.match(adapters, /continue/);
 
 assert.match(msiMarbleSystemsAdapters, /class MsiStoneAdapter/);
@@ -89,11 +90,15 @@ assert.match(msiMarbleSystemsAdapters, /Item Code/);
 assert.match(msiMarbleSystemsAdapters, /Available Quantity/);
 assert.match(msiMarbleSystemsAdapters, /Location/);
 assert.match(msiMarbleSystemsAdapters, /stockQuantity:\s*quantity/);
-// Do not manufacture pagination URLs. Only follow pagination URLs that the
-// vendor actually exposes, so terminal 404/500 pages do not fail the sync.
-assert.doesNotMatch(msiMarbleSystemsAdapters, /\?page=\$\{page\}/);
-assert.doesNotMatch(msiMarbleSystemsAdapters, /page\/\$\{page\}/);
-assert.match(msiMarbleSystemsAdapters, /pagination/i);
+// MSI page 2 and Marble Systems page 2 are valid, while later terminal pages
+// can return 5xx/404. After at least one successful page, terminal pagination
+// responses must stop discovery rather than failing the complete vendor run.
+assert.match(msiMarbleSystemsAdapters, /fetchPaginationHtml/);
+assert.match(msiMarbleSystemsAdapters, /page\s*>\s*1/);
+assert.match(msiMarbleSystemsAdapters, /response\.status\s*===\s*404/);
+assert.match(msiMarbleSystemsAdapters, /response\.status\s*>=\s*500/);
+assert.match(msiMarbleSystemsAdapters, /\?page=\$\{page\}/);
+assert.match(msiMarbleSystemsAdapters, /page\/\$\{page\}/);
 assert.doesNotMatch(msiMarbleSystemsAdapters, /vendorPriceReference/);
 assert.doesNotMatch(msiMarbleSystemsAdapters, /\.from\(["']inventory["']\)/);
 
