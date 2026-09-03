@@ -60,6 +60,10 @@ assert(
   migration.includes("mixed_currency") && migration.includes("currency_code"),
   "PB-2 must expose currency consistency instead of inventing FX conversion"
 );
+assert(
+  migration.includes("(select s.default_currency from settings s)"),
+  "PB-2 currency fallback must bind the settings CTE alias so the RPC executes at runtime"
+);
 
 assert(
   domain.includes('hasPermission(profile.roles, "pricing.cost.view")'),
