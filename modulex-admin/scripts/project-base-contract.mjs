@@ -100,6 +100,14 @@ assert(
   projectDetail.includes('.from("customer_project_status_history")') && projectDetail.includes('title="Activity"'),
   "Project detail must show truthful Project lifecycle activity from status history"
 );
+assert(
+  projectDetail.includes('text-gray-700 dark:text-gray-300'),
+  "Project detail summary text must remain readable in light and dark themes"
+);
+assert(
+  projectDetail.includes('md:grid-cols-2 xl:grid-cols-5'),
+  "Project Settings should use the available wide-screen space without leaving an empty third column"
+);
 
 assert(
   customerOrdersList.includes('if (status === "all") query = query.neq("status", "cancelled")'),
