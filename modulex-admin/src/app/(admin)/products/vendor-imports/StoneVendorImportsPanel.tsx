@@ -232,7 +232,8 @@ export default function StoneVendorImportsPanel() {
   const [savingMapping, setSavingMapping] = useState(false);
 
   const getAccessToken = useCallback(async () => {
-    let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    let session = sessionData.session;
     if (sessionError || !session?.access_token) {
       throw new Error("Your admin session could not be verified. Please sign in again.");
     }
@@ -456,7 +457,10 @@ export default function StoneVendorImportsPanel() {
   function togglePageSelection(checked: boolean) {
     setSelectedIds((current) => {
       const next = new Set(current);
-      for (const id of pageEligibleIds) checked ? next.add(id) : next.delete(id);
+      for (const id of pageEligibleIds) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
       return next;
     });
   }
@@ -757,7 +761,7 @@ export default function StoneVendorImportsPanel() {
                 const individuallyApprovable = Boolean(item.stone_type_id) && item.availability_status !== "MISSING";
                 return (
                   <TableRow key={item.id} className="align-middle">
-                    <TableCell variant="admin"><Checkbox checked={selectedIds.has(item.id)} onChange={(checked) => setSelectedIds((current) => { const next = new Set(current); checked ? next.add(item.id) : next.delete(item.id); return next; })} disabled={!eligible || bulkApproving} ariaLabel={`Select ${item.sku ?? item.title} for Stone approval`} /></TableCell>
+                    <TableCell variant="admin"><Checkbox checked={selectedIds.has(item.id)} onChange={(checked) => setSelectedIds((current) => { const next = new Set(current); if (checked) next.add(item.id); else next.delete(item.id); return next; })} disabled={!eligible || bulkApproving} ariaLabel={`Select ${item.sku ?? item.title} for Stone approval`} /></TableCell>
                     <TableCell variant="admin">{item.image_url ? <a href={item.image_url} target="_blank" rel="noreferrer"><img src={item.image_url} alt={item.title} loading="lazy" referrerPolicy="no-referrer" className="h-14 w-14 object-contain" /></a> : <Badge size="sm" color="light">No image</Badge>}</TableCell>
                     <TableCell variant="admin"><span className="block font-medium uppercase">{item.vendor_code}</span><span className="mt-1 block text-xs opacity-70">{item.stone_data.collection ?? item.vendor_category_label ?? "—"}</span></TableCell>
                     <TableCell variant="admin"><span className="block font-medium">{item.stone_type_name ?? item.stone_data.stoneTypeName ?? "Unresolved"}</span><span className="mt-1 block text-xs opacity-70">Source: {item.stone_data.sourceStoneTypeName ?? "—"}</span>{item.stone_type_review_status === "pending_review" ? <Badge size="sm" color="warning">Taxonomy review pending</Badge> : null}</TableCell>
