@@ -107,6 +107,9 @@ export async function runStoneVendorCatalogSync(
       categoryLabel: options.categoryLabel,
     });
     discovered = products.length;
+    if (products.length === 0) {
+      throw new Error(`Stone vendor discovery returned zero products for ${vendorCode}.`);
+    }
 
     for (const product of products) {
       try {

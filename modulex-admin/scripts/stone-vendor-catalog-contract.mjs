@@ -13,6 +13,7 @@ const readOptional = (path) => {
 };
 
 const domain = read("src/lib/vendor-catalog/stone-domain.ts");
+const sinkAdapters = read("src/lib/vendor-catalog/adapters.ts");
 const adapters = read("src/lib/vendor-catalog/stone-adapters.ts");
 const msiMarbleSystemsAdapters = read(
   "src/lib/vendor-catalog/stone-adapters-msi-marble-systems.ts"
@@ -39,6 +40,15 @@ assert.match(domain, /"msi"/);
 assert.match(domain, /"marble_systems"/);
 assert.doesNotMatch(domain, /vendorPriceReference/);
 
+// Ruvati is a catalog source, not a Woo checkout. Woo purchasability must not
+// classify an otherwise in-stock catalog item as unavailable.
+assert.match(sinkAdapters, /product\.is_in_stock\s*===\s*false/);
+assert.match(sinkAdapters, /product\.is_in_stock\s*===\s*true/);
+assert.doesNotMatch(
+  sinkAdapters,
+  /if\s*\(product\.is_purchasable\s*===\s*false\)\s*\{[\s\S]{0,180}?status:\s*"UNAVAILABLE"/
+);
+
 assert.match(adapters, /class EwMarbleStoneAdapter/);
 assert.match(adapters, /class VeneziaStoneAdapter/);
 assert.match(adapters, /parseEwMarbleDetail/);
@@ -52,6 +62,18 @@ assert.match(adapters, /marble_systems:\s*\(\)\s*=>\s*new MarbleSystemsStoneAdap
 assert.match(adapters, /stoneVendorCatalogRegistry/);
 assert.doesNotMatch(adapters, /0\.00 EUR/);
 assert.doesNotMatch(adapters, /vendorPriceReference/);
+
+// East West moved from numeric category routes to /products/<stone-type>, and
+// the runtime behavior contract verifies current nested product detail URLs.
+assert.match(adapters, /\/products\/\$\{encodeURIComponent\(category\.key\)\}/);
+assert.match(adapters, /product\/view/);
+assert.doesNotMatch(adapters, /\/products\/category\/view\//);
+
+// Venezia has stale/dead catalog links in secondary navigation. A 404 category
+// must be skipped instead of aborting the complete vendor run.
+assert.match(adapters, /status\s*===\s*404/);
+assert.match(adapters, /html\s*===\s*null/);
+assert.match(adapters, /continue/);
 
 assert.match(msiMarbleSystemsAdapters, /class MsiStoneAdapter/);
 assert.match(msiMarbleSystemsAdapters, /parseMsiDetailVariants/);
@@ -68,8 +90,12 @@ assert.match(msiMarbleSystemsAdapters, /Item Code/);
 assert.match(msiMarbleSystemsAdapters, /Available Quantity/);
 assert.match(msiMarbleSystemsAdapters, /Location/);
 assert.match(msiMarbleSystemsAdapters, /stockQuantity:\s*quantity/);
-assert.match(msiMarbleSystemsAdapters, /page\s*===\s*1/);
-assert.match(msiMarbleSystemsAdapters, /page\/\$\{page\}/);
+// MSI page 2 and Marble Systems page 2 are valid, while later terminal pages
+// can return 5xx/404. Runtime behavior tests own the exact URL-shape checks.
+assert.match(msiMarbleSystemsAdapters, /fetchPaginationHtml/);
+assert.match(msiMarbleSystemsAdapters, /page\s*>\s*1/);
+assert.match(msiMarbleSystemsAdapters, /response\.status\s*===\s*404/);
+assert.match(msiMarbleSystemsAdapters, /response\.status\s*>=\s*500/);
 assert.doesNotMatch(msiMarbleSystemsAdapters, /vendorPriceReference/);
 assert.doesNotMatch(msiMarbleSystemsAdapters, /\.from\(["']inventory["']\)/);
 
@@ -79,6 +105,8 @@ assert.match(sync, /stone_data/);
 assert.match(sync, /resolve_vendor_stone_type/);
 assert.match(sync, /vendor_price_reference:\s*null/);
 assert.match(sync, /missingReconciliation:\s*false/);
+assert.match(sync, /products\.length\s*===\s*0/);
+assert.match(sync, /zero products|no products/i);
 assert.doesNotMatch(sync, /\.from\("inventory"\)/);
 assert.doesNotMatch(sync, /store.*publish/i);
 
@@ -133,5 +161,7 @@ assert.match(sql, /stone_data jsonb/);
 assert.match(sql, /vendor inventory is reference-only/i);
 assert.match(sql, /v_material_price_band_id is not null/i);
 assert.equal(migration.trim(), sql.trim(), "Deployable Stone vendor migration must mirror canonical SQL");
+
+await import("./vendor-catalog-adapter-behavior-contract.mjs");
 
 console.log("stone vendor catalog contract: ok");

@@ -324,31 +324,28 @@ type WooCategory = {
 };
 
 function normalizeRuvatiAvailability(product: WooProduct): NormalizedVendorProduct["availability"] {
-  if (product.is_purchasable === false) {
-    return {
-      status: "UNAVAILABLE",
-      available: product.is_in_stock ?? null,
-      purchasable: false,
-      stockQuantity: null,
-    };
-  }
-  if (product.is_purchasable === true && product.is_in_stock === false) {
+  if (product.is_in_stock === false) {
     return {
       status: "OUT_OF_STOCK",
       available: false,
-      purchasable: true,
+      purchasable: product.is_purchasable ?? null,
       stockQuantity: null,
     };
   }
-  if (product.is_purchasable === true && product.is_in_stock === true) {
+  if (product.is_in_stock === true) {
     return {
       status: "AVAILABLE",
       available: true,
-      purchasable: true,
+      purchasable: product.is_purchasable ?? null,
       stockQuantity: null,
     };
   }
-  return unknownAvailability();
+  return {
+    status: "UNKNOWN",
+    available: null,
+    purchasable: product.is_purchasable ?? null,
+    stockQuantity: null,
+  };
 }
 
 function extractSitemapUrls(xml: string) {
