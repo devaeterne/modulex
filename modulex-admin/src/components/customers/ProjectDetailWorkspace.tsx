@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
+import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
 import Input from "@/components/form/input/InputField";
@@ -297,35 +298,39 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         ) : null}
       </ComponentCard>
 
-      {canManageProjects ? (
-        <ComponentCard title="Project Settings" desc="Update Project ownership, lifecycle status, and schedule without changing the Customer account.">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <div>
-              <Label htmlFor="project-detail-name">Project name</Label>
-              <Input id="project-detail-name" value={editName} onChange={(event) => setEditName(event.target.value)} />
+      <div className={canManageProjects ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start" : undefined}>
+        {canManageProjects ? (
+          <ComponentCard title="Project Settings" desc="Update Project ownership, lifecycle status, and schedule without changing the Customer account.">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div>
+                <Label htmlFor="project-detail-name">Project name</Label>
+                <Input id="project-detail-name" value={editName} onChange={(event) => setEditName(event.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="project-detail-sales-rep">Sales Rep</Label>
+                <Select id="project-detail-sales-rep" options={salesRepOptions} value={editSalesRepId} onChange={setEditSalesRepId} placeholder="No sales rep" allowEmpty />
+              </div>
+              <div>
+                <Label htmlFor="project-detail-status">Status</Label>
+                <Select id="project-detail-status" options={projectStatusOptions} value={editStatus} onChange={(value) => setEditStatus(value as ProjectStatus)} />
+              </div>
+              <div>
+                <Label htmlFor="project-detail-start-date">Start date</Label>
+                <Input id="project-detail-start-date" type="date" value={editStartDate} onChange={(event) => setEditStartDate(event.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="project-detail-target-date">Target date</Label>
+                <Input id="project-detail-target-date" type="date" value={editTargetDate} onChange={(event) => setEditTargetDate(event.target.value)} />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="project-detail-sales-rep">Sales Rep</Label>
-              <Select id="project-detail-sales-rep" options={salesRepOptions} value={editSalesRepId} onChange={setEditSalesRepId} placeholder="No sales rep" allowEmpty />
+            <div className="flex justify-end">
+              <Button onClick={saveProject} disabled={savingProject || loading}>{savingProject ? "Saving…" : "Save Project"}</Button>
             </div>
-            <div>
-              <Label htmlFor="project-detail-status">Status</Label>
-              <Select id="project-detail-status" options={projectStatusOptions} value={editStatus} onChange={(value) => setEditStatus(value as ProjectStatus)} />
-            </div>
-            <div>
-              <Label htmlFor="project-detail-start-date">Start date</Label>
-              <Input id="project-detail-start-date" type="date" value={editStartDate} onChange={(event) => setEditStartDate(event.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="project-detail-target-date">Target date</Label>
-              <Input id="project-detail-target-date" type="date" value={editTargetDate} onChange={(event) => setEditTargetDate(event.target.value)} />
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button onClick={saveProject} disabled={savingProject || loading}>{savingProject ? "Saving…" : "Save Project"}</Button>
-          </div>
-        </ComponentCard>
-      ) : null}
+          </ComponentCard>
+        ) : null}
+
+        <ProjectProgressSummary project={project} projectActivity={projectActivity} />
+      </div>
 
       <ComponentCard
         title="Orders"
