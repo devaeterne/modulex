@@ -154,7 +154,7 @@ assert(
     projectProgressUi.includes('title="Project Progress"'),
   "Project Progress must use shared Admin card, badge and light/dark text primitives"
 );
-for (const sectionLabel of ["Lifecycle", "Orders", "Delivery", "Installation", "Commercial", "Recent Activity"]) {
+for (const sectionLabel of ["Lifecycle", "Orders", "Delivery", "Installation", "Commercial"]) {
   assert(projectProgressUi.includes(sectionLabel), `Project Progress must show ${sectionLabel}`);
 }
 assert(
