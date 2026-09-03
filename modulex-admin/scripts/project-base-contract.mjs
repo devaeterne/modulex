@@ -20,10 +20,12 @@ function read(relativePath) {
 const permissions = read("src/lib/auth/permissions.ts");
 const sidebar = read("src/layout/AppSidebar.tsx");
 const projectDomain = read("src/lib/customers/project-domain.ts");
+const projectProgressDomain = read("src/lib/customers/project-progress.ts");
 const projectsPage = read("src/app/(admin)/projects/page.tsx");
 const projectsWorkspace = read("src/components/customers/ProjectsWorkspace.tsx");
 const projectDetailPage = read("src/app/(admin)/projects/[id]/page.tsx");
 const projectDetail = read("src/components/customers/ProjectDetailWorkspace.tsx");
+const projectProgressUi = read("src/components/customers/ProjectProgressSummary.tsx");
 const customerOrdersList = read("src/components/customers/CustomerOrdersList.tsx");
 const newOrderPage = read("src/app/(admin)/customers/[id]/orders/new/page.tsx");
 const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
@@ -139,6 +141,39 @@ assert(
     projectDetail.includes('variant="admin">Activity</TableCell>') &&
     projectDetail.includes('variant="admin">By</TableCell>'),
   "Project activity must explain what changed and identify the actor when available"
+);
+
+assert(
+  projectDetail.includes("ProjectProgressSummary"),
+  "Project detail must expose an at-a-glance Project Progress summary"
+);
+assert(
+  projectProgressUi.includes("ComponentCard") &&
+    projectProgressUi.includes("Badge") &&
+    projectProgressUi.includes("ADMIN_TEXT_STYLES") &&
+    projectProgressUi.includes('title="Project Progress"'),
+  "Project Progress must use shared Admin card, badge and light/dark text primitives"
+);
+for (const sectionLabel of ["Lifecycle", "Orders", "Delivery", "Installation", "Commercial", "Recent Activity"]) {
+  assert(projectProgressUi.includes(sectionLabel), `Project Progress must show ${sectionLabel}`);
+}
+assert(
+  projectProgressDomain.includes('.from("customer_order_status_history")') &&
+    projectProgressDomain.includes('.from("customer_order_revisions")') &&
+    projectProgressDomain.includes('.from("customer_invoices")'),
+  "Project Progress must derive activity and commercial state from canonical Order/Invoice records"
+);
+assert(
+  projectProgressDomain.includes('order.status !== "cancelled"') &&
+    projectProgressDomain.includes('order.fulfillment_type !== "pickup"') &&
+    projectProgressDomain.includes('order.fulfillment_type === "delivery_installation"'),
+  "Project Progress must exclude cancelled Orders and derive delivery/installation eligibility from canonical fulfillment type"
+);
+assert(
+  projectProgressDomain.includes('.neq("status", "void")') &&
+    projectProgressDomain.includes("PROJECT_PROGRESS_ACTIVITY_LIMIT") &&
+    projectProgressDomain.includes("PROJECT_PROGRESS_INVOICE_LIMIT"),
+  "Project Progress invoice/activity reads must exclude void invoices and remain explicitly bounded"
 );
 
 assert(
