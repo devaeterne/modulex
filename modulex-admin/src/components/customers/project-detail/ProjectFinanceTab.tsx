@@ -9,6 +9,7 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { Modal } from "@/components/ui/modal";
 import { ADMIN_SURFACE_CARD, ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   Table,
@@ -22,11 +23,14 @@ import {
 import {
   allocateProjectPayment,
   createProjectPaymentRequirement,
+  deleteProjectPayment,
   loadProjectPaymentLedger,
   recordProjectPayment,
   reverseProjectPayment,
+  updateProjectPayment,
   type ProjectPaymentCurrencySummary,
   type ProjectPaymentLedger,
+  type ProjectPaymentTransaction,
 } from "@/lib/customers/project-payments";
 import {
   loadProjectPaymentStatus,
@@ -110,6 +114,17 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
   const [reverseAmount, setReverseAmount] = useState("");
   const [reverseReason, setReverseReason] = useState("");
 
+  const [editingPayment, setEditingPayment] = useState<ProjectPaymentTransaction | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editCurrency, setEditCurrency] = useState("USD");
+  const [editDate, setEditDate] = useState(todayInput());
+  const [editReference, setEditReference] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editReason, setEditReason] = useState("");
+
+  const [deletingPayment, setDeletingPayment] = useState<ProjectPaymentTransaction | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -182,6 +197,74 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
       return { summary, orderValue, customerBalance, planDifference };
     });
   }, [ledger, orderTotals]);
+
+  const editChangesFinancials = Boolean(
+    editingPayment
+      && (Number(editAmount) !== editingPayment.amount || editCurrency.trim().toUpperCase() !== editingPayment.currencyCode)
+  );
+
+  function openEditPayment(transaction: ProjectPaymentTransaction) {
+    setEditingPayment(transaction);
+    setEditAmount(String(transaction.amount));
+    setEditCurrency(transaction.currencyCode);
+    setEditDate(transaction.transactionDate);
+    setEditReference(transaction.referenceNo ?? "");
+    setEditNotes(transaction.notes ?? "");
+    setEditReason("");
+    setError(null);
+  }
+
+  function openDeletePayment(transaction: ProjectPaymentTransaction) {
+    setDeletingPayment(transaction);
+    setDeleteReason("");
+    setError(null);
+  }
+
+  async function handleUpdatePayment() {
+    if (!editingPayment) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await updateProjectPayment({
+        paymentId: editingPayment.id,
+        amount: Number(editAmount),
+        currencyCode: editCurrency,
+        transactionDate: editDate,
+        paymentMethodId: editingPayment.paymentMethodId,
+        referenceNo: editReference || null,
+        notes: editNotes || null,
+        reason: editReason || null,
+      });
+      setEditingPayment(null);
+      setMessage(result.allocationReset
+        ? "Payment updated. Amount/currency changed, so its previous allocations were cleared and must be allocated again."
+        : "Payment updated. Existing allocations were preserved.");
+      await load();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Customer payment could not be updated.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeletePayment() {
+    if (!deletingPayment || !deleteReason.trim()) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await deleteProjectPayment({ paymentId: deletingPayment.id, reason: deleteReason.trim() });
+      setDeletingPayment(null);
+      setDeleteReason("");
+      setMessage("Payment and its live allocations were deleted. An immutable audit snapshot was retained.");
+      await load();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Customer payment could not be deleted.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function runAction(action: () => Promise<unknown>, successMessage: string) {
     setSaving(true);
@@ -336,7 +419,7 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
         </div>
       </ComponentCard>
 
-      <ComponentCard title="Customer Payments" desc="Actual cash received. Payments may be recorded before an Invoice exists.">
+      <ComponentCard title="Customer Payments" desc="Actual cash received. Payments may be recorded before an Invoice exists. Admin/Finance can edit or hard-delete original payment rows; every correction is audit logged.">
         <TableViewport>
           <Table variant="admin" minWidth="standard">
             <TableHeader variant="admin">
@@ -347,10 +430,11 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
                 <TableCell isHeader variant="admin">Amount</TableCell>
                 <TableCell isHeader variant="admin">Allocated</TableCell>
                 <TableCell isHeader variant="admin">Unallocated</TableCell>
+                <TableCell isHeader variant="admin">Actions</TableCell>
               </TableRow>
             </TableHeader>
             <TableBody variant="admin">
-              {(ledger?.transactions.length ?? 0) === 0 ? <TableStateRow colSpan={6}>No customer payment transaction has been recorded yet.</TableStateRow> : null}
+              {(ledger?.transactions.length ?? 0) === 0 ? <TableStateRow colSpan={7}>No customer payment transaction has been recorded yet.</TableStateRow> : null}
               {(ledger?.transactions ?? []).map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell variant="admin">{displayDate(transaction.transactionDate)}</TableCell>
@@ -359,6 +443,14 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
                   <TableCell variant="admin">{money(transaction.amount, transaction.currencyCode)}</TableCell>
                   <TableCell variant="admin">{money(transaction.allocated, transaction.currencyCode)}</TableCell>
                   <TableCell variant="admin">{money(transaction.unallocated, transaction.currencyCode)}</TableCell>
+                  <TableCell variant="admin">
+                    {transaction.transactionType === "payment" && transaction.status === "posted" ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" disabled={saving} onClick={() => openEditPayment(transaction)}>Edit Payment</Button>
+                        <Button size="sm" variant="danger" disabled={saving} onClick={() => openDeletePayment(transaction)}>Delete Payment</Button>
+                      </div>
+                    ) : "—"}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -416,6 +508,81 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
       </ComponentCard>
 
       {canViewCostMargin ? <ProjectFinancialSummary projectId={projectId} /> : null}
+
+      <Modal
+        isOpen={Boolean(editingPayment)}
+        onClose={() => !saving && setEditingPayment(null)}
+        ariaLabel="Edit customer payment"
+        className="relative w-full max-w-2xl p-6"
+      >
+        <div className="space-y-5">
+          <div className="pr-12">
+            <h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Edit Payment</h3>
+            <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>Metadata-only edits keep existing allocations. Changing amount or currency clears allocations and requires re-allocation.</p>
+          </div>
+
+          {editingPayment && editChangesFinancials && editingPayment.allocated > 0 ? (
+            <Alert
+              variant="warning"
+              title="Allocations will be cleared"
+              message={`${money(editingPayment.allocated, editingPayment.currencyCode)} is currently allocated. Saving an amount or currency change will return that value to open requirements for re-allocation.`}
+            />
+          ) : null}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div><Label htmlFor="edit-payment-amount">Payment amount</Label><Input id="edit-payment-amount" type="number" min="0" step="0.01" value={editAmount} onChange={(event) => setEditAmount(event.target.value)} /></div>
+            <div><Label htmlFor="edit-payment-currency">Currency</Label><Input id="edit-payment-currency" value={editCurrency} maxLength={3} onChange={(event) => setEditCurrency(event.target.value.toUpperCase())} /></div>
+            <div><Label htmlFor="edit-payment-date">Transaction date</Label><Input id="edit-payment-date" type="date" value={editDate} onChange={(event) => setEditDate(event.target.value)} /></div>
+            <div><Label htmlFor="edit-payment-reference">Reference</Label><Input id="edit-payment-reference" value={editReference} onChange={(event) => setEditReference(event.target.value)} /></div>
+            <div><Label htmlFor="edit-payment-notes">Notes</Label><Input id="edit-payment-notes" value={editNotes} onChange={(event) => setEditNotes(event.target.value)} /></div>
+            <div><Label htmlFor="edit-payment-reason">Change note (optional)</Label><Input id="edit-payment-reason" value={editReason} onChange={(event) => setEditReason(event.target.value)} /></div>
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button variant="outline" disabled={saving} onClick={() => setEditingPayment(null)}>Cancel</Button>
+            <Button
+              disabled={saving || Number(editAmount) <= 0 || editCurrency.trim().length !== 3 || !editDate}
+              onClick={() => void handleUpdatePayment()}
+            >
+              {saving ? "Updating…" : "Update Payment"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(deletingPayment)}
+        onClose={() => !saving && setDeletingPayment(null)}
+        ariaLabel="Delete customer payment"
+        className="relative w-full max-w-xl p-6"
+      >
+        <div className="space-y-5">
+          <div className="pr-12">
+            <h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Delete Payment</h3>
+            <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>The payment and all of its live milestone allocations will be permanently removed from the ledger. An immutable audit snapshot will remain.</p>
+          </div>
+
+          {deletingPayment ? (
+            <Alert
+              variant="warning"
+              title="Hard delete"
+              message={`${displayDate(deletingPayment.transactionDate)} — ${money(deletingPayment.amount, deletingPayment.currencyCode)}. Currently allocated: ${money(deletingPayment.allocated, deletingPayment.currencyCode)}.`}
+            />
+          ) : null}
+
+          <div>
+            <Label htmlFor="delete-payment-reason">Delete reason</Label>
+            <Input id="delete-payment-reason" value={deleteReason} onChange={(event) => setDeleteReason(event.target.value)} />
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button variant="outline" disabled={saving} onClick={() => setDeletingPayment(null)}>Cancel</Button>
+            <Button variant="danger" disabled={saving || !deleteReason.trim()} onClick={() => void handleDeletePayment()}>
+              {saving ? "Deleting…" : "Delete Payment"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
