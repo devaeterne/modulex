@@ -2,6 +2,16 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Input from "@/components/form/input/InputField";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import FormHint from "@/components/form/FormHint";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import { Modal } from "@/components/ui/modal";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableViewport } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import type {
@@ -12,37 +22,17 @@ import type {
   ProfileLookup,
 } from "@/lib/customers/types";
 
-const inputClass =
-  "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs transition placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-gray-500";
-
-const selectClass = inputClass;
-
-const primaryButtonClass =
-  "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
-
-const secondaryButtonClass =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
-
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 const CUSTOMER_STATUSES: CustomerStatus[] = ["active", "inactive", "blocked", "prospect"];
 
 type PortalFilter = "all" | "enabled" | "disabled";
 type Summary = { total: number; active: number; prospects: number; portal: number };
 
-function statusClass(status: CustomerStatus) {
-  if (status === "active") {
-    return "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400";
-  }
-
-  if (status === "blocked") {
-    return "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400";
-  }
-
-  if (status === "prospect") {
-    return "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400";
-  }
-
-  return "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400";
+function statusColor(status: CustomerStatus): "success" | "error" | "warning" | "light" {
+  if (status === "active") return "success";
+  if (status === "blocked") return "error";
+  if (status === "prospect") return "warning";
+  return "light";
 }
 
 function titleCase(value: string) {
@@ -480,15 +470,11 @@ export default function CustomersTable() {
   return (
     <div className="space-y-5">
       {errorMessage && (
-        <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
-          {errorMessage}
-        </div>
+        <Alert variant="error" title="Unable to load customers" message={errorMessage} />
       )}
 
       {successMessage && (
-        <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
-          {successMessage}
-        </div>
+        <Alert variant="success" title="Customer updated" message={successMessage} />
       )}
 
       {!isLoading && (
@@ -500,133 +486,99 @@ export default function CustomersTable() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-        <div className="border-b border-gray-200 px-5 py-5 dark:border-gray-800 sm:px-6">
+      <ComponentCard
+        title="Customers"
+        desc="Customer master data, pricing groups and portal accounts."
+        headerAction={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setFiltersOpen((current) => !current)}>
+              Filters {activeFilterCount > 0 && <Badge color="info">{activeFilterCount}</Badge>}
+            </Button>
+            {canManage && <Button onClick={() => setCreateOpen(true)}>New Customer</Button>}
+          </div>
+        }
+      >
+        <div>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Customers</h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Customer master data, pricing groups and portal accounts.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((current) => !current)}
-                className={
-                  filtersOpen || activeFilterCount
-                    ? "inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 text-sm font-medium text-brand-700 shadow-theme-xs dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-400"
-                    : secondaryButtonClass
-                }
-              >
-                Filters
-                {activeFilterCount > 0 && (
-                  <span className="rounded-full bg-brand-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-
-              {canManage && (
-                <button type="button" onClick={() => setCreateOpen(true)} className={primaryButtonClass}>
-                  New Customer
-                </button>
-              )}
-            </div>
+            <div />
           </div>
         </div>
 
         <div className="p-5 sm:p-6">
           {filtersOpen && (
-            <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+            <ComponentCard title="Filters" desc="Server-side filters are reflected in the URL so views can be shared or revisited.">
               <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-800 dark:text-white/90">Filters</h3>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Server-side filters are reflected in the URL so views can be shared or revisited.
-                  </p>
-                </div>
+                <div />
                 {activeFilterCount > 0 && (
-                  <button
+                  <Button
                     type="button"
                     onClick={clearFilters}
-                    className="text-xs font-medium text-brand-600 dark:text-brand-400"
+                    variant="outline"
                   >
                     Clear All
-                  </button>
+                  </Button>
                 )}
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
                 <div className="xl:col-span-2">
                   <FilterLabel>Search</FilterLabel>
-                  <input
+                  <Input
                     value={searchQuery}
                     onChange={(event) => {
                       setSearchQuery(event.target.value);
                       resetToFirstPage();
                     }}
                     placeholder="Code, company, email, tax number..."
-                    className={inputClass}
                   />
                 </div>
 
                 <div>
                   <FilterLabel>Status</FilterLabel>
-                  <select
+                  <Select
                     value={statusFilter}
-                    onChange={(event) => {
-                      setStatusFilter(event.target.value as "all" | CustomerStatus);
+                    onChange={(value) => {
+                      setStatusFilter(value as "all" | CustomerStatus);
                       resetToFirstPage();
                     }}
-                    className={selectClass}
-                  >
-                    <option value="all">All Statuses</option>
-                    <option value="active">Active</option>
-                    <option value="prospect">Prospect</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="blocked">Blocked</option>
-                  </select>
+                    options={[
+                      { value: "all", label: "All Statuses" },
+                      ...CUSTOMER_STATUSES.map((value) => ({ value, label: titleCase(value) })),
+                    ]}
+                  />
                 </div>
 
                 <div>
                   <FilterLabel>Customer Type</FilterLabel>
-                  <select
+                  <Select
                     value={typeFilter}
-                    onChange={(event) => {
-                      setTypeFilter(event.target.value);
+                    onChange={(value) => {
+                      setTypeFilter(value);
                       resetToFirstPage();
                     }}
-                    className={selectClass}
-                  >
-                    <option value="">All Types</option>
-                    {customerTypes.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
-                  </select>
+                    options={customerTypes.map((item) => ({ value: item.id, label: item.name }))}
+                    placeholder="All Types"
+                    allowEmpty
+                  />
                 </div>
 
                 <div>
                   <FilterLabel>Price Group</FilterLabel>
-                  <select
+                  <Select
                     value={priceGroupFilter}
-                    onChange={(event) => {
-                      setPriceGroupFilter(event.target.value);
+                    onChange={(value) => {
+                      setPriceGroupFilter(value);
                       resetToFirstPage();
                     }}
-                    className={selectClass}
-                  >
-                    <option value="">All Groups</option>
-                    {priceGroups.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
-                  </select>
+                    options={priceGroups.map((item) => ({ value: item.id, label: item.name }))}
+                    placeholder="All Groups"
+                    allowEmpty
+                  />
                 </div>
 
                 <div>
                   <FilterLabel>Country</FilterLabel>
-                  <input
+                  <Input
                     value={countryFilter}
                     maxLength={2}
                     placeholder="US"
@@ -634,295 +586,255 @@ export default function CustomersTable() {
                       setCountryFilter(event.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2));
                       resetToFirstPage();
                     }}
-                    className={inputClass}
                   />
                 </div>
 
                 <div>
                   <FilterLabel>Portal</FilterLabel>
-                  <select
+                  <Select
                     value={portalFilter}
-                    onChange={(event) => {
-                      setPortalFilter(event.target.value as PortalFilter);
+                    onChange={(value) => {
+                      setPortalFilter(value as PortalFilter);
                       resetToFirstPage();
                     }}
-                    className={selectClass}
-                  >
-                    <option value="all">All</option>
-                    <option value="enabled">Enabled</option>
-                    <option value="disabled">Disabled</option>
-                  </select>
+                    options={[
+                      { value: "all", label: "All" },
+                      { value: "enabled", label: "Enabled" },
+                      { value: "disabled", label: "Disabled" },
+                    ]}
+                  />
                 </div>
 
                 <div className="xl:col-span-2">
                   <FilterLabel>Sales Representative</FilterLabel>
-                  <select
+                  <Select
                     value={salesRepFilter}
-                    onChange={(event) => {
-                      setSalesRepFilter(event.target.value);
+                    onChange={(value) => {
+                      setSalesRepFilter(value);
                       resetToFirstPage();
                     }}
-                    className={selectClass}
-                  >
-                    <option value="">All Representatives</option>
-                    {profiles
+                    options={profiles
                       .filter((item) => ["super_admin", "admin", "sales"].includes(item.role))
-                      .map((item) => (
-                        <option key={item.id} value={item.id}>{item.full_name || item.email}</option>
-                      ))}
-                  </select>
+                      .map((item) => ({ value: item.id, label: item.full_name || item.email || "" }))}
+                    placeholder="All Representatives"
+                    allowEmpty
+                  />
                 </div>
               </div>
-            </div>
+            </ComponentCard>
           )}
 
           {isLoading ? (
             <div className="flex min-h-[360px] items-center justify-center">
-              <div className="text-center">
-                <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" />
-                <p className="text-sm text-gray-500">Loading customers...</p>
-              </div>
+              <FormHint>Loading customers...</FormHint>
             </div>
           ) : (
             <>
-              <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-                    <thead className="bg-gray-50 dark:bg-white/[0.02]">
-                      <tr>
+              <TableViewport>
+                  <Table variant="admin" minWidth="wide">
+                    <TableHeader variant="admin">
+                      <TableRow>
                         {["Customer", "Type", "Contact", "Country", "Price Group", "Sales Rep", "Portal", "Status", ""].map((label) => (
-                          <th
+                          <TableCell isHeader
                             key={label || "action"}
-                            className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400"
+                            className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wide"
                           >
                             {label}
-                          </th>
+                          </TableCell>
                         ))}
-                      </tr>
-                    </thead>
+                      </TableRow>
+                    </TableHeader>
 
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    <TableBody className="divide-y">
                       {customers.length === 0 ? (
-                        <tr>
-                          <td colSpan={9} className="px-4 py-12 text-center text-sm text-gray-500">
+                        <TableRow>
+                          <TableCell colSpan={9} className="px-4 py-12 text-center text-sm">
                             No customers found.
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ) : (
                         customers.map((customer) => (
-                          <tr key={customer.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                            <td className="px-4 py-3">
+                          <TableRow key={customer.id}>
+                            <TableCell className="px-4 py-3">
                               <Link
                                 href={`/customers/${customer.id}`}
-                                className="font-semibold text-gray-800 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400"
+                                className="font-semibold"
                               >
                                 {customer.name}
                               </Link>
-                              <p className="mt-0.5 text-xs text-gray-400">{customer.customer_code}</p>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                              <p className="mt-0.5 text-xs">{customer.customer_code}</p>
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-sm">
                               {customer.customer_type_id ? typeMap.get(customer.customer_type_id) ?? "—" : "—"}
-                            </td>
-                            <td className="px-4 py-3">
-                              <p className="text-sm text-gray-700 dark:text-gray-300">{customer.email || "—"}</p>
-                              {customer.phone && <p className="mt-0.5 text-xs text-gray-400">{customer.phone}</p>}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{customer.country_code || "—"}</td>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                            </TableCell>
+                            <TableCell className="px-4 py-3">
+                              <p className="text-sm">{customer.email || "—"}</p>
+                              {customer.phone && <p className="mt-0.5 text-xs">{customer.phone}</p>}
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-sm">{customer.country_code || "—"}</TableCell>
+                            <TableCell className="px-4 py-3 text-sm font-medium">
                               {customer.price_group_id ? groupMap.get(customer.price_group_id) ?? "—" : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-sm">
                               {customer.sales_rep_id ? profileMap.get(customer.sales_rep_id) ?? "—" : "—"}
-                            </td>
-                            <td className="px-4 py-3">
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                                  customer.portal_enabled
-                                    ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"
-                                    : "bg-gray-100 text-gray-500 dark:bg-white/[0.06] dark:text-gray-400"
-                                }`}
-                              >
+                            </TableCell>
+                            <TableCell className="px-4 py-3">
+                              <Badge color={customer.portal_enabled ? "info" : "light"}>
                                 {customer.portal_enabled ? "Enabled" : "Disabled"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(customer.status)}`}>
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="px-4 py-3">
+                              <Badge color={statusColor(customer.status)}>
                                 {titleCase(customer.status)}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right">
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-right">
                               <Link
                                 href={`/customers/${customer.id}`}
-                                className="text-sm font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+                                className="text-sm font-medium"
                               >
                                 Open
                               </Link>
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         ))
                       )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                    </TableBody>
+                  </Table>
+              </TableViewport>
 
-              <div className="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Showing <span className="font-medium text-gray-700 dark:text-gray-300">{startRow}–{endRow}</span> of <span className="font-medium text-gray-700 dark:text-gray-300">{filteredCount}</span>
+              <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm">
+                  Showing <span className="font-medium">{startRow}–{endRow}</span> of <span className="font-medium">{filteredCount}</span>
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={pageSize}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
+                  <Select
+                    value={String(pageSize)}
+                    onChange={(value) => {
+                      setPageSize(Number(value));
                       resetToFirstPage();
                     }}
-                    className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={size}>{size} / page</option>
-                    ))}
-                  </select>
-                  <button
+                    options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} / page` }))}
+                  />
+                  <Button
                     type="button"
                     disabled={currentPage <= 1}
                     onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                    className={secondaryButtonClass}
+                    variant="outline"
                   >
                     Previous
-                  </button>
-                  <span className="flex h-10 min-w-[90px] items-center justify-center rounded-lg bg-gray-50 px-3 text-xs text-gray-600 dark:bg-white/[0.04] dark:text-gray-300">
+                  </Button>
+                  <span className="flex h-10 min-w-[90px] items-center justify-center px-3 text-xs">
                     {currentPage} / {totalPages}
                   </span>
-                  <button
+                  <Button
                     type="button"
                     disabled={currentPage >= totalPages}
                     onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                    className={secondaryButtonClass}
+                    variant="outline"
                   >
                     Next
-                  </button>
+                  </Button>
                 </div>
               </div>
             </>
           )}
         </div>
-      </div>
+      </ComponentCard>
 
-      {createOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-xl dark:bg-gray-900">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-5 dark:border-gray-800">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">New Customer</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Create the customer master record. More details can be added from the customer card.
-                </p>
-              </div>
-              <button type="button" onClick={() => setCreateOpen(false)} className="text-xl text-gray-400 hover:text-gray-700">×</button>
+      <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} ariaLabel="New Customer" className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <ComponentCard title="New Customer" desc="Create the customer master record. More details can be added from the customer card.">
+            <div className="flex items-center justify-between border-b px-6 py-5">
+              <div />
             </div>
 
             <div className="grid gap-4 p-6 md:grid-cols-2">
               <Field label="Company / Customer Name" required>
-                <input
+                <Input
                   value={newCustomer.name}
                   onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))}
-                  className={inputClass}
                 />
               </Field>
               <Field label="Legal Name">
-                <input
+                <Input
                   value={newCustomer.legal_name}
                   onChange={(event) => setNewCustomer((current) => ({ ...current, legal_name: event.target.value }))}
-                  className={inputClass}
                 />
               </Field>
               <Field label="Customer Type">
-                <select
+                <Select
                   value={newCustomer.customer_type_id}
-                  onChange={(event) => setNewCustomer((current) => ({ ...current, customer_type_id: event.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="">Default (Company)</option>
-                  {customerTypes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
+                  onChange={(value) => setNewCustomer((current) => ({ ...current, customer_type_id: value }))}
+                  options={customerTypes.map((item) => ({ value: item.id, label: item.name }))}
+                  placeholder="Default (Company)"
+                  allowEmpty
+                />
               </Field>
               <Field label="Status">
-                <select
+                <Select
                   value={newCustomer.status}
-                  onChange={(event) => setNewCustomer((current) => ({ ...current, status: event.target.value as CustomerStatus }))}
-                  className={selectClass}
-                >
-                  <option value="prospect">Prospect</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="blocked">Blocked</option>
-                </select>
+                  onChange={(value) => setNewCustomer((current) => ({ ...current, status: value as CustomerStatus }))}
+                  options={CUSTOMER_STATUSES.map((value) => ({ value, label: titleCase(value) }))}
+                />
               </Field>
               <Field label="Email">
-                <input
+                <Input
                   type="email"
                   value={newCustomer.email}
                   onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))}
-                  className={inputClass}
                 />
               </Field>
               <Field label="Phone">
-                <input
+                <Input
                   value={newCustomer.phone}
                   onChange={(event) => setNewCustomer((current) => ({ ...current, phone: event.target.value }))}
-                  className={inputClass}
                 />
               </Field>
               <Field label="Country Code">
-                <input
+                <Input
                   maxLength={2}
                   placeholder="US"
                   value={newCustomer.country_code}
                   onChange={(event) => setNewCustomer((current) => ({ ...current, country_code: event.target.value.toUpperCase() }))}
-                  className={inputClass}
                 />
               </Field>
               <Field label="Price Group">
-                <select
+                <Select
                   value={newCustomer.price_group_id}
-                  onChange={(event) => setNewCustomer((current) => ({ ...current, price_group_id: event.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="">Default (List / Base)</option>
-                  {priceGroups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
+                  onChange={(value) => setNewCustomer((current) => ({ ...current, price_group_id: value }))}
+                  options={priceGroups.map((item) => ({ value: item.id, label: item.name }))}
+                  placeholder="Default (List / Base)"
+                  allowEmpty
+                />
               </Field>
               <Field label="Sales Representative">
-                <select
+                <Select
                   value={newCustomer.sales_rep_id}
-                  onChange={(event) => setNewCustomer((current) => ({ ...current, sales_rep_id: event.target.value }))}
-                  className={selectClass}
-                >
-                  <option value="">Unassigned</option>
-                  {profiles
+                  onChange={(value) => setNewCustomer((current) => ({ ...current, sales_rep_id: value }))}
+                  options={profiles
                     .filter((item) => ["super_admin", "admin", "sales"].includes(item.role))
-                    .map((item) => <option key={item.id} value={item.id}>{item.full_name || item.email}</option>)}
-                </select>
+                    .map((item) => ({ value: item.id, label: item.full_name || item.email || "" }))}
+                  placeholder="Unassigned"
+                  allowEmpty
+                />
               </Field>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-4 dark:border-gray-800">
-              <button type="button" onClick={() => setCreateOpen(false)} className={secondaryButtonClass}>Cancel</button>
-              <button type="button" onClick={createCustomer} disabled={isSaving} className={primaryButtonClass}>
+            <div className="flex justify-end gap-2 border-t px-6 py-4">
+              <Button type="button" onClick={() => setCreateOpen(false)} variant="outline">Cancel</Button>
+              <Button type="button" onClick={createCustomer} disabled={isSaving}>
                 {isSaving ? "Creating..." : "Create Customer"}
-              </button>
+              </Button>
             </div>
-          </div>
-        </div>
-      )}
+          </ComponentCard>
+      </Modal>
     </div>
   );
 }
 
 function FilterLabel({ children }: { children: React.ReactNode }) {
-  return <label className="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">{children}</label>;
+  return <Label>{children}</Label>;
 }
 
 function Field({
@@ -936,9 +848,9 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-        {label}{required && <span className="ml-1 text-error-500">*</span>}
-      </label>
+      <Label>
+        {label}{required && <span className="ml-1">*</span>}
+      </Label>
       {children}
     </div>
   );
@@ -953,19 +865,12 @@ function SummaryCard({
   value: number;
   type?: "default" | "success" | "warning" | "brand";
 }) {
-  const classes =
-    type === "success"
-      ? "border-success-200 bg-success-50 dark:border-success-500/30 dark:bg-success-500/10"
-      : type === "warning"
-        ? "border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10"
-        : type === "brand"
-          ? "border-brand-200 bg-brand-50 dark:border-brand-500/30 dark:bg-brand-500/10"
-          : "border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900";
-
   return (
-    <div className={`rounded-2xl border p-5 shadow-theme-xs ${classes}`}>
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">{value}</p>
-    </div>
+    <ComponentCard title={label}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-2xl font-semibold">{value}</p>
+        {type !== "default" && <Badge color={type === "brand" ? "info" : type}>{label}</Badge>}
+      </div>
+    </ComponentCard>
   );
 }
