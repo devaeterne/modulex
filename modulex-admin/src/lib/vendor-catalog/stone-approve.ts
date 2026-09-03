@@ -50,9 +50,31 @@ function normalizedCode(value: string, fallback: string) {
   return normalized || fallback;
 }
 
-function stoneSku(item: StoneItemRow) {
-  const identity = item.sku?.trim() || item.external_id;
-  return normalizedCode(`STONE-${item.vendor_code}-${identity}`, `STONE-${item.id.slice(0, 8)}`);
+async function stoneSku(item: StoneItemRow) {
+  const sourceSku = item.sku?.trim();
+  if (!sourceSku) {
+    return normalizedCode(
+      `STONE-${item.vendor_code}-${item.external_id}`,
+      `STONE-${item.id.slice(0, 8)}`
+    );
+  }
+
+  const { count: duplicateSourceSkuCount, error } = await supabaseAdmin
+    .from("vendor_catalog_items")
+    .select("id", { count: "exact", head: true })
+    .eq("catalog_domain", "stone")
+    .eq("vendor_code", item.vendor_code)
+    .eq("sku", sourceSku)
+    .neq("id", item.id);
+  if (error) throw error;
+
+  const identity = (duplicateSourceSkuCount ?? 0) > 0
+    ? `${sourceSku}-${item.variant_code?.trim() || item.external_id}`
+    : sourceSku;
+  return normalizedCode(
+    `STONE-${item.vendor_code}-${identity}`,
+    `STONE-${item.id.slice(0, 8)}`
+  );
 }
 
 function stringValue(value: unknown) {
@@ -146,7 +168,7 @@ async function loadOrCreateCanonicalProduct(
     return backfillCanonicalDescription(data as StoneCanonicalProduct, description);
   }
 
-  const sku = stoneSku(item);
+  const sku = await stoneSku(item);
   const { data: existing, error: existingError } = await supabaseAdmin
     .from("products")
     .select("id,sku,base_product_code,name,description,metadata")
