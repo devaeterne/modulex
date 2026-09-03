@@ -18,13 +18,15 @@ import {
   TableStateRow,
   TableViewport,
 } from "@/components/ui/table";
-import { supabase } from "@/lib/supabase/client";
+import { hasPermission } from "@/lib/auth/permissions";
 import {
   createCustomerProject,
   listCustomerProjects,
   type CustomerProject,
   type ProjectStatus,
 } from "@/lib/customers/project-domain";
+import { supabase } from "@/lib/supabase/client";
+import { getCurrentProfile } from "@/lib/supabase/profile";
 
 type CustomerOption = { id: string; name: string; sales_rep_id: string | null };
 type ProfileOption = { id: string; full_name: string | null; email: string | null; role: string; is_active: boolean };
@@ -67,6 +69,7 @@ export default function ProjectsWorkspace() {
   const [projects, setProjects] = useState<CustomerProject[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
+  const [canManageProjects, setCanManageProjects] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,7 +119,19 @@ export default function ProjectsWorkspace() {
     setLoading(true);
     setError(null);
     try {
-      await Promise.all([loadReferenceData(), loadProjects()]);
+      const { profile, error: profileError } = await getCurrentProfile();
+      if (profileError) throw profileError;
+
+      const nextCanManageProjects = Boolean(profile && hasPermission(profile.roles, "projects.manage"));
+      setCanManageProjects(nextCanManageProjects);
+
+      await loadProjects();
+      if (nextCanManageProjects) {
+        await loadReferenceData();
+      } else {
+        setCustomers([]);
+        setProfiles([]);
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Projects could not be loaded.");
     } finally {
@@ -139,6 +154,10 @@ export default function ProjectsWorkspace() {
   }
 
   async function handleCreate() {
+    if (!canManageProjects) {
+      setError("You do not have permission to create projects.");
+      return;
+    }
     if (!customerId || !name.trim()) {
       setError("Customer and Project name are required.");
       return;
@@ -180,29 +199,31 @@ export default function ProjectsWorkspace() {
         </div>
       ) : null}
 
-      <ComponentCard title="Create Project" desc="Create the Job container first; Orders can then be created inside it.">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div>
-            <Label htmlFor="project-customer">Customer</Label>
-            <Select id="project-customer" options={customerOptions} value={customerId} onChange={handleCustomerChange} placeholder="Select customer" />
+      {canManageProjects ? (
+        <ComponentCard title="Create Project" desc="Create the Job container first; Orders can then be created inside it.">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <Label htmlFor="project-customer">Customer</Label>
+              <Select id="project-customer" options={customerOptions} value={customerId} onChange={handleCustomerChange} placeholder="Select customer" />
+            </div>
+            <div>
+              <Label htmlFor="project-name">Project name</Label>
+              <Input id="project-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Kitchen Remodel" />
+            </div>
+            <div>
+              <Label htmlFor="project-sales-rep">Sales Rep</Label>
+              <Select id="project-sales-rep" options={salesRepOptions} value={salesRepId} onChange={setSalesRepId} placeholder="Select sales rep" allowEmpty />
+            </div>
+            <div>
+              <Label htmlFor="project-target-date">Target date</Label>
+              <Input id="project-target-date" type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
+            </div>
           </div>
-          <div>
-            <Label htmlFor="project-name">Project name</Label>
-            <Input id="project-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Kitchen Remodel" />
+          <div className="flex justify-end">
+            <Button onClick={handleCreate} disabled={saving}>{saving ? "Creating…" : "Create Project"}</Button>
           </div>
-          <div>
-            <Label htmlFor="project-sales-rep">Sales Rep</Label>
-            <Select id="project-sales-rep" options={salesRepOptions} value={salesRepId} onChange={setSalesRepId} placeholder="Select sales rep" allowEmpty />
-          </div>
-          <div>
-            <Label htmlFor="project-target-date">Target date</Label>
-            <Input id="project-target-date" type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
-          </div>
-        </div>
-        <div className="flex justify-end">
-          <Button onClick={handleCreate} disabled={saving}>{saving ? "Creating…" : "Create Project"}</Button>
-        </div>
-      </ComponentCard>
+        </ComponentCard>
+      ) : null}
 
       <ComponentCard title="Projects" desc="Project ownership is separate from who created an Order.">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px_160px]">
