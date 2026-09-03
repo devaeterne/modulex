@@ -91,14 +91,11 @@ assert.match(msiMarbleSystemsAdapters, /Available Quantity/);
 assert.match(msiMarbleSystemsAdapters, /Location/);
 assert.match(msiMarbleSystemsAdapters, /stockQuantity:\s*quantity/);
 // MSI page 2 and Marble Systems page 2 are valid, while later terminal pages
-// can return 5xx/404. After at least one successful page, terminal pagination
-// responses must stop discovery rather than failing the complete vendor run.
+// can return 5xx/404. Runtime behavior tests own the exact URL-shape checks.
 assert.match(msiMarbleSystemsAdapters, /fetchPaginationHtml/);
 assert.match(msiMarbleSystemsAdapters, /page\s*>\s*1/);
 assert.match(msiMarbleSystemsAdapters, /response\.status\s*===\s*404/);
 assert.match(msiMarbleSystemsAdapters, /response\.status\s*>=\s*500/);
-assert.match(msiMarbleSystemsAdapters, /\?page=\$\{page\}/);
-assert.match(msiMarbleSystemsAdapters, /page\/\$\{page\}/);
 assert.doesNotMatch(msiMarbleSystemsAdapters, /vendorPriceReference/);
 assert.doesNotMatch(msiMarbleSystemsAdapters, /\.from\(["']inventory["']\)/);
 
