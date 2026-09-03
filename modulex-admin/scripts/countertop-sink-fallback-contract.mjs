@@ -10,10 +10,10 @@ const assert = (condition, message) => {
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const migrationPath = "../modulex-store/supabase/migrations/20260903030000_countertop_sink_manual_fallback.sql";
 
-assert(configurator.includes("stoneSearch"), "Countertop Stone selection must expose search state");
-assert(configurator.includes("sinkSearch"), "Countertop Sink selection must expose search state");
-assert(configurator.includes("Search stone by name or SKU"), "Stone search must be discoverable by name/SKU");
-assert(configurator.includes("Search sink by name or SKU"), "Sink search must be discoverable by name/SKU");
+assert(configurator.includes('import SearchableSelect from "@/components/form/SearchableSelect"'), "Countertop Stone/Sink selection must use the shared searchable dropdown primitive");
+assert((configurator.match(/<SearchableSelect/g) ?? []).length >= 2, "Countertop Stone and Sink fields must both render searchable dropdowns");
+assert(configurator.includes('searchPlaceholder="Search stone by name or SKU"'), "Stone search must be discoverable by name/SKU inside its dropdown");
+assert(configurator.includes('searchPlaceholder="Search sink by name or SKU"'), "Sink search must be discoverable by name/SKU inside its dropdown");
 assert(configurator.includes("manualSinkPrice"), "Countertop configurator must keep manual Sink fallback price state");
 assert(configurator.includes("Manual sink price fallback"), "Countertop configurator must label the manual Sink fallback clearly");
 assert(configurator.includes('rpc("calculate_countertop_price_with_sink_fallback"'), "Countertop preview must use the server-authoritative Sink fallback pricing RPC");
