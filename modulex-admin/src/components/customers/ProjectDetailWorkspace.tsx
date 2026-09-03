@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
@@ -20,10 +21,33 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
-import { getCustomerProject, type CustomerProject, type ProjectStatus } from "@/lib/customers/project-domain";
+import {
+  getCustomerProject,
+  updateCustomerProject,
+  type CustomerProject,
+  type ProjectStatus,
+} from "@/lib/customers/project-domain";
 
 type StandaloneOrder = { id: string; order_number: string; status: string; order_date: string; grand_total: number | string };
+type ProfileOption = { id: string; full_name: string | null; email: string | null; role: string; is_active: boolean };
+type ProjectStatusHistory = {
+  id: string;
+  from_status: ProjectStatus | null;
+  to_status: ProjectStatus;
+  note: string | null;
+  created_at: string;
+};
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
+
+const projectStatusOptions: Array<{ value: ProjectStatus; label: string }> = [
+  { value: "draft", label: "Draft" },
+  { value: "quoted", label: "Quoted" },
+  { value: "approved", label: "Approved" },
+  { value: "ordered", label: "Ordered" },
+  { value: "in_progress", label: "In progress" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
 function statusLabel(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
@@ -50,6 +74,15 @@ function displayDate(value: string | null | undefined) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
 }
 
+function displayDateTime(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function dateInputValue(value: string | null | undefined) {
+  return value ? value.slice(0, 10) : "";
+}
+
 function money(value: string | number, currency: string) {
   const amount = Number(value ?? 0);
   try {
@@ -63,17 +96,35 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   const router = useRouter();
   const [project, setProject] = useState<CustomerProject | null>(null);
   const [standaloneOrders, setStandaloneOrders] = useState<StandaloneOrder[]>([]);
+  const [projectActivity, setProjectActivity] = useState<ProjectStatusHistory[]>([]);
+  const [projectProfiles, setProjectProfiles] = useState<ProfileOption[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [canManageOrders, setCanManageOrders] = useState(false);
+  const [canManageProjects, setCanManageProjects] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingProject, setSavingProject] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editSalesRepId, setEditSalesRepId] = useState("");
+  const [editStatus, setEditStatus] = useState<ProjectStatus>("draft");
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editTargetDate, setEditTargetDate] = useState("");
 
   const orderOptions = useMemo(
     () => standaloneOrders.map((order) => ({ value: order.id, label: `${order.order_number} — ${statusLabel(order.status)}` })),
     [standaloneOrders]
   );
+  const salesRepOptions = useMemo(() => {
+    const options = projectProfiles
+      .filter((profile) => ["super_admin", "admin", "sales"].includes(profile.role))
+      .map((profile) => ({ value: profile.id, label: profile.full_name || profile.email || "Unnamed user" }));
+    if (project?.sales_rep_id && !options.some((option) => option.value === project.sales_rep_id)) {
+      return [{ value: project.sales_rep_id, label: `${project.sales_rep_name || "Current sales rep"} (current)` }, ...options];
+    }
+    return options;
+  }, [project, projectProfiles]);
   const activeOrders = useMemo(
     () => (project?.orders ?? []).filter((order) => order.status !== "cancelled"),
     [project]
@@ -84,7 +135,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
     setError(null);
     try {
       const nextProject = await getCustomerProject(projectId);
-      const [{ profile, error: profileError }, ordersResult] = await Promise.all([
+      const [{ profile, error: profileError }, ordersResult, activityResult] = await Promise.all([
         getCurrentProfile(),
         supabase
           .from("customer_orders")
@@ -93,12 +144,40 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
           .is("project_id", null)
           .neq("status", "cancelled")
           .order("order_date", { ascending: false }),
+        supabase
+          .from("customer_project_status_history")
+          .select("id, from_status, to_status, note, created_at")
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: false })
+          .limit(50),
       ]);
       if (profileError) throw profileError;
       if (ordersResult.error) throw ordersResult.error;
+      if (activityResult.error) throw activityResult.error;
+
+      const nextCanManageProjects = Boolean(profile && hasPermission(profile.roles, "projects.manage"));
+      let nextProfiles: ProfileOption[] = [];
+      if (nextCanManageProjects) {
+        const profilesResult = await supabase
+          .from("profiles")
+          .select("id, full_name, email, role, is_active")
+          .eq("is_active", true)
+          .order("full_name");
+        if (profilesResult.error) throw profilesResult.error;
+        nextProfiles = (profilesResult.data ?? []) as ProfileOption[];
+      }
+
       setProject(nextProject);
-      setCanManageOrders(Boolean(profile && hasPermission(profile.role, "orders.manage")));
+      setCanManageOrders(Boolean(profile && hasPermission(profile.roles, "orders.manage")));
+      setCanManageProjects(nextCanManageProjects);
       setStandaloneOrders((ordersResult.data ?? []) as StandaloneOrder[]);
+      setProjectActivity((activityResult.data ?? []) as ProjectStatusHistory[]);
+      setProjectProfiles(nextProfiles);
+      setEditName(nextProject.name);
+      setEditSalesRepId(nextProject.sales_rep_id ?? "");
+      setEditStatus(nextProject.status);
+      setEditStartDate(dateInputValue(nextProject.start_date));
+      setEditTargetDate(dateInputValue(nextProject.target_date));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Project could not be loaded.");
     } finally {
@@ -109,6 +188,36 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function saveProject() {
+    if (!project || !canManageProjects) return;
+    if (!editName.trim()) {
+      setError("Project name is required.");
+      return;
+    }
+    setSavingProject(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await updateCustomerProject({
+        projectId: project.id,
+        name: editName,
+        salesRepId: editSalesRepId || null,
+        projectAddressId: project.project_address_id,
+        startDate: editStartDate || null,
+        targetDate: editTargetDate || null,
+        customerNotes: project.customer_notes,
+        internalNotes: project.internal_notes,
+        status: editStatus,
+      });
+      setMessage("Project details saved.");
+      await load();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Project could not be updated.");
+    } finally {
+      setSavingProject(false);
+    }
+  }
 
   async function assignOrder() {
     if (!selectedOrderId) return;
@@ -171,6 +280,36 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         ) : null}
       </ComponentCard>
 
+      {canManageProjects ? (
+        <ComponentCard title="Project Settings" desc="Update Project ownership, lifecycle status, and schedule without changing the Customer account.">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <Label htmlFor="project-detail-name">Project name</Label>
+              <Input id="project-detail-name" value={editName} onChange={(event) => setEditName(event.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="project-detail-sales-rep">Sales Rep</Label>
+              <Select id="project-detail-sales-rep" options={salesRepOptions} value={editSalesRepId} onChange={setEditSalesRepId} placeholder="No sales rep" allowEmpty />
+            </div>
+            <div>
+              <Label htmlFor="project-detail-status">Status</Label>
+              <Select id="project-detail-status" options={projectStatusOptions} value={editStatus} onChange={(value) => setEditStatus(value as ProjectStatus)} />
+            </div>
+            <div>
+              <Label htmlFor="project-detail-start-date">Start date</Label>
+              <Input id="project-detail-start-date" type="date" value={editStartDate} onChange={(event) => setEditStartDate(event.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="project-detail-target-date">Target date</Label>
+              <Input id="project-detail-target-date" type="date" value={editTargetDate} onChange={(event) => setEditTargetDate(event.target.value)} />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={saveProject} disabled={savingProject || loading}>{savingProject ? "Saving…" : "Save Project"}</Button>
+          </div>
+        </ComponentCard>
+      ) : null}
+
       <ComponentCard
         title="Orders"
         desc="Cancelled Orders stay out of the active Project workspace and remain available from the Customer Orders cancelled filter."
@@ -220,6 +359,33 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
             <Button onClick={assignOrder} disabled={!selectedOrderId || saving}>{saving ? "Linking…" : "Link Order"}</Button>
           </div>
         ) : null}
+      </ComponentCard>
+
+      <ComponentCard title="Activity" desc="Project lifecycle history is append-only and shown newest first.">
+        <TableViewport>
+          <Table variant="admin" minWidth="standard">
+            <TableHeader variant="admin">
+              <TableRow>
+                <TableCell isHeader variant="admin">When</TableCell>
+                <TableCell isHeader variant="admin">From</TableCell>
+                <TableCell isHeader variant="admin">To</TableCell>
+                <TableCell isHeader variant="admin">Note</TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody variant="admin">
+              {loading ? <TableStateRow colSpan={4}>Refreshing Project activity…</TableStateRow> : null}
+              {!loading && projectActivity.length === 0 ? <TableStateRow colSpan={4}>No Project lifecycle activity has been recorded yet.</TableStateRow> : null}
+              {!loading ? projectActivity.map((entry) => (
+                <TableRow key={entry.id}>
+                  <TableCell variant="admin">{displayDateTime(entry.created_at)}</TableCell>
+                  <TableCell variant="admin">{entry.from_status ? <Badge color={badgeColor(entry.from_status)}>{statusLabel(entry.from_status)}</Badge> : "Created"}</TableCell>
+                  <TableCell variant="admin"><Badge color={badgeColor(entry.to_status)}>{statusLabel(entry.to_status)}</Badge></TableCell>
+                  <TableCell variant="admin">{entry.note || "—"}</TableCell>
+                </TableRow>
+              )) : null}
+            </TableBody>
+          </Table>
+        </TableViewport>
       </ComponentCard>
     </div>
   );
