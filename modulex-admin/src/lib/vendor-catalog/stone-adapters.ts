@@ -132,6 +132,16 @@ async function fetchHtml(fetchImpl: FetchLike, url: string) {
   return response.text();
 }
 
+async function fetchHtmlOrNullOn404(fetchImpl: FetchLike, url: string) {
+  const response = await fetchImpl(url, {
+    headers: { accept: "text/html,application/xhtml+xml" },
+    cache: "no-store",
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Stone vendor request failed (${response.status}): ${url}`);
+  return response.text();
+}
+
 export function parseEwMarbleDetail(html: string, productUrl: string, categoryLabel?: string | null): NormalizedStoneVendorProduct {
   const text = stripHtml(html);
   const title = firstMatch(html, [/<h1\b[^>]*>([\s\S]*?)<\/h1>/i, /<title\b[^>]*>([\s\S]*?)<\/title>/i]) ?? "Untitled stone";
@@ -226,6 +236,8 @@ function discoverLinks(html: string, baseUrl: string, pattern: RegExp) {
   return [...byUrl.entries()].map(([url, label]) => ({ url, label }));
 }
 
+const EW_CATEGORY_PATH = /^\/products\/(quartz|soapstone|porcelain|granite|quartzite|marble)\/?$/i;
+
 export class EwMarbleStoneAdapter implements StoneVendorAdapter {
   readonly vendorCode = "ew_marble" as const;
   readonly displayName = "East West Marble";
@@ -237,7 +249,7 @@ export class EwMarbleStoneAdapter implements StoneVendorAdapter {
   }
   async listCategories(): Promise<StoneVendorCategory[]> {
     const html = await fetchHtml(this.fetchImpl, `${this.baseUrl}/products`);
-    return discoverLinks(html, this.baseUrl, /^\/products\/category\/view\/\d+\/?$/i)
+    return discoverLinks(html, this.baseUrl, EW_CATEGORY_PATH)
       .map(({ url, label }) => ({ key: new URL(url).pathname.split("/").filter(Boolean).at(-1)!, label: label || "Stone", productCount: null }))
       .filter((value, index, all) => all.findIndex((candidate) => candidate.key === value.key) === index);
   }
@@ -247,8 +259,10 @@ export class EwMarbleStoneAdapter implements StoneVendorAdapter {
       : await this.listCategories();
     const products: Array<{ url: string; categoryLabel: string }> = [];
     for (const category of categories) {
-      const html = await fetchHtml(this.fetchImpl, `${this.baseUrl}/products/category/view/${encodeURIComponent(category.key)}`);
-      for (const link of discoverLinks(html, this.baseUrl, /^\/products\/product\/view\/\d+\/\d+\/?$/i)) {
+      const html = await fetchHtml(this.fetchImpl, `${this.baseUrl}/products/${encodeURIComponent(category.key)}`);
+      const escapedKey = category.key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pattern = new RegExp(`^/products/${escapedKey}/product/view/\\d+/\\d+/?$`, "i");
+      for (const link of discoverLinks(html, this.baseUrl, pattern)) {
         products.push({ url: link.url, categoryLabel: category.label });
       }
     }
@@ -278,7 +292,11 @@ export class VeneziaStoneAdapter implements StoneVendorAdapter {
       : await this.listCategories();
     const products: Array<{ url: string; categoryLabel: string }> = [];
     for (const category of categories) {
-      const html = await fetchHtml(this.fetchImpl, `${this.baseUrl}/catalog/${encodeURIComponent(category.key)}`);
+      const html = await fetchHtmlOrNullOn404(
+        this.fetchImpl,
+        `${this.baseUrl}/catalog/${encodeURIComponent(category.key)}`
+      );
+      if (html === null) continue;
       const pattern = new RegExp(`^/catalog/${category.key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/[^/]+/?$`, "i");
       for (const link of discoverLinks(html, this.baseUrl, pattern)) products.push({ url: link.url, categoryLabel: category.label });
     }
