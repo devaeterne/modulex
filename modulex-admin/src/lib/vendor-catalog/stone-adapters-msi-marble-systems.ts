@@ -137,6 +137,16 @@ async function fetchHtml(fetchImpl: FetchLike, url: string) {
   return response.text();
 }
 
+async function fetchOptionalDetailHtml(fetchImpl: FetchLike, url: string) {
+  const response = await fetchImpl(url, {
+    headers: { accept: "text/html,application/xhtml+xml" },
+    cache: "no-store",
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Stone vendor request failed (${response.status}): ${url}`);
+  return response.text();
+}
+
 async function fetchPaginationHtml(fetchImpl: FetchLike, url: string, page: number) {
   const response = await fetchImpl(url, {
     headers: { accept: "text/html,application/xhtml+xml" },
@@ -537,9 +547,13 @@ export class MarbleSystemsStoneAdapter implements StoneVendorAdapter {
     }
 
     const unique = [...new Map(links.map((item) => [item.url, item])).values()];
-    const products = await mapWithConcurrency(unique, 3, async (item) =>
-      parseMarbleSystemsDetail(await fetchHtml(this.fetchImpl, item.url), item.url, item.categoryLabel)
+    const products = await mapWithConcurrency(unique, 3, async (item) => {
+      const html = await fetchOptionalDetailHtml(this.fetchImpl, item.url);
+      return html === null ? null : parseMarbleSystemsDetail(html, item.url, item.categoryLabel);
+    });
+    return products.filter(
+      (product): product is NormalizedStoneVendorProduct =>
+        product !== null && /^SL/i.test(product.sku ?? "") && product.stoneTypeName !== "Unknown"
     );
-    return products.filter((product) => /^SL/i.test(product.sku ?? "") && product.stoneTypeName !== "Unknown");
   }
 }
