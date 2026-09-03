@@ -311,23 +311,20 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         ) : null}
       </ComponentCard>
 
-      <div className="overflow-x-auto border-b border-gray-200 dark:border-gray-800" role="tablist" aria-label="Project workspace sections">
-        <div className="flex min-w-max gap-1">
+      <div className="overflow-x-auto" role="tablist" aria-label="Project workspace sections">
+        <div className="flex min-w-max gap-2">
           {PROJECT_TABS.map((tab) => (
-            <button
+            <Button
               key={tab}
-              type="button"
+              size="sm"
+              variant={activeTab === tab ? "primary" : "ghost"}
               role="tab"
               aria-selected={activeTab === tab}
               onClick={() => setActiveTab(tab)}
-              className={`border-b-2 px-4 py-3 text-sm font-medium transition ${
-                activeTab === tab
-                  ? "border-gray-900 text-gray-900 dark:border-white dark:text-white"
-                  : "border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-              }`}
+              className="whitespace-nowrap"
             >
               {tab}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
