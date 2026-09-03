@@ -32,7 +32,8 @@ const paymentStatusDomain = read("src/lib/customers/project-payment-status.ts");
 const financeTab = read("src/components/customers/project-detail/ProjectFinanceTab.tsx");
 const migration = readRepo("modulex-store/supabase/migrations/20260903143000_customer_project_payment_ledger.sql");
 const hardening = readRepo("modulex-store/supabase/migrations/20260903143500_customer_project_payment_ledger_hardening.sql");
-const allSql = `${migration}\n${hardening}`;
+const invoiceRoleGuard = readRepo("modulex-store/supabase/migrations/20260903144000_customer_project_payment_invoice_role_guard.sql");
+const allSql = `${migration}\n${hardening}\n${invoiceRoleGuard}`;
 
 assert(permissions.includes('"project_payments.view"'), "PB-3A requires project_payments.view");
 assert(permissions.includes('"project_payments.manage"'), "PB-3A requires project_payments.manage");
@@ -51,9 +52,7 @@ for (const forbidden of ["amount", "paid_amount", "balance", "cost", "margin", "
   assert(!new RegExp(`\\b${forbidden}\\b`, "i").test(paymentStatusDomain), `Sales payment status adapter must not model restricted field ${forbidden}`);
 }
 
-for (const tab of ["Overview", "Orders", "Finance", "Procurement", "Fulfillment", "Documents", "Activity"]) {
-  assert(projectDetail.includes(`"${tab}"`), `Project detail must expose ${tab} tab`);
-}
+for (const tab of ["Overview", "Orders", "Finance", "Procurement", "Fulfillment", "Documents", "Activity"]) assert(projectDetail.includes(`"${tab}"`), `Project detail must expose ${tab} tab`);
 assert(projectDetail.includes('role="tablist"'), "Project detail tabs must expose tablist semantics");
 assert(projectDetail.includes('role="tab"'), "Project detail tabs must expose tab semantics");
 assert(financeTab.includes("loadProjectPaymentStatus"), "Project Finance must support Sales-safe payment status");
@@ -62,13 +61,12 @@ assert(financeTab.includes("ProjectFinancialSummary"), "Project Finance must pre
 
 assert(invoiceDetail.includes("ledger_managed"), "Invoice detail must distinguish legacy and ledger-managed invoices");
 assert(invoiceDetail.includes("Legacy payment tracking") || invoiceDetail.includes("ledgerManaged"), "Invoice detail must preserve an explicit legacy compatibility path");
+assert(invoiceDetail.includes('hasPermission(profile.role, "project_payments.manage")'), "Invoice payment controls must use the dedicated Project payment mutation permission");
+assert(invoiceDetail.includes("canManagePayments") && invoiceDetail.includes("!ledgerManaged && canManagePayments"), "Legacy paid_amount controls must be hidden from Sales");
+assert(invoiceRoleGuard.includes("Sales cannot record customer payments"), "DB must reject Sales paid_amount mutations even for legacy invoices");
 
-for (const tableName of ["customer_project_payment_requirements", "customer_project_payment_transactions", "customer_project_payment_allocations"]) {
-  assert(migration.includes(tableName), `PB-3A migration must create ${tableName}`);
-}
-for (const functionName of ["get_customer_project_payment_ledger", "get_customer_project_payment_status", "create_customer_project_payment_requirement", "record_customer_project_payment", "allocate_customer_project_payment", "reverse_customer_project_payment"]) {
-  assert(allSql.includes(functionName), `PB-3A SQL must define ${functionName}`);
-}
+for (const tableName of ["customer_project_payment_requirements", "customer_project_payment_transactions", "customer_project_payment_allocations"]) assert(migration.includes(tableName), `PB-3A migration must create ${tableName}`);
+for (const functionName of ["get_customer_project_payment_ledger", "get_customer_project_payment_status", "create_customer_project_payment_requirement", "record_customer_project_payment", "allocate_customer_project_payment", "reverse_customer_project_payment"]) assert(allSql.includes(functionName), `PB-3A SQL must define ${functionName}`);
 assert(migration.includes("ledger_managed"), "PB-3A migration must add ledger_managed invoice compatibility state");
 assert(migration.includes("customer_invoices") && migration.includes("paid_amount"), "PB-3A migration must reconcile ledger-managed invoices to paid_amount compatibility projection");
 assert(!migration.toLowerCase().includes("insert into public.customer_project_payment_transactions select"), "PB-3A must not fabricate historical payment transactions from existing invoice paid_amount");
@@ -83,8 +81,6 @@ for (const privateEntrypoint of [
   "private.allocate_customer_project_payment(uuid, uuid, numeric)",
   "private.reverse_customer_project_payment(uuid, numeric, text)",
   "private.void_customer_project_payment(uuid, text)",
-]) {
-  assert(hardening.includes(`grant execute on function ${privateEntrypoint} to authenticated, service_role;`), `SECURITY INVOKER wrapper chain requires authenticated EXECUTE on ${privateEntrypoint}`);
-}
+]) assert(hardening.includes(`grant execute on function ${privateEntrypoint} to authenticated, service_role;`), `SECURITY INVOKER wrapper chain requires authenticated EXECUTE on ${privateEntrypoint}`);
 
 console.log("PASS: PB-3A Project payment ledger contract");
