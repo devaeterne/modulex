@@ -25,6 +25,13 @@ try {
 }
 
 const identity = await importTranspiled(identitySource);
+const approvalSource = read("src/lib/vendor-catalog/stone-approve.ts");
+
+assert.match(approvalSource, /buildStoneIdentityCandidates/);
+assert.match(approvalSource, /categoryFamilyCode/);
+assert.match(approvalSource, /disambiguatedVariantCode/);
+assert.match(approvalSource, /category_id/);
+assert.match(approvalSource, /color_code/);
 
 const perlaQuartz = identity.buildStoneIdentityCandidates({
   familyKey: "VENEZIA:perla-taj",
