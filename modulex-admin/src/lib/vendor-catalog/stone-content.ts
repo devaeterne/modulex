@@ -13,6 +13,7 @@ export type StoneInventoryLike = {
 
 export type StoneDataLike = {
   stoneTypeName?: string | null;
+  brand?: string | null;
   collection?: string | null;
   colors?: string[] | null;
   backgroundColor?: string | null;
