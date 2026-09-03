@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withApiTiming } from "@/lib/observability/apiTiming";
 import { authorizeVendorCatalogAdmin } from "@/lib/vendor-catalog/auth";
 import { approveStoneVendorCatalogItem } from "@/lib/vendor-catalog/stone-approve";
 import { serializeUnknownError, unknownErrorMessage } from "@/lib/errors/unknown-error";
@@ -20,7 +21,7 @@ function boundedLimit(value: unknown) {
   return Math.max(1, Math.min(10, Math.trunc(parsed)));
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const authorization = await authorizeVendorCatalogAdmin(request);
   if (authorization instanceof Response) return authorization;
 
@@ -103,4 +104,11 @@ export async function POST(request: Request) {
     remaining: Math.max(0, candidates.length - batch.length),
     results,
   });
+}
+
+export async function POST(request: Request) {
+  return withApiTiming(
+    { route: "/api/vendor-catalog/stone/backfill-approved", method: "POST" },
+    () => handlePost(request)
+  );
 }
