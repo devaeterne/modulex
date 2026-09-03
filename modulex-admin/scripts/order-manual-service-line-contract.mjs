@@ -106,6 +106,7 @@ assert(serviceDetails.includes("lineNote"), "ServiceLineDetails must render the 
 
 assert(orderDomain.includes("manual_service"), "client order domain must represent manual_service explicitly");
 assert(orderDomain.includes("line_note"), "client order serialization/hydration must preserve line_note");
+assert(/from\("products"\)[\s\S]{0,500}\.eq\("sku",\s*"SERVICE"\)/.test(orderDomain), "Order context must fetch canonical SERVICE by stable SKU independently of the bulk product-list row cap");
 assert(types.includes("line_note"), "order/invoice item types must expose historical line_note");
 
 for (const [name, source] of [
