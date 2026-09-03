@@ -298,7 +298,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         ) : null}
       </ComponentCard>
 
-      <div className={canManageProjects ? "grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start" : undefined}>
+      <div className={canManageProjects ? "grid gap-6 2xl:grid-cols-[minmax(0,1fr)_380px] 2xl:items-start" : undefined}>
         {canManageProjects ? (
           <ComponentCard title="Project Settings" desc="Update Project ownership, lifecycle status, and schedule without changing the Customer account.">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
