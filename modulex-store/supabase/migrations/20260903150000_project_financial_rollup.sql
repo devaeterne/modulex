@@ -109,7 +109,7 @@ begin
   ),
   currency_state as (
     select
-      coalesce((select min(cs.currency_code) from currency_sources cs), (select s.default_currency from settings), 'USD') as currency_code,
+      coalesce((select min(cs.currency_code) from currency_sources cs), (select s.default_currency from settings s), 'USD') as currency_code,
       (select count(distinct cs.currency_code) from currency_sources cs) > 1 as mixed_currency
   ),
   totals as (
