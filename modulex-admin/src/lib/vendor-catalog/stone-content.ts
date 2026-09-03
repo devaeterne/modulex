@@ -1,17 +1,17 @@
-type StoneVariantLike = {
+export type StoneVariantLike = {
   thickness?: string | null;
   finish?: string | null;
   dimensions?: string | null;
   slabSizeClass?: string | null;
 };
 
-type StoneInventoryLike = {
+export type StoneInventoryLike = {
   lotNumber?: string | null;
   batchNumber?: string | null;
   location?: string | null;
 };
 
-type StoneDataLike = {
+export type StoneDataLike = {
   stoneTypeName?: string | null;
   collection?: string | null;
   colors?: string[] | null;
@@ -22,7 +22,7 @@ type StoneDataLike = {
   vendorInventory?: StoneInventoryLike[] | null;
 };
 
-type StoneDescriptionInput = {
+export type StoneDescriptionInput = {
   title: string;
   description: string | null;
   stone_data: StoneDataLike | null;
