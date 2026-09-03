@@ -65,6 +65,19 @@ assert(newOrder.includes("projectId?: string | null"), "New Order form must acce
 assert(orderDetailPage.includes("CustomerOrderProjectLink"), "Order detail must expose its Project when linked");
 
 assert(
+  projectsWorkspace.includes('hasPermission(profile.roles, "projects.manage")'),
+  "Projects create UI must derive projects.manage from the current user's full role set"
+);
+assert(
+  /\{canManageProjects\s*\?\s*\(\s*<ComponentCard title="Create Project"/.test(projectsWorkspace),
+  "Projects create UI must be hidden from projects.view-only users"
+);
+assert(
+  !projectsWorkspace.includes("await Promise.all([loadReferenceData(), loadProjects()]);"),
+  "Projects view-only users must not be forced to load create-only Customer/Profile references"
+);
+
+assert(
   customerOrdersList.includes('if (status === "all") query = query.neq("status", "cancelled")'),
   "Customer Orders default list must exclude cancelled Orders"
 );
