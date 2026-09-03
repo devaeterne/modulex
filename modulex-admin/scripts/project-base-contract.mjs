@@ -83,6 +83,28 @@ assert(
     projectsWorkspace.includes("requestId !== reloadRequestId.current"),
   "Projects list must ignore stale async reload responses when filters change rapidly"
 );
+assert(
+  projectsWorkspace.includes("ADMIN_TEXT_STYLES") && projectsWorkspace.includes("ADMIN_TEXT_STYLES.body"),
+  "Projects pagination/footer text must use shared light/dark Admin text tokens"
+);
+assert(
+  projectsWorkspace.includes("customerFilterId") &&
+    projectsWorkspace.includes("salesRepFilterId") &&
+    projectsWorkspace.includes("customerId: customerFilterId || null") &&
+    projectsWorkspace.includes("salesRepId: salesRepFilterId || null"),
+  "Projects list must expose Customer and Sales Rep filters through the existing server-side RPC"
+);
+assert(
+  projectsWorkspace.includes("SearchableSelect") &&
+    projectsWorkspace.includes('searchPlaceholder="Search customers') &&
+    projectsWorkspace.includes('searchPlaceholder="Search sales reps'),
+  "Project Customer and Sales Rep selectors must be searchable"
+);
+assert(
+  projectsWorkspace.includes("REFERENCE_RESULT_LIMIT") &&
+    projectsWorkspace.includes(".limit(REFERENCE_RESULT_LIMIT)"),
+  "Project reference selectors must bound Customer/Profile reads instead of loading unbounded datasets"
+);
 
 assert(
   projectDetail.includes("updateCustomerProject") && projectDetail.includes('.rpc("assign_customer_order_to_project"'),
