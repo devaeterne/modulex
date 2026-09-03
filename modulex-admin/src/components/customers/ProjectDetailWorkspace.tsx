@@ -9,6 +9,7 @@ import Input from "@/components/form/input/InputField";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   Table,
   TableBody,
@@ -283,14 +284,14 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         desc={project.customer_name}
         headerAction={<Badge color={badgeColor(project.status)}>{statusLabel(project.status)}</Badge>}
       >
-        <div className="grid gap-4 text-sm text-gray-700 dark:text-gray-300 md:grid-cols-2 lg:grid-cols-4">
+        <div className={`grid gap-4 text-sm md:grid-cols-2 lg:grid-cols-4 ${ADMIN_TEXT_STYLES.body}`}>
           <p><strong>Sales Rep:</strong> {project.sales_rep_name || "—"}</p>
           <p><strong>Start:</strong> {displayDate(project.start_date)}</p>
           <p><strong>Target:</strong> {displayDate(project.target_date)}</p>
           <p><strong>Orders:</strong> {activeOrders.length}</p>
         </div>
         {project.project_address_snapshot ? (
-          <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Project site:</strong> {String(project.project_address_snapshot.address_line_1 ?? "")} {String(project.project_address_snapshot.city ?? "")}</p>
+          <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}><strong>Project site:</strong> {String(project.project_address_snapshot.address_line_1 ?? "")} {String(project.project_address_snapshot.city ?? "")}</p>
         ) : null}
       </ComponentCard>
 
@@ -394,7 +395,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
                   <TableCell variant="admin">{displayDateTime(entry.created_at)}</TableCell>
                   <TableCell variant="admin">
                     <div className="space-y-1">
-                      <p className="font-medium text-gray-800 dark:text-white/90">{describeProjectActivity(entry)}</p>
+                      <p className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{describeProjectActivity(entry)}</p>
                       <div className="flex flex-wrap items-center gap-2">
                         {entry.from_status ? <Badge color={badgeColor(entry.from_status)}>{statusLabel(entry.from_status)}</Badge> : <Badge color="light">Created</Badge>}
                         <span aria-hidden="true">→</span>
