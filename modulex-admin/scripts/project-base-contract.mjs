@@ -21,8 +21,10 @@ const permissions = read("src/lib/auth/permissions.ts");
 const sidebar = read("src/layout/AppSidebar.tsx");
 const projectDomain = read("src/lib/customers/project-domain.ts");
 const projectsPage = read("src/app/(admin)/projects/page.tsx");
+const projectsWorkspace = read("src/components/customers/ProjectsWorkspace.tsx");
 const projectDetailPage = read("src/app/(admin)/projects/[id]/page.tsx");
 const projectDetail = read("src/components/customers/ProjectDetailWorkspace.tsx");
+const customerOrdersList = read("src/components/customers/CustomerOrdersList.tsx");
 const newOrderPage = read("src/app/(admin)/customers/[id]/orders/new/page.tsx");
 const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
 const orderDetailPage = read("src/app/(admin)/customers/[id]/orders/[orderId]/page.tsx");
@@ -61,5 +63,38 @@ assert(newOrderPage.includes("projectId={projectId}"), "New Order page must pass
 assert(newOrder.includes("createProjectCustomerOrder"), "New Order must use the Project-aware create boundary when projectId is present");
 assert(newOrder.includes("projectId?: string | null"), "New Order form must accept an optional projectId without breaking standalone creation");
 assert(orderDetailPage.includes("CustomerOrderProjectLink"), "Order detail must expose its Project when linked");
+
+assert(
+  customerOrdersList.includes('if (status === "all") query = query.neq("status", "cancelled")'),
+  "Customer Orders default list must exclude cancelled Orders"
+);
+assert(
+  customerOrdersList.includes('else query = query.eq("status", status)'),
+  "Customer Orders must still allow an explicit Cancelled status filter"
+);
+assert(
+  projectDetail.includes('.neq("status", "cancelled")'),
+  "Project link-existing Order choices must exclude cancelled Orders"
+);
+assert(
+  projectDetail.includes('order.status !== "cancelled"'),
+  "Project detail must exclude cancelled child Orders"
+);
+assert(
+  projectsWorkspace.includes("TableViewport") && projectsWorkspace.includes("TableStateRow"),
+  "Projects list must use the shared Admin table system"
+);
+assert(
+  projectsWorkspace.includes('from "@/components/ui/alert/Alert"'),
+  "Projects list must use the shared Alert primitive for feedback"
+);
+assert(
+  projectDetail.includes("TableViewport") && projectDetail.includes("TableStateRow"),
+  "Project detail Orders must use the shared Admin table system"
+);
+assert(
+  projectDetail.includes('from "@/components/ui/alert/Alert"'),
+  "Project detail must use the shared Alert primitive for feedback"
+);
 
 console.log("PASS: project-base foundation contract");
