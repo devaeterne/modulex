@@ -191,6 +191,7 @@ assert.match(sql, /vendor inventory is reference-only/i);
 assert.match(sql, /v_material_price_band_id is not null/i);
 assert.equal(migration.trim(), sql.trim(), "Deployable Stone vendor migration must mirror canonical SQL");
 
+await import("./vendor-error-behavior-contract.mjs");
 await import("./vendor-catalog-adapter-behavior-contract.mjs");
 
 console.log("stone vendor catalog contract: ok");
