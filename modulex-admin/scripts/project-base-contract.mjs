@@ -85,6 +85,23 @@ assert(
 );
 
 assert(
+  projectDetail.includes("updateCustomerProject") && projectDetail.includes('.rpc("assign_customer_order_to_project"'),
+  "Project detail must preserve Order linking while exposing the authoritative Project update boundary"
+);
+assert(
+  projectDetail.includes('hasPermission(profile.roles, "projects.manage")'),
+  "Project detail manage UI must derive projects.manage from the current user's full role set"
+);
+assert(
+  /\{canManageProjects\s*\?\s*\(\s*<ComponentCard title="Project Settings"/.test(projectDetail),
+  "Project Settings must be hidden from projects.view-only users"
+);
+assert(
+  projectDetail.includes('.from("customer_project_status_history")') && projectDetail.includes('title="Activity"'),
+  "Project detail must show truthful Project lifecycle activity from status history"
+);
+
+assert(
   customerOrdersList.includes('if (status === "all") query = query.neq("status", "cancelled")'),
   "Customer Orders default list must exclude cancelled Orders"
 );
