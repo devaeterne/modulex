@@ -53,6 +53,10 @@ export type ProjectPaymentLedger = {
   transactions: ProjectPaymentTransaction[];
 };
 
+export type ProjectPaymentUpdateResult = {
+  allocationReset: boolean;
+};
+
 type RawCurrencySummary = {
   currency_code?: string | null;
   expected?: number | string | null;
@@ -243,6 +247,42 @@ export async function reverseProjectPayment(input: {
 export async function voidProjectPayment(input: { paymentId: string; reason: string }) {
   await requireProjectPaymentManage();
   const { data, error } = await supabase.rpc("void_customer_project_payment", {
+    p_payment_id: input.paymentId,
+    p_reason: input.reason,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function updateProjectPayment(input: {
+  paymentId: string;
+  amount: number;
+  currencyCode: string;
+  transactionDate: string;
+  paymentMethodId?: string | null;
+  referenceNo?: string | null;
+  notes?: string | null;
+  reason?: string | null;
+}): Promise<ProjectPaymentUpdateResult> {
+  await requireProjectPaymentManage();
+  const { data, error } = await supabase.rpc("update_customer_project_payment", {
+    p_payment_id: input.paymentId,
+    p_amount: input.amount,
+    p_currency_code: input.currencyCode,
+    p_transaction_date: input.transactionDate,
+    p_payment_method_id: input.paymentMethodId ?? null,
+    p_reference_no: input.referenceNo ?? null,
+    p_notes: input.notes ?? null,
+    p_reason: input.reason ?? null,
+  });
+  if (error) throw error;
+  const raw = (data ?? {}) as { allocation_reset?: boolean };
+  return { allocationReset: Boolean(raw.allocation_reset) };
+}
+
+export async function deleteProjectPayment(input: { paymentId: string; reason: string }) {
+  await requireProjectPaymentManage();
+  const { data, error } = await supabase.rpc("delete_customer_project_payment", {
     p_payment_id: input.paymentId,
     p_reason: input.reason,
   });
