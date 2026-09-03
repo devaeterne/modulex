@@ -97,7 +97,6 @@ async function handleGet(request: Request) {
   const mappingEligibility = new Map<string, boolean>();
   const uniqueMappings = new Map<string, Candidate>();
   for (const candidate of candidates) {
-    if (candidate.catalog_domain === "stone") continue;
     const key = `${candidate.vendor_code}:${candidate.vendor_category_key ?? ""}`;
     if (!uniqueMappings.has(key)) uniqueMappings.set(key, candidate);
   }
@@ -119,12 +118,12 @@ async function handleGet(request: Request) {
 
   const ids = candidates
     .filter((candidate) => {
-      if (candidate.catalog_domain === "stone") return Boolean(candidate.stone_type_id);
-      return (
-        mappingEligibility.get(
-          `${candidate.vendor_code}:${candidate.vendor_category_key ?? ""}`
-        ) === true
-      );
+      const mappingReady =
+        mappingEligibility.get(`${candidate.vendor_code}:${candidate.vendor_category_key ?? ""}`) === true;
+      if (candidate.catalog_domain === "stone") {
+        return Boolean(candidate.stone_type_id) && mappingReady;
+      }
+      return mappingReady;
     })
     .map((candidate) => candidate.id);
 
