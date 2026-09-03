@@ -27,6 +27,9 @@ const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
 const stonePanel = readOptional(
   "src/app/(admin)/products/vendor-imports/StoneVendorImportsPanel.tsx"
 );
+const sinkPanel = readOptional(
+  "src/app/(admin)/products/vendor-imports/SinkVendorImportsPanel.tsx"
+);
 const bulkEligibleRoute = read("src/app/api/vendor-catalog/bulk/eligible/route.ts");
 const sql = read("sql/stone-vendor-catalog-foundation.sql");
 const migration = read("../modulex-store/supabase/migrations/20260902213000_stone_vendor_catalog_foundation.sql");
@@ -110,8 +113,15 @@ assert.match(sync, /zero products|no products/i);
 assert.doesNotMatch(sync, /\.from\("inventory"\)/);
 assert.doesNotMatch(sync, /store.*publish/i);
 
-assert.match(stoneApproval, /product_type.*STONE|eq\("code",\s*"STONE"\)/s);
-assert.match(stoneApproval, /eq\("code",\s*"SLAB"\)/);
+// Stone approval must use the same persistent vendor-category mapping boundary
+// as Sink approval. Product Master requires category_id, while Stone Type remains
+// an independent taxonomy requirement.
+assert.match(stoneApproval, /loadVendorCategoryMapping/);
+assert.match(stoneApproval, /mapping\.category\.id/);
+assert.match(stoneApproval, /mapping\.category\.name/);
+assert.match(stoneApproval, /mapping\.productType\.code\s*!==\s*"STONE"/);
+assert.match(stoneApproval, /mapping\.uom\.code\s*!==\s*"SLAB"/);
+assert.doesNotMatch(stoneApproval, /category_id:\s*null/);
 assert.match(stoneApproval, /material_price_band_id:\s*null/);
 assert.match(stoneApproval, /review_status:\s*"APPROVED"/);
 assert.match(stoneApproval, /storeProductContentId:\s*null/);
@@ -145,12 +155,31 @@ assert.match(stonePanel, /Finish/);
 assert.match(stonePanel, /Location/);
 assert.match(stonePanel, /Select one Stone vendor/);
 
-// Generic bulk approval remains shared, but Stone eligibility must not depend
-// on Sink category mappings. A resolved Stone Type is the fail-closed gate.
+// Stone review must surface the existing category-mapping editor on a 409,
+// keep STONE + SLAB fixed for Stone imports, and show synced/unchanged rows after
+// a full Stone sync so a harmless second sync cannot make the catalog appear empty.
+assert.match(stonePanel, /CATEGORY_MAPPING_REQUIRED/);
+assert.match(stonePanel, /\/api\/vendor-catalog\/category-mappings/);
+assert.match(stonePanel, /Vendor Category Mapping/);
+assert.match(stonePanel, /Category mapping required/);
+assert.match(stonePanel, /STONE/);
+assert.match(stonePanel, /SLAB/);
+assert.match(stonePanel, /setChangeStates\(\["NEW",\s*"UPDATED",\s*"UNCHANGED"\]\)/);
+
+// Long-running sync/bulk approval can cross the Supabase access-token expiry
+// boundary. Refresh near expiry and reacquire a token for each approval batch.
+assert.match(stonePanel, /refreshSession\(\)/);
+assert.match(stonePanel, /for\s*\(const batch of chunks\(ids, 5\)\)[\s\S]{0,220}?getAccessToken\(\)/);
+assert.match(sinkPanel, /refreshSession\(\)/);
+assert.match(sinkPanel, /for\s*\(const batch of chunk\(ids, 5\)\)[\s\S]{0,220}?getAccessToken\(\)/);
+
+// Generic bulk approval remains shared. Stone eligibility requires both a
+// resolved Stone Type and a valid persistent vendor category mapping.
 assert.match(bulkEligibleRoute, /catalog_domain/);
 assert.match(bulkEligibleRoute, /stone_type_id/);
-assert.match(bulkEligibleRoute, /candidate\.catalog_domain === "stone"/);
-assert.match(bulkEligibleRoute, /Boolean\(candidate\.stone_type_id\)/);
+assert.match(bulkEligibleRoute, /loadVendorCategoryMapping/);
+assert.doesNotMatch(bulkEligibleRoute, /if\s*\(candidate\.catalog_domain === "stone"\)\s*continue/);
+assert.match(bulkEligibleRoute, /candidate\.catalog_domain === "stone"[\s\S]{0,220}?candidate\.stone_type_id/);
 
 assert.match(sql, /alter column material_price_band_id drop not null/i);
 assert.match(sql, /vendor_stone_type_mappings/);
