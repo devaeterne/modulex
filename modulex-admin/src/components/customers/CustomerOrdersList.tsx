@@ -263,7 +263,8 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
         .select("*", { count: "exact" });
 
       if (customerId) query = query.eq("customer_id", customerId);
-      if (status !== "all") query = query.eq("status", status);
+      if (status === "all") query = query.neq("status", "cancelled");
+      else query = query.eq("status", status);
 
       if (normalizedSearch) {
         const pattern = quotePostgrestValue(`%${debouncedSearch.trim()}%`);
