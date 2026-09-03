@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
 import ProjectFinanceTab from "@/components/customers/project-detail/ProjectFinanceTab";
@@ -117,6 +117,7 @@ function money(value: string | number, currency: string) {
 
 export default function ProjectDetailWorkspace({ projectId }: { projectId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<ProjectTab>("Overview");
   const [project, setProject] = useState<CustomerProject | null>(null);
   const [standaloneOrders, setStandaloneOrders] = useState<StandaloneOrder[]>([]);
@@ -215,6 +216,13 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       setLoading(false);
     }
   }, [projectId]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    if (requestedTab && PROJECT_TABS.includes(requestedTab as ProjectTab)) {
+      setActiveTab(requestedTab as ProjectTab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     void load();
