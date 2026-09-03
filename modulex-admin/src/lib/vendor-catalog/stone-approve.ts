@@ -5,6 +5,7 @@ import {
   buildStoneProductDescription,
   type StoneDataLike,
 } from "@/lib/vendor-catalog/stone-content";
+import { buildStoneIdentityCandidates } from "@/lib/vendor-catalog/stone-identity";
 import { loadVendorCategoryMapping } from "@/lib/vendor-catalog/mappings";
 import { stoneVendorCatalogLabels } from "@/lib/vendor-catalog/stone-adapters";
 import { archiveStoneProductContent } from "@/lib/vendor-catalog/stone-media";
@@ -36,6 +37,12 @@ type StoneCanonicalProduct = {
   base_product_code: string | null;
   name: string;
   description: string | null;
+};
+
+type StoneFamilyProduct = StoneCanonicalProduct & {
+  category_id: string;
+  color_code: string;
+  metadata: Record<string, unknown> | null;
 };
 
 function normalizedCode(value: string, fallback: string) {
@@ -149,6 +156,82 @@ async function backfillCanonicalDescription(
   return data as StoneCanonicalProduct;
 }
 
+function isSameVendorIdentity(row: StoneFamilyProduct, item: StoneItemRow) {
+  const metadata = row.metadata ?? {};
+  return metadata.vendor_code === item.vendor_code && metadata.vendor_external_id === item.external_id;
+}
+
+async function loadFamilyProducts(baseProductCode: string) {
+  const { data, error } = await supabaseAdmin
+    .from("products")
+    .select("id,sku,base_product_code,name,description,category_id,color_code,metadata")
+    .eq("base_product_code", baseProductCode);
+  if (error) throw error;
+  return (data ?? []) as StoneFamilyProduct[];
+}
+
+async function resolveStoneProductIdentity(
+  item: StoneItemRow,
+  sku: string,
+  category: { id: string; name: string }
+) {
+  const candidates = buildStoneIdentityCandidates({
+    familyKey: item.family_key,
+    fallbackFamilyCode: sku,
+    categoryName: category.name,
+    externalId: item.external_id,
+    title: item.title,
+    variantCode: item.variant_code,
+    finish: stringValue(item.stone_data?.variant?.finish),
+  });
+
+  const baseFamilyProducts = await loadFamilyProducts(candidates.baseFamilyCode);
+  const hasCategoryConflict = baseFamilyProducts.some((row) => row.category_id !== category.id);
+  const familyCode = hasCategoryConflict
+    ? candidates.categoryFamilyCode
+    : candidates.baseFamilyCode;
+  const familyProducts = hasCategoryConflict
+    ? await loadFamilyProducts(familyCode)
+    : baseFamilyProducts;
+
+  if (familyProducts.some((row) => row.category_id !== category.id)) {
+    throw new Error(`Stone family identity collision detected for ${familyCode}.`);
+  }
+
+  const baseVariantMatch = familyProducts.find(
+    (row) => row.color_code.toUpperCase() === candidates.baseVariantCode
+  );
+  if (!baseVariantMatch) {
+    return {
+      familyCode,
+      variantCode: candidates.baseVariantCode,
+      existingProduct: null as StoneFamilyProduct | null,
+    };
+  }
+  if (isSameVendorIdentity(baseVariantMatch, item)) {
+    return {
+      familyCode,
+      variantCode: candidates.baseVariantCode,
+      existingProduct: baseVariantMatch,
+    };
+  }
+
+  const disambiguatedMatch = familyProducts.find(
+    (row) => row.color_code.toUpperCase() === candidates.disambiguatedVariantCode
+  );
+  if (disambiguatedMatch && !isSameVendorIdentity(disambiguatedMatch, item)) {
+    throw new Error(
+      `Stone variant identity collision detected for ${familyCode}/${candidates.disambiguatedVariantCode}.`
+    );
+  }
+
+  return {
+    familyCode,
+    variantCode: candidates.disambiguatedVariantCode,
+    existingProduct: disambiguatedMatch ?? null,
+  };
+}
+
 async function loadOrCreateCanonicalProduct(
   item: StoneItemRow,
   authorization: Authorization,
@@ -188,8 +271,11 @@ async function loadOrCreateCanonicalProduct(
   const colors = Array.isArray(rawColors)
     ? rawColors.filter((value): value is string => typeof value === "string")
     : [];
-  const familyKey = normalizedCode(item.family_key?.trim() || sku, sku);
-  const variantCode = normalizedCode(item.variant_code?.trim() || "DEFAULT", "DEFAULT");
+  const identity = await resolveStoneProductIdentity(item, sku, mapping.category);
+  if (identity.existingProduct) {
+    return backfillCanonicalDescription(identity.existingProduct, description);
+  }
+
   const userClient = createVendorCatalogUserClient(authorization.accessToken);
   const { data: savedId, error: saveError } = await userClient.rpc("save_product_master_v2", {
     p_product: {
@@ -200,8 +286,8 @@ async function loadOrCreateCanonicalProduct(
       description,
       brand_id: brand.id,
       category_id: mapping.category.id,
-      base_product_code: familyKey,
-      color_code: variantCode,
+      base_product_code: identity.familyCode,
+      color_code: identity.variantCode,
       color_name: item.variant_label || colors[0] || null,
       brand: brand.name,
       category: mapping.category.name,
@@ -219,6 +305,8 @@ async function loadOrCreateCanonicalProduct(
         vendor_family_key: item.family_key,
         vendor_variant_code: item.variant_code,
         vendor_variant_label: item.variant_label,
+        canonical_family_code: identity.familyCode,
+        canonical_variant_code: identity.variantCode,
         stone: item.stone_data ?? {},
       },
     },
