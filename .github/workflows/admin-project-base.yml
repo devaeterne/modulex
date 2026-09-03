@@ -27,5 +27,7 @@ jobs:
         run: node scripts/project-base-contract.mjs
       - name: Project Progress layout contract
         run: node scripts/project-progress-layout-contract.mjs
+      - name: Project Financial rollup contract
+        run: node scripts/project-financial-rollup-contract.mjs
       - name: Countertop Sink fallback contract
         run: node scripts/countertop-sink-fallback-contract.mjs
