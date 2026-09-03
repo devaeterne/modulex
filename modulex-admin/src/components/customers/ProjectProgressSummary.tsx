@@ -8,7 +8,6 @@ import Button from "@/components/ui/button/Button";
 import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   loadProjectProgress,
-  type ProjectProgressActivity,
   type ProjectProgressData,
 } from "@/lib/customers/project-progress";
 import type { CustomerProject, ProjectStatus } from "@/lib/customers/project-domain";
@@ -26,47 +25,16 @@ export type ProjectProgressLifecycleEntry = {
   actor: ProjectActivityActor | ProjectActivityActor[] | null;
 };
 
-type CombinedActivity = {
-  id: string;
-  kind: "project" | ProjectProgressActivity["kind"];
-  title: string;
-  note: string | null;
-  actorName: string | null;
-  createdAt: string;
-};
-
 const PROJECT_LIFECYCLE: ProjectStatus[] = ["draft", "quoted", "approved", "ordered", "in_progress", "completed"];
 
 function statusLabel(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function displayDateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
-
-function projectActivityActor(entry: ProjectProgressLifecycleEntry) {
-  if (!entry.changed_by) return "System";
-  const actor = Array.isArray(entry.actor) ? entry.actor[0] : entry.actor;
-  return actor?.full_name || actor?.email || "Modulex user";
-}
-
-function projectActivityTitle(entry: ProjectProgressLifecycleEntry) {
-  if (!entry.from_status) return `Project created with ${statusLabel(entry.to_status)} status.`;
-  return `Project status changed from ${statusLabel(entry.from_status)} to ${statusLabel(entry.to_status)}.`;
-}
-
 function progressColor(completed: number, total: number): BadgeColor {
   if (total > 0 && completed >= total) return "success";
   if (completed > 0) return "info";
   return "light";
-}
-
-function activityColor(kind: CombinedActivity["kind"]): BadgeColor {
-  if (kind === "project") return "primary";
-  if (kind === "revision") return "warning";
-  if (kind === "invoice") return "success";
-  return "info";
 }
 
 export default function ProjectProgressSummary({
@@ -105,28 +73,6 @@ export default function ProjectProgressSummary({
     return statuses;
   }, [project.status, projectActivity]);
 
-  const recentActivity = useMemo<CombinedActivity[]>(() => {
-    const projectEvents: CombinedActivity[] = projectActivity.map((entry) => ({
-      id: `project-${entry.id}`,
-      kind: "project",
-      title: projectActivityTitle(entry),
-      note: entry.note,
-      actorName: projectActivityActor(entry),
-      createdAt: entry.created_at,
-    }));
-    const operationalEvents: CombinedActivity[] = (data?.activities ?? []).map((entry) => ({
-      id: entry.id,
-      kind: entry.kind,
-      title: entry.title,
-      note: entry.note,
-      actorName: entry.actorName,
-      createdAt: entry.createdAt,
-    }));
-    return [...projectEvents, ...operationalEvents]
-      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
-      .slice(0, 5);
-  }, [data?.activities, projectActivity]);
-
   return (
     <ComponentCard
       title="Project Progress"
@@ -142,89 +88,72 @@ export default function ProjectProgressSummary({
       {loading && !data ? <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`} role="status">Loading Project progress…</p> : null}
 
       {data ? (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <section aria-labelledby="project-progress-lifecycle" className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p id="project-progress-lifecycle" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Lifecycle</p>
               {project.status === "cancelled" ? <Badge color="error">Cancelled</Badge> : <Badge color="primary">{statusLabel(project.status)}</Badge>}
             </div>
-            <div className="space-y-2" role="list" aria-label="Project lifecycle">
-              {PROJECT_LIFECYCLE.map((status) => {
+            <div className="flex flex-wrap items-center gap-2" role="list" aria-label="Project lifecycle">
+              {PROJECT_LIFECYCLE.map((status, index) => {
                 const isCurrent = project.status === status;
                 const isDone = attainedStatuses.has(status) && !isCurrent;
+                const stateLabel = isCurrent ? "Current" : isDone ? "Done" : "Pending";
+                const color: BadgeColor = isCurrent
+                  ? (status === "completed" ? "success" : "primary")
+                  : isDone
+                    ? "success"
+                    : "light";
                 return (
-                  <div key={status} className="flex items-center justify-between gap-3" role="listitem">
-                    <span className={`text-sm ${isCurrent ? ADMIN_TEXT_STYLES.strong : ADMIN_TEXT_STYLES.body}`}>{statusLabel(status)}</span>
-                    <Badge color={isCurrent ? (status === "completed" ? "success" : "primary") : isDone ? "success" : "light"}>
-                      {isCurrent ? "Current" : isDone ? "Done" : "Pending"}
-                    </Badge>
+                  <div key={status} className="flex items-center gap-2" role="listitem">
+                    <Badge color={color}>{statusLabel(status)} · {stateLabel}</Badge>
+                    {index < PROJECT_LIFECYCLE.length - 1 ? <span className={ADMIN_TEXT_STYLES.muted} aria-hidden="true">→</span> : null}
                   </div>
                 );
               })}
             </div>
           </section>
 
-          <section aria-labelledby="project-progress-orders" className="space-y-3">
-            <p id="project-progress-orders" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Orders</p>
-            <div className="flex items-center justify-between gap-3">
-              <span className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Confirmed or later</span>
-              <Badge color={progressColor(data.orders.confirmedOrLater, data.orders.active)}>{data.orders.confirmedOrLater} / {data.orders.active}</Badge>
-            </div>
-            <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>{data.orders.active} active Order{data.orders.active === 1 ? "" : "s"}; cancelled Orders are excluded.</p>
-          </section>
-
-          <section aria-labelledby="project-progress-delivery" className="space-y-3">
-            <p id="project-progress-delivery" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Delivery</p>
-            <div className="flex items-center justify-between gap-3">
-              <span className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Delivery Orders complete</span>
-              <Badge color={progressColor(data.delivery.completed, data.delivery.total)}>{data.delivery.completed} / {data.delivery.total}</Badge>
-            </div>
-            <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Pickup Orders are excluded from delivery progress.</p>
-          </section>
-
-          <section aria-labelledby="project-progress-installation" className="space-y-3">
-            <p id="project-progress-installation" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Installation</p>
-            <div className="flex items-center justify-between gap-3">
-              <span className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Installation Orders complete</span>
-              <Badge color={progressColor(data.installation.completed, data.installation.total)}>{data.installation.completed} / {data.installation.total}</Badge>
-            </div>
-            <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Only Delivery + Installation Orders are counted.</p>
-          </section>
-
-          <section aria-labelledby="project-progress-commercial" className="space-y-3">
-            <p id="project-progress-commercial" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Commercial</p>
-            <div className="flex items-center justify-between gap-3">
-              <span className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Invoiced Orders</span>
-              <Badge color={progressColor(data.commercial.invoicedOrders, data.commercial.activeOrders)}>{data.commercial.invoicedOrders} / {data.commercial.activeOrders}</Badge>
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <span className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Paid Invoices</span>
-              <Badge color={progressColor(data.commercial.paidInvoices, data.commercial.invoices)}>{data.commercial.paidInvoices} / {data.commercial.invoices}</Badge>
-            </div>
-            <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Counts only. Financial totals remain owned by the later Project Finance rollup.</p>
-          </section>
-
-          <section aria-labelledby="project-progress-activity" className="space-y-3">
-            <p id="project-progress-activity" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Recent Activity</p>
-            {recentActivity.length === 0 ? (
-              <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>No Project or Order activity has been recorded yet.</p>
-            ) : (
-              <div className="space-y-4" role="list" aria-label="Recent Project activity">
-                {recentActivity.map((entry) => (
-                  <div key={entry.id} className="space-y-1" role="listitem">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge size="sm" color={activityColor(entry.kind)}>{statusLabel(entry.kind)}</Badge>
-                      <span className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>{entry.title}</span>
-                    </div>
-                    <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>
-                      {displayDateTime(entry.createdAt)}{entry.actorName ? ` · ${entry.actorName}` : ""}
-                    </p>
-                    {entry.note ? <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>{entry.note}</p> : null}
-                  </div>
-                ))}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section aria-labelledby="project-progress-orders" className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <p id="project-progress-orders" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Orders</p>
+                <Badge color={progressColor(data.orders.confirmedOrLater, data.orders.active)}>{data.orders.confirmedOrLater} / {data.orders.active}</Badge>
               </div>
-            )}
-          </section>
+              <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Confirmed or later</p>
+              <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>{data.orders.active} active Order{data.orders.active === 1 ? "" : "s"}; cancelled Orders are excluded.</p>
+            </section>
+
+            <section aria-labelledby="project-progress-delivery" className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <p id="project-progress-delivery" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Delivery</p>
+                <Badge color={progressColor(data.delivery.completed, data.delivery.total)}>{data.delivery.completed} / {data.delivery.total}</Badge>
+              </div>
+              <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Delivery Orders complete</p>
+              <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Pickup Orders are excluded.</p>
+            </section>
+
+            <section aria-labelledby="project-progress-installation" className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <p id="project-progress-installation" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Installation</p>
+                <Badge color={progressColor(data.installation.completed, data.installation.total)}>{data.installation.completed} / {data.installation.total}</Badge>
+              </div>
+              <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Installation Orders complete</p>
+              <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Only Delivery + Installation Orders are counted.</p>
+            </section>
+
+            <section aria-labelledby="project-progress-commercial" className="space-y-2">
+              <p id="project-progress-commercial" className={`text-sm font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Commercial</p>
+              <div className="flex items-center justify-between gap-3">
+                <span className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Invoiced Orders</span>
+                <Badge color={progressColor(data.commercial.invoicedOrders, data.commercial.activeOrders)}>{data.commercial.invoicedOrders} / {data.commercial.activeOrders}</Badge>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Paid Invoices</span>
+                <Badge color={progressColor(data.commercial.paidInvoices, data.commercial.invoices)}>{data.commercial.paidInvoices} / {data.commercial.invoices}</Badge>
+              </div>
+            </section>
+          </div>
         </div>
       ) : null}
     </ComponentCard>
