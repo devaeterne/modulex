@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createVendorCatalogUserClient } from "@/lib/vendor-catalog/auth";
+import { loadVendorCategoryMapping } from "@/lib/vendor-catalog/mappings";
 import { stoneVendorCatalogLabels } from "@/lib/vendor-catalog/stone-adapters";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
@@ -14,6 +15,8 @@ type StoneItemRow = {
   title: string;
   description: string | null;
   product_url: string;
+  vendor_category_key: string | null;
+  vendor_category_label: string | null;
   family_key: string | null;
   variant_code: string | null;
   variant_label: string | null;
@@ -70,20 +73,10 @@ async function ensureBrand(item: StoneItemRow) {
   return created;
 }
 
-async function loadStoneReferences() {
-  const [{ data: productType, error: typeError }, { data: uom, error: uomError }] = await Promise.all([
-    supabaseAdmin.from("product_types").select("id,name").eq("code", "STONE").eq("is_active", true).single(),
-    supabaseAdmin.from("units_of_measure").select("id,name,code").eq("code", "SLAB").eq("is_active", true).single(),
-  ]);
-  if (typeError || !productType) throw typeError ?? new Error("Active STONE product type is missing.");
-  if (uomError || !uom) throw uomError ?? new Error("Active SLAB UOM is missing.");
-  return { productType, uom };
-}
-
 async function loadItem(itemId: string) {
   const { data, error } = await supabaseAdmin
     .from("vendor_catalog_items")
-    .select("id,vendor_code,external_id,sku,title,description,product_url,family_key,variant_code,variant_label,stone_type_id,stone_data,canonical_product_id,catalog_domain")
+    .select("id,vendor_code,external_id,sku,title,description,product_url,vendor_category_key,vendor_category_label,family_key,variant_code,variant_label,stone_type_id,stone_data,canonical_product_id,catalog_domain")
     .eq("id", itemId)
     .single();
   if (error || !data) throw error ?? new Error("Stone vendor catalog item was not found.");
@@ -91,8 +84,25 @@ async function loadItem(itemId: string) {
   return data as StoneItemRow & { catalog_domain: "stone" };
 }
 
+async function loadStoneCategoryMapping(item: StoneItemRow) {
+  const mapping = await loadVendorCategoryMapping({
+    vendorCode: item.vendor_code,
+    vendorCategoryKey: item.vendor_category_key,
+    vendorCategoryLabel: item.vendor_category_label,
+  });
+  if (mapping.productType.code !== "STONE") {
+    throw new Error("Stone vendor categories must map to the STONE Product Type.");
+  }
+  if (mapping.uom.code !== "SLAB") {
+    throw new Error("Stone vendor categories must map to the SLAB UOM.");
+  }
+  return mapping;
+}
+
 async function loadOrCreateCanonicalProduct(item: StoneItemRow, authorization: Authorization) {
   if (!item.stone_type_id) throw new Error("Stone type must be resolved before approval.");
+
+  const mapping = await loadStoneCategoryMapping(item);
 
   if (item.canonical_product_id) {
     const { data, error } = await supabaseAdmin
@@ -119,12 +129,11 @@ async function loadOrCreateCanonicalProduct(item: StoneItemRow, authorization: A
     return existing;
   }
 
-  const [brand, refs] = await Promise.all([ensureBrand(item), loadStoneReferences()]);
+  const brand = await ensureBrand(item);
   const rawColors = item.stone_data?.colors;
   const colors = Array.isArray(rawColors)
     ? rawColors.filter((value): value is string => typeof value === "string")
     : [];
-  const stoneTypeName = stringValue(item.stone_data?.stoneTypeName) ?? "Stone";
   const familyKey = normalizedCode(item.family_key?.trim() || sku, sku);
   const variantCode = normalizedCode(item.variant_code?.trim() || "DEFAULT", "DEFAULT");
   const userClient = createVendorCatalogUserClient(authorization.accessToken);
@@ -136,15 +145,15 @@ async function loadOrCreateCanonicalProduct(item: StoneItemRow, authorization: A
       name: item.title,
       description: item.description,
       brand_id: brand.id,
-      category_id: null,
+      category_id: mapping.category.id,
       base_product_code: familyKey,
       color_code: variantCode,
       color_name: item.variant_label || colors[0] || null,
       brand: brand.name,
-      category: stoneTypeName,
-      unit: refs.uom.code.toLowerCase(),
-      product_type_id: refs.productType.id,
-      uom_id: refs.uom.id,
+      category: mapping.category.name,
+      unit: mapping.uom.code.toLowerCase(),
+      product_type_id: mapping.productType.id,
+      uom_id: mapping.uom.id,
       min_stock_level: 0,
       status: "active",
       metadata: {

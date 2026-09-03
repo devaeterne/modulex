@@ -107,7 +107,34 @@ type StoneSyncResult = {
   failed: number;
 };
 type StoneSyncResponse = { results?: StoneSyncResult[]; error?: string };
-type BulkResult = { itemId: string; status: "APPROVED" | "SKIPPED" | "FAILED"; error?: string };
+type ApproveResponse = {
+  productId?: string;
+  code?: "CATEGORY_MAPPING_REQUIRED" | "VENDOR_CATALOG_MISSING" | "VENDOR_REVIEW_NOT_ELIGIBLE";
+  vendorCode?: string;
+  vendorCategoryKey?: string | null;
+  vendorCategoryLabel?: string | null;
+  error?: string;
+};
+type BulkResult = {
+  itemId: string;
+  status: "APPROVED" | "SKIPPED" | "FAILED";
+  code?: string;
+  error?: string;
+};
+type MappingOption = { id: string; name: string; code?: string };
+type ProductTypeOption = MappingOption & { default_uom_id?: string | null };
+type MappingOptionsResponse = {
+  categories?: MappingOption[];
+  productTypes?: ProductTypeOption[];
+  uoms?: MappingOption[];
+  error?: string;
+};
+type MappingRequest = {
+  vendorCode: string;
+  vendorCategoryKey: string | null;
+  vendorCategoryLabel: string | null;
+  retryIds: string[];
+};
 type UiAlert = { variant: "success" | "warning" | "info"; title: string; message: string };
 
 const STONE_CATALOG_SELECT =
@@ -115,7 +142,7 @@ const STONE_CATALOG_SELECT =
 const VENDOR_IMAGE_SELECT = "item_id,url,sort_order,storage_bucket,storage_path" as const;
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const REVIEW_STATUSES: ReviewStatus[] = ["PENDING", "APPROVED", "IGNORED"];
-const DEFAULT_CHANGE_STATES: ChangeState[] = ["NEW", "UPDATED"];
+const DEFAULT_CHANGE_STATES: ChangeState[] = ["NEW", "UPDATED", "UNCHANGED"];
 const CHANGE_FILTERS: Array<{ state: ChangeState; label: string }> = [
   { state: "NEW", label: "New" },
   { state: "UPDATED", label: "Updated" },
@@ -198,10 +225,26 @@ export default function StoneVendorImportsPanel() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<UiAlert | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mappingRequest, setMappingRequest] = useState<MappingRequest | null>(null);
+  const [mappingOptions, setMappingOptions] = useState<MappingOptionsResponse | null>(null);
+  const [mappingCategorySelection, setMappingCategorySelection] = useState("__create__");
+  const [mappingCategoryName, setMappingCategoryName] = useState("");
+  const [savingMapping, setSavingMapping] = useState(false);
 
   const getAccessToken = useCallback(async () => {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session?.access_token) throw new Error("Your admin session could not be verified. Please sign in again.");
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    let session = sessionData.session;
+    if (sessionError || !session?.access_token) {
+      throw new Error("Your admin session could not be verified. Please sign in again.");
+    }
+    const expiresAtMs = (session.expires_at ?? 0) * 1000;
+    if (!expiresAtMs || expiresAtMs - Date.now() <= 60_000) {
+      const { data, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !data.session?.access_token) {
+        throw new Error("Your admin session expired. Please sign in again.");
+      }
+      session = data.session;
+    }
     return session.access_token;
   }, []);
 
@@ -238,7 +281,6 @@ export default function StoneVendorImportsPanel() {
     if (!vendorCode || vendorCode === "all") return;
     const existing = vendors.find((vendor) => vendor.code === vendorCode);
     if (existing?.categoriesLoaded) return;
-
     const accessToken = await getAccessToken();
     const response = await fetch(
       `/api/vendor-catalog/stone/vendors?vendor=${encodeURIComponent(vendorCode)}`,
@@ -248,9 +290,7 @@ export default function StoneVendorImportsPanel() {
       vendor?: { vendorCode: string; label: string; categories?: StoneVendorCategory[] };
       error?: string;
     };
-    if (!response.ok || !payload.vendor) {
-      throw new Error(payload.error || "Unable to load Stone vendor categories.");
-    }
+    if (!response.ok || !payload.vendor) throw new Error(payload.error || "Unable to load Stone vendor categories.");
     setVendors((current) => current.map((vendor) =>
       vendor.code === vendorCode
         ? { ...vendor, categories: payload.vendor?.categories ?? [], categoriesLoaded: true }
@@ -260,16 +300,12 @@ export default function StoneVendorImportsPanel() {
 
   useEffect(() => {
     if (!syncVendor) return;
-    void ensureCategories(syncVendor).catch((categoryError) =>
-      setError(categoryError instanceof Error ? categoryError.message : String(categoryError))
-    );
+    void ensureCategories(syncVendor).catch((categoryError) => setError(categoryError instanceof Error ? categoryError.message : String(categoryError)));
   }, [ensureCategories, syncVendor]);
 
   useEffect(() => {
     if (tableVendor === "all") return;
-    void ensureCategories(tableVendor).catch((categoryError) =>
-      setError(categoryError instanceof Error ? categoryError.message : String(categoryError))
-    );
+    void ensureCategories(tableVendor).catch((categoryError) => setError(categoryError instanceof Error ? categoryError.message : String(categoryError)));
   }, [ensureCategories, tableVendor]);
 
   const loadItems = useCallback(async () => {
@@ -277,11 +313,7 @@ export default function StoneVendorImportsPanel() {
     setLoading(true);
     setError(null);
     if (changeStates.length === 0) {
-      setItems([]);
-      setTotalCount(0);
-      setTotalPages(1);
-      setLoading(false);
-      return;
+      setItems([]); setTotalCount(0); setTotalPages(1); setLoading(false); return;
     }
 
     const from = (currentPage - 1) * pageSize;
@@ -306,10 +338,7 @@ export default function StoneVendorImportsPanel() {
       .range(from, from + pageSize - 1);
     if (requestId !== requestIdRef.current) return;
     if (queryError) {
-      setError(queryError.message);
-      setItems([]);
-      setLoading(false);
-      return;
+      setError(queryError.message); setItems([]); setLoading(false); return;
     }
 
     const rows = (data ?? []) as StoneCatalogRow[];
@@ -325,19 +354,13 @@ export default function StoneVendorImportsPanel() {
         .eq("kind", "image")
         .in("item_id", itemIds)
         .order("sort_order", { ascending: true });
-      if (assetError) {
-        setError(assetError.message);
-        setLoading(false);
-        return;
-      }
+      if (assetError) { setError(assetError.message); setLoading(false); return; }
       for (const asset of (assets ?? []) as VendorImageRow[]) {
         if (imageByItem.has(asset.item_id)) continue;
         if (asset.storage_bucket && asset.storage_path) {
           const { data: { publicUrl } } = supabase.storage.from(asset.storage_bucket).getPublicUrl(asset.storage_path);
           imageByItem.set(asset.item_id, publicUrl);
-        } else {
-          imageByItem.set(asset.item_id, asset.url);
-        }
+        } else imageByItem.set(asset.item_id, asset.url);
       }
     }
 
@@ -346,11 +369,7 @@ export default function StoneVendorImportsPanel() {
         .from("countertop_stone_types")
         .select("id,name,review_status")
         .in("id", stoneTypeIds);
-      if (stoneTypeError) {
-        setError(stoneTypeError.message);
-        setLoading(false);
-        return;
-      }
+      if (stoneTypeError) { setError(stoneTypeError.message); setLoading(false); return; }
       for (const stoneType of (stoneTypes ?? []) as StoneTypeRow[]) stoneTypeById.set(stoneType.id, stoneType);
     }
 
@@ -367,28 +386,19 @@ export default function StoneVendorImportsPanel() {
     }));
     const nextCount = count ?? 0;
     const nextPages = Math.max(1, Math.ceil(nextCount / pageSize));
-    setTotalCount(nextCount);
-    setTotalPages(nextPages);
+    setTotalCount(nextCount); setTotalPages(nextPages);
     if (currentPage > nextPages) setCurrentPage(nextPages);
     setLoading(false);
   }, [availabilityFilter, changeStates, currentPage, linkedFilter, pageSize, query, reviewStatus, tableCategory, tableVendor]);
 
   const loadEligibility = useCallback(async () => {
-    if (reviewStatus !== "PENDING" || changeStates.length === 0) {
-      setEligibleIds([]);
-      return;
-    }
+    if (reviewStatus !== "PENDING" || changeStates.length === 0) { setEligibleIds([]); return; }
     setEligibilityLoading(true);
     try {
       const accessToken = await getAccessToken();
       const params = new URLSearchParams({
-        catalogDomain: "stone",
-        vendor: tableVendor,
-        category: tableCategory,
-        reviewStatus,
-        linked: linkedFilter,
-        availability: availabilityFilter,
-        changeStates: changeStates.join(","),
+        catalogDomain: "stone", vendor: tableVendor, category: tableCategory, reviewStatus,
+        linked: linkedFilter, availability: availabilityFilter, changeStates: changeStates.join(","),
       });
       if (query) params.set("query", query);
       const response = await fetch(`/api/vendor-catalog/bulk/eligible?${params.toString()}`, {
@@ -403,9 +413,7 @@ export default function StoneVendorImportsPanel() {
     } catch (eligibilityError) {
       setEligibleIds([]);
       setError(eligibilityError instanceof Error ? eligibilityError.message : String(eligibilityError));
-    } finally {
-      setEligibilityLoading(false);
-    }
+    } finally { setEligibilityLoading(false); }
   }, [availabilityFilter, changeStates, getAccessToken, linkedFilter, query, reviewStatus, tableCategory, tableVendor]);
 
   useEffect(() => { void loadItems(); }, [loadItems]);
@@ -422,62 +430,83 @@ export default function StoneVendorImportsPanel() {
   ], [vendors]);
   const syncCategoryOptions = [
     { value: "all", label: "All categories" },
-    ...(syncVendorOption?.categories ?? []).map((category) => ({
-      value: category.key,
-      label: category.productCount === null ? category.label : `${category.label} (${category.productCount})`,
-    })),
+    ...(syncVendorOption?.categories ?? []).map((category) => ({ value: category.key, label: category.productCount === null ? category.label : `${category.label} (${category.productCount})` })),
   ];
   const tableVendorOption = vendors.find((vendor) => vendor.code === tableVendor) ?? null;
   const tableCategoryOptions = [
     { value: "all", label: tableVendor === "all" ? "Select a vendor first" : "All categories" },
-    ...(tableVendorOption?.categories ?? []).map((category) => ({
-      value: category.key,
-      label: category.productCount === null ? category.label : `${category.label} (${category.productCount})`,
-    })),
+    ...(tableVendorOption?.categories ?? []).map((category) => ({ value: category.key, label: category.productCount === null ? category.label : `${category.label} (${category.productCount})` })),
   ];
   const eligibleSet = useMemo(() => new Set(eligibleIds), [eligibleIds]);
   const pageEligibleIds = items.filter((item) => eligibleSet.has(item.id)).map((item) => item.id);
   const allPageEligibleSelected = pageEligibleIds.length > 0 && pageEligibleIds.every((id) => selectedIds.has(id));
   const pageStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const pageEnd = Math.min(totalCount, currentPage * pageSize);
+  const stoneProductType = mappingOptions?.productTypes?.find((option) => option.code === "STONE") ?? null;
+  const slabUom = mappingOptions?.uoms?.find((option) => option.code === "SLAB") ?? null;
+  const mappingCategoryOptions = [
+    { value: "__create__", label: "Create a new Modulex category" },
+    ...(mappingOptions?.categories ?? []).map((option) => ({ value: option.id, label: option.name })),
+  ];
 
-  function resetReviewScope() {
-    clearSelection();
-    setCurrentPage(1);
-  }
-
+  function resetReviewScope() { clearSelection(); setCurrentPage(1); }
   function toggleChangeState(state: ChangeState) {
     setChangeStates((current) => current.includes(state) ? current.filter((item) => item !== state) : [...current, state]);
     resetReviewScope();
   }
-
   function togglePageSelection(checked: boolean) {
     setSelectedIds((current) => {
       const next = new Set(current);
-      for (const id of pageEligibleIds) checked ? next.add(id) : next.delete(id);
+      for (const id of pageEligibleIds) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
       return next;
     });
   }
 
+  async function loadMappingOptions() {
+    const accessToken = await getAccessToken();
+    const response = await fetch("/api/vendor-catalog/category-mappings", {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    const payload = (await response.json().catch(() => ({}))) as MappingOptionsResponse;
+    if (!response.ok) throw new Error(payload.error || "Unable to load Modulex mapping options.");
+    setMappingOptions(payload);
+    return payload;
+  }
+
+  async function openMapping(payload: ApproveResponse, retryIds: string[]) {
+    const request: MappingRequest = {
+      vendorCode: payload.vendorCode ?? "",
+      vendorCategoryKey: payload.vendorCategoryKey ?? null,
+      vendorCategoryLabel: payload.vendorCategoryLabel ?? null,
+      retryIds,
+    };
+    setMappingRequest(request);
+    const options = await loadMappingOptions();
+    const matchingCategory = (options.categories ?? []).find(
+      (option) => option.name.toLowerCase() === (request.vendorCategoryLabel ?? "").toLowerCase()
+    );
+    setMappingCategorySelection(matchingCategory?.id ?? "__create__");
+    setMappingCategoryName(request.vendorCategoryLabel ?? "");
+    setNotice({
+      variant: "warning",
+      title: "Category mapping required",
+      message: "Choose or create the Modulex category. Stone Product Type is fixed to STONE and UOM is fixed to SLAB. Approval is paused until the mapping is saved.",
+    });
+  }
+
   async function syncStoneCatalog() {
-    if (!syncVendor) {
-      setError("Select one Stone vendor before syncing.");
-      return;
-    }
-    setSyncing(true);
-    setError(null);
-    setNotice(null);
+    if (!syncVendor) { setError("Select one Stone vendor before syncing."); return; }
+    setSyncing(true); setError(null); setNotice(null);
     try {
       const accessToken = await getAccessToken();
       const selectedCategory = syncCategory === "all" ? null : syncVendorOption?.categories.find((category) => category.key === syncCategory) ?? null;
       const response = await fetch("/api/vendor-catalog/stone/sync", {
         method: "POST",
         headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
-        body: JSON.stringify({
-          vendor: syncVendor,
-          categoryKey: selectedCategory?.key ?? null,
-          categoryLabel: selectedCategory?.label ?? null,
-        }),
+        body: JSON.stringify({ vendor: syncVendor, categoryKey: selectedCategory?.key ?? null, categoryLabel: selectedCategory?.label ?? null }),
       });
       const payload = (await response.json().catch(() => ({}))) as StoneSyncResponse;
       if (!response.ok) throw new Error(payload.error || `Stone vendor sync failed with HTTP ${response.status}.`);
@@ -494,55 +523,53 @@ export default function StoneVendorImportsPanel() {
         message: `${totals.discovered} found · ${totals.created} new · ${totals.updated} updated · ${totals.unchanged} unchanged · ${totals.failed} failed.`,
       });
       clearSelection();
-      await Promise.all([loadItems(), loadEligibility()]);
+      setReviewStatus("PENDING");
+      setTableVendor(syncVendor);
+      setTableCategory(syncCategory);
+      setChangeStates(["NEW", "UPDATED", "UNCHANGED"]);
+      setCurrentPage(1);
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : String(syncError));
-    } finally {
-      setSyncing(false);
-    }
+    } finally { setSyncing(false); }
   }
 
   async function approveIds(ids: string[]) {
     if (!ids.length) return;
-    setUpdatingId(ids[0]);
-    setError(null);
-    setNotice(null);
+    setUpdatingId(ids[0]); setError(null); setNotice(null);
     try {
-      const accessToken = await getAccessToken();
-      for (const itemId of ids) {
+      for (let index = 0; index < ids.length; index += 1) {
+        const itemId = ids[index];
+        const accessToken = await getAccessToken();
         const response = await fetch(`/api/vendor-catalog/items/${itemId}/approve`, {
-          method: "POST",
-          headers: { authorization: `Bearer ${accessToken}` },
+          method: "POST", headers: { authorization: `Bearer ${accessToken}` },
         });
-        const payload = (await response.json().catch(() => ({}))) as { productId?: string; error?: string };
+        const payload = (await response.json().catch(() => ({}))) as ApproveResponse;
+        if (response.status === 409 && payload.code === "CATEGORY_MAPPING_REQUIRED") {
+          await openMapping(payload, ids.slice(index));
+          return;
+        }
         if (!response.ok || !payload.productId) throw new Error(payload.error || "Stone product approval failed.");
       }
       setNotice({
-        variant: "success",
-        title: "Stone approval complete",
+        variant: "success", title: "Stone approval complete",
         message: `${ids.length} Stone item${ids.length === 1 ? "" : "s"} linked to Product Master. Material Band remains unassigned until management prices the material.`,
       });
       clearSelection();
       await Promise.all([loadItems(), loadEligibility()]);
     } catch (approveError) {
       setError(approveError instanceof Error ? approveError.message : String(approveError));
-    } finally {
-      setUpdatingId(null);
-    }
+    } finally { setUpdatingId(null); }
   }
 
   async function approveSelected() {
     const ids = [...selectedIds];
     if (!ids.length) return;
-    setBulkApproving(true);
-    setBulkProgress({ completed: 0, total: ids.length });
-    setError(null);
-    setNotice(null);
+    setBulkApproving(true); setBulkProgress({ completed: 0, total: ids.length }); setError(null); setNotice(null);
     try {
-      const accessToken = await getAccessToken();
       const results: BulkResult[] = [];
       let completed = 0;
       for (const batch of chunks(ids, 5)) {
+        const accessToken = await getAccessToken();
         const response = await fetch("/api/vendor-catalog/bulk/approve", {
           method: "POST",
           headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
@@ -557,41 +584,57 @@ export default function StoneVendorImportsPanel() {
       const approved = results.filter((result) => result.status === "APPROVED").length;
       const skipped = results.filter((result) => result.status === "SKIPPED").length;
       const failed = results.filter((result) => result.status === "FAILED").length;
-      setNotice({
-        variant: skipped || failed ? "warning" : "success",
-        title: "Bulk Stone approval complete",
-        message: `${approved} approved · ${skipped} skipped · ${failed} failed.`,
-      });
+      setNotice({ variant: skipped || failed ? "warning" : "success", title: "Bulk Stone approval complete", message: `${approved} approved · ${skipped} skipped · ${failed} failed.` });
       clearSelection();
       await Promise.all([loadItems(), loadEligibility()]);
     } catch (bulkError) {
       setError(bulkError instanceof Error ? bulkError.message : String(bulkError));
-    } finally {
-      setBulkApproving(false);
-      setBulkProgress(null);
-    }
+    } finally { setBulkApproving(false); setBulkProgress(null); }
+  }
+
+  async function saveMappingAndContinue() {
+    if (!mappingRequest?.vendorCategoryKey) { setError("This Stone row has no vendor category identity to map."); return; }
+    if (!stoneProductType || !slabUom) { setError("Active STONE Product Type and SLAB UOM are required before mapping Stone categories."); return; }
+    if (mappingCategorySelection === "__create__" && !mappingCategoryName.trim()) { setError("Enter the Modulex category name to create."); return; }
+
+    setSavingMapping(true); setError(null);
+    try {
+      const accessToken = await getAccessToken();
+      const response = await fetch("/api/vendor-catalog/category-mappings", {
+        method: "POST",
+        headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          vendorCode: mappingRequest.vendorCode,
+          vendorCategoryKey: mappingRequest.vendorCategoryKey,
+          vendorCategoryLabel: mappingRequest.vendorCategoryLabel ?? mappingRequest.vendorCategoryKey,
+          modulexCategoryId: mappingCategorySelection === "__create__" ? null : mappingCategorySelection,
+          createCategoryName: mappingCategorySelection === "__create__" ? mappingCategoryName.trim() : null,
+          productTypeId: stoneProductType.id,
+          uomId: slabUom.id,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Stone category mapping could not be saved.");
+      const retryIds = mappingRequest.retryIds;
+      setMappingRequest(null);
+      setNotice({ variant: "success", title: "Category mapping saved", message: "Stone category is mapped. Continuing approval." });
+      await approveIds(retryIds);
+    } catch (mappingError) {
+      setError(mappingError instanceof Error ? mappingError.message : String(mappingError));
+    } finally { setSavingMapping(false); }
   }
 
   async function setStatus(itemId: string, nextStatus: ReviewStatus) {
-    if (nextStatus === "APPROVED") {
-      await approveIds([itemId]);
-      return;
-    }
+    if (nextStatus === "APPROVED") { await approveIds([itemId]); return; }
     setUpdatingId(itemId);
     try {
-      const { error: updateError } = await supabase
-        .from("vendor_catalog_items")
-        .update({ review_status: nextStatus })
-        .eq("id", itemId)
-        .eq("catalog_domain", "stone");
+      const { error: updateError } = await supabase.from("vendor_catalog_items").update({ review_status: nextStatus }).eq("id", itemId).eq("catalog_domain", "stone");
       if (updateError) throw updateError;
       clearSelection();
       await Promise.all([loadItems(), loadEligibility()]);
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : String(updateError));
-    } finally {
-      setUpdatingId(null);
-    }
+    } finally { setUpdatingId(null); }
   }
 
   return (
@@ -604,152 +647,106 @@ export default function StoneVendorImportsPanel() {
       {notice ? <Alert variant={notice.variant} title={notice.title} message={notice.message} /> : null}
       {error ? <Alert variant="error" title="Stone vendor catalog error" message={error} /> : null}
 
-      <ComponentCard
-        title="Stone vendor sync"
-        desc="Select one Stone vendor per sync. This bounded sync avoids accidentally crawling every Stone website in a single action."
-      >
+      <ComponentCard title="Stone vendor sync" desc="Select one Stone vendor per sync. This bounded sync avoids accidentally crawling every Stone website in a single action.">
         <div className="grid gap-4 lg:grid-cols-2">
           <div>
             <Label htmlFor="stone-sync-vendor">Stone vendor</Label>
-            <Select
-              id="stone-sync-vendor"
-              value={syncVendor}
-              options={syncVendorOptions}
-              onChange={(value) => { setSyncVendor(value); setSyncCategory("all"); }}
-              ariaLabel="Stone vendor to sync"
-            />
+            <Select id="stone-sync-vendor" value={syncVendor} options={syncVendorOptions} onChange={(value) => { setSyncVendor(value); setSyncCategory("all"); }} ariaLabel="Stone vendor to sync" />
           </div>
           <div>
             <Label htmlFor="stone-sync-category">Vendor category</Label>
-            <Select
-              id="stone-sync-category"
-              value={syncCategory}
-              options={syncCategoryOptions}
-              onChange={setSyncCategory}
-              disabled={!syncVendor}
-              ariaLabel="Stone vendor category to sync"
-            />
+            <Select id="stone-sync-category" value={syncCategory} options={syncCategoryOptions} onChange={setSyncCategory} disabled={!syncVendor} ariaLabel="Stone vendor category to sync" />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => void syncStoneCatalog()} disabled={syncing || !syncVendor}>
-            {syncing ? "Syncing Stone…" : "Sync Stone Catalog"}
-          </Button>
+          <Button onClick={() => void syncStoneCatalog()} disabled={syncing || !syncVendor}>{syncing ? "Syncing Stone…" : "Sync Stone Catalog"}</Button>
           {!syncVendor ? <Badge size="sm" color="light">Select one Stone vendor</Badge> : null}
         </div>
       </ComponentCard>
 
-      <ComponentCard
-        title="Stone catalog review"
-        desc="Review Stone Type and supplier metadata, then approve selected materials into Product Master. Pricing remains a separate Material Band decision."
-      >
-        <form
-          onSubmit={(event) => { event.preventDefault(); setQuery(safeSearch(queryInput)); resetReviewScope(); }}
-          className="grid gap-4 lg:grid-cols-[minmax(240px,1fr)_auto] lg:items-end"
-        >
+      {mappingRequest ? (
+        <ComponentCard title="Vendor Category Mapping" desc="Stone approval is paused until this vendor category is mapped to Product Master classification.">
+          <Alert
+            variant="warning"
+            title="Category mapping required"
+            message={`${mappingRequest.vendorCode} / ${mappingRequest.vendorCategoryLabel ?? mappingRequest.vendorCategoryKey ?? "Unknown category"} is not mapped yet.`}
+          />
+          {mappingRequest.vendorCategoryKey ? (
+            <div className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <Label htmlFor="stone-mapping-category">Modulex category</Label>
+                  <Select id="stone-mapping-category" value={mappingCategorySelection} options={mappingCategoryOptions} onChange={setMappingCategorySelection} ariaLabel="Modulex category for Stone vendor mapping" />
+                </div>
+                {mappingCategorySelection === "__create__" ? (
+                  <div>
+                    <Label htmlFor="stone-mapping-new-category">New category name</Label>
+                    <InputField id="stone-mapping-new-category" value={mappingCategoryName} onChange={(event) => setMappingCategoryName(event.target.value)} placeholder="e.g. Countertop Stone" />
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge size="sm" color={stoneProductType ? "success" : "warning"}>Product Type: {stoneProductType?.code ?? "STONE missing"}</Badge>
+                <Badge size="sm" color={slabUom ? "success" : "warning"}>UOM: {slabUom?.code ?? "SLAB missing"}</Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button disabled={savingMapping || !stoneProductType || !slabUom} onClick={() => void saveMappingAndContinue()}>{savingMapping ? "Saving mapping…" : "Save Mapping & Continue Approval"}</Button>
+                <Button variant="outline" disabled={savingMapping} onClick={() => setMappingRequest(null)}>Cancel</Button>
+              </div>
+            </div>
+          ) : null}
+        </ComponentCard>
+      ) : null}
+
+      <ComponentCard title="Stone catalog review" desc="Review Stone Type and supplier metadata, then approve selected materials into Product Master. Pricing remains a separate Material Band decision.">
+        <form onSubmit={(event) => { event.preventDefault(); setQuery(safeSearch(queryInput)); resetReviewScope(); }} className="grid gap-4 lg:grid-cols-[minmax(240px,1fr)_auto] lg:items-end">
           <div>
             <Label htmlFor="stone-review-search">Search</Label>
-            <InputField
-              id="stone-review-search"
-              value={queryInput}
-              onChange={(event) => setQueryInput(event.target.value)}
-              placeholder="Stone name, SKU or external ID"
-            />
+            <InputField id="stone-review-search" value={queryInput} onChange={(event) => setQueryInput(event.target.value)} placeholder="Stone name, SKU or external ID" />
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="submit">Search</Button>
             <Button type="button" variant="outline" onClick={() => {
-              setQueryInput(""); setQuery(""); setTableVendor("all"); setTableCategory("all");
-              setAvailabilityFilter("all"); setLinkedFilter("all"); setReviewStatus("PENDING");
-              setChangeStates(DEFAULT_CHANGE_STATES); resetReviewScope();
+              setQueryInput(""); setQuery(""); setTableVendor("all"); setTableCategory("all"); setAvailabilityFilter("all"); setLinkedFilter("all"); setReviewStatus("PENDING"); setChangeStates(DEFAULT_CHANGE_STATES); resetReviewScope();
             }}>Clear filters</Button>
           </div>
         </form>
 
         <div className="grid gap-4 lg:grid-cols-4">
-          <div>
-            <Label htmlFor="stone-review-vendor">Vendor</Label>
-            <Select id="stone-review-vendor" value={tableVendor} options={tableVendorOptions} onChange={(value) => {
-              setTableVendor(value); setTableCategory("all"); resetReviewScope();
-            }} ariaLabel="Filter Stone imports by vendor" />
-          </div>
-          <div>
-            <Label htmlFor="stone-review-category">Category</Label>
-            <Select id="stone-review-category" value={tableCategory} options={tableCategoryOptions} onChange={(value) => {
-              setTableCategory(value); resetReviewScope();
-            }} disabled={tableVendor === "all"} ariaLabel="Filter Stone imports by vendor category" />
-          </div>
-          <div>
-            <Label htmlFor="stone-review-availability">Vendor status</Label>
-            <Select id="stone-review-availability" value={availabilityFilter} options={AVAILABILITY_OPTIONS} onChange={(value) => {
-              setAvailabilityFilter(value as AvailabilityFilter); resetReviewScope();
-            }} ariaLabel="Filter Stone imports by vendor status" />
-          </div>
-          <div>
-            <Label htmlFor="stone-review-linked">Linked status</Label>
-            <Select id="stone-review-linked" value={linkedFilter} options={[
-              { value: "all", label: "Linked / Unlinked" },
-              { value: "linked", label: "Linked" },
-              { value: "unlinked", label: "Unlinked" },
-            ]} onChange={(value) => { setLinkedFilter(value as LinkedFilter); resetReviewScope(); }} ariaLabel="Filter linked or unlinked Stone imports" />
-          </div>
+          <div><Label htmlFor="stone-review-vendor">Vendor</Label><Select id="stone-review-vendor" value={tableVendor} options={tableVendorOptions} onChange={(value) => { setTableVendor(value); setTableCategory("all"); resetReviewScope(); }} ariaLabel="Filter Stone imports by vendor" /></div>
+          <div><Label htmlFor="stone-review-category">Category</Label><Select id="stone-review-category" value={tableCategory} options={tableCategoryOptions} onChange={(value) => { setTableCategory(value); resetReviewScope(); }} disabled={tableVendor === "all"} ariaLabel="Filter Stone imports by vendor category" /></div>
+          <div><Label htmlFor="stone-review-availability">Vendor status</Label><Select id="stone-review-availability" value={availabilityFilter} options={AVAILABILITY_OPTIONS} onChange={(value) => { setAvailabilityFilter(value as AvailabilityFilter); resetReviewScope(); }} ariaLabel="Filter Stone imports by vendor status" /></div>
+          <div><Label htmlFor="stone-review-linked">Linked status</Label><Select id="stone-review-linked" value={linkedFilter} options={[{ value: "all", label: "Linked / Unlinked" }, { value: "linked", label: "Linked" }, { value: "unlinked", label: "Unlinked" }]} onChange={(value) => { setLinkedFilter(value as LinkedFilter); resetReviewScope(); }} ariaLabel="Filter linked or unlinked Stone imports" /></div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap gap-2" aria-label="Stone review status filters">
-            {REVIEW_STATUSES.map((status) => (
-              <Button key={status} size="sm" variant={reviewStatus === status ? "primary" : "outline"} aria-pressed={reviewStatus === status} onClick={() => {
-                setReviewStatus(status); resetReviewScope();
-              }}>{status}</Button>
-            ))}
+            {REVIEW_STATUSES.map((status) => <Button key={status} size="sm" variant={reviewStatus === status ? "primary" : "outline"} aria-pressed={reviewStatus === status} onClick={() => { setReviewStatus(status); resetReviewScope(); }}>{status}</Button>)}
           </div>
           <Badge size="sm" color="light">Showing {pageStart}–{pageEnd} of {totalCount}</Badge>
         </div>
 
         <fieldset className="flex flex-wrap gap-x-5 gap-y-3">
           <legend className="sr-only">Stone catalog change filters</legend>
-          {CHANGE_FILTERS.map(({ state, label }) => (
-            <Checkbox key={state} id={`stone-state-${state.toLowerCase()}`} label={label} checked={changeStates.includes(state)} onChange={() => toggleChangeState(state)} />
-          ))}
+          {CHANGE_FILTERS.map(({ state, label }) => <Checkbox key={state} id={`stone-state-${state.toLowerCase()}`} label={label} checked={changeStates.includes(state)} onChange={() => toggleChangeState(state)} />)}
         </fieldset>
 
         {reviewStatus === "PENDING" ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Badge size="sm" color="light">{eligibilityLoading ? "Checking eligibility…" : `${eligibleIds.length} eligible`}</Badge>
+            <Badge size="sm" color="light">{eligibilityLoading ? "Checking eligibility…" : `${eligibleIds.length} bulk-eligible`}</Badge>
             <Badge size="sm" color={selectedIds.size ? "primary" : "light"}>{selectedIds.size} selected</Badge>
-            {eligibleIds.length > 0 && selectedIds.size !== eligibleIds.length ? (
-              <Button size="sm" variant="outline" disabled={bulkApproving || eligibilityLoading} onClick={() => setSelectedIds(new Set(eligibleIds))}>
-                Select all {eligibleIds.length} eligible Stone items
-              </Button>
-            ) : null}
+            {eligibleIds.length > 0 && selectedIds.size !== eligibleIds.length ? <Button size="sm" variant="outline" disabled={bulkApproving || eligibilityLoading} onClick={() => setSelectedIds(new Set(eligibleIds))}>Select all {eligibleIds.length} mapped Stone items</Button> : null}
             {selectedIds.size ? <Button size="sm" variant="ghost" disabled={bulkApproving} onClick={clearSelection}>Clear selection</Button> : null}
-            {selectedIds.size ? (
-              <Button size="sm" disabled={bulkApproving} onClick={() => void approveSelected()}>
-                {bulkApproving ? `Approved ${bulkProgress?.completed ?? 0} of ${bulkProgress?.total ?? selectedIds.size}` : `Approve Selected (${selectedIds.size})`}
-              </Button>
-            ) : null}
+            {selectedIds.size ? <Button size="sm" disabled={bulkApproving} onClick={() => void approveSelected()}>{bulkApproving ? `Approved ${bulkProgress?.completed ?? 0} of ${bulkProgress?.total ?? selectedIds.size}` : `Approve Selected (${selectedIds.size})`}</Button> : null}
           </div>
         ) : null}
 
         <TableViewport>
           <Table variant="admin" minWidth="extraWide">
-            <TableHeader variant="admin">
-              <TableRow>
-                <TableCell isHeader variant="admin"><Checkbox checked={allPageEligibleSelected} onChange={togglePageSelection} disabled={!pageEligibleIds.length || bulkApproving} ariaLabel="Select approval-eligible Stone items on this page" /></TableCell>
-                <TableCell isHeader variant="admin">Image</TableCell>
-                <TableCell isHeader variant="admin">Vendor</TableCell>
-                <TableCell isHeader variant="admin">Stone Type</TableCell>
-                <TableCell isHeader variant="admin">State</TableCell>
-                <TableCell isHeader variant="admin">Availability</TableCell>
-                <TableCell isHeader variant="admin">Color</TableCell>
-                <TableCell isHeader variant="admin">Thickness / Finish</TableCell>
-                <TableCell isHeader variant="admin">Location</TableCell>
-                <TableCell isHeader variant="admin">Product</TableCell>
-                <TableCell isHeader variant="admin">Links</TableCell>
-                <TableCell isHeader variant="admin">Last seen</TableCell>
-                <TableCell isHeader variant="admin" className="text-right">Review</TableCell>
-              </TableRow>
-            </TableHeader>
+            <TableHeader variant="admin"><TableRow>
+              <TableCell isHeader variant="admin"><Checkbox checked={allPageEligibleSelected} onChange={togglePageSelection} disabled={!pageEligibleIds.length || bulkApproving} ariaLabel="Select approval-eligible Stone items on this page" /></TableCell>
+              <TableCell isHeader variant="admin">Image</TableCell><TableCell isHeader variant="admin">Vendor</TableCell><TableCell isHeader variant="admin">Stone Type</TableCell><TableCell isHeader variant="admin">State</TableCell><TableCell isHeader variant="admin">Availability</TableCell><TableCell isHeader variant="admin">Color</TableCell><TableCell isHeader variant="admin">Thickness / Finish</TableCell><TableCell isHeader variant="admin">Location</TableCell><TableCell isHeader variant="admin">Product</TableCell><TableCell isHeader variant="admin">Links</TableCell><TableCell isHeader variant="admin">Last seen</TableCell><TableCell isHeader variant="admin" className="text-right">Review</TableCell>
+            </TableRow></TableHeader>
             <TableBody variant="admin">
               {loading ? <TableStateRow colSpan={13}>Loading Stone imports…</TableStateRow> :
                changeStates.length === 0 ? <TableStateRow colSpan={13}>Select at least one catalog state.</TableStateRow> :
@@ -761,18 +758,13 @@ export default function StoneVendorImportsPanel() {
                 const colors = uniqueStrings(item.stone_data.colors ?? []);
                 const variant = item.stone_data.variant ?? {};
                 const eligible = eligibleSet.has(item.id);
+                const individuallyApprovable = Boolean(item.stone_type_id) && item.availability_status !== "MISSING";
                 return (
                   <TableRow key={item.id} className="align-middle">
-                    <TableCell variant="admin"><Checkbox checked={selectedIds.has(item.id)} onChange={(checked) => {
-                      setSelectedIds((current) => { const next = new Set(current); checked ? next.add(item.id) : next.delete(item.id); return next; });
-                    }} disabled={!eligible || bulkApproving} ariaLabel={`Select ${item.sku ?? item.title} for Stone approval`} /></TableCell>
+                    <TableCell variant="admin"><Checkbox checked={selectedIds.has(item.id)} onChange={(checked) => setSelectedIds((current) => { const next = new Set(current); if (checked) next.add(item.id); else next.delete(item.id); return next; })} disabled={!eligible || bulkApproving} ariaLabel={`Select ${item.sku ?? item.title} for Stone approval`} /></TableCell>
                     <TableCell variant="admin">{item.image_url ? <a href={item.image_url} target="_blank" rel="noreferrer"><img src={item.image_url} alt={item.title} loading="lazy" referrerPolicy="no-referrer" className="h-14 w-14 object-contain" /></a> : <Badge size="sm" color="light">No image</Badge>}</TableCell>
                     <TableCell variant="admin"><span className="block font-medium uppercase">{item.vendor_code}</span><span className="mt-1 block text-xs opacity-70">{item.stone_data.collection ?? item.vendor_category_label ?? "—"}</span></TableCell>
-                    <TableCell variant="admin">
-                      <span className="block font-medium">{item.stone_type_name ?? item.stone_data.stoneTypeName ?? "Unresolved"}</span>
-                      <span className="mt-1 block text-xs opacity-70">Source: {item.stone_data.sourceStoneTypeName ?? "—"}</span>
-                      {item.stone_type_review_status === "pending_review" ? <Badge size="sm" color="warning">Taxonomy review pending</Badge> : null}
-                    </TableCell>
+                    <TableCell variant="admin"><span className="block font-medium">{item.stone_type_name ?? item.stone_data.stoneTypeName ?? "Unresolved"}</span><span className="mt-1 block text-xs opacity-70">Source: {item.stone_data.sourceStoneTypeName ?? "—"}</span>{item.stone_type_review_status === "pending_review" ? <Badge size="sm" color="warning">Taxonomy review pending</Badge> : null}</TableCell>
                     <TableCell variant="admin"><Badge size="sm" color={changeColor(item.change_state)}>{item.change_state}</Badge></TableCell>
                     <TableCell variant="admin"><Badge size="sm" color={availabilityColor(item.availability_status)}>{availabilityLabel(item.availability_status)}</Badge>{item.vendor_stock_quantity !== null ? <span className="mt-1 block text-xs opacity-70">Vendor qty {item.vendor_stock_quantity}</span> : null}</TableCell>
                     <TableCell variant="admin"><span className="block text-sm">{colors.join(", ") || "—"}</span>{item.stone_data.colorTone ? <span className="mt-1 block text-xs opacity-70">{item.stone_data.colorTone}</span> : null}</TableCell>
@@ -782,7 +774,7 @@ export default function StoneVendorImportsPanel() {
                     <TableCell variant="admin"><div className="flex flex-col gap-1 text-xs">{item.canonical_product_id ? <a href={`/products/${item.canonical_product_id}/edit`} className="underline underline-offset-4 transition-opacity hover:opacity-75">Edit Product</a> : <span>Not linked</span>}<a href={item.product_url} target="_blank" rel="noreferrer" className="underline underline-offset-4 transition-opacity hover:opacity-75">Vendor source</a></div></TableCell>
                     <TableCell variant="admin" className="whitespace-nowrap text-xs">{new Date(item.last_seen_at).toLocaleString()}</TableCell>
                     <TableCell variant="admin"><div className="flex flex-wrap justify-end gap-2">
-                      {reviewStatus !== "APPROVED" ? <Button size="sm" disabled={updatingId === item.id || !eligible || bulkApproving} onClick={() => void setStatus(item.id, "APPROVED")}>{updatingId === item.id ? "Approving…" : "Approve Stone"}</Button> : null}
+                      {reviewStatus !== "APPROVED" ? <Button size="sm" disabled={updatingId === item.id || !individuallyApprovable || bulkApproving} onClick={() => void setStatus(item.id, "APPROVED")}>{updatingId === item.id ? "Approving…" : "Approve Stone"}</Button> : null}
                       {reviewStatus !== "IGNORED" ? <Button size="sm" variant="outline" disabled={updatingId === item.id || bulkApproving} onClick={() => void setStatus(item.id, "IGNORED")}>Ignore</Button> : null}
                       {reviewStatus !== "PENDING" ? <Button size="sm" variant="ghost" disabled={updatingId === item.id || bulkApproving} onClick={() => void setStatus(item.id, "PENDING")}>Pending</Button> : null}
                     </div></TableCell>
@@ -794,10 +786,7 @@ export default function StoneVendorImportsPanel() {
         </TableViewport>
 
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="stone-review-page-size">Rows per page</Label>
-            <Select id="stone-review-page-size" value={String(pageSize)} options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: String(size) }))} onChange={(value) => { setPageSize(Number(value)); setCurrentPage(1); }} ariaLabel="Stone rows per page" />
-          </div>
+          <div className="flex items-center gap-2"><Label htmlFor="stone-review-page-size">Rows per page</Label><Select id="stone-review-page-size" value={String(pageSize)} options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: String(size) }))} onChange={(value) => { setPageSize(Number(value)); setCurrentPage(1); }} ariaLabel="Stone rows per page" /></div>
           <div className="flex flex-wrap gap-2" aria-label="Stone import pagination">
             <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</Button>
             {pageNumbers(currentPage, totalPages).map((page) => <Button key={page} size="sm" variant={page === currentPage ? "primary" : "outline"} aria-pressed={page === currentPage} onClick={() => setCurrentPage(page)}>{page}</Button>)}

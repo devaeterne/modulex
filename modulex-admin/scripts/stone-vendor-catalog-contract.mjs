@@ -23,6 +23,9 @@ const approval = read("src/lib/vendor-catalog/approval.ts");
 const stoneApproval = read("src/lib/vendor-catalog/stone-approve.ts");
 const syncRoute = read("src/app/api/vendor-catalog/stone/sync/route.ts");
 const vendorsRoute = read("src/app/api/vendor-catalog/stone/vendors/route.ts");
+const approvalRoute = read("src/app/api/vendor-catalog/items/[itemId]/approve/route.ts");
+const bulkApprovalRoute = read("src/app/api/vendor-catalog/bulk/approve/route.ts");
+const errorSerializer = read("src/lib/errors/unknown-error.ts");
 const page = read("src/app/(admin)/products/vendor-imports/page.tsx");
 const stonePanel = readOptional(
   "src/app/(admin)/products/vendor-imports/StoneVendorImportsPanel.tsx"
@@ -63,14 +66,9 @@ assert.match(adapters, /stoneVendorCatalogRegistry/);
 assert.doesNotMatch(adapters, /0\.00 EUR/);
 assert.doesNotMatch(adapters, /vendorPriceReference/);
 
-// East West moved from numeric category routes to /products/<stone-type>, and
-// the runtime behavior contract verifies current nested product detail URLs.
 assert.match(adapters, /\/products\/\$\{encodeURIComponent\(category\.key\)\}/);
 assert.match(adapters, /product\/view/);
 assert.doesNotMatch(adapters, /\/products\/category\/view\//);
-
-// Venezia has stale/dead catalog links in secondary navigation. A 404 category
-// must be skipped instead of aborting the complete vendor run.
 assert.match(adapters, /status\s*===\s*404/);
 assert.match(adapters, /html\s*===\s*null/);
 assert.match(adapters, /continue/);
@@ -90,8 +88,6 @@ assert.match(msiMarbleSystemsAdapters, /Item Code/);
 assert.match(msiMarbleSystemsAdapters, /Available Quantity/);
 assert.match(msiMarbleSystemsAdapters, /Location/);
 assert.match(msiMarbleSystemsAdapters, /stockQuantity:\s*quantity/);
-// MSI page 2 and Marble Systems page 2 are valid, while later terminal pages
-// can return 5xx/404. Runtime behavior tests own the exact URL-shape checks.
 assert.match(msiMarbleSystemsAdapters, /fetchPaginationHtml/);
 assert.match(msiMarbleSystemsAdapters, /page\s*>\s*1/);
 assert.match(msiMarbleSystemsAdapters, /response\.status\s*===\s*404/);
@@ -110,13 +106,32 @@ assert.match(sync, /zero products|no products/i);
 assert.doesNotMatch(sync, /\.from\("inventory"\)/);
 assert.doesNotMatch(sync, /store.*publish/i);
 
-assert.match(stoneApproval, /product_type.*STONE|eq\("code",\s*"STONE"\)/s);
-assert.match(stoneApproval, /eq\("code",\s*"SLAB"\)/);
+// Product Master requires category_id. Stone approval must use the persistent
+// vendor-category mapping while keeping Stone Type as an independent taxonomy.
+assert.match(stoneApproval, /loadVendorCategoryMapping/);
+assert.match(stoneApproval, /mapping\.category\.id/);
+assert.match(stoneApproval, /mapping\.category\.name/);
+assert.match(stoneApproval, /mapping\.productType\.code\s*!==\s*"STONE"/);
+assert.match(stoneApproval, /mapping\.uom\.code\s*!==\s*"SLAB"/);
+assert.doesNotMatch(stoneApproval, /category_id:\s*null/);
 assert.match(stoneApproval, /material_price_band_id:\s*null/);
 assert.match(stoneApproval, /review_status:\s*"APPROVED"/);
 assert.match(stoneApproval, /storeProductContentId:\s*null/);
 assert.match(approval, /catalog_domain/);
 assert.match(approval, /approveStoneVendorCatalogItem/);
+
+// Supabase/PostgREST errors must retain actionable fields in server logs rather
+// than collapsing to "[object Object]".
+assert.match(errorSerializer, /unknownErrorMessage/);
+assert.match(errorSerializer, /serializeUnknownError/);
+assert.match(errorSerializer, /"code"/);
+assert.match(errorSerializer, /"details"/);
+assert.match(errorSerializer, /"hint"/);
+assert.match(approvalRoute, /serializeUnknownError\(error\)/);
+assert.match(approvalRoute, /unknownErrorMessage\(error/);
+assert.match(bulkApprovalRoute, /serializeUnknownError\(error\)/);
+assert.match(bulkApprovalRoute, /unknownErrorMessage\(error/);
+assert.doesNotMatch(approvalRoute, /String\(error\)/);
 
 assert.match(syncRoute, /allowCron:\s*true/);
 assert.match(syncRoute, /runStoneVendorCatalogSync/);
@@ -126,8 +141,6 @@ assert.match(vendorsRoute, /searchParams\.get\("vendor"\)/);
 assert.match(vendorsRoute, /requestedVendor/);
 assert.match(vendorsRoute, /Unknown Stone vendor/);
 
-// Admin Vendor Imports must expose Stone as a first-class review domain without
-// changing the existing Sink workflow.
 assert.match(page, /CatalogDomain/);
 assert.match(page, /StoneVendorImportsPanel/);
 assert.match(page, />Sink</);
@@ -145,12 +158,28 @@ assert.match(stonePanel, /Finish/);
 assert.match(stonePanel, /Location/);
 assert.match(stonePanel, /Select one Stone vendor/);
 
-// Generic bulk approval remains shared, but Stone eligibility must not depend
-// on Sink category mappings. A resolved Stone Type is the fail-closed gate.
+// Mapping is interactive for single-item approval; bulk remains fail-closed
+// until the mapping exists. STONE and SLAB are fixed classification boundaries.
+assert.match(stonePanel, /CATEGORY_MAPPING_REQUIRED/);
+assert.match(stonePanel, /\/api\/vendor-catalog\/category-mappings/);
+assert.match(stonePanel, /Vendor Category Mapping/);
+assert.match(stonePanel, /Category mapping required/);
+assert.match(stonePanel, /option\.code === "STONE"/);
+assert.match(stonePanel, /option\.code === "SLAB"/);
+assert.match(stonePanel, /setChangeStates\(\["NEW",\s*"UPDATED",\s*"UNCHANGED"\]\)/);
+assert.match(stonePanel, /DEFAULT_CHANGE_STATES[^\n]*\["NEW",\s*"UPDATED",\s*"UNCHANGED"\]/);
+
+// Long Stone approval sessions can cross JWT expiry. Refresh near expiry and
+// reacquire the token for each bulk batch instead of reusing one stale token.
+assert.match(stonePanel, /refreshSession\(\)/);
+assert.match(stonePanel, /for\s*\(const batch of chunks\(ids, 5\)\)[\s\S]{0,220}?getAccessToken\(\)/);
+
+// Stone eligibility now requires both resolved Stone Type and category mapping.
 assert.match(bulkEligibleRoute, /catalog_domain/);
 assert.match(bulkEligibleRoute, /stone_type_id/);
-assert.match(bulkEligibleRoute, /candidate\.catalog_domain === "stone"/);
-assert.match(bulkEligibleRoute, /Boolean\(candidate\.stone_type_id\)/);
+assert.match(bulkEligibleRoute, /loadVendorCategoryMapping/);
+assert.doesNotMatch(bulkEligibleRoute, /if\s*\(candidate\.catalog_domain === "stone"\)\s*continue/);
+assert.match(bulkEligibleRoute, /candidate\.catalog_domain === "stone"[\s\S]{0,220}?candidate\.stone_type_id/);
 
 assert.match(sql, /alter column material_price_band_id drop not null/i);
 assert.match(sql, /vendor_stone_type_mappings/);
@@ -162,6 +191,7 @@ assert.match(sql, /vendor inventory is reference-only/i);
 assert.match(sql, /v_material_price_band_id is not null/i);
 assert.equal(migration.trim(), sql.trim(), "Deployable Stone vendor migration must mirror canonical SQL");
 
+await import("./vendor-error-behavior-contract.mjs");
 await import("./vendor-catalog-adapter-behavior-contract.mjs");
 
 console.log("stone vendor catalog contract: ok");

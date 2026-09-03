@@ -1,4 +1,5 @@
 import { withApiTiming } from "@/lib/observability/apiTiming";
+import { serializeUnknownError, unknownErrorMessage } from "@/lib/errors/unknown-error";
 import {
   approveReviewableVendorCatalogItem,
   VendorCatalogMissingError,
@@ -61,16 +62,11 @@ async function handlePost(request: Request, context: RouteContext) {
 
     console.error("Vendor catalog approval failed.", {
       itemId,
-      error: error instanceof Error ? error.message : String(error),
+      error: serializeUnknownError(error),
     });
 
     return Response.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Vendor catalog approval failed.",
-      },
+      { error: unknownErrorMessage(error, "Vendor catalog approval failed.") },
       { status: 500 }
     );
   }
