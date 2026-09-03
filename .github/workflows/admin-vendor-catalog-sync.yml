@@ -12,6 +12,7 @@ on:
       - "modulex-admin/sql/stone-vendor-catalog-foundation.sql"
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
       - "modulex-admin/scripts/stone-vendor-catalog-contract.mjs"
+      - "modulex-admin/scripts/stone-media-approval-contract.mjs"
       - "modulex-admin/scripts/vendor-approval-idempotency-contract.mjs"
       - "modulex-admin/scripts/vendor-availability-contract.mjs"
       - "modulex-admin/docs/VENDOR_CATALOG_SYNC.md"
@@ -31,6 +32,7 @@ on:
       - "modulex-admin/sql/stone-vendor-catalog-foundation.sql"
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
       - "modulex-admin/scripts/stone-vendor-catalog-contract.mjs"
+      - "modulex-admin/scripts/stone-media-approval-contract.mjs"
       - "modulex-admin/scripts/vendor-approval-idempotency-contract.mjs"
       - "modulex-admin/scripts/vendor-availability-contract.mjs"
       - "modulex-admin/docs/VENDOR_CATALOG_SYNC.md"
@@ -60,6 +62,7 @@ jobs:
       - run: npm ci
       - run: node scripts/vendor-catalog-sync-contract.mjs
       - run: node scripts/stone-vendor-catalog-contract.mjs
+      - run: node scripts/stone-media-approval-contract.mjs
       - run: node scripts/vendor-approval-idempotency-contract.mjs
       - run: node scripts/vendor-availability-contract.mjs
       - run: npm run typecheck
