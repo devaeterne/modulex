@@ -28,6 +28,8 @@ const vendorPage = read("src/app/(admin)/products/vendor-imports/page.tsx");
 assert.match(stoneApproval, /archiveStoneProductContent/);
 assert.match(stoneApproval, /buildStoneProductDescription/);
 assert.match(stoneApproval, /Stone SKU collision detected/);
+assert.match(stoneApproval, /duplicateSourceSkuCount/);
+assert.match(stoneApproval, /item\.variant_code/);
 assert.doesNotMatch(stoneApproval, /storeProductContentId:\s*null/);
 assert.doesNotMatch(stoneApproval, /archivedImageCount:\s*0/);
 
