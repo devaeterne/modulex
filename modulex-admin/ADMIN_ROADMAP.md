@@ -1,15 +1,38 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Main baseline: `2789ffebf147e701682ea97f4f1a09481fa29e45`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current Admin next action: **Review/merge Vendor Catalog availability/bulk approval, then apply `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval`, run post-DDL advisors, deploy Admin, and perform signed-in sync/mapping/availability/bulk-approval acceptance.**
 
+## Customer read performance cleanup
+
+- [~] Deduplicate Customers summary, Customer Detail, and Order Detail initial reads without adding persistent client caching or changing mutation behavior.
+  - Main baseline: `7411c20d7d02bd6432d6c61196b34405429f11e1`.
+  - Customers summary reuses `get_customer_dashboard` with zero recent-row limits while preserving the directory's exact filtered count and server-side range.
+  - Customer and order detail consumers share only concurrent in-flight reads; settled requests are removed immediately so mutation-driven reloads cannot reuse stale data.
+  - Keep this package `[~]` until the draft PR contracts, full Admin verification, and a post-deploy authenticated production browser re-audit confirm the duplicate calls are removed.
+
 ## Admin UI standardization program
 
+- [~] Migrate the five legacy Customer feature components to canonical shared Admin primitives without changing customer/order queries, authorization, mutations, routes, or data-loading behavior; local strict and regression verification is complete, with production deployment/acceptance still pending.
 - [x] Standardize the production Dashboard with shared TailAdmin cards, alerts, buttons, and admin table primitives without changing KPI/RPC, retry, or role-filtering behavior.
   - `smoke:dashboard-ui` is wired into the normal Admin smoke chain; Dashboard UI, Admin UI, production-surface, RBAC, TypeScript, lint, production build, and diff-check passed locally.
+
+## Project Base — PB-1 foundation closeout
+
+- [x] Establish the additive Customer → Project → multiple Orders foundation without replacing the existing Order lifecycle, pricing, revision, reservation or fulfillment domains.
+  - Production Supabase contains `customer_projects`, `customer_project_status_history`, nullable `customer_orders.project_id`, the Project create/update/list/detail/assign/create-order RPC boundary, DB-authoritative Project numbering, lifecycle history, covering indexes, and authenticated-only Project RPC execution. Canonical production migration history records `20260902232013_project_base_core`, `20260902232311_project_base_order_assignment`, and `20260902234109_project_base_fk_covering_indexes`.
+  - Project Sales Rep is authoritative at Project level and may be prefilled from the Customer default without being rewritten by later Customer ownership changes. Project-context Order creation derives the Customer from the Project, and assigning an existing Order fails closed when Order Customer and Project Customer differ.
+  - `/projects` and `/projects/[id]` are protected by `projects.view` / `projects.manage`; Project list uses server-side search, Customer/Sales Rep/Status filters and pagination. Search covers Project #, Customer and Project name. Project Settings remains permission-gated.
+  - Existing standalone Orders remain valid with `project_id = null`. Cancelled Orders are hidden from the normal Order `All` view and excluded from Project active Order rows/count, Link Existing Order choices and Project Progress calculations while remaining reachable through the explicit `Cancelled` filter.
+  - AdminUICheck acceptance is complete for the changed Project/Order surfaces: shared Admin cards/forms/tables/alerts/badges/buttons, runtime locale formatting, readable Order revisions and Project lifecycle Activity, actor-aware Project status history, responsive tables/layouts, and light/dark contrast hardening are covered by the accepted runtime.
+  - Project Progress is locked as a **full-width compact overview**, not a sidebar/rail: horizontal `Draft → Quoted → Approved → Ordered → In Progress → Completed` badges with `Done / Current / Pending`, followed by responsive Orders / Delivery / Installation / Commercial blocks. Delivery/Installation remain read-only PB-1 summaries; Commercial is count/status only. The duplicate `Recent Activity` block is removed and the separate `Activity` card remains the official Project lifecycle/audit timeline.
+  - Accepted runtime SHA `e36126913a92acdf4d5c2783f12c29e87dff5030`: Admin Project Base #71, Admin UI Foundation #977, Admin A1 Core Operations #594 and Admin Customers UI #301 are green. Vercel Admin Preview `dpl_CfyHrv5kboYLAiPckd1HZg7Bz2dp` is `READY` on that exact runtime SHA and the final signed-in Project Detail / Project Progress presentation was accepted by the project owner.
+  - Fresh production Security + Performance Advisor review shows no Project-specific blocking finding. New Project covering/filter indexes may appear as unused-index `INFO` while traffic is still low; this is informational and not a PB-1 blocker.
+  - Store public/Customer Portal/Dealer Portal Project projection is unchanged. `modulex-store/STORE_ROADMAP.md` intentionally receives no PB-1 closeout mutation; portal Project navigation remains PB-8.
+  - PR #267 remains **draft/open** and must be merged by the project owner. PB-2 must not start until PB-1 is merged and the production Admin deployment is verified.
 
 ## Product Master UX v2
 
