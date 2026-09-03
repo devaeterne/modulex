@@ -5,7 +5,6 @@ import ComponentCard from "@/components/common/ComponentCard";
 import ProjectFinancialSummary from "@/components/customers/ProjectFinancialSummary";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
-import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
@@ -21,15 +20,15 @@ import {
   TableViewport,
 } from "@/components/ui/table";
 import {
-  allocateProjectPayment,
   createProjectPaymentRequirement,
   deleteProjectPayment,
+  deleteProjectPaymentRequirement,
   loadProjectPaymentLedger,
-  recordProjectPayment,
-  reverseProjectPayment,
+  recordAndAllocateProjectPayment,
   updateProjectPayment,
   type ProjectPaymentCurrencySummary,
   type ProjectPaymentLedger,
+  type ProjectPaymentRequirement,
   type ProjectPaymentTransaction,
 } from "@/lib/customers/project-payments";
 import {
@@ -96,23 +95,14 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  const [showAddPlan, setShowAddPlan] = useState(false);
   const [requirementName, setRequirementName] = useState("");
   const [requirementAmount, setRequirementAmount] = useState("");
-  const [requirementCurrency, setRequirementCurrency] = useState("USD");
+  const [requirementCurrency, setRequirementCurrency] = useState(orderTotals[0]?.currencyCode ?? "USD");
   const [requirementDueDate, setRequirementDueDate] = useState("");
-
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentCurrency, setPaymentCurrency] = useState("USD");
-  const [paymentDate, setPaymentDate] = useState(todayInput());
-  const [paymentReference, setPaymentReference] = useState("");
-
-  const [allocationPaymentId, setAllocationPaymentId] = useState("");
-  const [allocationRequirementId, setAllocationRequirementId] = useState("");
-  const [allocationAmount, setAllocationAmount] = useState("");
-
-  const [reversePaymentId, setReversePaymentId] = useState("");
-  const [reverseAmount, setReverseAmount] = useState("");
-  const [reverseReason, setReverseReason] = useState("");
+  const [quickAmounts, setQuickAmounts] = useState<Record<string, string>>({});
+  const [deletingRequirement, setDeletingRequirement] = useState<ProjectPaymentRequirement | null>(null);
+  const [showProfitability, setShowProfitability] = useState(false);
 
   const [editingPayment, setEditingPayment] = useState<ProjectPaymentTransaction | null>(null);
   const [editAmount, setEditAmount] = useState("");
@@ -133,11 +123,8 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
         const nextLedger = await loadProjectPaymentLedger(projectId);
         setLedger(nextLedger);
         setStatus(null);
-        const defaultCurrency = nextLedger.currencies[0]?.currencyCode;
-        if (defaultCurrency) {
-          setRequirementCurrency((current) => current || defaultCurrency);
-          setPaymentCurrency((current) => current || defaultCurrency);
-        }
+        const defaultCurrency = nextLedger.currencies[0]?.currencyCode ?? orderTotals[0]?.currencyCode;
+        if (defaultCurrency) setRequirementCurrency(defaultCurrency);
       } else {
         const nextStatus = await loadProjectPaymentStatus(projectId);
         setStatus(nextStatus);
@@ -148,41 +135,11 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
     } finally {
       setLoading(false);
     }
-  }, [canManageProjectPayments, projectId]);
+  }, [canManageProjectPayments, orderTotals, projectId]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  const paymentOptions = useMemo(
-    () => (ledger?.transactions ?? [])
-      .filter((transaction) => transaction.transactionType === "payment" && transaction.status === "posted" && transaction.unallocated > 0)
-      .map((transaction) => ({
-        value: transaction.id,
-        label: `${displayDate(transaction.transactionDate)} — ${money(transaction.unallocated, transaction.currencyCode)} available`,
-      })),
-    [ledger]
-  );
-
-  const requirementOptions = useMemo(
-    () => (ledger?.requirements ?? [])
-      .filter((requirement) => !["paid", "cancelled"].includes(requirement.status) && requirement.remaining > 0)
-      .map((requirement) => ({
-        value: requirement.id,
-        label: `${requirement.name} — ${money(requirement.remaining, requirement.currencyCode)} remaining`,
-      })),
-    [ledger]
-  );
-
-  const reversibleOptions = useMemo(
-    () => (ledger?.transactions ?? [])
-      .filter((transaction) => transaction.transactionType === "payment" && transaction.status === "posted")
-      .map((transaction) => ({
-        value: transaction.id,
-        label: `${displayDate(transaction.transactionDate)} — ${money(transaction.amount, transaction.currencyCode)}`,
-      })),
-    [ledger]
-  );
 
   const commercialSummaries = useMemo(() => {
     const ledgerByCurrency = new Map((ledger?.currencies ?? []).map((summary) => [summary.currencyCode, summary]));
@@ -192,9 +149,8 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
     return Array.from(currencies).sort().map((currencyCode) => {
       const summary = ledgerByCurrency.get(currencyCode) ?? emptyCurrencySummary(currencyCode);
       const orderValue = orderByCurrency.get(currencyCode) ?? 0;
-      const customerBalance = Math.max(summary.expected - summary.received, 0);
-      const planDifference = summary.expected - orderValue;
-      return { summary, orderValue, customerBalance, planDifference };
+      const balance = Math.max(orderValue - summary.received, 0);
+      return { summary, orderValue, balance };
     });
   }, [ledger, orderTotals]);
 
@@ -202,6 +158,10 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
     editingPayment
       && (Number(editAmount) !== editingPayment.amount || editCurrency.trim().toUpperCase() !== editingPayment.currencyCode)
   );
+
+  function quickAmount(requirement: ProjectPaymentRequirement) {
+    return quickAmounts[requirement.id] ?? String(requirement.remaining);
+  }
 
   function openEditPayment(transaction: ProjectPaymentTransaction) {
     setEditingPayment(transaction);
@@ -218,6 +178,64 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
     setDeletingPayment(transaction);
     setDeleteReason("");
     setError(null);
+  }
+
+  async function runAction(action: () => Promise<unknown>, successMessage: string) {
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await action();
+      setMessage(successMessage);
+      await load();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "Project payment action failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePaymentReceived(requirement: ProjectPaymentRequirement) {
+    const amount = Number(quickAmount(requirement));
+    if (!Number.isFinite(amount) || amount <= 0 || amount > requirement.remaining) return;
+
+    await runAction(async () => {
+      await recordAndAllocateProjectPayment({
+        requirementId: requirement.id,
+        amount,
+        transactionDate: todayInput(),
+      });
+      setQuickAmounts((current) => {
+        const next = { ...current };
+        delete next[requirement.id];
+        return next;
+      });
+    }, `${money(amount, requirement.currencyCode)} payment received and applied to ${requirement.name}.`);
+  }
+
+  async function handleCreatePlan() {
+    await runAction(async () => {
+      await createProjectPaymentRequirement({
+        projectId,
+        name: requirementName,
+        amount: Number(requirementAmount),
+        currencyCode: requirementCurrency,
+        dueDate: requirementDueDate || null,
+      });
+      setRequirementName("");
+      setRequirementAmount("");
+      setRequirementDueDate("");
+      setShowAddPlan(false);
+    }, "Payment Plan added.");
+  }
+
+  async function handleDeleteRequirement() {
+    if (!deletingRequirement) return;
+    const planName = deletingRequirement.name;
+    await runAction(async () => {
+      await deleteProjectPaymentRequirement({ requirementId: deletingRequirement.id });
+      setDeletingRequirement(null);
+    }, `${planName} was deleted. Existing customer payments were kept and released allocations are now Project credit.`);
   }
 
   async function handleUpdatePayment() {
@@ -238,7 +256,7 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
       });
       setEditingPayment(null);
       setMessage(result.allocationReset
-        ? "Payment updated. Amount/currency changed, so its previous allocations were cleared and must be allocated again."
+        ? "Payment updated. Amount/currency changed, so its previous allocations were cleared and are now Project credit."
         : "Payment updated. Existing allocations were preserved.");
       await load();
     } catch (actionError) {
@@ -261,21 +279,6 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
       await load();
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Customer payment could not be deleted.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function runAction(action: () => Promise<unknown>, successMessage: string) {
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await action();
-      setMessage(successMessage);
-      await load();
-    } catch (actionError) {
-      setError(actionError instanceof Error ? actionError.message : "Project payment action failed.");
     } finally {
       setSaving(false);
     }
@@ -329,117 +332,123 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
       {error ? <Alert variant="error" title="Project payment action failed" message={error} /> : null}
       {message ? <Alert variant="success" title="Project payment updated" message={message} /> : null}
 
-      <ComponentCard
-        title="Commercial Overview"
-        desc="Order Value is a reference, Payment Plan is the expected collection schedule, and Collected is actual customer cash. Open Requirements can remain while equivalent Unallocated Credit is already on hand. Currency totals are never silently converted."
-      >
-        {loading && !ledger ? <p className="text-sm" role="status">Loading Project payment ledger…</p> : null}
-        <div className="space-y-6">
-          {commercialSummaries.map(({ summary, orderValue, customerBalance, planDifference }) => {
-            const differenceDirection = planDifference > 0 ? "above" : "below";
-            return (
-              <div key={summary.currencyCode} className="space-y-4">
-                {commercialSummaries.length > 1 ? (
-                  <p className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>{summary.currencyCode}</p>
-                ) : null}
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Metric label="Order Value" value={money(orderValue, summary.currencyCode)} />
-                  <Metric label="Payment Plan" value={money(summary.expected, summary.currencyCode)} />
-                  <Metric label="Collected" value={money(summary.received, summary.currencyCode)} />
-                  <Metric label="Customer Balance" value={money(customerBalance, summary.currencyCode)} />
-                  <Metric label="Applied" value={money(summary.allocated, summary.currencyCode)} />
-                  <Metric label="Unallocated Credit" value={money(summary.unallocatedCredit, summary.currencyCode)} />
-                  <Metric label="Open Requirements" value={money(summary.remaining, summary.currencyCode)} />
-                  <Metric label="Overdue" value={money(summary.overdue, summary.currencyCode)} />
-                </div>
-                {Math.abs(planDifference) > 0.005 ? (
-                  <Alert
-                    variant="warning"
-                    title="Payment plan / Order value difference"
-                    message={`Payment plan is ${money(Math.abs(planDifference), summary.currencyCode)} ${differenceDirection} the current Project Order value. Order totals are a reference only; this does not block payment planning.`}
-                  />
-                ) : null}
-              </div>
-            );
-          })}
-          {!loading && commercialSummaries.length === 0 ? (
-            <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>No active Order value, customer payment plan, or payment transaction has been recorded yet.</p>
-          ) : null}
-        </div>
-      </ComponentCard>
+      {loading && !ledger ? <p className="text-sm" role="status">Loading Project payment ledger…</p> : null}
 
-      <ComponentCard title="Payment Plan" desc="Order totals are a reference; milestones are not locked 1:1 to Orders. Applied means customer cash explicitly allocated to that milestone.">
+      <div className="space-y-4">
+        {commercialSummaries.map(({ summary, orderValue, balance }) => (
+          <div key={summary.currencyCode} className="space-y-3">
+            {commercialSummaries.length > 1 ? (
+              <p className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>{summary.currencyCode}</p>
+            ) : null}
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <Metric label="Order Value" value={money(orderValue, summary.currencyCode)} />
+              <Metric label="Collected" value={money(summary.received, summary.currencyCode)} />
+              <Metric label="Balance" value={money(balance, summary.currencyCode)} />
+              <Metric label="Credit" value={money(summary.unallocatedCredit, summary.currencyCode)} />
+            </div>
+          </div>
+        ))}
+        {!loading && commercialSummaries.length === 0 ? (
+          <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>No active Order value or customer payment has been recorded yet.</p>
+        ) : null}
+      </div>
+
+      <ComponentCard
+        title="Payment Plan"
+        desc="Create the collection plan, then record received cash directly from the matching plan row."
+        headerAction={<Button size="sm" onClick={() => setShowAddPlan(true)}>Add Plan</Button>}
+      >
         <TableViewport>
-          <Table variant="admin" minWidth="standard">
+          <Table variant="admin" minWidth="wide">
             <TableHeader variant="admin">
               <TableRow>
-                <TableCell isHeader variant="admin">Milestone</TableCell>
-                <TableCell isHeader variant="admin">Due</TableCell>
+                <TableCell isHeader variant="admin">Plan</TableCell>
                 <TableCell isHeader variant="admin">Expected</TableCell>
-                <TableCell isHeader variant="admin">Applied</TableCell>
+                <TableCell isHeader variant="admin">Paid</TableCell>
                 <TableCell isHeader variant="admin">Remaining</TableCell>
-                <TableCell isHeader variant="admin">Status</TableCell>
+                <TableCell isHeader variant="admin">Receive Payment</TableCell>
+                <TableCell isHeader variant="admin">Actions</TableCell>
               </TableRow>
             </TableHeader>
             <TableBody variant="admin">
-              {(ledger?.requirements.length ?? 0) === 0 ? <TableStateRow colSpan={6}>No payment milestones have been defined yet.</TableStateRow> : null}
-              {(ledger?.requirements ?? []).map((requirement) => (
-                <TableRow key={requirement.id}>
-                  <TableCell variant="admin">{requirement.name}</TableCell>
-                  <TableCell variant="admin">{displayDate(requirement.dueDate)}</TableCell>
-                  <TableCell variant="admin">{money(requirement.amount, requirement.currencyCode)}</TableCell>
-                  <TableCell variant="admin">{money(requirement.received, requirement.currencyCode)}</TableCell>
-                  <TableCell variant="admin">{money(requirement.remaining, requirement.currencyCode)}</TableCell>
-                  <TableCell variant="admin"><Badge color={collectionBadge(requirement.status)}>{statusLabel(requirement.status)}</Badge></TableCell>
-                </TableRow>
-              ))}
+              {(ledger?.requirements.length ?? 0) === 0 ? <TableStateRow colSpan={6}>No Payment Plan has been created yet.</TableStateRow> : null}
+              {(ledger?.requirements ?? []).map((requirement) => {
+                const amountValue = quickAmount(requirement);
+                const amountNumber = Number(amountValue);
+                const canReceive = requirement.remaining > 0
+                  && Number.isFinite(amountNumber)
+                  && amountNumber > 0
+                  && amountNumber <= requirement.remaining;
+                return (
+                  <TableRow key={requirement.id}>
+                    <TableCell variant="admin">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{requirement.name}</span>
+                          <Badge color={collectionBadge(requirement.status)}>{statusLabel(requirement.status)}</Badge>
+                        </div>
+                        <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Due {displayDate(requirement.dueDate)}</p>
+                      </div>
+                    </TableCell>
+                    <TableCell variant="admin">{money(requirement.amount, requirement.currencyCode)}</TableCell>
+                    <TableCell variant="admin">{money(requirement.received, requirement.currencyCode)}</TableCell>
+                    <TableCell variant="admin">{money(requirement.remaining, requirement.currencyCode)}</TableCell>
+                    <TableCell variant="admin">
+                      {requirement.remaining > 0 ? (
+                        <div className="flex min-w-72 items-center gap-2">
+                          <Input
+                            id={`plan-payment-${requirement.id}`}
+                            aria-label={`Payment received for ${requirement.name}`}
+                            type="number"
+                            min="0"
+                            max={requirement.remaining}
+                            step="0.01"
+                            value={amountValue}
+                            onChange={(event) => setQuickAmounts((current) => ({ ...current, [requirement.id]: event.target.value }))}
+                          />
+                          <Button size="sm" disabled={saving || !canReceive} onClick={() => void handlePaymentReceived(requirement)}>
+                            Payment Received
+                          </Button>
+                        </div>
+                      ) : (
+                        <Badge color="success">Paid</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell variant="admin">
+                      <Button size="sm" variant="danger" disabled={saving} onClick={() => setDeletingRequirement(requirement)}>
+                        Delete Plan
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableViewport>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div><Label htmlFor="requirement-name">Milestone</Label><Input id="requirement-name" value={requirementName} onChange={(event) => setRequirementName(event.target.value)} /></div>
-          <div><Label htmlFor="requirement-amount">Expected amount</Label><Input id="requirement-amount" type="number" min="0" step="0.01" value={requirementAmount} onChange={(event) => setRequirementAmount(event.target.value)} /></div>
-          <div><Label htmlFor="requirement-currency">Currency</Label><Input id="requirement-currency" value={requirementCurrency} maxLength={3} onChange={(event) => setRequirementCurrency(event.target.value.toUpperCase())} /></div>
-          <div><Label htmlFor="requirement-due">Due date</Label><Input id="requirement-due" type="date" value={requirementDueDate} onChange={(event) => setRequirementDueDate(event.target.value)} /></div>
-        </div>
-        <div className="flex justify-end">
-          <Button disabled={saving || !requirementName.trim() || Number(requirementAmount) <= 0} onClick={() => void runAction(async () => {
-            await createProjectPaymentRequirement({
-              projectId,
-              name: requirementName,
-              amount: Number(requirementAmount),
-              currencyCode: requirementCurrency,
-              dueDate: requirementDueDate || null,
-            });
-            setRequirementName("");
-            setRequirementAmount("");
-            setRequirementDueDate("");
-          }, "Payment milestone added.")}>Add Requirement</Button>
-        </div>
       </ComponentCard>
 
-      <ComponentCard title="Customer Payments" desc="Actual cash received. Payments may be recorded before an Invoice exists. Admin/Finance can edit or hard-delete original payment rows; every correction is audit logged.">
+      <ComponentCard
+        title="Payment History"
+        desc="Actual customer cash recorded on this Project. Detailed allocation and reversal tools belong in the dedicated Finance area."
+      >
         <TableViewport>
           <Table variant="admin" minWidth="standard">
             <TableHeader variant="admin">
               <TableRow>
                 <TableCell isHeader variant="admin">Date</TableCell>
                 <TableCell isHeader variant="admin">Type</TableCell>
-                <TableCell isHeader variant="admin">Reference</TableCell>
                 <TableCell isHeader variant="admin">Amount</TableCell>
-                <TableCell isHeader variant="admin">Allocated</TableCell>
-                <TableCell isHeader variant="admin">Unallocated</TableCell>
+                <TableCell isHeader variant="admin">Applied</TableCell>
+                <TableCell isHeader variant="admin">Credit</TableCell>
                 <TableCell isHeader variant="admin">Actions</TableCell>
               </TableRow>
             </TableHeader>
             <TableBody variant="admin">
-              {(ledger?.transactions.length ?? 0) === 0 ? <TableStateRow colSpan={7}>No customer payment transaction has been recorded yet.</TableStateRow> : null}
+              {(ledger?.transactions.length ?? 0) === 0 ? <TableStateRow colSpan={6}>No customer payment has been recorded yet.</TableStateRow> : null}
               {(ledger?.transactions ?? []).map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell variant="admin">{displayDate(transaction.transactionDate)}</TableCell>
                   <TableCell variant="admin">{statusLabel(transaction.transactionType)}</TableCell>
-                  <TableCell variant="admin">{transaction.referenceNo || "—"}</TableCell>
                   <TableCell variant="admin">{money(transaction.amount, transaction.currencyCode)}</TableCell>
                   <TableCell variant="admin">{money(transaction.allocated, transaction.currencyCode)}</TableCell>
                   <TableCell variant="admin">{money(transaction.unallocated, transaction.currencyCode)}</TableCell>
@@ -456,58 +465,74 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
             </TableBody>
           </Table>
         </TableViewport>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div><Label htmlFor="payment-amount">Payment amount</Label><Input id="payment-amount" type="number" min="0" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} /></div>
-          <div><Label htmlFor="payment-currency">Currency</Label><Input id="payment-currency" value={paymentCurrency} maxLength={3} onChange={(event) => setPaymentCurrency(event.target.value.toUpperCase())} /></div>
-          <div><Label htmlFor="payment-date">Transaction date</Label><Input id="payment-date" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} /></div>
-          <div><Label htmlFor="payment-reference">Reference</Label><Input id="payment-reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div>
-        </div>
-        <div className="flex justify-end">
-          <Button disabled={saving || Number(paymentAmount) <= 0 || paymentCurrency.length !== 3} onClick={() => void runAction(async () => {
-            await recordProjectPayment({
-              projectId,
-              amount: Number(paymentAmount),
-              currencyCode: paymentCurrency,
-              transactionDate: paymentDate,
-              referenceNo: paymentReference || null,
-            });
-            setPaymentAmount("");
-            setPaymentReference("");
-          }, "Customer payment recorded.")}>Record Payment</Button>
-        </div>
       </ComponentCard>
 
-      <ComponentCard title="Allocate Payment" desc="Apply available Project customer credit to one expected milestone explicitly.">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div><Label htmlFor="allocation-payment">Payment</Label><Select id="allocation-payment" options={paymentOptions} value={allocationPaymentId} onChange={setAllocationPaymentId} placeholder="Select payment" allowEmpty /></div>
-          <div><Label htmlFor="allocation-requirement">Milestone</Label><Select id="allocation-requirement" options={requirementOptions} value={allocationRequirementId} onChange={setAllocationRequirementId} placeholder="Select milestone" allowEmpty /></div>
-          <div><Label htmlFor="allocation-amount">Amount</Label><Input id="allocation-amount" type="number" min="0" step="0.01" value={allocationAmount} onChange={(event) => setAllocationAmount(event.target.value)} /></div>
+      {canViewCostMargin ? (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setShowProfitability((current) => !current)}>
+              {showProfitability ? "Hide Project Profitability" : "Show Project Profitability"}
+            </Button>
+          </div>
+          {showProfitability ? <ProjectFinancialSummary projectId={projectId} /> : null}
         </div>
-        <div className="flex justify-end">
-          <Button disabled={saving || !allocationPaymentId || !allocationRequirementId || Number(allocationAmount) <= 0} onClick={() => void runAction(async () => {
-            await allocateProjectPayment({ paymentId: allocationPaymentId, requirementId: allocationRequirementId, amount: Number(allocationAmount) });
-            setAllocationAmount("");
-          }, "Payment allocation recorded.")}>Allocate Payment</Button>
-        </div>
-      </ComponentCard>
+      ) : null}
 
-      <ComponentCard title="Reverse Payment" desc="Posted cash is corrected through an append-safe reversal rather than destructive edits.">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div><Label htmlFor="reverse-payment">Payment</Label><Select id="reverse-payment" options={reversibleOptions} value={reversePaymentId} onChange={setReversePaymentId} placeholder="Select payment" allowEmpty /></div>
-          <div><Label htmlFor="reverse-amount">Reversal amount</Label><Input id="reverse-amount" type="number" min="0" step="0.01" value={reverseAmount} onChange={(event) => setReverseAmount(event.target.value)} /></div>
-          <div><Label htmlFor="reverse-reason">Reason</Label><Input id="reverse-reason" value={reverseReason} onChange={(event) => setReverseReason(event.target.value)} /></div>
+      <Modal
+        isOpen={showAddPlan}
+        onClose={() => !saving && setShowAddPlan(false)}
+        ariaLabel="Add Payment Plan"
+        className="relative w-full max-w-2xl p-6"
+      >
+        <div className="space-y-5">
+          <div className="pr-12">
+            <h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Add Plan</h3>
+            <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>Add one expected customer payment milestone. You can record the payment directly from the plan row afterward.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div><Label htmlFor="requirement-name">Plan name</Label><Input id="requirement-name" value={requirementName} onChange={(event) => setRequirementName(event.target.value)} /></div>
+            <div><Label htmlFor="requirement-amount">Amount</Label><Input id="requirement-amount" type="number" min="0" step="0.01" value={requirementAmount} onChange={(event) => setRequirementAmount(event.target.value)} /></div>
+            <div><Label htmlFor="requirement-currency">Currency</Label><Input id="requirement-currency" value={requirementCurrency} maxLength={3} onChange={(event) => setRequirementCurrency(event.target.value.toUpperCase())} /></div>
+            <div><Label htmlFor="requirement-due">Due date</Label><Input id="requirement-due" type="date" value={requirementDueDate} onChange={(event) => setRequirementDueDate(event.target.value)} /></div>
+          </div>
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button variant="outline" disabled={saving} onClick={() => setShowAddPlan(false)}>Cancel</Button>
+            <Button
+              disabled={saving || !requirementName.trim() || Number(requirementAmount) <= 0 || requirementCurrency.trim().length !== 3}
+              onClick={() => void handleCreatePlan()}
+            >
+              {saving ? "Adding…" : "Add Plan"}
+            </Button>
+          </div>
         </div>
-        <div className="flex justify-end">
-          <Button variant="outline" disabled={saving || !reversePaymentId || Number(reverseAmount) <= 0 || !reverseReason.trim()} onClick={() => void runAction(async () => {
-            await reverseProjectPayment({ paymentId: reversePaymentId, amount: Number(reverseAmount), reason: reverseReason });
-            setReverseAmount("");
-            setReverseReason("");
-          }, "Payment reversal recorded.")}>Reverse Payment</Button>
-        </div>
-      </ComponentCard>
+      </Modal>
 
-      {canViewCostMargin ? <ProjectFinancialSummary projectId={projectId} /> : null}
+      <Modal
+        isOpen={Boolean(deletingRequirement)}
+        onClose={() => !saving && setDeletingRequirement(null)}
+        ariaLabel="Delete Payment Plan"
+        className="relative w-full max-w-xl p-6"
+      >
+        <div className="space-y-5">
+          <div className="pr-12">
+            <h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Delete Plan</h3>
+            <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>The plan will disappear from the live Project. Customer payments stay in Payment History and any released allocation becomes Project credit. A deletion audit snapshot is retained.</p>
+          </div>
+          {deletingRequirement ? (
+            <Alert
+              variant="warning"
+              title="Delete Payment Plan"
+              message={`${deletingRequirement.name} — ${money(deletingRequirement.amount, deletingRequirement.currencyCode)}. Applied cash: ${money(deletingRequirement.received, deletingRequirement.currencyCode)}.`}
+            />
+          ) : null}
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button variant="outline" disabled={saving} onClick={() => setDeletingRequirement(null)}>Cancel</Button>
+            <Button variant="danger" disabled={saving} onClick={() => void handleDeleteRequirement()}>
+              {saving ? "Deleting…" : "Delete Plan"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={Boolean(editingPayment)}
@@ -518,14 +543,14 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
         <div className="space-y-5">
           <div className="pr-12">
             <h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Edit Payment</h3>
-            <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>Metadata-only edits keep existing allocations. Changing amount or currency clears allocations and requires re-allocation.</p>
+            <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>Metadata-only edits keep existing allocations. Changing amount or currency releases allocations back to Project credit.</p>
           </div>
 
           {editingPayment && editChangesFinancials && editingPayment.allocated > 0 ? (
             <Alert
               variant="warning"
-              title="Allocations will be cleared"
-              message={`${money(editingPayment.allocated, editingPayment.currencyCode)} is currently allocated. Saving an amount or currency change will return that value to open requirements for re-allocation.`}
+              title="Allocations will be released"
+              message={`${money(editingPayment.allocated, editingPayment.currencyCode)} is currently applied to Payment Plans. Saving an amount or currency change will release it to Project credit.`}
             />
           ) : null}
 
@@ -559,14 +584,14 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
         <div className="space-y-5">
           <div className="pr-12">
             <h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Delete Payment</h3>
-            <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>The payment and all of its live milestone allocations will be permanently removed from the ledger. An immutable audit snapshot will remain.</p>
+            <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>The payment and all of its live Payment Plan allocations will be permanently removed. An immutable audit snapshot will remain.</p>
           </div>
 
           {deletingPayment ? (
             <Alert
               variant="warning"
               title="Hard delete"
-              message={`${displayDate(deletingPayment.transactionDate)} — ${money(deletingPayment.amount, deletingPayment.currencyCode)}. Currently allocated: ${money(deletingPayment.allocated, deletingPayment.currencyCode)}.`}
+              message={`${displayDate(deletingPayment.transactionDate)} — ${money(deletingPayment.amount, deletingPayment.currencyCode)}. Currently applied: ${money(deletingPayment.allocated, deletingPayment.currencyCode)}.`}
             />
           ) : null}
 
