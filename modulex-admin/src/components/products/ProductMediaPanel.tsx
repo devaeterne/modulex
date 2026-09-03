@@ -5,6 +5,10 @@ import ComponentCard from "@/components/common/ComponentCard";
 import FormHint from "@/components/form/FormHint";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
+import {
+  ADMIN_SURFACE_CARD,
+  ADMIN_TEXT_STYLES,
+} from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
 
 type ProductIdentity = {
@@ -143,29 +147,26 @@ export default function ProductMediaPanel({ productId }: ProductMediaPanelProps)
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {media.map((item) => (
-              <article
-                key={item.id}
-                className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.02]"
-              >
-                <div className="aspect-square bg-gray-50 p-3 dark:bg-gray-900">
+              <article key={item.id} className={ADMIN_SURFACE_CARD}>
+                <div className="aspect-square p-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.url}
                     alt={item.alt_text || item.title || product?.name || "Product image"}
-                    className="h-full w-full rounded-lg object-contain"
+                    className="h-full w-full object-contain"
                     loading="lazy"
                   />
                 </div>
-                <div className="space-y-2 border-t border-gray-200 p-3 dark:border-gray-800">
+                <div className="space-y-2 border-t p-3">
                   <div className="flex flex-wrap items-center gap-2">
                     {item.is_primary ? <Badge color="success">Primary</Badge> : null}
                     <Badge color="light">#{item.sort_order + 1}</Badge>
                   </div>
-                  <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                  <p className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>
                     {item.title || item.alt_text || `Product image ${item.sort_order + 1}`}
                   </p>
                   {item.storage_bucket && item.storage_path ? (
-                    <p className="break-all text-xs text-gray-500 dark:text-gray-400">
+                    <p className={`break-all text-xs ${ADMIN_TEXT_STYLES.muted}`}>
                       {item.storage_bucket}/{item.storage_path}
                     </p>
                   ) : null}
