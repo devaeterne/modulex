@@ -101,8 +101,10 @@ assert(
   "Project detail must show truthful Project lifecycle activity from status history"
 );
 assert(
-  projectDetail.includes('text-gray-700 dark:text-gray-300'),
-  "Project detail summary text must remain readable in light and dark themes"
+  projectDetail.includes("ADMIN_TEXT_STYLES") &&
+    projectDetail.includes("ADMIN_TEXT_STYLES.body") &&
+    projectDetail.includes("ADMIN_TEXT_STYLES.strong"),
+  "Project detail summary and activity text must use shared light/dark Admin text tokens"
 );
 assert(
   projectDetail.includes('md:grid-cols-2 xl:grid-cols-5'),
