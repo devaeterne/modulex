@@ -69,6 +69,12 @@ export const ADMIN_STATUS_TONES = {
   },
 } as const;
 
+export const ADMIN_TEXT_STYLES = {
+  body: "text-gray-700 dark:text-gray-300",
+  strong: "text-gray-800 dark:text-white/90",
+  muted: "text-gray-500 dark:text-gray-400",
+} as const;
+
 export const ADMIN_DOCUMENT_STYLES = {
   viewer: "bg-gray-100 transition-colors dark:bg-gray-950 print:bg-white",
   toolbar: "rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900",

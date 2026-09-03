@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import SectionTitle from "@/components/common/SectionTitle";
 import SummaryRow from "@/components/common/SummaryRow";
@@ -8,11 +8,13 @@ import FormHint from "@/components/form/FormHint";
 import Label from "@/components/form/Label";
 import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
+import SearchableSelect from "@/components/form/SearchableSelect";
 import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
+import { parseDbDecimal } from "@/lib/validation";
 
 type Option = { value: string; label: string };
 type MaterialBandRow = {
@@ -50,6 +52,7 @@ type CountertopPriceResult = {
   edge_subtotal?: string | number;
   sink_subtotal?: string | number;
   services_subtotal?: string | number;
+  sink_price_source?: "price_group" | "manual_fallback" | null;
   attached?: boolean;
   order_item_id?: string;
 };
@@ -63,6 +66,7 @@ type ExistingConfiguration = {
   edge_linear_ft: string | number;
   slab_quantity: string | number;
   manual_price_per_sqft: string | number | null;
+  manual_sink_price: string | number | null;
   override_reason: string | null;
   configuration: unknown;
   pricing_snapshot: unknown;
@@ -74,6 +78,13 @@ type CountertopConfiguratorProps = {
   onAttached?: (orderItemId: string) => void;
   onClose?: () => void;
 };
+
+const MANUAL_SINK_PRICE_CONTRACT = {
+  precision: 18,
+  scale: 4,
+  min: 0.0001,
+  allowNull: true,
+} as const;
 
 function money(value: string | number | undefined) {
   const amount = Number(value ?? 0);
@@ -133,6 +144,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
   const [priceGroupId, setPriceGroupId] = useState("");
   const [edgeId, setEdgeId] = useState("");
   const [sinkId, setSinkId] = useState("");
+  const [manualSinkPrice, setManualSinkPrice] = useState("");
   const [sqft, setSqft] = useState("");
   const [edgeLinearFt, setEdgeLinearFt] = useState("0");
   const [slabQuantity, setSlabQuantity] = useState("1");
@@ -169,7 +181,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
           ? supabase.from("customer_orders").select("price_group_id").eq("id", contextOrderId).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
         orderItemId
-          ? supabase.from("countertop_configurations").select("stone_product_id,material_price_band_id,sink_product_id,price_group_id,sqft,edge_profile_id,edge_linear_ft,slab_quantity,manual_price_per_sqft,override_reason,configuration,pricing_snapshot").eq("order_item_id", orderItemId).maybeSingle()
+          ? supabase.from("countertop_configurations").select("stone_product_id,material_price_band_id,sink_product_id,price_group_id,sqft,edge_profile_id,edge_linear_ft,slab_quantity,manual_price_per_sqft,manual_sink_price,override_reason,configuration,pricing_snapshot").eq("order_item_id", orderItemId).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
       ]);
 
@@ -210,7 +222,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
 
       setTypes((typeResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
       setEdges((edgeResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
-      setSinks((sinkResult.data ?? []).map((row) => ({ value: row.id, label: `${row.name} (${row.sku})` })));
+      setSinks((sinkResult.data ?? []).map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name })));
       setPriceGroups((priceGroupResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
       setStones(mappedStones);
       setMaterialBands(mappedBands);
@@ -229,6 +241,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
         setEdgeId(existing.edge_profile_id ?? "");
         setEdgeLinearFt(String(existing.edge_linear_ft ?? 0));
         setSinkId(existing.sink_product_id ?? "");
+        setManualSinkPrice(existing.manual_sink_price === null ? "" : String(existing.manual_sink_price));
         setSlabQuantity(String(existing.slab_quantity ?? 1));
         setManualPrice(existing.manual_price_per_sqft === null ? "" : String(existing.manual_price_per_sqft));
         setOverrideReason(existing.override_reason ?? "");
@@ -241,7 +254,9 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
     return () => { mounted = false; };
   }, [orderId, orderItemId, orderContext?.lineNo]);
 
-  const filteredStones = useMemo(() => stones.filter((row) => !stoneTypeId || row.stone_type_id === stoneTypeId), [stones, stoneTypeId]);
+  const stoneOptions = stones
+    .filter((row) => !stoneTypeId || row.stone_type_id === stoneTypeId)
+    .map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name }));
   const selectedStone = stones.find((row) => row.id === stoneProductId);
   const selectedBand = materialBands.find((row) => row.id === materialBandId);
   const defaultBand = materialBands.find((row) => row.id === selectedStone?.material_price_band_id);
@@ -259,14 +274,29 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
     setServices((rows) => rows.map((row) => row.id === id ? { ...row, selected: !row.selected } : row));
   }
 
+  function parseManualSinkPrice() {
+    const parsed = parseDbDecimal(manualSinkPrice, MANUAL_SINK_PRICE_CONTRACT);
+    if (parsed.error) {
+      setError(`Manual Sink fallback: ${parsed.error}`);
+      return null;
+    }
+    if (!sinkId && parsed.value !== null) {
+      setError("Select a Sink before entering a manual Sink fallback price.");
+      return null;
+    }
+    return parsed.value;
+  }
+
   async function calculate() {
     setError(null);
     setResult(null);
     if (!priceGroupId) return setError("This order needs a saved price group before countertop pricing can be calculated.");
     if (!stoneProductId || Number(sqft) <= 0) return setError("Select a stone and enter square footage before calculating.");
     if (!materialBandId) return setError("Select a Material Price Band before calculating.");
+    const normalizedManualSinkPrice = parseManualSinkPrice();
+    if (normalizedManualSinkPrice === null && manualSinkPrice.trim()) return;
 
-    const { data, error: pricingError } = await supabase.rpc("calculate_countertop_price", {
+    const { data, error: pricingError } = await supabase.rpc("calculate_countertop_price_with_sink_fallback", {
       p_stone_product_id: stoneProductId,
       p_material_price_band_id: materialBandId,
       p_price_group_id: priceGroupId,
@@ -276,6 +306,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
       p_sink_product_id: sinkId || null,
       p_services: selectedServices(),
       p_manual_material_price: manualPrice || null,
+      p_manual_sink_price: normalizedManualSinkPrice,
     });
     if (pricingError) return setError(errorMessage(pricingError, "Unable to calculate countertop pricing."));
     setResult(data as CountertopPriceResult);
@@ -285,6 +316,8 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
     if (!result) return setError("Calculate countertop pricing before attaching.");
     if (!orderItemId && !orderId) return setError("Open a draft customer order to configure and attach a countertop.");
     if (!materialBandId) return setError("Select a Material Price Band before saving the countertop.");
+    const normalizedManualSinkPrice = parseManualSinkPrice();
+    if (normalizedManualSinkPrice === null && manualSinkPrice.trim()) return;
 
     setSaving(true);
     setError(null);
@@ -297,7 +330,12 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
       p_edge_linear_ft: edgeLinearFt || "0",
       p_sink_product_id: sinkId || null,
       p_services: selectedServices(),
-      p_configuration: { edge_profile_id: edgeId || null, material_price_band_id: materialBandId, service_selection: selectedServices() },
+      p_configuration: {
+        edge_profile_id: edgeId || null,
+        material_price_band_id: materialBandId,
+        service_selection: selectedServices(),
+        ...(normalizedManualSinkPrice === null ? {} : { manual_sink_price: normalizedManualSinkPrice }),
+      },
       p_manual_material_price: manualPrice || null,
       p_slab_quantity: slabQuantity,
       p_override_reason: overrideReason || null,
@@ -346,10 +384,11 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
               <Select options={types} value={stoneTypeId} placeholder="Select Stone Type" allowEmpty onChange={(value) => { setStoneTypeId(value); setStoneProductId(""); setMaterialBandId(""); setResult(null); }} />
             </Field>
             <Field label="Stone" required>
-              <Select
-                options={filteredStones.map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name }))}
+              <SearchableSelect
+                options={stoneOptions}
                 value={stoneProductId}
                 placeholder="Select Stone"
+                searchPlaceholder="Search stone by name or SKU"
                 onChange={(value) => {
                   const nextStone = stones.find((row) => row.id === value);
                   setStoneProductId(value);
@@ -381,7 +420,32 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
               <Input type="number" step="0.0001" min="0" value={edgeLinearFt} onChange={(event) => { setEdgeLinearFt(event.target.value); setResult(null); }} />
             </Field>
             <Field label="Sink (optional)">
-              <Select options={sinks} value={sinkId} placeholder="No sink" allowEmpty onChange={(value) => { setSinkId(value); setResult(null); }} />
+              <SearchableSelect
+                options={sinks}
+                value={sinkId}
+                placeholder="No sink"
+                searchPlaceholder="Search sink by name or SKU"
+                allowEmpty
+                onChange={(value) => {
+                  if (value !== sinkId) setManualSinkPrice("");
+                  setSinkId(value);
+                  setResult(null);
+                }}
+              />
+            </Field>
+            <Field
+              label="Manual sink price fallback (optional)"
+              hint="Used only when the selected Sink has no current active price for this order's price group. An active current Sink price always wins."
+            >
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="0.0001"
+                min="0.0001"
+                value={manualSinkPrice}
+                disabled={!sinkId}
+                onChange={(event) => { setManualSinkPrice(event.target.value); setResult(null); }}
+              />
             </Field>
             <Field label="Commercial price group" hint={hasOrderPricingContext ? "Inherited from the saved order." : "Select the pricing context for this countertop."}>
               <Select options={priceGroups} value={priceGroupId} onChange={(value) => { setPriceGroupId(value); setResult(null); }} disabled={hasOrderPricingContext} />
@@ -442,6 +506,7 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
               {result.stone?.material_price_band ? <Badge color="primary">{result.stone.material_price_band}</Badge> : null}
               {result.stone?.sqft !== undefined ? <Badge color="light">{Number(result.stone.sqft)} sq ft</Badge> : null}
               {result.stone?.price_per_sqft !== undefined ? <Badge color="success">{money(result.stone.price_per_sqft)} / sq ft</Badge> : null}
+              {result.sink_price_source === "manual_fallback" ? <Badge color="warning">Manual Sink fallback</Badge> : null}
             </div>
             <div className="grid gap-x-8 gap-y-1 md:grid-cols-2">
               <SummaryRow label="Material" value={money(result.material_subtotal)} />

@@ -1,7 +1,23 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableStateRow,
+  TableViewport,
+} from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -20,6 +36,16 @@ const ORDER_STATUSES: CustomerOrderStatus[] = [
   "completed",
   "cancelled",
 ];
+
+const statusOptions: Array<{ value: "all" | CustomerOrderStatus; label: string }> = [
+  { value: "all", label: "All Statuses" },
+  ...ORDER_STATUSES.map((value) => ({ value, label: titleCase(value) })),
+];
+
+const pageSizeOptions = PAGE_SIZE_OPTIONS.map((size) => ({
+  value: String(size),
+  label: `${size} / page`,
+}));
 
 type CustomerLookup = {
   id: string;
@@ -50,14 +76,16 @@ type OrderSummaryRow = {
   currency_code: string | null;
 };
 
+type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
+
 function money(value: string | number | null | undefined, currency = "USD") {
   const amount = Number(value ?? 0);
   try {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(
       Number.isFinite(amount) ? amount : 0
     );
   } catch {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+    return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(
       Number.isFinite(amount) ? amount : 0
     );
   }
@@ -65,19 +93,19 @@ function money(value: string | number | null | undefined, currency = "USD") {
 
 function date(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
 }
 
 function titleCase(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function badge(status: CustomerOrderStatus) {
-  if (status === "completed") return "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400";
-  if (status === "cancelled") return "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400";
-  if (["shipped", "delivered", "installation_scheduled", "installation_in_progress"].includes(status)) return "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400";
-  if (["confirmed", "in_preparation", "ready_for_shipment"].includes(status)) return "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400";
-  return "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400";
+function badgeColor(status: CustomerOrderStatus): BadgeColor {
+  if (status === "completed" || status === "delivered") return "success";
+  if (status === "cancelled") return "error";
+  if (["shipped", "installation_scheduled", "installation_in_progress"].includes(status)) return "info";
+  if (["confirmed", "in_preparation", "ready_for_shipment"].includes(status)) return "warning";
+  return "light";
 }
 
 function grandTotal(order: CustomerOrder) {
@@ -97,6 +125,7 @@ function parsePositiveInteger(value: string | null, fallback: number) {
 }
 
 export default function CustomerOrdersList({ customerId }: { customerId?: string }) {
+  const router = useRouter();
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerLookup | null>(null);
   const [orders, setOrders] = useState<OrderDirectoryRow[]>([]);
   const [canManage, setCanManage] = useState(false);
@@ -110,6 +139,7 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(50);
   const [filteredCount, setFilteredCount] = useState(0);
+  const [refreshToken, setRefreshToken] = useState(0);
   const [summary, setSummary] = useState<OrderSummary>({
     total: 0,
     open: 0,
@@ -123,6 +153,34 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
   const totalPages = Math.max(1, Math.ceil(filteredCount / pageSize));
   const startRow = filteredCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRow = Math.min(currentPage * pageSize, filteredCount);
+  const columnCount = selectedCustomer ? 6 : 7;
+  const totalValueLabel =
+    summary.currencyCount <= 1
+      ? money(summary.totalValue, summary.currencyCode || "USD")
+      : "Multiple currencies";
+
+  const headerActions = useMemo(() => {
+    if (!selectedCustomer) return undefined;
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push(`/customers/${selectedCustomer.id}`)}
+        >
+          Customer Card
+        </Button>
+        {canManage ? (
+          <Button
+            size="sm"
+            onClick={() => router.push(`/customers/${selectedCustomer.id}/orders/new`)}
+          >
+            New Order
+          </Button>
+        ) : null}
+      </div>
+    );
+  }, [canManage, router, selectedCustomer]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -202,6 +260,7 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
     async function initialize() {
       setIsLoading(true);
       setErrorMessage(null);
+      setAuthReady(false);
 
       const { profile, error: profileError } = await getCurrentProfile();
       if (cancelled) return;
@@ -242,12 +301,12 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
     return () => {
       cancelled = true;
     };
-  }, [customerId]);
+  }, [customerId, refreshToken]);
 
   useEffect(() => {
     if (!authReady) return;
     void loadSummary();
-  }, [authReady, loadSummary]);
+  }, [authReady, loadSummary, refreshToken]);
 
   useEffect(() => {
     if (!authReady || !urlReady) return;
@@ -263,7 +322,8 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
         .select("*", { count: "exact" });
 
       if (customerId) query = query.eq("customer_id", customerId);
-      if (status !== "all") query = query.eq("status", status);
+      if (status === "all") query = query.neq("status", "cancelled");
+      else query = query.eq("status", status);
 
       if (normalizedSearch) {
         const pattern = quotePostgrestValue(`%${debouncedSearch.trim()}%`);
@@ -309,157 +369,165 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
     status,
     normalizedSearch,
     debouncedSearch,
+    refreshToken,
   ]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  const totalValueLabel =
-    summary.currencyCount <= 1
-      ? money(summary.totalValue, summary.currencyCode || "USD")
-      : "Multiple currencies";
-
-  if (isLoading && !orders.length) {
-    return <Loading label="Loading orders..." />;
-  }
-  if (errorMessage && !orders.length) {
-    return <ErrorBox>{errorMessage}</ErrorBox>;
-  }
-
   return (
     <div className="space-y-5">
-      {errorMessage && <ErrorBox>{errorMessage}</ErrorBox>}
-
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-            {selectedCustomer ? `${selectedCustomer.name} Orders` : "Customer Orders"}
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {selectedCustomer
-              ? `${selectedCustomer.customer_code} • order history`
-              : "Review customer orders and fulfillment status."}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {selectedCustomer && (
-            <Link href={`/customers/${selectedCustomer.id}`} className="inline-flex h-10 items-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-transparent dark:text-gray-300 dark:hover:bg-white/[0.05]">
-              Customer Card
-            </Link>
-          )}
-          {selectedCustomer && canManage && (
-            <Link href={`/customers/${selectedCustomer.id}/orders/new`} className="inline-flex h-10 items-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
-              New Order
-            </Link>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Summary label="Orders" value={summary.total.toString()} />
-        <Summary label="Open" value={summary.open.toString()} />
-        <Summary label="Completed" value={summary.completed.toString()} />
-        <Summary label="Total Value" value={totalValueLabel} />
-      </div>
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="grid gap-3 border-b border-gray-200 p-4 md:grid-cols-[1fr_240px] dark:border-gray-800">
-          <input
-            value={searchQuery}
-            onChange={(event) => {
-              setSearchQuery(event.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search order, reference, payment or customer..."
-            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-          />
-          <select
-            value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as "all" | CustomerOrderStatus);
-              setCurrentPage(1);
-            }}
-            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+      {errorMessage ? (
+        <div className="space-y-3" role="alert">
+          <Alert variant="error" title="Orders could not be loaded" message={errorMessage} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRefreshToken((value) => value + 1)}
+            disabled={isLoading}
           >
-            <option value="all">All Statuses</option>
-            {ORDER_STATUSES.map((item) => <option key={item} value={item}>{titleCase(item)}</option>)}
-          </select>
+            Retry
+          </Button>
+        </div>
+      ) : null}
+
+      <ComponentCard
+        title={selectedCustomer ? `${selectedCustomer.name} Orders` : "Customer Orders"}
+        desc={
+          selectedCustomer
+            ? `${selectedCustomer.customer_code} • order history`
+            : "Review customer orders and fulfillment status."
+        }
+        headerAction={headerActions}
+      >
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <ComponentCard title="Orders"><p className="text-xl font-semibold">{summary.total}</p></ComponentCard>
+          <ComponentCard title="Open"><p className="text-xl font-semibold">{summary.open}</p></ComponentCard>
+          <ComponentCard title="Completed"><p className="text-xl font-semibold">{summary.completed}</p></ComponentCard>
+          <ComponentCard title="Total Value"><p className="text-xl font-semibold">{totalValueLabel}</p></ComponentCard>
+        </div>
+      </ComponentCard>
+
+      <ComponentCard
+        title="Order Directory"
+        desc={status === "all" ? "Cancelled Orders are hidden until the Cancelled status filter is selected." : "Review Orders matching the current filters."}
+      >
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px_160px]">
+          <div>
+            <Label htmlFor="order-search">Search</Label>
+            <Input
+              id="order-search"
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Order, reference, payment or customer"
+            />
+          </div>
+          <div>
+            <Label htmlFor="order-status">Status</Label>
+            <Select
+              id="order-status"
+              options={statusOptions}
+              value={status}
+              onChange={(value) => {
+                setStatus(value as "all" | CustomerOrderStatus);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+          <div>
+            <Label htmlFor="order-page-size">Rows</Label>
+            <Select
+              id="order-page-size"
+              options={pageSizeOptions}
+              value={String(pageSize)}
+              onChange={(value) => {
+                setPageSize(Number(value));
+                setCurrentPage(1);
+              }}
+            />
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/[0.02]">
-              <tr>
-                {["Order", ...(selectedCustomer ? [] : ["Customer"]), "Date", "Fulfillment", "Status", "Items", "Total"].map((label) => (
-                  <th key={label} className="px-5 py-3 text-left text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {orders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                  <td className="px-5 py-4">
-                    <Link href={`/customers/${order.customer_id}/orders/${order.id}`} className="text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400">
+        <TableViewport>
+          <Table variant="admin" minWidth="standard">
+            <TableHeader variant="admin">
+              <TableRow>
+                <TableCell isHeader variant="admin">Order</TableCell>
+                {!selectedCustomer ? <TableCell isHeader variant="admin">Customer</TableCell> : null}
+                <TableCell isHeader variant="admin">Date</TableCell>
+                <TableCell isHeader variant="admin">Fulfillment</TableCell>
+                <TableCell isHeader variant="admin">Status</TableCell>
+                <TableCell isHeader variant="admin">Items</TableCell>
+                <TableCell isHeader variant="admin">Total</TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody variant="admin">
+              {isLoading ? <TableStateRow colSpan={columnCount}>Loading orders…</TableStateRow> : null}
+              {!isLoading && orders.length === 0 ? <TableStateRow colSpan={columnCount}>No orders match the current filters.</TableStateRow> : null}
+              {!isLoading ? orders.map((order) => (
+                <TableRow key={order.id}>
+                  <TableCell variant="admin">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.push(`/customers/${order.customer_id}/orders/${order.id}`)}
+                    >
                       {order.order_number}
-                    </Link>
-                    <p className="mt-0.5 text-xs text-gray-400">{order.customer_reference || "No reference"}</p>
-                  </td>
-                  {!selectedCustomer && (
-                    <td className="px-5 py-4">
-                      <Link href={`/customers/${order.customer_id}`} className="text-sm font-medium text-gray-800 hover:text-brand-600 dark:text-white/90 dark:hover:text-brand-400">
+                    </Button>
+                    <p className="mt-1 text-xs">{order.customer_reference || "No reference"}</p>
+                  </TableCell>
+                  {!selectedCustomer ? (
+                    <TableCell variant="admin">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push(`/customers/${order.customer_id}`)}
+                      >
                         {order.customer_name}
-                      </Link>
-                      <p className="text-xs text-gray-400">{order.customer_code}</p>
-                    </td>
-                  )}
-                  <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{date(order.order_date)}</td>
-                  <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{titleCase(order.fulfillment_type || "delivery")}</td>
-                  <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${badge(order.status)}`}>{titleCase(order.status)}</span></td>
-                  <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">{order.item_count}</td>
-                  <td className="px-5 py-4 text-right text-sm font-semibold text-gray-800 dark:text-white/90">{money(grandTotal(order), order.currency_code)}</td>
-                </tr>
-              ))}
-              {orders.length === 0 && (
-                <tr><td colSpan={selectedCustomer ? 6 : 7} className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">No orders found.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </Button>
+                      <p className="mt-1 text-xs">{order.customer_code}</p>
+                    </TableCell>
+                  ) : null}
+                  <TableCell variant="admin">{date(order.order_date)}</TableCell>
+                  <TableCell variant="admin">{titleCase(order.fulfillment_type || "delivery")}</TableCell>
+                  <TableCell variant="admin"><Badge color={badgeColor(order.status)}>{titleCase(order.status)}</Badge></TableCell>
+                  <TableCell variant="admin">{order.item_count}</TableCell>
+                  <TableCell variant="admin" className="text-right font-semibold">{money(grandTotal(order), order.currency_code)}</TableCell>
+                </TableRow>
+              )) : null}
+            </TableBody>
+          </Table>
+        </TableViewport>
 
-        <div className="flex flex-col gap-3 border-t border-gray-100 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm" aria-live="polite">
             {filteredCount === 0 ? "0 orders" : `${startRow}–${endRow} of ${filteredCount} orders`}
           </p>
           <div className="flex items-center gap-2">
-            <select
-              value={pageSize}
-              onChange={(event) => {
-                setPageSize(Number(event.target.value));
-                setCurrentPage(1);
-              }}
-              className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage <= 1 || isLoading}
+              onClick={() => setCurrentPage((value) => Math.max(1, value - 1))}
             >
-              {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size} / page</option>)}
-            </select>
-            <button disabled={currentPage <= 1 || isLoading} onClick={() => setCurrentPage((value) => Math.max(1, value - 1))} className="h-9 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300">Previous</button>
-            <span className="min-w-[75px] text-center text-xs text-gray-500 dark:text-gray-400">{currentPage} / {totalPages}</span>
-            <button disabled={currentPage >= totalPages || isLoading} onClick={() => setCurrentPage((value) => Math.min(totalPages, value + 1))} className="h-9 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300">Next</button>
+              Previous
+            </Button>
+            <span className="min-w-[75px] text-center text-sm">{currentPage} / {totalPages}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage >= totalPages || isLoading}
+              onClick={() => setCurrentPage((value) => Math.min(totalPages, value + 1))}
+            >
+              Next
+            </Button>
           </div>
         </div>
-      </div>
+      </ComponentCard>
     </div>
   );
-}
-
-function Summary({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]"><p className="text-xs text-gray-500 dark:text-gray-400">{label}</p><p className="mt-1 text-xl font-semibold text-gray-800 dark:text-white/90">{value}</p></div>;
-}
-
-function Loading({ label }: { label: string }) {
-  return <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"><div className="text-center"><div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" /><p className="text-sm text-gray-500 dark:text-gray-400">{label}</p></div></div>;
-}
-
-function ErrorBox({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-2xl border border-error-200 bg-error-50 p-6 text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{children}</div>;
 }

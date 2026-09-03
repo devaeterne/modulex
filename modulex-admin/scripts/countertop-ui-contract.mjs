@@ -30,5 +30,9 @@ assert(!configurator.includes('<h3 className="text-sm font-semibold">Additional 
 assert(!configurator.includes('<span>{orderContext.lineNo ? `Line ${orderContext.lineNo}` : "New countertop"}</span>'), "Countertop order context must not rely on inherited text color");
 assert(!configurator.includes('<span className="text-sm font-semibold">{result.stone?.name ?? selectedStone?.name ?? "Selected stone"}</span>'), "Countertop price summary Stone label must not rely on inherited text color");
 assert(configurator.includes('Badge color="light"'), "Countertop contextual labels must use semantic shared Badge tones");
+assert(configurator.includes('import SearchableSelect from "@/components/form/SearchableSelect"'), "Countertop Stone/Sink selection must use the shared searchable dropdown primitive");
+assert((configurator.match(/<SearchableSelect/g) ?? []).length >= 2, "Countertop Stone and Sink fields must both render searchable dropdowns");
+assert(!configurator.includes('ariaLabel="Search stone by name or SKU"'), "Stone search must live inside its dropdown instead of as a separate field");
+assert(!configurator.includes('ariaLabel="Search sink by name or SKU"'), "Sink search must live inside its dropdown instead of as a separate field");
 
 console.log("Countertop shared UI contract: PASS");

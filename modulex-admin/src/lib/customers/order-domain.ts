@@ -241,6 +241,29 @@ function mapOrderProducts(rows: ProductQueryRow[]): OrderDomainProduct[] {
   }));
 }
 
+async function loadOrderProducts(includeInactive = false): Promise<OrderDomainProduct[]> {
+  const bulkProductsResult = includeInactive
+    ? await supabase.from("products").select(PRODUCT_COLUMNS).in("status", ["active", "inactive"]).order("sku")
+    : await supabase.from("products").select(PRODUCT_COLUMNS).eq("status", "active").order("sku");
+  if (bulkProductsResult.error) throw bulkProductsResult.error;
+
+  const serviceProductResult = await supabase
+    .from("products")
+    .select(PRODUCT_COLUMNS)
+    .eq("status", "active")
+    .eq("sku", "SERVICE")
+    .maybeSingle();
+  if (serviceProductResult.error) throw serviceProductResult.error;
+
+  const rows = [...((bulkProductsResult.data ?? []) as unknown as ProductQueryRow[])];
+  const serviceProduct = serviceProductResult.data as unknown as ProductQueryRow | null;
+  if (serviceProduct && !rows.some((product) => product.id === serviceProduct.id)) {
+    rows.push(serviceProduct);
+  }
+
+  return mapOrderProducts(rows);
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -390,16 +413,16 @@ export async function loadCustomerOrderRevisionPolicy(customerId: string, orderI
 export async function loadCreateOrderContext(customerId: string): Promise<CreateOrderContext> {
   await requireEditorProfile("create");
 
-  const [customerResult, addressesResult, groupsResult, methodsResult, productsResult, taxRulesResult] = await Promise.all([
+  const [customerResult, addressesResult, groupsResult, methodsResult, products, taxRulesResult] = await Promise.all([
     supabase.from("customers").select("*").eq("id", customerId).single(),
     supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("address_name"),
     supabase.from("price_groups").select(PRICE_GROUP_COLUMNS).eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
     supabase.from("payment_methods").select(PAYMENT_METHOD_COLUMNS).eq("is_active", true).order("sort_order"),
-    supabase.from("products").select(PRODUCT_COLUMNS).eq("status", "active").order("sku"),
+    loadOrderProducts(),
     supabase.from("order_tax_rules").select("fulfillment_type, tax_rate, is_active"),
   ]);
 
-  const firstError = customerResult.error || addressesResult.error || groupsResult.error || methodsResult.error || productsResult.error || taxRulesResult.error;
+  const firstError = customerResult.error || addressesResult.error || groupsResult.error || methodsResult.error || taxRulesResult.error;
   if (firstError) throw firstError;
 
   return {
@@ -407,7 +430,7 @@ export async function loadCreateOrderContext(customerId: string): Promise<Create
     addresses: (addressesResult.data ?? []) as CustomerAddress[],
     priceGroups: (groupsResult.data ?? []) as PriceGroupLookup[],
     paymentMethods: (methodsResult.data ?? []) as PaymentMethod[],
-    products: mapOrderProducts((productsResult.data ?? []) as unknown as ProductQueryRow[]),
+    products,
     taxRules: (taxRulesResult.data ?? []) as OrderTaxRule[],
   };
 }
@@ -415,18 +438,18 @@ export async function loadCreateOrderContext(customerId: string): Promise<Create
 export async function loadEditOrderContext(customerId: string, orderId: string): Promise<EditOrderContext> {
   const profile = await requireEditorProfile("edit");
 
-  const [customerResult, orderResult, itemsResult, addressesResult, groupsResult, methodsResult, productsResult, taxRulesResult] = await Promise.all([
+  const [customerResult, orderResult, itemsResult, addressesResult, groupsResult, methodsResult, products, taxRulesResult] = await Promise.all([
     supabase.from("customers").select("*").eq("id", customerId).single(),
     supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
     supabase.from("customer_order_items").select("*").eq("order_id", orderId).order("line_no"),
     supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("address_name"),
     supabase.from("price_groups").select(PRICE_GROUP_COLUMNS).eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
     supabase.from("payment_methods").select(PAYMENT_METHOD_COLUMNS).eq("is_active", true).order("sort_order"),
-    supabase.from("products").select(PRODUCT_COLUMNS).in("status", ["active", "inactive"]).order("sku"),
+    loadOrderProducts(true),
     supabase.from("order_tax_rules").select("fulfillment_type, tax_rate, is_active"),
   ]);
 
-  const firstError = customerResult.error || orderResult.error || itemsResult.error || addressesResult.error || groupsResult.error || methodsResult.error || productsResult.error || taxRulesResult.error;
+  const firstError = customerResult.error || orderResult.error || itemsResult.error || addressesResult.error || groupsResult.error || methodsResult.error || taxRulesResult.error;
   if (firstError) throw firstError;
 
   const itemRows = (itemsResult.data ?? []) as CustomerOrderItem[];
@@ -440,7 +463,7 @@ export async function loadEditOrderContext(customerId: string, orderId: string):
     addresses: (addressesResult.data ?? []) as CustomerAddress[],
     priceGroups: (groupsResult.data ?? []) as PriceGroupLookup[],
     paymentMethods: (methodsResult.data ?? []) as PaymentMethod[],
-    products: mapOrderProducts((productsResult.data ?? []) as unknown as ProductQueryRow[]),
+    products,
     taxRules: (taxRulesResult.data ?? []) as OrderTaxRule[],
     role: profile.role,
   };

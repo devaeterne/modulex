@@ -1,0 +1,31 @@
+name: Admin Project Base
+
+on:
+  pull_request:
+    paths:
+      - "modulex-admin/**"
+      - "modulex-store/supabase/migrations/**"
+      - ".github/workflows/admin-project-base.yml"
+      - "docs/PROJECT_BASE_PLAN.md"
+  workflow_dispatch:
+
+jobs:
+  project-base-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: Project Base contract
+        run: node scripts/project-base-contract.mjs
+      - name: Project Progress layout contract
+        run: node scripts/project-progress-layout-contract.mjs
+      - name: Countertop Sink fallback contract
+        run: node scripts/countertop-sink-fallback-contract.mjs

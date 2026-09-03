@@ -23,6 +23,7 @@ for (const token of [
   "ADMIN_SURFACE_POPOVER",
   "ADMIN_SURFACE_MODAL",
   "ADMIN_STATUS_TONES",
+  "ADMIN_TEXT_STYLES",
 ]) {
   expect(theme.includes(`export const ${token}`), `Shared Admin theme must export ${token}`);
 }
@@ -31,6 +32,10 @@ expect(theme.includes("focus-visible:"), "Shared Admin theme tokens must own key
 expect(
   /ADMIN_BUTTON_VARIANTS\s*=\s*\{[\s\S]*?danger:[\s\S]*?ghost:/m.test(theme),
   "Shared button tokens must expose danger and ghost semantic variants",
+);
+expect(
+  /ADMIN_TEXT_STYLES\s*=\s*\{[\s\S]*?body:[\s\S]*?strong:[\s\S]*?muted:/m.test(theme),
+  "Shared Admin text tokens must expose body, strong, and muted theme-aware text roles",
 );
 
 const button = read("src/components/ui/button/Button.tsx");
