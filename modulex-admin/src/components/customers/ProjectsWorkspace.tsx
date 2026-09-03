@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
@@ -30,6 +30,7 @@ import { getCurrentProfile } from "@/lib/supabase/profile";
 
 type CustomerOption = { id: string; name: string; sales_rep_id: string | null };
 type ProfileOption = { id: string; full_name: string | null; email: string | null; role: string; is_active: boolean };
+type ProjectReferenceData = { customers: CustomerOption[]; profiles: ProfileOption[] };
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 
@@ -66,6 +67,7 @@ function displayDate(value: string | null) {
 
 export default function ProjectsWorkspace() {
   const router = useRouter();
+  const reloadRequestId = useRef(0);
   const [projects, setProjects] = useState<CustomerProject[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
@@ -93,49 +95,52 @@ export default function ProjectsWorkspace() {
   const startRow = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRow = Math.min(currentPage * pageSize, totalCount);
 
-  const loadReferenceData = useCallback(async () => {
+  const loadReferenceData = useCallback(async (): Promise<ProjectReferenceData> => {
     const [customersResult, profilesResult] = await Promise.all([
       supabase.from("customers").select("id, name, sales_rep_id").order("name"),
       supabase.from("profiles").select("id, full_name, email, role, is_active").eq("is_active", true).order("full_name"),
     ]);
     const firstError = customersResult.error || profilesResult.error;
     if (firstError) throw firstError;
-    setCustomers((customersResult.data ?? []) as CustomerOption[]);
-    setProfiles((profilesResult.data ?? []) as ProfileOption[]);
+    return {
+      customers: (customersResult.data ?? []) as CustomerOption[],
+      profiles: (profilesResult.data ?? []) as ProfileOption[],
+    };
   }, []);
 
-  const loadProjects = useCallback(async () => {
-    const result = await listCustomerProjects({
-      search: search || null,
-      status: status === "all" ? null : status,
-      limit: pageSize,
-      offset: (currentPage - 1) * pageSize,
-    });
-    setProjects(result.items);
-    setTotalCount(result.total_count);
-  }, [currentPage, pageSize, search, status]);
+  const loadProjects = useCallback(() => listCustomerProjects({
+    search: search || null,
+    status: status === "all" ? null : status,
+    limit: pageSize,
+    offset: (currentPage - 1) * pageSize,
+  }), [currentPage, pageSize, search, status]);
 
   const reload = useCallback(async () => {
+    const requestId = ++reloadRequestId.current;
     setLoading(true);
     setError(null);
     try {
       const { profile, error: profileError } = await getCurrentProfile();
+      if (requestId !== reloadRequestId.current) return;
       if (profileError) throw profileError;
 
       const nextCanManageProjects = Boolean(profile && hasPermission(profile.roles, "projects.manage"));
-      setCanManageProjects(nextCanManageProjects);
+      const [projectResult, referenceData] = await Promise.all([
+        loadProjects(),
+        nextCanManageProjects ? loadReferenceData() : Promise.resolve<ProjectReferenceData | null>(null),
+      ]);
+      if (requestId !== reloadRequestId.current) return;
 
-      await loadProjects();
-      if (nextCanManageProjects) {
-        await loadReferenceData();
-      } else {
-        setCustomers([]);
-        setProfiles([]);
-      }
+      setCanManageProjects(nextCanManageProjects);
+      setProjects(projectResult.items);
+      setTotalCount(projectResult.total_count);
+      setCustomers(referenceData?.customers ?? []);
+      setProfiles(referenceData?.profiles ?? []);
     } catch (loadError) {
+      if (requestId !== reloadRequestId.current) return;
       setError(loadError instanceof Error ? loadError.message : "Projects could not be loaded.");
     } finally {
-      setLoading(false);
+      if (requestId === reloadRequestId.current) setLoading(false);
     }
   }, [loadProjects, loadReferenceData]);
 
@@ -176,7 +181,6 @@ export default function ProjectsWorkspace() {
       setName("");
       setTargetDate("");
       setMessage("Project created.");
-      await loadProjects();
       router.push(`/projects/${projectId}`);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Project could not be created.");
