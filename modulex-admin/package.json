@@ -42,7 +42,7 @@
     "smoke:product-master-v2": "node scripts/product-master-v2-contract.mjs",
     "smoke:a3-2-store-product-publishing": "node scripts/a3-2-store-product-publishing-contract.mjs",
     "smoke:a3-3-pricing": "node scripts/a3-3-pricing-contract.mjs",
-    "smoke:countertop-domain": "node scripts/countertop-domain-contract.mjs",
+    "smoke:countertop-domain": "node scripts/countertop-domain-contract.mjs && node scripts/stone-profile-rls-contract.mjs",
     "smoke:secondary-cms-admin": "node scripts/secondary-cms-admin-contract.mjs",
     "smoke:requests-admin": "node scripts/requests-admin-contract.mjs",
     "smoke:request-center-ui": "node scripts/request-center-ui-contract.mjs",
