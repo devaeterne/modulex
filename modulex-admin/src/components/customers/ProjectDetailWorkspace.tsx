@@ -31,6 +31,7 @@ import {
 
 type StandaloneOrder = { id: string; order_number: string; status: string; order_date: string; grand_total: number | string };
 type ProfileOption = { id: string; full_name: string | null; email: string | null; role: string; is_active: boolean };
+type ProjectActivityActor = { full_name: string | null; email: string | null };
 type ProjectStatusHistory = {
   id: string;
   from_status: ProjectStatus | null;
@@ -38,7 +39,7 @@ type ProjectStatusHistory = {
   note: string | null;
   changed_by: string | null;
   created_at: string;
-  actor: { full_name: string | null; email: string | null } | null;
+  actor: ProjectActivityActor | ProjectActivityActor[] | null;
 };
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
 
@@ -95,7 +96,8 @@ function describeProjectActivity(entry: ProjectStatusHistory) {
 
 function projectActivityActor(entry: ProjectStatusHistory) {
   if (!entry.changed_by) return "System";
-  return entry.actor?.full_name || entry.actor?.email || "Modulex user";
+  const actor = Array.isArray(entry.actor) ? entry.actor[0] : entry.actor;
+  return actor?.full_name || actor?.email || "Modulex user";
 }
 
 function money(value: string | number, currency: string) {
