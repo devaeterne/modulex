@@ -22,6 +22,8 @@ type SearchableSelectProps = {
   noResultsText?: string;
   allowEmpty?: boolean;
   onChange: (value: string) => void;
+  onSearchChange?: (query: string) => void;
+  loading?: boolean;
   disabled?: boolean;
   required?: boolean;
   error?: boolean;
@@ -37,6 +39,8 @@ export default function SearchableSelect({
   noResultsText = "No matching options.",
   allowEmpty = false,
   onChange,
+  onSearchChange,
+  loading = false,
   disabled = false,
   required = false,
   error = false,
@@ -51,15 +55,23 @@ export default function SearchableSelect({
 
   const selected = options.find((option) => option.value === value);
   const filteredOptions = useMemo(() => {
+    if (onSearchChange) return options;
     const normalized = query.trim().toLowerCase();
     if (!normalized) return options;
     return options.filter((option) => option.label.toLowerCase().includes(normalized));
-  }, [options, query]);
+  }, [onSearchChange, options, query]);
 
   useEffect(() => {
     if (!isOpen) return;
     searchRef.current?.focus();
-  }, [isOpen]);
+    if (onSearchChange) onSearchChange("");
+  }, [isOpen, onSearchChange]);
+
+  useEffect(() => {
+    if (!isOpen || !onSearchChange) return;
+    const timeout = window.setTimeout(() => onSearchChange(query), 250);
+    return () => window.clearTimeout(timeout);
+  }, [isOpen, onSearchChange, query]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -163,7 +175,8 @@ export default function SearchableSelect({
                 {placeholder}
               </button>
             ) : null}
-            {filteredOptions.map((option) => {
+            {loading ? <p className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">Loading options…</p> : null}
+            {!loading ? filteredOptions.map((option) => {
               const isSelected = option.value === value;
               return (
                 <button
@@ -177,8 +190,8 @@ export default function SearchableSelect({
                   {option.label}
                 </button>
               );
-            })}
-            {filteredOptions.length === 0 ? (
+            }) : null}
+            {!loading && filteredOptions.length === 0 ? (
               <p className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">{noResultsText}</p>
             ) : null}
           </div>
