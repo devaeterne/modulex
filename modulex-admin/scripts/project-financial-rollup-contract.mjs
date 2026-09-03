@@ -18,6 +18,7 @@ function read(relativePath) {
 }
 
 const migration = read("../modulex-store/supabase/migrations/20260903150000_project_financial_rollup.sql");
+const runtimeFix = read("../modulex-store/supabase/migrations/20260903151500_project_financial_rollup_runtime_fix.sql");
 const domain = read("src/lib/customers/project-financial.ts");
 const summaryUi = read("src/components/customers/ProjectFinancialSummary.tsx");
 const detailUi = read("src/components/customers/ProjectDetailWorkspace.tsx");
@@ -27,8 +28,21 @@ assert(
   "PB-2 must expose one canonical Project financial summary RPC"
 );
 assert(
-  /security\s+definer/i.test(migration) && migration.includes("set search_path"),
-  "Project financial RPC must use a pinned SECURITY DEFINER boundary"
+  migration.includes("private.get_customer_project_financial_summary") && /security\s+definer/i.test(migration),
+  "PB-2 privileged implementation must live in private schema behind SECURITY DEFINER"
+);
+assert(
+  /create\s+or\s+replace\s+function\s+public\.get_customer_project_financial_summary[\s\S]*?language\s+sql[\s\S]*?set\s+search_path\s*=\s*pg_catalog,\s*private/i.test(migration),
+  "PB-2 public RPC must be a SECURITY INVOKER SQL wrapper over the private implementation"
+);
+assert(
+  !/create\s+or\s+replace\s+function\s+public\.get_customer_project_financial_summary[\s\S]{0,300}?security\s+definer/i.test(migration),
+  "PB-2 public RPC must not be SECURITY DEFINER because authenticated browser EXECUTE would trigger the exposed-definer advisor"
+);
+assert(
+  runtimeFix.includes("private.get_customer_project_financial_summary") &&
+    runtimeFix.includes("select private.get_customer_project_financial_summary($1)"),
+  "PB-2 production runtime fix must preserve the private-definer/public-invoker boundary"
 );
 assert(
   migration.includes("super_admin") && migration.includes("admin") && migration.includes("finance"),
