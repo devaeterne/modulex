@@ -25,5 +25,7 @@ jobs:
       - run: npm ci
       - name: Project Base contract
         run: node scripts/project-base-contract.mjs
+      - name: Project Progress layout contract
+        run: node scripts/project-progress-layout-contract.mjs
       - name: Countertop Sink fallback contract
         run: node scripts/countertop-sink-fallback-contract.mjs
