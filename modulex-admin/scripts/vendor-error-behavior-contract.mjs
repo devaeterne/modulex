@@ -26,4 +26,6 @@ assert.equal(unknownErrorMessage(postgrestError, "fallback"), postgrestError.mes
 assert.deepEqual(serializeUnknownError(postgrestError), postgrestError);
 assert.equal(unknownErrorMessage({}, "fallback"), "fallback");
 
+await import("./stone-profile-rls-contract.mjs");
+
 console.log("vendor structured error behavior contract: ok");
