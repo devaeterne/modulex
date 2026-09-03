@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
+import ProjectFinancialSummary from "@/components/customers/ProjectFinancialSummary";
 import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
@@ -119,6 +120,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [canManageOrders, setCanManageOrders] = useState(false);
   const [canManageProjects, setCanManageProjects] = useState(false);
+  const [canViewProjectFinancials, setCanViewProjectFinancials] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
@@ -174,6 +176,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       if (activityResult.error) throw activityResult.error;
 
       const nextCanManageProjects = Boolean(profile && hasPermission(profile.roles, "projects.manage"));
+      const nextCanViewProjectFinancials = Boolean(profile && hasPermission(profile.roles, "pricing.cost.view"));
       let nextProfiles: ProfileOption[] = [];
       if (nextCanManageProjects) {
         const profilesResult = await supabase
@@ -188,6 +191,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       setProject(nextProject);
       setCanManageOrders(Boolean(profile && hasPermission(profile.roles, "orders.manage")));
       setCanManageProjects(nextCanManageProjects);
+      setCanViewProjectFinancials(nextCanViewProjectFinancials);
       setStandaloneOrders((ordersResult.data ?? []) as StandaloneOrder[]);
       setProjectActivity((activityResult.data ?? []) as ProjectStatusHistory[]);
       setProjectProfiles(nextProfiles);
@@ -299,6 +303,8 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       </ComponentCard>
 
       <ProjectProgressSummary project={project} projectActivity={projectActivity} />
+
+      {canViewProjectFinancials ? <ProjectFinancialSummary projectId={project.id} /> : null}
 
       {canManageProjects ? (
         <ComponentCard title="Project Settings" desc="Update Project ownership, lifecycle status, and schedule without changing the Customer account.">
