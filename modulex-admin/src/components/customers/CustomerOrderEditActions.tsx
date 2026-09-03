@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { ADMIN_BUTTON_VARIANTS, ADMIN_FOCUS_RING } from "@/components/ui/theme/adminTheme";
+import { useParams, useRouter } from "next/navigation";
+import Button from "@/components/ui/button/Button";
 import {
   loadCustomerOrderRevisionPolicy,
   type CustomerOrderRevisionPolicy,
@@ -11,6 +10,7 @@ import {
 
 export default function CustomerOrderEditActions() {
   const params = useParams<{ id: string; orderId: string }>();
+  const router = useRouter();
   const [policy, setPolicy] = useState<CustomerOrderRevisionPolicy | null>(null);
 
   useEffect(() => {
@@ -32,12 +32,13 @@ export default function CustomerOrderEditActions() {
   if (!policy?.canEdit) return null;
 
   return (
-    <Link
-      href={`/customers/${params.id}/orders/${params.orderId}/edit`}
+    <Button
+      variant="outline"
+      size="sm"
       title={policy.reason}
-      className={`inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-medium transition ${ADMIN_BUTTON_VARIANTS.outline} ${ADMIN_FOCUS_RING}`}
+      onClick={() => router.push(`/customers/${params.id}/orders/${params.orderId}/edit`)}
     >
       Edit Order
-    </Link>
+    </Button>
   );
 }
