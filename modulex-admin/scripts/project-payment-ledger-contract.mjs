@@ -58,6 +58,8 @@ for (const forbidden of ["amount", "paid_amount", "balance", "cost", "margin", "
 for (const tab of ["Overview", "Orders", "Finance", "Procurement", "Fulfillment", "Documents", "Activity"]) assert(projectDetail.includes(`"${tab}"`), `Project detail must expose ${tab} tab`);
 assert(projectDetail.includes('role="tablist"'), "Project detail tabs must expose tablist semantics");
 assert(projectDetail.includes('role="tab"'), "Project detail tabs must expose tab semantics");
+assert(projectDetail.includes("useSearchParams") && projectDetail.includes('searchParams.get("tab")'), "Project detail must honor ?tab= deep links from related workflows");
+assert(invoiceDetail.includes("?tab=Finance"), "Ledger-managed Invoice must deep-link directly to Project Finance");
 assert(financeTab.includes("loadProjectPaymentStatus"), "Project Finance must support Sales-safe payment status");
 assert(financeTab.includes("loadProjectPaymentLedger"), "Project Finance must support Admin/Finance ledger detail");
 assert(financeTab.includes("ProjectFinancialSummary"), "Project Finance must preserve PB-2 profitability separately");
