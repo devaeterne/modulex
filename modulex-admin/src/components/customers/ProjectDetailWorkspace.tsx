@@ -269,20 +269,20 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         desc={project.customer_name}
         headerAction={<Badge color={badgeColor(project.status)}>{statusLabel(project.status)}</Badge>}
       >
-        <div className="grid gap-4 text-sm md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 text-sm text-gray-700 dark:text-gray-300 md:grid-cols-2 lg:grid-cols-4">
           <p><strong>Sales Rep:</strong> {project.sales_rep_name || "—"}</p>
           <p><strong>Start:</strong> {displayDate(project.start_date)}</p>
           <p><strong>Target:</strong> {displayDate(project.target_date)}</p>
           <p><strong>Orders:</strong> {activeOrders.length}</p>
         </div>
         {project.project_address_snapshot ? (
-          <p className="text-sm"><strong>Project site:</strong> {String(project.project_address_snapshot.address_line_1 ?? "")} {String(project.project_address_snapshot.city ?? "")}</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Project site:</strong> {String(project.project_address_snapshot.address_line_1 ?? "")} {String(project.project_address_snapshot.city ?? "")}</p>
         ) : null}
       </ComponentCard>
 
       {canManageProjects ? (
         <ComponentCard title="Project Settings" desc="Update Project ownership, lifecycle status, and schedule without changing the Customer account.">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div>
               <Label htmlFor="project-detail-name">Project name</Label>
               <Input id="project-detail-name" value={editName} onChange={(event) => setEditName(event.target.value)} />
