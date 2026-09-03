@@ -108,6 +108,14 @@ assert(
   projectDetail.includes('md:grid-cols-2 xl:grid-cols-5'),
   "Project Settings should use the available wide-screen space without leaving an empty third column"
 );
+assert(
+  projectDetail.includes("describeProjectActivity") &&
+    projectDetail.includes("changed_by") &&
+    projectDetail.includes("customer_project_status_history_changed_by_fkey") &&
+    projectDetail.includes('variant="admin">Activity</TableCell>') &&
+    projectDetail.includes('variant="admin">By</TableCell>'),
+  "Project activity must explain what changed and identify the actor when available"
+);
 
 assert(
   customerOrdersList.includes('if (status === "all") query = query.neq("status", "cancelled")'),
