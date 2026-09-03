@@ -32,6 +32,6 @@ assert.doesNotMatch(migration, /security definer/i);
 // Stone Type profile (for example STONE -> Marble), which is what Countertop
 // filters on when choosing a Stone Type.
 assert.match(stoneApproval, /stone_type_id:\s*item\.stone_type_id/);
-assert.match(configurator, /\.eq\("stone_type_id",\s*stoneTypeId\)/);
+assert.match(configurator, /\.filter\(\(row\)\s*=>\s*!stoneTypeId\s*\|\|\s*row\.stone_type_id\s*===\s*stoneTypeId\)/);
 
 console.log("stone profile RLS contract: ok");
