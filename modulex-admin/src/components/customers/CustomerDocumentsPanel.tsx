@@ -1,15 +1,19 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import FormHint from "@/components/form/FormHint";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import Label from "@/components/form/Label";
+import Alert from "@/components/ui/alert/Alert";
+import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { loadCustomerDocuments } from "@/lib/customers/read-dedup";
 import type { CustomerDocument } from "@/lib/customers/types";
 
 const bucket = "customer-documents";
-const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs transition focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const buttonClass = "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
-
 function safeFileName(name: string) {
   const cleaned = name.trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-");
   return cleaned || "document";
@@ -119,58 +123,49 @@ export default function CustomerDocumentsPanel({ customerId }: { customerId: str
   }
 
   return (
-    <section className="mb-5 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Customer Documents</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Files are stored in the private customer-documents bucket. Dealer visibility must be enabled explicitly by an Admin.
-        </p>
-      </div>
-
-      {error ? <div className="mb-4 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{error}</div> : null}
-      {message ? <div className="mb-4 rounded-lg border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">{message}</div> : null}
+    <div className="mb-5">
+    <ComponentCard title="Customer Documents" desc="Files are stored in the private customer-documents bucket. Dealer visibility must be enabled explicitly by an Admin.">
+      {error ? <Alert variant="error" title="Document action failed" message={error} /> : null}
+      {message ? <Alert variant="success" title="Documents updated" message={message} /> : null}
 
       {canUpload ? (
-        <form onSubmit={uploadDocument} className="mb-6 grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02] md:grid-cols-2">
+        <form onSubmit={uploadDocument} className="mb-6 grid gap-3 md:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="customer-document-file">File</label>
-            <input id="customer-document-file" type="file" required disabled={busy} onChange={(event) => setFile(event.target.files?.[0] ?? null)} className={inputClass} />
+            <Label htmlFor="customer-document-file">File</Label>
+            <Input id="customer-document-file" type="file" required disabled={busy} onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="customer-document-type">Document type</label>
-            <input id="customer-document-type" value={documentType} disabled={busy} onChange={(event) => setDocumentType(event.target.value)} className={inputClass} placeholder="Specification, agreement, drawing…" />
+            <Label htmlFor="customer-document-type">Document type</Label>
+            <Input id="customer-document-type" value={documentType} disabled={busy} onChange={(event) => setDocumentType(event.target.value)} placeholder="Specification, agreement, drawing…" />
           </div>
           <div className="md:col-span-2">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="customer-document-description">Description</label>
-            <input id="customer-document-description" value={description} disabled={busy} onChange={(event) => setDescription(event.target.value)} className={inputClass} />
+            <Label htmlFor="customer-document-description">Description</Label>
+            <Input id="customer-document-description" value={description} disabled={busy} onChange={(event) => setDescription(event.target.value)} />
           </div>
           <div className="md:col-span-2 flex justify-end">
-            <button type="submit" disabled={busy || !file} className={buttonClass}>{busy ? "Uploading…" : "Upload document"}</button>
+            <Button type="submit" disabled={busy || !file}>{busy ? "Uploading…" : "Upload document"}</Button>
           </div>
         </form>
       ) : null}
 
       <div className="space-y-3">
-        {documents.length === 0 ? <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700">No active documents.</div> : documents.map((item) => (
-          <div key={item.id} className="flex flex-col gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-800 md:flex-row md:items-center md:justify-between">
+        {documents.length === 0 ? <Alert variant="info" title="No documents" message="No active documents." /> : documents.map((item) => (
+          <div key={item.id} className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="font-medium text-gray-800 dark:text-white/90">{item.file_name}</p>
-              <p className="mt-1 text-xs text-gray-500">{item.document_type || "Document"}{item.description ? ` · ${item.description}` : ""}</p>
-              <p className="mt-1 text-xs text-gray-400">Dealer Portal: {item.portal_visible ? "Visible" : "Hidden"}</p>
+              <p className="font-medium">{item.file_name}</p>
+              <FormHint>{item.document_type || "Document"}{item.description ? ` · ${item.description}` : ""}</FormHint>
+              <FormHint>Dealer Portal: {item.portal_visible ? "Visible" : "Hidden"}</FormHint>
             </div>
-            <label className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-              <input
-                type="checkbox"
+            <Checkbox
+                label="Visible to Dealer Portal"
                 checked={item.portal_visible}
                 disabled={!canManagePortal || busy}
-                onChange={(event) => void setPortalVisibility(item.id, event.target.checked)}
-                className="h-4 w-4 accent-brand-500"
+                onChange={(checked) => void setPortalVisibility(item.id, checked)}
               />
-              Visible to Dealer Portal
-            </label>
           </div>
         ))}
       </div>
-    </section>
+    </ComponentCard>
+    </div>
   );
 }

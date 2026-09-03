@@ -15,6 +15,7 @@ Current Admin next action: **Review/merge Vendor Catalog availability/bulk appro
 
 ## Admin UI standardization program
 
+- [~] Migrate the five legacy Customer feature components to canonical shared Admin primitives without changing customer/order queries, authorization, mutations, routes, or data-loading behavior; local strict and regression verification is complete, with production deployment/acceptance still pending.
 - [x] Standardize the production Dashboard with shared TailAdmin cards, alerts, buttons, and admin table primitives without changing KPI/RPC, retry, or role-filtering behavior.
   - `smoke:dashboard-ui` is wired into the normal Admin smoke chain; Dashboard UI, Admin UI, production-surface, RBAC, TypeScript, lint, production build, and diff-check passed locally.
 

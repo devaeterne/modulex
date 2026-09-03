@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { loadCustomerRecord } from "@/lib/customers/read-dedup";
 import type { CustomerPortalUser } from "@/lib/customers/types";
-
-const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const primaryButtonClass = "inline-flex h-9 items-center justify-center rounded-lg bg-brand-500 px-3 text-xs font-medium text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
-const secondaryButtonClass = "inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300";
-const dangerButtonClass = "inline-flex h-9 items-center justify-center rounded-lg border border-error-200 bg-error-50 px-3 text-xs font-medium text-error-700 transition hover:bg-error-100 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400";
 
 function titleCase(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
@@ -103,62 +106,47 @@ export default function CustomerPortalAccessCard({ customerId }: { customerId: s
   if (loading || !canManage) return null;
 
   return (
-    <section className="rounded-2xl border border-brand-200 bg-white p-5 shadow-theme-xs dark:border-brand-500/30 dark:bg-gray-900 sm:p-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">Secure lifecycle</p>
-          <h2 className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">Store Portal Access</h2>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Invitation, activation and suspension are controlled by the Admin server. Status cannot be promoted manually.</p>
-        </div>
-        <button
-          type="button"
+    <ComponentCard
+      title="Store Portal Access"
+      desc="Invitation, activation and suspension are controlled by the Admin server. Status cannot be promoted manually."
+      headerAction={<Button
+          variant={portalEnabled ? "danger" : "primary"}
+          size="sm"
           disabled={busyId !== null}
           onClick={() => void action(portalEnabled ? "disable_portal" : "enable_portal")}
-          className={portalEnabled ? dangerButtonClass : primaryButtonClass}
         >
           {portalEnabled ? "Disable Portal" : "Enable Portal"}
-        </button>
-      </div>
-
-      {error && <div className="mt-4 rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700">{error}</div>}
-      {message && <div className="mt-4 rounded-lg border border-success-200 bg-success-50 px-3 py-2 text-sm text-success-700">{message}</div>}
+        </Button>}
+    >
+      <span className="sr-only">Store Portal Access</span>
+      {error ? <Alert variant="error" title="Portal action failed" message={error} /> : null}
+      {message ? <Alert variant="success" title="Portal updated" message={message} /> : null}
 
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
         {users.map((user) => (
-          <div key={user.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-gray-800 dark:text-white/90">{user.full_name || user.login_email}</h3>
-                  {user.is_primary && <span className="rounded-full bg-brand-50 px-2 py-1 text-xs text-brand-700">Primary</span>}
-                </div>
-                <p className="mt-1 text-sm text-gray-500">{user.login_email}</p>
-                <p className="mt-2 text-xs text-gray-400">{titleCase(user.portal_role)} · {titleCase(user.status)}</p>
-              </div>
-              <div className="flex flex-wrap justify-end gap-2">
-                {user.status === "never_invited" && <button className={primaryButtonClass} disabled={!portalEnabled || busyId !== null} onClick={() => void action("invite", user.id)}>Invite</button>}
-                {user.status === "invited" && <button className={secondaryButtonClass} disabled={!portalEnabled || busyId !== null} onClick={() => void action("resend_invite", user.id)}>Resend Invite</button>}
-                {user.status !== "suspended" && user.status !== "never_invited" && <button className={dangerButtonClass} disabled={busyId !== null} onClick={() => void action("suspend", user.id)}>Suspend</button>}
-                {user.status === "suspended" && <button className={secondaryButtonClass} disabled={busyId !== null} onClick={() => void action("restore", user.id)}>Restore</button>}
-                {!user.is_primary && <button className={secondaryButtonClass} disabled={busyId !== null} onClick={() => void action("set_primary", user.id)}>Set Primary</button>}
-                {user.status === "never_invited" && !user.auth_user_id && <button className={dangerButtonClass} disabled={busyId !== null} onClick={() => void removeDraft(user.id)}>Remove Draft</button>}
-              </div>
+          <ComponentCard key={user.id} title={user.full_name || user.login_email} desc={`${user.login_email} · ${titleCase(user.portal_role)} · ${titleCase(user.status)}`} headerAction={user.is_primary ? <Badge color="primary">Primary</Badge> : undefined}>
+            <div className="flex flex-wrap justify-end gap-2">
+              {user.status === "never_invited" ? <Button size="sm" disabled={!portalEnabled || busyId !== null} onClick={() => void action("invite", user.id)}>Invite</Button> : null}
+              {user.status === "invited" ? <Button size="sm" variant="outline" disabled={!portalEnabled || busyId !== null} onClick={() => void action("resend_invite", user.id)}>Resend Invite</Button> : null}
+              {user.status !== "suspended" && user.status !== "never_invited" ? <Button size="sm" variant="danger" disabled={busyId !== null} onClick={() => void action("suspend", user.id)}>Suspend</Button> : null}
+              {user.status === "suspended" ? <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void action("restore", user.id)}>Restore</Button> : null}
+              {!user.is_primary ? <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void action("set_primary", user.id)}>Set Primary</Button> : null}
+              {user.status === "never_invited" && !user.auth_user_id ? <Button size="sm" variant="danger" disabled={busyId !== null} onClick={() => void removeDraft(user.id)}>Remove Draft</Button> : null}
             </div>
-          </div>
+          </ComponentCard>
         ))}
-        {!users.length && <div className="rounded-xl border border-dashed border-gray-300 p-5 text-sm text-gray-500 dark:border-gray-700">No dealer portal users yet.</div>}
+        {!users.length ? <Alert variant="info" title="No portal users" message="No dealer portal users yet." /> : null}
       </div>
 
-      <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-        <h3 className="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Create Portal User</h3>
+      <ComponentCard title="Create Portal User">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Full Name<input className={`${inputClass} mt-1`} value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} /></label>
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Login Email<input className={`${inputClass} mt-1`} type="email" value={form.login_email} onChange={(event) => setForm({ ...form, login_email: event.target.value })} /></label>
-          <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Portal Role<select className={`${inputClass} mt-1`} value={form.portal_role} onChange={(event) => setForm({ ...form, portal_role: event.target.value as "admin" | "buyer" | "viewer" })}><option value="admin">Admin</option><option value="buyer">Buyer</option><option value="viewer">Viewer</option></select></label>
-          <label className="flex items-center gap-2 pt-6 text-sm text-gray-600 dark:text-gray-300"><input type="checkbox" checked={form.is_primary} onChange={(event) => setForm({ ...form, is_primary: event.target.checked })} />Primary portal user</label>
+          <div><Label>Full Name</Label><Input value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} /></div>
+          <div><Label>Login Email</Label><Input type="email" value={form.login_email} onChange={(event) => setForm({ ...form, login_email: event.target.value })} /></div>
+          <div><Label>Portal Role</Label><Select options={[{ value: "admin", label: "Admin" }, { value: "buyer", label: "Buyer" }, { value: "viewer", label: "Viewer" }]} value={form.portal_role} onChange={(value) => setForm({ ...form, portal_role: value as "admin" | "buyer" | "viewer" })} /></div>
+          <div className="pt-6"><Checkbox label="Primary portal user" checked={form.is_primary} onChange={(is_primary) => setForm({ ...form, is_primary })} /></div>
         </div>
-        <div className="mt-4 flex justify-end"><button type="button" className={primaryButtonClass} disabled={busyId !== null} onClick={() => void createUser()}>{busyId === "create" ? "Creating…" : "Create Portal User"}</button></div>
-      </div>
-    </section>
+        <div className="mt-4 flex justify-end"><Button disabled={busyId !== null} onClick={() => void createUser()}>{busyId === "create" ? "Creating…" : "Create Portal User"}</Button></div>
+      </ComponentCard>
+    </ComponentCard>
   );
 }
