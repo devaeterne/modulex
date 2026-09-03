@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
-import ProjectFinancialSummary from "@/components/customers/ProjectFinancialSummary";
 import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
+import ProjectFinanceTab from "@/components/customers/project-detail/ProjectFinanceTab";
+import ProjectPendingDomainTab from "@/components/customers/project-detail/ProjectPendingDomainTab";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
 import Input from "@/components/form/input/InputField";
@@ -44,6 +45,9 @@ type ProjectStatusHistory = {
   actor: ProjectActivityActor | ProjectActivityActor[] | null;
 };
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
+
+const PROJECT_TABS = ["Overview", "Orders", "Finance", "Procurement", "Fulfillment", "Documents", "Activity"] as const;
+type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const projectStatusOptions: Array<{ value: ProjectStatus; label: string }> = [
   { value: "draft", label: "Draft" },
@@ -113,6 +117,7 @@ function money(value: string | number, currency: string) {
 
 export default function ProjectDetailWorkspace({ projectId }: { projectId: string }) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<ProjectTab>("Overview");
   const [project, setProject] = useState<CustomerProject | null>(null);
   const [standaloneOrders, setStandaloneOrders] = useState<StandaloneOrder[]>([]);
   const [projectActivity, setProjectActivity] = useState<ProjectStatusHistory[]>([]);
@@ -121,6 +126,8 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   const [canManageOrders, setCanManageOrders] = useState(false);
   const [canManageProjects, setCanManageProjects] = useState(false);
   const [canViewProjectFinancials, setCanViewProjectFinancials] = useState(false);
+  const [canViewProjectPayments, setCanViewProjectPayments] = useState(false);
+  const [canManageProjectPayments, setCanManageProjectPayments] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
@@ -192,6 +199,8 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       setCanManageOrders(Boolean(profile && hasPermission(profile.roles, "orders.manage")));
       setCanManageProjects(nextCanManageProjects);
       setCanViewProjectFinancials(nextCanViewProjectFinancials);
+      setCanViewProjectPayments(Boolean(profile && hasPermission(profile.roles, "project_payments.view")));
+      setCanManageProjectPayments(Boolean(profile && hasPermission(profile.roles, "project_payments.manage")));
       setStandaloneOrders((ordersResult.data ?? []) as StandaloneOrder[]);
       setProjectActivity((activityResult.data ?? []) as ProjectStatusHistory[]);
       setProjectProfiles(nextProfiles);
@@ -302,126 +311,188 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         ) : null}
       </ComponentCard>
 
-      <ProjectProgressSummary project={project} projectActivity={projectActivity} />
+      <div className="overflow-x-auto border-b border-gray-200 dark:border-gray-800" role="tablist" aria-label="Project workspace sections">
+        <div className="flex min-w-max gap-1">
+          {PROJECT_TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              onClick={() => setActiveTab(tab)}
+              className={`border-b-2 px-4 py-3 text-sm font-medium transition ${
+                activeTab === tab
+                  ? "border-gray-900 text-gray-900 dark:border-white dark:text-white"
+                  : "border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {canViewProjectFinancials ? <ProjectFinancialSummary projectId={project.id} /> : null}
+      {activeTab === "Overview" ? (
+        <div className="space-y-6">
+          <ProjectProgressSummary project={project} projectActivity={projectActivity} />
 
-      {canManageProjects ? (
-        <ComponentCard title="Project Settings" desc="Update Project ownership, lifecycle status, and schedule without changing the Customer account.">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <div>
-              <Label htmlFor="project-detail-name">Project name</Label>
-              <Input id="project-detail-name" value={editName} onChange={(event) => setEditName(event.target.value)} />
+          {canManageProjects ? (
+            <ComponentCard title="Project Settings" desc="Update Project ownership, lifecycle status, and schedule without changing the Customer account.">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div>
+                  <Label htmlFor="project-detail-name">Project name</Label>
+                  <Input id="project-detail-name" value={editName} onChange={(event) => setEditName(event.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor="project-detail-sales-rep">Sales Rep</Label>
+                  <Select id="project-detail-sales-rep" options={salesRepOptions} value={editSalesRepId} onChange={setEditSalesRepId} placeholder="No sales rep" allowEmpty />
+                </div>
+                <div>
+                  <Label htmlFor="project-detail-status">Status</Label>
+                  <Select id="project-detail-status" options={projectStatusOptions} value={editStatus} onChange={(value) => setEditStatus(value as ProjectStatus)} />
+                </div>
+                <div>
+                  <Label htmlFor="project-detail-start-date">Start date</Label>
+                  <Input id="project-detail-start-date" type="date" value={editStartDate} onChange={(event) => setEditStartDate(event.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor="project-detail-target-date">Target date</Label>
+                  <Input id="project-detail-target-date" type="date" value={editTargetDate} onChange={(event) => setEditTargetDate(event.target.value)} />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={saveProject} disabled={savingProject || loading}>{savingProject ? "Saving…" : "Save Project"}</Button>
+              </div>
+            </ComponentCard>
+          ) : null}
+        </div>
+      ) : null}
+
+      {activeTab === "Orders" ? (
+        <ComponentCard
+          title="Orders"
+          desc="Cancelled Orders stay out of the active Project workspace and remain available from the Customer Orders cancelled filter."
+          headerAction={canManageOrders ? (
+            <Button size="sm" onClick={() => router.push(`/customers/${project.customer_id}/orders/new?projectId=${project.id}`)}>
+              New Order
+            </Button>
+          ) : undefined}
+        >
+          <TableViewport>
+            <Table variant="admin" minWidth="standard">
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell isHeader variant="admin">Order</TableCell>
+                  <TableCell isHeader variant="admin">Date</TableCell>
+                  <TableCell isHeader variant="admin">Status</TableCell>
+                  <TableCell isHeader variant="admin">Items</TableCell>
+                  <TableCell isHeader variant="admin">Total</TableCell>
+                  <TableCell isHeader variant="admin">Action</TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody variant="admin">
+                {loading ? <TableStateRow colSpan={6}>Refreshing Orders…</TableStateRow> : null}
+                {!loading && activeOrders.length === 0 ? <TableStateRow colSpan={6}>No active Orders are linked to this Project yet.</TableStateRow> : null}
+                {!loading ? activeOrders.map((order) => (
+                  <TableRow key={order.id}>
+                    <TableCell variant="admin"><span className="font-medium">{order.order_number}</span></TableCell>
+                    <TableCell variant="admin">{displayDate(order.order_date)}</TableCell>
+                    <TableCell variant="admin"><Badge color={orderBadgeColor(order.status)}>{statusLabel(order.status)}</Badge></TableCell>
+                    <TableCell variant="admin">{order.item_count}</TableCell>
+                    <TableCell variant="admin">{money(order.grand_total, order.currency_code)}</TableCell>
+                    <TableCell variant="admin">
+                      <Button variant="outline" size="sm" onClick={() => router.push(`/customers/${project.customer_id}/orders/${order.id}`)}>Open Order</Button>
+                    </TableCell>
+                  </TableRow>
+                )) : null}
+              </TableBody>
+            </Table>
+          </TableViewport>
+
+          {canManageOrders ? (
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+              <div>
+                <Label htmlFor="standalone-order">Link existing customer Order</Label>
+                <Select id="standalone-order" options={orderOptions} value={selectedOrderId} onChange={setSelectedOrderId} placeholder="Select standalone Order" allowEmpty />
+              </div>
+              <Button onClick={assignOrder} disabled={!selectedOrderId || saving}>{saving ? "Linking…" : "Link Order"}</Button>
             </div>
-            <div>
-              <Label htmlFor="project-detail-sales-rep">Sales Rep</Label>
-              <Select id="project-detail-sales-rep" options={salesRepOptions} value={editSalesRepId} onChange={setEditSalesRepId} placeholder="No sales rep" allowEmpty />
-            </div>
-            <div>
-              <Label htmlFor="project-detail-status">Status</Label>
-              <Select id="project-detail-status" options={projectStatusOptions} value={editStatus} onChange={(value) => setEditStatus(value as ProjectStatus)} />
-            </div>
-            <div>
-              <Label htmlFor="project-detail-start-date">Start date</Label>
-              <Input id="project-detail-start-date" type="date" value={editStartDate} onChange={(event) => setEditStartDate(event.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="project-detail-target-date">Target date</Label>
-              <Input id="project-detail-target-date" type="date" value={editTargetDate} onChange={(event) => setEditTargetDate(event.target.value)} />
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button onClick={saveProject} disabled={savingProject || loading}>{savingProject ? "Saving…" : "Save Project"}</Button>
-          </div>
+          ) : null}
         </ComponentCard>
       ) : null}
 
-      <ComponentCard
-        title="Orders"
-        desc="Cancelled Orders stay out of the active Project workspace and remain available from the Customer Orders cancelled filter."
-        headerAction={canManageOrders ? (
-          <Button size="sm" onClick={() => router.push(`/customers/${project.customer_id}/orders/new?projectId=${project.id}`)}>
-            New Order
-          </Button>
-        ) : undefined}
-      >
-        <TableViewport>
-          <Table variant="admin" minWidth="standard">
-            <TableHeader variant="admin">
-              <TableRow>
-                <TableCell isHeader variant="admin">Order</TableCell>
-                <TableCell isHeader variant="admin">Date</TableCell>
-                <TableCell isHeader variant="admin">Status</TableCell>
-                <TableCell isHeader variant="admin">Items</TableCell>
-                <TableCell isHeader variant="admin">Total</TableCell>
-                <TableCell isHeader variant="admin">Action</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody variant="admin">
-              {loading ? <TableStateRow colSpan={6}>Refreshing Orders…</TableStateRow> : null}
-              {!loading && activeOrders.length === 0 ? <TableStateRow colSpan={6}>No active Orders are linked to this Project yet.</TableStateRow> : null}
-              {!loading ? activeOrders.map((order) => (
-                <TableRow key={order.id}>
-                  <TableCell variant="admin"><span className="font-medium">{order.order_number}</span></TableCell>
-                  <TableCell variant="admin">{displayDate(order.order_date)}</TableCell>
-                  <TableCell variant="admin"><Badge color={orderBadgeColor(order.status)}>{statusLabel(order.status)}</Badge></TableCell>
-                  <TableCell variant="admin">{order.item_count}</TableCell>
-                  <TableCell variant="admin">{money(order.grand_total, order.currency_code)}</TableCell>
-                  <TableCell variant="admin">
-                    <Button variant="outline" size="sm" onClick={() => router.push(`/customers/${project.customer_id}/orders/${order.id}`)}>Open Order</Button>
-                  </TableCell>
+      {activeTab === "Finance" ? (
+        canViewProjectPayments ? (
+          <ProjectFinanceTab
+            projectId={project.id}
+            canManageProjectPayments={canManageProjectPayments}
+            canViewCostMargin={canViewProjectFinancials}
+          />
+        ) : (
+          <Alert variant="warning" title="Finance access restricted" message="You do not have permission to view Project customer collection status." />
+        )
+      ) : null}
+
+      {activeTab === "Procurement" ? (
+        <ProjectPendingDomainTab
+          title="Procurement"
+          description="Vendor order, expected delivery and purchase-price tracking will be connected in PB-3B without inventing placeholder procurement records."
+        />
+      ) : null}
+
+      {activeTab === "Fulfillment" ? (
+        <div className="space-y-6">
+          <ProjectProgressSummary project={project} projectActivity={projectActivity} />
+          <ComponentCard title="Fulfillment" desc="Shipment and Installation remain canonical domains while this tab aggregates their Project progress.">
+            <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Detailed procurement blockers and fulfillment rollups will be added in PB-5 without replacing existing Shipment or Installation records.</p>
+          </ComponentCard>
+        </div>
+      ) : null}
+
+      {activeTab === "Documents" ? (
+        <ProjectPendingDomainTab
+          title="Documents"
+          description="The Project document index will reuse existing Modulex storage/document contracts after they are mapped; no duplicate storage system is created here."
+        />
+      ) : null}
+
+      {activeTab === "Activity" ? (
+        <ComponentCard title="Activity" desc="A readable Project lifecycle timeline, newest first.">
+          <TableViewport>
+            <Table variant="admin" minWidth="standard">
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell isHeader variant="admin">When</TableCell>
+                  <TableCell isHeader variant="admin">Activity</TableCell>
+                  <TableCell isHeader variant="admin">By</TableCell>
+                  <TableCell isHeader variant="admin">Note</TableCell>
                 </TableRow>
-              )) : null}
-            </TableBody>
-          </Table>
-        </TableViewport>
-
-        {canManageOrders ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <div>
-              <Label htmlFor="standalone-order">Link existing customer Order</Label>
-              <Select id="standalone-order" options={orderOptions} value={selectedOrderId} onChange={setSelectedOrderId} placeholder="Select standalone Order" allowEmpty />
-            </div>
-            <Button onClick={assignOrder} disabled={!selectedOrderId || saving}>{saving ? "Linking…" : "Link Order"}</Button>
-          </div>
-        ) : null}
-      </ComponentCard>
-
-      <ComponentCard title="Activity" desc="A readable Project lifecycle timeline, newest first.">
-        <TableViewport>
-          <Table variant="admin" minWidth="standard">
-            <TableHeader variant="admin">
-              <TableRow>
-                <TableCell isHeader variant="admin">When</TableCell>
-                <TableCell isHeader variant="admin">Activity</TableCell>
-                <TableCell isHeader variant="admin">By</TableCell>
-                <TableCell isHeader variant="admin">Note</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody variant="admin">
-              {loading ? <TableStateRow colSpan={4}>Refreshing Project activity…</TableStateRow> : null}
-              {!loading && projectActivity.length === 0 ? <TableStateRow colSpan={4}>No Project lifecycle activity has been recorded yet.</TableStateRow> : null}
-              {!loading ? projectActivity.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell variant="admin">{displayDateTime(entry.created_at)}</TableCell>
-                  <TableCell variant="admin">
-                    <div className="space-y-1">
-                      <p className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{describeProjectActivity(entry)}</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {entry.from_status ? <Badge color={badgeColor(entry.from_status)}>{statusLabel(entry.from_status)}</Badge> : <Badge color="light">Created</Badge>}
-                        <span aria-hidden="true">→</span>
-                        <Badge color={badgeColor(entry.to_status)}>{statusLabel(entry.to_status)}</Badge>
+              </TableHeader>
+              <TableBody variant="admin">
+                {loading ? <TableStateRow colSpan={4}>Refreshing Project activity…</TableStateRow> : null}
+                {!loading && projectActivity.length === 0 ? <TableStateRow colSpan={4}>No Project lifecycle activity has been recorded yet.</TableStateRow> : null}
+                {!loading ? projectActivity.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell variant="admin">{displayDateTime(entry.created_at)}</TableCell>
+                    <TableCell variant="admin">
+                      <div className="space-y-1">
+                        <p className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{describeProjectActivity(entry)}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {entry.from_status ? <Badge color={badgeColor(entry.from_status)}>{statusLabel(entry.from_status)}</Badge> : <Badge color="light">Created</Badge>}
+                          <span aria-hidden="true">→</span>
+                          <Badge color={badgeColor(entry.to_status)}>{statusLabel(entry.to_status)}</Badge>
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell variant="admin">{projectActivityActor(entry)}</TableCell>
-                  <TableCell variant="admin">{entry.note || "—"}</TableCell>
-                </TableRow>
-              )) : null}
-            </TableBody>
-          </Table>
-        </TableViewport>
-      </ComponentCard>
+                    </TableCell>
+                    <TableCell variant="admin">{projectActivityActor(entry)}</TableCell>
+                    <TableCell variant="admin">{entry.note || "—"}</TableCell>
+                  </TableRow>
+                )) : null}
+              </TableBody>
+            </Table>
+          </TableViewport>
+        </ComponentCard>
+      ) : null}
     </div>
   );
 }
