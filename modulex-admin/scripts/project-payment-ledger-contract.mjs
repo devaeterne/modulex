@@ -135,8 +135,26 @@ assert(
   "PB-3A must not fabricate historical payment transactions from existing invoice paid_amount"
 );
 assert(
+  migration.includes("voided_at") && migration.includes("voided_by") && migration.includes("void_reason"),
+  "PB-3A payment voids must retain explicit immutable audit metadata"
+);
+assert(
   hardening.includes("revoke") && hardening.includes("grant"),
   "PB-3A hardening migration must define explicit execute/table access boundaries"
 );
+for (const privateEntrypoint of [
+  "private.get_customer_project_payment_ledger(uuid)",
+  "private.get_customer_project_payment_status(uuid)",
+  "private.create_customer_project_payment_requirement(uuid, text, numeric, text, date, text, uuid)",
+  "private.record_customer_project_payment(uuid, numeric, text, date, uuid, text, text)",
+  "private.allocate_customer_project_payment(uuid, uuid, numeric)",
+  "private.reverse_customer_project_payment(uuid, numeric, text)",
+  "private.void_customer_project_payment(uuid, text)",
+]) {
+  assert(
+    hardening.includes(`grant execute on function ${privateEntrypoint} to authenticated, service_role;`),
+    `SECURITY INVOKER wrapper chain requires authenticated EXECUTE on ${privateEntrypoint}`
+  );
+}
 
 console.log("PASS: PB-3A Project payment ledger contract");
