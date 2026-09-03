@@ -33,7 +33,8 @@ const financeTab = read("src/components/customers/project-detail/ProjectFinanceT
 const migration = readRepo("modulex-store/supabase/migrations/20260903143000_customer_project_payment_ledger.sql");
 const hardening = readRepo("modulex-store/supabase/migrations/20260903143500_customer_project_payment_ledger_hardening.sql");
 const invoiceRoleGuard = readRepo("modulex-store/supabase/migrations/20260903144000_customer_project_payment_invoice_role_guard.sql");
-const allSql = `${migration}\n${hardening}\n${invoiceRoleGuard}`;
+const advisorCleanup = readRepo("modulex-store/supabase/migrations/20260903144500_customer_project_payment_advisor_cleanup.sql");
+const allSql = `${migration}\n${hardening}\n${invoiceRoleGuard}\n${advisorCleanup}`;
 const salesPermissions = permissions.match(/sales:\s*\[([\s\S]*?)\],\s*finance:/)?.[1] ?? "";
 const financePermissions = permissions.match(/finance:\s*\[([\s\S]*?)\],\s*hr:/)?.[1] ?? "";
 
@@ -84,5 +85,24 @@ for (const privateEntrypoint of [
   "private.reverse_customer_project_payment(uuid, numeric, text)",
   "private.void_customer_project_payment(uuid, text)",
 ]) assert(hardening.includes(`grant execute on function ${privateEntrypoint} to authenticated, service_role;`), `SECURITY INVOKER wrapper chain requires authenticated EXECUTE on ${privateEntrypoint}`);
+
+for (const indexName of [
+  "customer_project_payment_requirements_cancelled_by_idx",
+  "customer_project_payment_requirements_created_by_idx",
+  "customer_project_payment_requirements_updated_by_idx",
+  "customer_project_payment_transactions_payment_method_idx",
+  "customer_project_payment_transactions_created_by_idx",
+  "customer_project_payment_transactions_voided_by_idx",
+  "customer_project_payment_allocations_created_by_idx",
+]) assert(advisorCleanup.includes(indexName), `PB-3A advisor cleanup must add ${indexName}`);
+
+for (const tableName of [
+  "customer_project_payment_requirements",
+  "customer_project_payment_transactions",
+  "customer_project_payment_allocations",
+]) {
+  assert(advisorCleanup.includes(`on public.${tableName}`), `PB-3A advisor cleanup must define explicit deny RLS for ${tableName}`);
+}
+assert(advisorCleanup.includes("as restrictive") && advisorCleanup.includes("using (false)") && advisorCleanup.includes("with check (false)"), "PB-3A ledger tables must keep explicit deny-by-default RLS policies");
 
 console.log("PASS: PB-3A Project payment ledger contract");
