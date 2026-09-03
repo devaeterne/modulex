@@ -187,6 +187,16 @@ function msiField(text: string, label: string, nextLabels: string[]) {
   return text.match(new RegExp(`${escaped}\\s*:?(.*?)\\s*(?=${next ? `(?:${next})\\s*:?'?` : "$"})`, "i"))?.[1]?.trim() || null;
 }
 
+function msiPaginationProgress(html: string) {
+  const text = stripHtml(html);
+  const match = text.match(/\bShowing\s+(\d+)(?:\s*[-–—]\s*(\d+))?\s+of\s+(\d+)\b/i);
+  if (!match) return null;
+  const shown = Number(match[2] ?? match[1]);
+  const total = Number(match[3]);
+  if (!Number.isFinite(shown) || !Number.isFinite(total) || total < 0) return null;
+  return { shown, total };
+}
+
 function inferMsiMaterial(text: string, productUrl: string, categoryLabel?: string | null) {
   const explicit = text.match(/Material Type\s*:?[\s-]*(Glazed Porcelain|Porcelain|Quartzite|Granite|Marble|Travertine|Soapstone|Quartz)\b/i)?.[1];
   if (explicit) return explicit;
@@ -370,6 +380,8 @@ export class MsiStoneAdapter implements StoneVendorAdapter {
           (pathname) => isMsiProductPath(pathname, category.key)
         );
         for (const link of pageLinks) links.push({ url: link.url, categoryLabel: category.label });
+        const progress = msiPaginationProgress(html);
+        if (progress && progress.shown >= progress.total) break;
         const uniqueCount = new Set(links.map((item) => item.url)).size;
         if (uniqueCount === previousCount || pageLinks.length === 0) break;
         previousCount = uniqueCount;
