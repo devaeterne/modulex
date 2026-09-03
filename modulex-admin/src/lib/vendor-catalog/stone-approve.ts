@@ -1,8 +1,13 @@
 import "server-only";
 
 import { createVendorCatalogUserClient } from "@/lib/vendor-catalog/auth";
+import {
+  buildStoneProductDescription,
+  type StoneDataLike,
+} from "@/lib/vendor-catalog/stone-content";
 import { loadVendorCategoryMapping } from "@/lib/vendor-catalog/mappings";
 import { stoneVendorCatalogLabels } from "@/lib/vendor-catalog/stone-adapters";
+import { archiveStoneProductContent } from "@/lib/vendor-catalog/stone-media";
 import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
 type Authorization = { userId: string; accessToken: string };
@@ -21,8 +26,16 @@ type StoneItemRow = {
   variant_code: string | null;
   variant_label: string | null;
   stone_type_id: string | null;
-  stone_data: Record<string, unknown> | null;
+  stone_data: StoneDataLike | null;
   canonical_product_id: string | null;
+};
+
+type StoneCanonicalProduct = {
+  id: string;
+  sku: string;
+  base_product_code: string | null;
+  name: string;
+  description: string | null;
 };
 
 function normalizedCode(value: string, fallback: string) {
@@ -37,9 +50,31 @@ function normalizedCode(value: string, fallback: string) {
   return normalized || fallback;
 }
 
-function stoneSku(item: StoneItemRow) {
-  const identity = item.sku?.trim() || item.external_id;
-  return normalizedCode(`STONE-${item.vendor_code}-${identity}`, `STONE-${item.id.slice(0, 8)}`);
+async function stoneSku(item: StoneItemRow) {
+  const sourceSku = item.sku?.trim();
+  if (!sourceSku) {
+    return normalizedCode(
+      `STONE-${item.vendor_code}-${item.external_id}`,
+      `STONE-${item.id.slice(0, 8)}`
+    );
+  }
+
+  const { count: duplicateSourceSkuCount, error } = await supabaseAdmin
+    .from("vendor_catalog_items")
+    .select("id", { count: "exact", head: true })
+    .eq("catalog_domain", "stone")
+    .eq("vendor_code", item.vendor_code)
+    .eq("sku", sourceSku)
+    .neq("id", item.id);
+  if (error) throw error;
+
+  const identity = (duplicateSourceSkuCount ?? 0) > 0
+    ? `${sourceSku}-${item.variant_code?.trim() || item.external_id}`
+    : sourceSku;
+  return normalizedCode(
+    `STONE-${item.vendor_code}-${identity}`,
+    `STONE-${item.id.slice(0, 8)}`
+  );
 }
 
 function stringValue(value: unknown) {
@@ -99,7 +134,26 @@ async function loadStoneCategoryMapping(item: StoneItemRow) {
   return mapping;
 }
 
-async function loadOrCreateCanonicalProduct(item: StoneItemRow, authorization: Authorization) {
+async function backfillCanonicalDescription(
+  product: StoneCanonicalProduct,
+  description: string
+): Promise<StoneCanonicalProduct> {
+  if (product.description?.trim() || !description.trim()) return product;
+  const { data, error } = await supabaseAdmin
+    .from("products")
+    .update({ description })
+    .eq("id", product.id)
+    .select("id,sku,base_product_code,name,description")
+    .single();
+  if (error || !data) throw error ?? new Error("Stone product description backfill returned no row.");
+  return data as StoneCanonicalProduct;
+}
+
+async function loadOrCreateCanonicalProduct(
+  item: StoneItemRow,
+  authorization: Authorization,
+  description: string
+) {
   if (!item.stone_type_id) throw new Error("Stone type must be resolved before approval.");
 
   const mapping = await loadStoneCategoryMapping(item);
@@ -107,17 +161,17 @@ async function loadOrCreateCanonicalProduct(item: StoneItemRow, authorization: A
   if (item.canonical_product_id) {
     const { data, error } = await supabaseAdmin
       .from("products")
-      .select("id,sku,base_product_code")
+      .select("id,sku,base_product_code,name,description")
       .eq("id", item.canonical_product_id)
       .single();
     if (error || !data) throw error ?? new Error("Linked Stone product was not found.");
-    return data;
+    return backfillCanonicalDescription(data as StoneCanonicalProduct, description);
   }
 
-  const sku = stoneSku(item);
+  const sku = await stoneSku(item);
   const { data: existing, error: existingError } = await supabaseAdmin
     .from("products")
-    .select("id,sku,base_product_code,metadata")
+    .select("id,sku,base_product_code,name,description,metadata")
     .ilike("sku", sku)
     .maybeSingle();
   if (existingError) throw existingError;
@@ -126,7 +180,7 @@ async function loadOrCreateCanonicalProduct(item: StoneItemRow, authorization: A
     if (metadata.vendor_code !== item.vendor_code || metadata.vendor_external_id !== item.external_id) {
       throw new Error(`Stone SKU collision detected for ${sku}.`);
     }
-    return existing;
+    return backfillCanonicalDescription(existing as StoneCanonicalProduct, description);
   }
 
   const brand = await ensureBrand(item);
@@ -143,7 +197,7 @@ async function loadOrCreateCanonicalProduct(item: StoneItemRow, authorization: A
       sku,
       barcode: null,
       name: item.title,
-      description: item.description,
+      description,
       brand_id: brand.id,
       category_id: mapping.category.id,
       base_product_code: familyKey,
@@ -179,16 +233,23 @@ async function loadOrCreateCanonicalProduct(item: StoneItemRow, authorization: A
 
   const { data: created, error: createdError } = await supabaseAdmin
     .from("products")
-    .select("id,sku,base_product_code")
+    .select("id,sku,base_product_code,name,description")
     .eq("id", String(savedId))
     .single();
   if (createdError || !created) throw createdError ?? new Error("Created Stone product was not found.");
-  return created;
+  return created as StoneCanonicalProduct;
 }
 
 export async function approveStoneVendorCatalogItem(itemId: string, authorization: Authorization) {
   const item = await loadItem(itemId);
-  const product = await loadOrCreateCanonicalProduct(item, authorization);
+  const description = buildStoneProductDescription(item);
+  const product = await loadOrCreateCanonicalProduct(item, authorization, description);
+  const contentResult = await archiveStoneProductContent({
+    item,
+    product,
+    description,
+    userId: authorization.userId,
+  });
 
   const { error: itemUpdateError } = await supabaseAdmin
     .from("vendor_catalog_items")
@@ -203,8 +264,8 @@ export async function approveStoneVendorCatalogItem(itemId: string, authorizatio
 
   return {
     productId: product.id,
-    storeProductContentId: null,
-    archivedImageCount: 0,
+    storeProductContentId: contentResult.storeProductContentId,
+    archivedImageCount: contentResult.archivedImageCount,
     baseProductCode: product.base_product_code ?? product.sku ?? null,
   };
 }

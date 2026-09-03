@@ -93,7 +93,7 @@ assert.match(msiMarbleSystemsAdapters, /page\s*>\s*1/);
 assert.match(msiMarbleSystemsAdapters, /response\.status\s*===\s*404/);
 assert.match(msiMarbleSystemsAdapters, /response\.status\s*>=\s*500/);
 assert.doesNotMatch(msiMarbleSystemsAdapters, /vendorPriceReference/);
-assert.doesNotMatch(msiMarbleSystemsAdapters, /\.from\(["']inventory["']\)/);
+assert.doesNotMatch(msiMarbleSystemsAdapters, /\.from\("inventory"\)/);
 
 assert.match(sync, /catalog_domain:\s*"stone"/);
 assert.match(sync, /stone_type_id/);
@@ -116,7 +116,9 @@ assert.match(stoneApproval, /mapping\.uom\.code\s*!==\s*"SLAB"/);
 assert.doesNotMatch(stoneApproval, /category_id:\s*null/);
 assert.match(stoneApproval, /material_price_band_id:\s*null/);
 assert.match(stoneApproval, /review_status:\s*"APPROVED"/);
-assert.match(stoneApproval, /storeProductContentId:\s*null/);
+assert.match(stoneApproval, /archiveStoneProductContent/);
+assert.match(stoneApproval, /buildStoneProductDescription/);
+assert.doesNotMatch(stoneApproval, /storeProductContentId:\s*null/);
 assert.match(approval, /catalog_domain/);
 assert.match(approval, /approveStoneVendorCatalogItem/);
 

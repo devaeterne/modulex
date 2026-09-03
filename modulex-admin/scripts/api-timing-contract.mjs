@@ -108,13 +108,14 @@ const expectedInventory = [
   "src/app/api/vendor-catalog/category-mappings/route.ts",
   "src/app/api/vendor-catalog/check/route.ts",
   "src/app/api/vendor-catalog/items/[itemId]/approve/route.ts",
+  "src/app/api/vendor-catalog/stone/backfill-approved/route.ts",
   "src/app/api/vendor-catalog/stone/sync/route.ts",
   "src/app/api/vendor-catalog/stone/vendors/route.ts",
   "src/app/api/vendor-catalog/sync/route.ts",
   "src/app/api/vendor-catalog/vendors/route.ts",
 ].sort();
 
-assert.equal(routeInventory.length, 17, `Expected 17 API route files, found ${routeInventory.length}`);
+assert.equal(routeInventory.length, 18, `Expected 18 API route files, found ${routeInventory.length}`);
 assert.deepEqual(routeInventory, expectedInventory, "API route inventory changed; review timing coverage");
 
 const uninstrumented = [];
