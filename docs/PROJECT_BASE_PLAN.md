@@ -1,13 +1,17 @@
 # Modulex Project Base — Implementation Plan
 
 Last reviewed: 2026-09-03
-Branch: `project-base`
-Draft PR: `#267 — feat: establish project-base workstream`
-Current package: **PB-1 — Project Core + Order Integration — CLOSEOUT**
-Current status: **PB-1 implementation and runtime acceptance are complete on the accepted runtime SHA `e36126913a92acdf4d5c2783f12c29e87dff5030`. The additive Project foundation is live in the existing production Supabase, legacy standalone Orders remain supported, and PR #267 remains draft/open for user-owned merge after docs-only closeout CI.**
-Next action: **Finish docs-only closeout verification, confirm PR #267 remains mergeable against execution-time `main`, then hand the PR to the project owner for merge. Do not start PB-2 until the PB-1 merge and production Admin deployment are confirmed.**
+Active branch: `feat/project-operations-hub-pb3`
+Active PR: `#272 — feat: add PB-3A Project payment ledger`
+Production Supabase: `bzjoeernnmvuhzyvbowc`
 
-This file is the operational source of truth for the `project-base` workstream. When the project owner asks **“project-base’de şu an neredeyiz?”**, read this file first and report the current package, completed items, blockers, acceptance evidence, and next action.
+Current package: **PB-3A — Customer Payment Ledger — production DB accepted / code PR closeout**
+
+Current status: **PB-1 Project foundation and PB-2 Project Financial Rollup are merged/deployed. PB-3A production migrations, live role/RPC smoke tests, zero-residue rollback acceptance and package-specific Advisor cleanup are complete. PR #272 contains the tabbed Project workspace and Admin UI integration and remains user-owned for review/merge.**
+
+Next action: **Finish final-head CI and preview/UI review for PR #272, then hand it to the project owner for merge. After PB-3A merges/deploys, continue with PB-3B Procurement, PB-4 Project-linked outgoing Finance, then PB-5 Fulfillment rollup.**
+
+This file is the operational source of truth for the Project Base workstream. When asked where Project Base stands, read this file first and report the current package, completed packages, acceptance evidence, blockers and next action.
 
 ## Status Legend
 
@@ -20,7 +24,7 @@ This file is the operational source of truth for the `project-base` workstream. 
 
 # 1. Goal
 
-Introduce **Project / Job** as the business-level parent for customer work while preserving the existing Orders, Invoices, Shipments, Installations, pricing, Customer Portal, and Dealer Portal behavior.
+Project / Job is the business-level parent for customer work while existing operational domains stay canonical.
 
 ```text
 Customer / Account
@@ -29,7 +33,9 @@ Customer / Account
        ├── Project Address / Site
        ├── Orders
        ├── Invoices
-       ├── Payments
+       ├── Customer Receivables / Payments
+       ├── Procurement
+       ├── Project Expenses / Outgoing Payments
        ├── Delivery / Shipments
        ├── Installations
        ├── Participants
@@ -38,379 +44,355 @@ Customer / Account
        └── Financial Summary
 ```
 
-The 2023–2026 cabinet sales workbooks are business evidence for this workflow; they are not a schema to copy literally.
+The historical cabinet-sales workbooks are business evidence, not a schema to copy literally.
 
 ---
 
-# 2. Rollout Strategy — Approved 2026-09-03
+# 2. Non-Negotiable Architecture Rules
 
-## Git
+1. `customer_orders` remains canonical for Orders.
+2. Project is optional for legacy standalone Orders; `customer_orders.project_id` remains nullable.
+3. Project Customer and Order Customer mismatch fails closed at the authoritative DB/server boundary.
+4. Project Sales Rep is authoritative for the Project and is independent from later Customer default-sales-rep changes.
+5. Order revision history is not Project Change Order history.
+6. Project lifecycle, payment state, fulfillment state and financial closure are separate dimensions.
+7. Internal cost, margin, vendor, commission, payment-detail, audit and internal-note data must not leak to Store/Portal without an explicitly approved narrow projection.
+8. Finance and Project screens must read the same canonical financial truth; no duplicate Project-vs-Finance ledger.
+9. No automatic historical business-data fabrication/backfill unless separately approved.
+10. DB migration acceptance and code merge/deploy acceptance are separate gates.
+11. Every Project package must run relevant CI, production-safe DB acceptance and Supabase Advisor review before closeout.
+12. Parallel work must be preserved: re-check execution-time `main` and open PRs before every new package.
 
-- Project work stays on `project-base` until the foundation acceptance gate passes.
-- `main` is not directly edited by Project implementation work.
-- Parallel `main` changes are periodically synced into `project-base` after conflict review.
+---
 
-## Supabase
+# 3. Approved Financial Semantics
 
-**Approved decision:** use the existing production Supabase project `bzjoeernnmvuhzyvbowc`.
+```text
+Gross Profit = Sales - Cost
+Gross Margin % = Gross Profit / Sales
+Markup % = Gross Profit / Cost
+```
 
-There will be **no separate Supabase development branch/project** for Project Base.
+Project completion and financial closure are different states.
 
-This is acceptable because the Project foundation migrations are deliberately additive and backward compatible:
+Future Finance overview must consume the same Project-linked finance truth:
 
-- create new Project tables,
-- add new indexes,
-- add new RLS/RPC contracts,
-- add nullable `customer_orders.project_id`,
-- do not drop/rename existing columns,
-- do not make Project mandatory for existing Orders,
-- do not backfill or rewrite existing business rows unless separately approved.
+- Expected Receivables
+- Collected
+- Remaining Receivables
+- Overdue
+- Expected Payables
+- Paid Out
+- Remaining Payables
+- Cash In
+- Cash Out
+- Net Cash Flow
 
-Production DB changes must be safe for the current `main` application before they are applied. New schema must remain dormant/backward compatible until `project-base` code consumes it.
+---
 
-## Merge gate
+# 4. Package Status
 
-The first mergeable Project foundation is intentionally small:
+## PB-0 — Git Isolation & Baseline `[x]`
+
+- [x] Establish Project workstream and tracker.
+- [x] Review repo/admin/store instructions and production schema.
+- [x] Use the existing production Supabase project with additive/backward-compatible migrations.
+- [x] Preserve parallel `main` work rather than overwriting it.
+
+**Status: COMPLETE.**
+
+---
+
+## PB-1 — Project Core + Order Integration `[x]`
+
+### Canonical model
 
 ```text
 Customer
-   ↓
-Project
-   ↓
-One or more existing Customer Orders
+  └── Project
+       └── one or more Customer Orders
 ```
 
-`project-base` may be merged to `main` once all of the following are verified:
+### Accepted capabilities
 
-1. Project create/list/detail works.
-2. Project has an authoritative Project-level Sales Rep.
-3. A Project can contain multiple existing-style Orders.
-4. New Project-context Orders persist `project_id` server-side.
-5. Order customer must match Project customer.
-6. Existing standalone Orders with `project_id = null` behave exactly as before.
-7. Existing pricing, revisions, reservations, shipments and installations remain intact.
-8. Store / Customer Portal / Dealer Portal projections do not expose new internal Project data accidentally.
-9. Required Admin UI/RBAC/typecheck/lint/build/contracts pass.
-10. Supabase Security + Performance Advisors show no Project-specific blocking finding.
+- [x] `customer_projects` and append-safe Project lifecycle history.
+- [x] DB-authoritative Project numbering.
+- [x] authoritative Project Sales Rep.
+- [x] nullable `customer_orders.project_id`.
+- [x] Project Customer = Order Customer enforcement.
+- [x] Project create/list/detail/update contracts.
+- [x] Project-context Order creation.
+- [x] existing Order linking.
+- [x] legacy standalone Orders remain valid.
+- [x] cancelled Orders excluded from active Project work while remaining explicitly filterable.
+- [x] `/projects` and `/projects/[id]` Admin surfaces with `projects.view` / `projects.manage`.
+- [x] compact Project Progress summary and actor-aware lifecycle Activity.
+- [x] no Store/Customer Portal/Dealer Portal internal Project projection widening.
 
-After this merge, the remaining Project capabilities are **upgrades**, not blockers for the Project foundation:
-
-- Finance rollups
-- Customer payment ledger
-- External/project expenses
-- Change Orders
-- Participants
-- Commissions
-- Project-level delivery/install rollups
-- Portal Project navigation
-- Historical Excel import
-
----
-
-# 3. Non-Negotiable Safety Rules
-
-1. All foundation DB changes are additive.
-2. Do not drop, rename, repurpose, or tighten existing Order columns during PB-1.
-3. `customer_orders.project_id` is nullable.
-4. Existing Orders without a Project remain valid indefinitely unless a later migration is explicitly approved.
-5. No automatic legacy Order backfill in PB-1.
-6. Project Customer and Order Customer mismatches fail closed at the authoritative server/DB boundary.
-7. Do not weaken RLS, grants, role checks, idempotency, pricing snapshots, reservations, revision history, or audit semantics.
-8. Project data does not automatically become Store/Portal data.
-9. Internal cost, margin, commission, vendor, audit, and internal-note data must not leak to public/portal projections.
-10. Every Project package updates this tracker before it is considered complete.
-
----
-
-# 4. Verified Existing Production Truth
-
-Relevant existing tables include:
-
-- `customers`
-- `profiles`
-- `customer_orders`
-- `customer_order_items`
-- `customer_order_revisions`
-- `customer_order_status_history`
-- `customer_order_reservations`
-- `customer_invoices`
-- `customer_invoice_items`
-- `customer_shipments`
-- `customer_shipment_items`
-- `customer_installations`
-- `customer_activity`
-- `payment_methods`
-- `payment_terms`
-
-Verified decisions/facts:
-
-- `customer_orders.customer_id` is required.
-- `customer_invoices.order_id` is nullable.
-- `customer_shipments.order_id` is required.
-- `customer_installations.order_id` is required.
-- `customers.sales_rep_id` already exists.
-- Order currently has no first-class salesperson field.
-- Order `created_by` is audit identity, not salesperson.
-- There is currently no first-class customer payment transaction ledger; invoices summarize `paid_amount`.
-- Existing Order revision history must stay distinct from future Project Change Orders.
-
-## Sales Rep rule
-
-```text
-customers.sales_rep_id
-  = Customer/account default salesperson
-
-customer_projects.sales_rep_id
-  = authoritative salesperson for that Project/Job
-```
-
-Project creation may prefill the Customer salesperson, but later Customer salesperson changes must not rewrite historical Project ownership.
-
----
-
-# 5. Project Core Domain
-
-## 5.1 Project is the business container
-
-A Customer may have multiple Projects; a Project may have multiple Orders.
-
-```text
-Paul Davis
-  ├── Cruz Job
-  │    ├── Order #1
-  │    └── Order #2
-  ├── Bowen Job
-  └── Rawat Island
-```
-
-## 5.2 Quote is not a foundation blocker
-
-A Project can exist before an Order. Quote/proposal versioning may be added later without changing Project ownership.
-
-## 5.3 Existing Order stays canonical
-
-Do not replace `customer_orders`.
-
-Foundation relationship:
-
-```text
-customer_orders.project_id uuid null -> customer_projects.id
-```
-
-## 5.4 Order Revision ≠ Project Change Order
-
-- `customer_order_revisions` = revision/audit history of a specific Order.
-- Project Change Order = later post-sale scope/value adjustment.
-
-These remain separate domains.
-
-## 5.5 Status dimensions stay separate
-
-Project lifecycle candidate:
-
-```text
-DRAFT
-QUOTED
-APPROVED
-ORDERED
-IN_PROGRESS
-COMPLETED
-CANCELLED
-```
-
-Payment, delivery and installation statuses are separate derived/operational dimensions and must not be collapsed into one status field.
-
----
-
-# 6. Target Project Tables
-
-Exact SQL must follow current Modulex migration/RLS conventions.
-
-## `customer_projects`
-
-```text
-id uuid pk
-project_number text unique
-customer_id uuid not null -> customers.id
-name text not null
-status text not null
-sales_rep_id uuid null -> profiles.id
-project_address_id uuid null -> customer_addresses.id where appropriate
-project_address_snapshot jsonb null
-start_date date null
-target_date date null
-completed_at timestamptz null
-customer_notes text null
-internal_notes text null
-created_by uuid null
-updated_by uuid null
-created_at timestamptz not null
-updated_at timestamptz not null
-```
-
-Requirements:
-
-- DB-authoritative Project number generation.
-- Customer/project mismatch fails closed.
-- Historical address snapshot semantics preserved.
-- Referenced/historical Projects are not physically deleted by default.
-
-## `customer_project_status_history`
-
-Append-safe lifecycle history.
-
-## `customer_project_participants`
-
-Deferred until after the mergeable foundation unless needed by the accepted Project UI.
-
-Future roles include:
-
-- SALES_REP
-- DESIGNER
-- CONTRACTOR
-- INSTALLER
-- REFERRAL_PARTNER
-
-`customer_projects.sales_rep_id` remains the reporting/filtering source of truth for the Project salesperson.
-
----
-
-# 7. Work Packages
-
-## PB-0 — Git Isolation & Baseline
-
-- [x] Verify current `main` before branching.
-- [x] Confirm `project-base` did not already exist.
-- [x] Create Git branch `project-base`.
-- [x] Review repo-wide `AGENTS.md`.
-- [x] Review Admin and Store roadmaps.
-- [x] Inspect production Project-relevant schema.
-- [x] Add Project Base tracker.
-- [x] Open long-lived draft PR #267.
-- [x] Sync Stone vendor work from newer `main` into `project-base` without changing `main` from Project work.
-- [x] Decide Supabase rollout strategy: **production Supabase, additive/backward-compatible migrations**.
-- [x] Cancel separate Supabase branch/project plan.
-
-**PB-0 status: COMPLETE.**
-
----
-
-## PB-1 — Mergeable Project Foundation `[x]`
-
-### A. DB foundation
-
-- [x] Add Project foundation contract coverage before/with implementation.
-- [x] Add `customer_projects` production contract.
-- [x] Add `customer_project_status_history` lifecycle history.
-- [x] Add covering indexes for customer/status/sales-rep/date/FK access paths.
-- [x] Add RLS/grants using current Admin authorization conventions.
-- [x] Add DB-authoritative Project number generation.
-- [x] Add Project create/update/status/list/detail RPC/server contracts.
-- [x] Add nullable `customer_orders.project_id` FK.
-- [x] Enforce Order Customer = Project Customer when Project is present.
-- [x] Preserve legacy Orders without automatic backfill.
-- [x] Apply reviewed additive Project migrations to production Supabase.
-- [x] Verify existing Orders with `project_id = null` still work.
-- [x] Run Security Advisor; no Project-specific blocking finding.
-- [x] Run Performance Advisor; no Project-specific blocking finding. New Project indexes may report unused-index `INFO` until production traffic exercises them.
-
-Production migration history at PB-1 closeout:
+### Production migrations
 
 - `20260902232013_project_base_core`
 - `20260902232311_project_base_order_assignment`
 - `20260902234109_project_base_fk_covering_indexes`
 
-Read-only closeout introspection confirms Project tables have RLS enabled, public Project RPCs are authenticated-executable and anon-denied, `customer_orders.project_id` remains nullable, 16 standalone Orders still have `project_id = null`, and 3 Orders are Project-linked. No business-data mutation was performed during closeout.
-
-### B. Admin Project UI
-
-- [x] Read `modulex-admin/docs/ADMIN_UI_GUIDE.md`.
-- [x] Read `modulex-admin/docs/ADMIN_VALIDATION_GUIDE.md` before form/mutation closeout.
-- [x] Define Project RBAC mapping with `projects.view` / `projects.manage`.
-- [x] Add `/projects` navigation and route.
-- [x] Add Project list with server-side search/filter/pagination.
-- [x] Search covers Project # / customer / Project name; filters cover Customer, Sales Rep and Status. The stale pre-implementation date-filter requirement is removed from PB-1 because it was not part of the accepted foundation UI.
-- [x] Add Project create flow.
-- [x] Prefill Customer salesperson when present; persist Project salesperson independently.
-- [x] Add `/projects/[id]` detail shell.
-- [x] Initial foundation sections: Overview, Orders, Project Progress and dedicated Activity.
-- [x] Keep future financial/delivery/install capabilities truthful: PB-1 Project Progress is read-only derived summary and Commercial is count/status only; authoritative rollups remain PB-2/PB-3/PB-5.
-- [x] Implement explicit loading/empty/populated/error/retry/permission-aware states.
-
-### C. Order integration
-
-- [x] Allow Order creation from Project context.
-- [x] Persist `project_id` server-side.
-- [x] Show Project on Order detail when present.
-- [x] Show child Orders on Project detail.
-- [x] Preserve standalone Order creation.
-- [x] Preserve pricing snapshots, countertop behavior, reservations, revisions and fulfillment contracts.
-- [x] Add regressions for Order with Project and Order without Project.
-- [x] Exclude cancelled Orders from normal Order `All` results, Project Detail active Orders/count, Project Progress calculations and Link Existing Order choices; retain explicit `Cancelled` filtering.
-
-### D. Foundation verification
-
-- [x] Project contract tests pass — Admin Project Base #71.
-- [x] Existing Order domain/lifecycle/pricing/countertop regressions pass — Admin A1 Core Operations #594 and Admin Customers UI #301 remain green on the accepted runtime SHA.
-- [x] Admin UI strict gate passes — Admin UI Foundation #977.
-- [x] RBAC smoke passes — Admin UI Foundation #977.
-- [x] TypeScript passes — Admin UI Foundation #977.
-- [x] Lint passes — Admin UI Foundation #977.
-- [x] Production build passes — Admin UI Foundation #977.
-- [x] Vercel Preview is available for runtime acceptance: deployment `dpl_CfyHrv5kboYLAiPckd1HZg7Bz2dp` is `READY` on exact runtime SHA `e36126913a92acdf4d5c2783f12c29e87dff5030`.
-- [x] Signed-in Preview acceptance completed by the project owner for the final Project Detail / Project Progress presentation and Project↔Order workflow.
-- [x] Production DB acceptance confirms the nullable legacy path and Project-linked path coexist.
-- [x] Store/Customer Portal/Dealer Portal regression confirms no accidental Project/internal projection exposure.
-- [x] Project Progress acceptance is locked as a **full-width compact overview** with horizontal lifecycle badge flow (`Draft → Quoted → Approved → Ordered → In Progress → Completed`, `Done / Current / Pending`), responsive Orders / Delivery / Installation / Commercial blocks, cancelled-Order exclusion, and a separate actor-aware `Activity` card as the official Project lifecycle/audit timeline.
-
-**PB-1 done:** Project is a real production DB entity, Admin can create/manage it, existing Orders can optionally belong to it, Project Customer is authoritative for Project-context Orders, and legacy standalone Orders remain backward compatible.
-
-### PB-1 merge decision
-
-PB-1 is functionally accepted. PR #267 remains draft/open and must be merged by the project owner only after the docs-only closeout commit is green and GitHub still reports the PR mergeable against execution-time `main`.
-
-The following packages are explicitly not required for that merge.
+**Status: MERGED / DEPLOYED / ACCEPTED.**
 
 ---
 
-## PB-2 — Project Financial Rollup — post-foundation upgrade
+## PB-2 — Project Financial Rollup `[x]`
 
-- [ ] Roll up sales from canonical Orders/Invoices.
-- [ ] Roll up cost from canonical profitability/cost contracts.
-- [ ] Category mapping: Cabinet / Countertop / Sink / Labor / Material / Other.
-- [ ] Calculate Total Cost, Total Sales, Gross Profit, Gross Margin %, Markup %, Invoiced, Paid, Balance.
-- [ ] Never use spreadsheet `Sold / Cost` as Gross Margin.
-- [ ] Add Project Financial Summary UI.
-- [ ] Prevent internal finance leakage to Store/Portal.
+### Accepted scope
+
+- [x] Roll up canonical Order sales and current canonical product cost.
+- [x] Category mapping:
+  - Cabinet
+  - Countertop
+  - Sink
+  - Labor
+  - Material
+  - Other
+- [x] Calculate:
+  - Total Sales
+  - Total Cost
+  - Gross Profit
+  - Gross Margin %
+  - Markup %
+  - Invoiced
+  - Paid
+  - Balance
+- [x] Cancelled Orders excluded.
+- [x] Invoice lifecycle includes `issued`, `partially_paid`, `paid`, `overdue`; excludes `draft` and `void`.
+- [x] Missing cost fails closed instead of presenting false profitability.
+- [x] Mixed currencies fail closed instead of inventing FX conversion.
+- [x] Cost/margin visibility restricted to Admin/Finance through `pricing.cost.view` plus DB role guard.
+- [x] Sales denied detailed Project profitability with SQLSTATE `42501`.
+- [x] Project Financial Summary Admin UI.
+- [x] No Store/Portal finance leakage.
+
+### Git / deployment acceptance
+
+PR #271: `feat: add PB-2 project financial rollup`
+
+Merge SHA:
+`2f5fc9f2638c41af86124cf5f907f9f25a355399`
+
+Accepted production Admin deployment:
+`dpl_575svdZs7mu9ZKXKTydAVzkNNMno`
+
+### Production migrations
+
+- `20260903110906_project_financial_rollup`
+- `20260903111231_project_financial_rollup_runtime_fix`
+- `20260903111716_project_financial_rollup_advisor_hardening`
+
+**Status: MERGED / DEPLOYED / ACCEPTED.**
 
 ---
 
-## PB-3 — Customer Payment Ledger — post-foundation upgrade
+## PB-3A — Customer Payment Ledger `[~]`
 
-Payment plan and actual payment transaction are separate concepts.
-
-Future minimum model:
+Payment plan and actual customer cash are separate concepts.
 
 ```text
 Project
-  └── Payment Requirement / Installment
-       └── Payment Allocations
-            └── Actual Payment Transactions
+  ├── Payment Requirement / Milestone
+  ├── Actual Customer Payment Transaction
+  └── Payment Allocation
+       └── transaction ↔ requirement
 ```
 
-Requirements:
+### Approved business rules
 
-- partial payment,
-- multiple transactions against one requirement,
-- one transaction allocated across multiple requirements,
-- pending / partially paid / paid derived status,
-- reversal/refund/void without destructive history edits.
+- [x] Customer deposit/prepayment may exist before an Invoice.
+- [x] Requirement and actual payment are separate records.
+- [x] Partial payment supported.
+- [x] Multiple transactions may satisfy one requirement.
+- [x] One payment may allocate across multiple requirements.
+- [x] Unallocated Project customer credit remains explicit.
+- [x] Requirement state is derived from effective allocations.
+- [x] Reversal/refund/void is append-safe; posted financial history is not destructively rewritten.
+- [x] Project/currency mismatch fails closed.
+- [x] No silent FX conversion is invented.
+- [x] No automatic FIFO allocation; allocation is explicit.
+
+### Invoice compatibility
+
+- [x] Add `customer_invoices.ledger_managed` compatibility state.
+- [x] Historical `paid_amount` is preserved; migration does not fabricate historical payment transactions.
+- [x] Ledger-managed Invoice paid amount/payment-derived status is maintained from allocations.
+- [x] Ledger-managed Invoice payment values are read-only in Invoice UI.
+- [x] Legacy Invoice history remains readable.
+- [x] New customer payment mutation is Finance/Admin-only.
+- [x] Sales cannot write `paid_amount` or force paid/partially-paid state even on legacy Invoice workflow.
+- [x] Invoice → Project Finance deep-link uses `?tab=Finance` and Project Detail honors tab deep links.
+
+### RBAC
+
+- [x] `project_payments.view`
+- [x] `project_payments.manage`
+- [x] Sales receives view-only sanitized collection state.
+- [x] Finance/Admin receive detailed ledger + mutations.
+- [x] PB-2 cost/margin remains a separate permission boundary.
+
+### Project Detail workspace
+
+PB-3A establishes the long-lived Project workspace shell:
+
+- [x] Overview
+- [x] Orders
+- [x] Finance
+- [x] Procurement
+- [x] Fulfillment
+- [x] Documents
+- [x] Activity
+
+Implemented now:
+
+- [x] Overview and Orders preserve PB-1 behavior.
+- [x] Finance implements customer receivables/payment ledger.
+- [x] Activity preserves lifecycle history.
+- [x] Fulfillment reuses the existing Project Progress truth without replacing Shipment/Installation domains.
+- [x] Procurement/Documents remain truthful staged shells; no fake records are created.
+
+### Finance tab — Admin/Finance
+
+- [x] Expected
+- [x] Received
+- [x] Remaining
+- [x] Overdue
+- [x] Unallocated Credit
+- [x] Payment Plan / milestone table
+- [x] Add Requirement
+- [x] Customer Payments table
+- [x] Record Payment
+- [x] Allocate Payment
+- [x] Reverse Payment
+- [x] PB-2 Project Financial Summary remains separately gated by cost/margin permission.
+
+### Finance tab — Sales
+
+Sales sees only collection progress:
+
+- [x] overall collection state
+- [x] milestone name
+- [x] due date
+- [x] milestone status
+
+Sales projection intentionally does **not** model:
+
+- payment amount
+- paid amount
+- balance
+- cost
+- margin
+- profit
+- vendor price
+- outgoing expense amount
+
+### Production migrations
+
+Applied successfully:
+
+- `20260903124606_customer_project_payment_ledger`
+- `20260903124630_customer_project_payment_ledger_hardening`
+- `20260903124645_customer_project_payment_invoice_role_guard`
+- `20260903125353_customer_project_payment_advisor_cleanup`
+
+Repository mirrors:
+
+- `20260903143000_customer_project_payment_ledger.sql`
+- `20260903143500_customer_project_payment_ledger_hardening.sql`
+- `20260903144000_customer_project_payment_invoice_role_guard.sql`
+- `20260903144500_customer_project_payment_advisor_cleanup.sql`
+
+### Production authorization acceptance
+
+- [x] RLS enabled on all three ledger tables.
+- [x] anon/authenticated direct table access denied.
+- [x] explicit restrictive deny-by-default policies installed.
+- [x] anon public RPC execution denied.
+- [x] public RPCs are SECURITY INVOKER.
+- [x] private role-guarded implementations use pinned SECURITY DEFINER boundaries.
+- [x] Sales sanitized status RPC succeeds.
+- [x] Sales detailed ledger RPC returns SQLSTATE `42501`.
+- [x] Sales record-payment RPC returns SQLSTATE `42501`.
+
+### Rollback-only production mutation acceptance
+
+Finance-role test flow:
+
+```text
+Requirement 100 USD
+Payment      60 USD
+Allocate     40 USD
+Reverse      20 USD
+-------------------
+Effective Collected 40 USD
+Remaining           60 USD
+```
+
+- [x] canonical ledger returned Expected 100 / Received 40 / Allocated 40 / Remaining 60.
+- [x] requirement derived `partially_paid`.
+- [x] reversal preserved append-safe history.
+- [x] transaction rolled back.
+- [x] follow-up production counts: 0 requirements / 0 transactions / 0 allocations.
+
+Void smoke:
+
+- [x] posted payment can be voided through authoritative RPC when unallocated/unreversed.
+- [x] `voided_at`, `voided_by`, `void_reason` recorded.
+- [x] transaction rolled back with zero residue.
+
+### Advisor acceptance
+
+- [x] Initial PB-3A RLS-no-policy INFO identified.
+- [x] Initial PB-3A unindexed-FK INFO identified.
+- [x] forward cleanup migration added explicit restrictive deny policies.
+- [x] covering FK indexes added.
+- [x] fresh Security/Performance Advisor scan shows those PB-3A findings removed.
+- [x] new ledger indexes may appear as `unused_index` INFO until real traffic exists; this is expected.
+- [x] unrelated Store/HR/vendor/support advisor backlog remains outside PB-3A.
+
+### Acceptance artifact
+
+`docs/acceptance/pb-3a-project-payment-ledger.md`
+
+### Git state
+
+PR #272: `feat: add PB-3A Project payment ledger`
+
+- [x] production DB migration acceptance complete.
+- [x] live role/RPC smoke complete.
+- [x] advisor cleanup complete.
+- [x] strict shared Admin UI primitives/tokens used by new Project shell/Finance surfaces.
+- [~] final-head CI + preview/UI review.
+- [ ] project owner merge.
+- [ ] production Admin deployment after merge.
+
+**PB-3A status: DB ACCEPTED; CODE PR CLOSEOUT IN PROGRESS.**
 
 ---
 
-## PB-4 — Finance Outgoing Payments / Project Expenses — post-foundation upgrade
+## PB-3B — Procurement `[ ]`
 
-Finance remains the owner of outgoing money movements.
+Goal: make Project procurement first-class without duplicating Vendor Catalog or Inventory truth.
+
+Expected scope:
+
+- vendor purchase/order commitment linked to Project/Order scope where appropriate;
+- expected vendor delivery dates;
+- procurement status/blockers;
+- purchase-cost truth feeding Project finance without double counting;
+- existing Vendor Catalog remains product-discovery/import domain, not procurement ledger;
+- no Store/Portal projection unless separately approved.
+
+Exact schema/RPC/UI must be designed against execution-time production truth before implementation.
+
+---
+
+## PB-4 — Finance Outgoing Payments / Project Expenses `[ ]`
+
+Finance owns outgoing money movements.
 
 Examples:
 
@@ -435,166 +417,116 @@ project_id = <project>
 → Project expense/payment
 ```
 
-Project Expense view must be a filtered view of Finance truth, not a second duplicate ledger.
+Rules:
 
-Cost and cash payment remain separate concepts; do not double-count cost when vendor bills are paid.
+- Project Expense view is a filtered view of canonical Finance truth, not a duplicate ledger.
+- Cost/accrual and cash payment are separate concepts.
+- Paying a vendor bill must not double-count Project cost.
+- Sales must not see outgoing money amounts unless a future explicit permission decision says otherwise.
 
 ---
 
-## PB-5 — Delivery & Installation Rollup — post-foundation upgrade
+## PB-5 — Delivery & Installation Rollup `[ ]`
 
 - [ ] Derive Project delivery state from child Orders/Shipments.
 - [ ] Derive Project installation state from child Orders/Installations.
 - [ ] Support multiple deliveries/installations.
 - [ ] Preserve existing fulfillment lifecycle ownership.
-- [ ] Model Customer Pickup separately where needed by existing `fulfillment_type` semantics.
+- [ ] Model Customer Pickup separately through existing `fulfillment_type` semantics.
+- [ ] Surface procurement blockers once PB-3B exists.
 
 ---
 
-## PB-6 — Participants & Commission Ledger — post-foundation upgrade
+## PB-6 — Participants & Commission Ledger `[ ]`
 
-Participants:
+Participants may include:
 
 - Designer
 - Contractor
 - Installer
 - Referral Partner
 
-Commission must support adjustments/offsets rather than one editable amount field.
-
-Future commission ledger should support fixed/percentage, category, earned/approved/paid states, and correction/offset entries.
+Commission ledger must support fixed/percentage, category, earned/approved/paid states and adjustment/offset entries rather than one editable amount field.
 
 ---
 
-## PB-7 — Change Orders — post-foundation upgrade
+## PB-7 — Change Orders `[ ]`
 
-Support post-sale scope changes such as:
+Support post-sale scope/value changes such as:
 
-- added cabinets,
-- island revision,
-- added vanity/master bath,
-- removed item,
-- customer credit,
-- vendor credit,
+- added cabinets;
+- island revision;
+- additional vanity/bath scope;
+- removed item;
+- customer credit;
+- vendor credit;
 - price adjustment.
 
-Important rule:
-
-- customer/sell impact and vendor/cost impact are separate,
-- original approved commercial history is not destructively rewritten,
-- Order revisions remain separate from Project Change Orders.
+Customer/sell impact and vendor/cost impact remain separate. Original approved commercial history is not destructively rewritten. Order revisions remain distinct from Project Change Orders.
 
 ---
 
-## PB-8 — Portal Project Projection — later upgrade
+## PB-8 — Portal Project Projection `[ ]`
 
 Only after Admin/DB Project truth is stable:
 
-- narrow sanitized Project projection,
-- customer/dealer isolation,
-- no internal cost/margin/commission/vendor/audit leakage,
+- narrow sanitized Project projection;
+- strict customer/dealer isolation;
+- no internal cost/margin/commission/vendor/payment-detail/audit leakage;
 - Project → Orders / Shipments / Installations navigation.
 
-Update `modulex-store/STORE_ROADMAP.md` in the same package.
+Update `modulex-store/STORE_ROADMAP.md` in the same package when this begins.
 
 ---
 
-## PB-9 — Historical Excel Import — last
+## PB-9 — Historical Excel Import `[ ]`
 
-Because current production business data is not the migration driver, historical import is not a foundation blocker.
+Historical import remains last and is not a foundation blocker.
 
-When later required:
+When required:
 
-- stage first,
-- preserve source file/row provenance,
-- match Customer separately from Project,
-- map salesperson to Project,
-- never trust spreadsheet `Profit Margin` as canonical margin,
-- flag ambiguous mixed note/status rows for review,
-- reconcile totals before production write.
-
----
-
-# 8. Financial Semantics Already Approved
-
-```text
-Gross Profit = Sales - Cost
-Gross Margin % = Gross Profit / Sales
-Markup % = Gross Profit / Cost
-```
-
-Project completion and financial closure are different states.
-
-Finance future overview must read the same Project-linked finance truth used by Project screens:
-
-- Expected Receivables
-- Collected
-- Remaining
-- Overdue
-- Expected Payables
-- Paid Out
-- Remaining Payables
-- Cash In
-- Cash Out
-- Net Cash Flow
-
-No duplicate Finance-vs-Project source of truth.
+- stage first;
+- preserve source file/row provenance;
+- match Customer separately from Project;
+- map salesperson to Project;
+- never trust spreadsheet `Profit Margin` as canonical margin;
+- flag ambiguous mixed note/status rows for review;
+- reconcile totals before production writes.
 
 ---
 
-# 9. Foundation Acceptance Scenarios
+# 5. Current Snapshot
 
-PB-1 must prove at minimum:
+As of 2026-09-03:
 
-1. Existing Order with `project_id = null` still works.
-2. One Customer can have multiple Projects.
-3. One Project can have multiple Orders.
-4. Project salesperson can differ from Customer default.
-5. Changing Customer salesperson does not rewrite Project salesperson.
-6. Order Customer cannot conflict with Project Customer.
-7. Project-created Order uses the existing commercial Order contract.
-8. Order pricing/reservations/revisions remain unchanged.
-9. Existing shipment/installation behavior still resolves from Order.
-10. Store/Customer Portal/Dealer Portal are unchanged unless explicitly extended later.
-11. Internal Project data is not exposed publicly.
-
-All PB-1 foundation scenarios are accepted by the runtime/DB/CI evidence recorded above. No PB-2/PB-3/PB-5 authoritative rollup is implied by this acceptance.
+- Production Supabase strategy: existing project `bzjoeernnmvuhzyvbowc`.
+- PB-1: merged/deployed/accepted.
+- PB-2: merged/deployed/accepted.
+- PB-3A DB: production migrations applied/accepted.
+- PB-3A production business-data residue from acceptance: **none**.
+- PB-3A Sales boundary: status-only works; detailed ledger/payment mutation denied.
+- PB-3A Finance boundary: requirement/payment/allocation/reversal rollback flow accepted.
+- PB-3A Advisor-specific RLS/FK findings: cleaned.
+- PB-3A code branch: `feat/project-operations-hub-pb3`.
+- PB-3A PR: #272, user-owned; **do not auto-merge**.
+- Store public/Customer Portal/Dealer Portal behavior: unchanged by PB-3A.
+- Next business package after PB-3A merge/deploy: **PB-3B Procurement**.
 
 ---
 
-# 10. Tracking Protocol
+# 6. Tracking Protocol
 
-For every Project Base package:
+For every Project package:
 
 1. Re-check latest `main` and parallel PRs.
-2. Re-read this file before deciding next action.
-3. Sync safe newer `main` work into `project-base` when necessary.
-4. Mark active work `[~]`.
-5. Record changed business decisions here immediately.
+2. Re-read this tracker before deciding the next action.
+3. Preserve safe newer parallel work.
+4. Mark active package `[~]`.
+5. Record business/architecture decisions immediately.
 6. Mark `[x]` only after fresh verification evidence.
 7. Update Current package / Current status / Next action.
 8. Update `modulex-admin/ADMIN_ROADMAP.md` when Admin capability materially changes.
 9. Update `modulex-store/STORE_ROADMAP.md` only when Store/Portal behavior materially changes.
-10. DB migration acceptance and code merge acceptance are separate checks, even though PB-1 intentionally uses production Supabase.
-
----
-
-# 11. Current Snapshot
-
-As of 2026-09-03:
-
-- Git branch: `project-base`.
-- Draft PR: #267, open; **do not auto-merge**. The project owner performs the merge.
-- Accepted runtime SHA: `e36126913a92acdf4d5c2783f12c29e87dff5030`.
-- Accepted Vercel Admin Preview: `dpl_CfyHrv5kboYLAiPckd1HZg7Bz2dp`, `READY`, exact runtime SHA above.
-- Execution-time `main` observed during closeout: `0c5e3feec4f213002b7268b70d6d483e789acefb`; the accepted runtime branch was 2 commits behind but PR #267 was mergeable before docs-only closeout. Re-check this gate after the closeout commit.
-- Supabase strategy: **existing production project `bzjoeernnmvuhzyvbowc`**.
-- Separate Supabase branch/project: **cancelled**.
-- Production Project foundation migrations are applied: `project_base_core`, `project_base_order_assignment`, `project_base_fk_covering_indexes`.
-- Project tables/RPC/FK/RLS/grants are present; `customer_orders.project_id` is nullable; Project/customer assignment fails closed on mismatch.
-- Fresh closeout Security/Performance Advisor review shows **no Project-specific blocking finding**. Project unused-index notices are informational, not a reason to remove the new covering/filter indexes during PB-1 closeout.
-- Business-data mutation during PB-1 closeout: **none**; verification used repository/runtime metadata and read-only production introspection.
-- Current package: **PB-1 — Mergeable Project Foundation — functionally accepted, docs/PR closeout in progress**.
-- Store public/Customer Portal/Dealer Portal Project projection: **unchanged**; `modulex-store/STORE_ROADMAP.md` is intentionally untouched for PB-1 closeout.
-- Finance, Payments, Change Orders, Participants, Commissions and authoritative Project delivery/install rollups remain **post-foundation upgrades**.
-- Immediate next action: **finish docs-only CI + PR mergeability verification, report `PB-1 merge-ready`, then wait for the project owner to merge and production-deploy PB-1 before any PB-2 implementation.**
+10. Keep DB migration acceptance separate from code merge/deploy acceptance.
+11. Use rollback-only production mutation probes where real writes are not required for acceptance.
+12. Never leave acceptance-test business data in production.
