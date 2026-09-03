@@ -1,93 +1,162 @@
-# Modulex Project Progress — Design Lock
+# Modulex Project Progress — PB-1 Design Lock
 
-Approved: 2026-09-03
+Last reviewed: 2026-09-03
 Branch: `project-base`
-Scope: PB-1 Project Detail read-only progress summary
+Scope: **PB-1 accepted Project Detail progress presentation**
+
+This document locks the accepted PB-1 Project Progress layout so future Project packages do not accidentally reintroduce the discarded sidebar/rail layout or duplicate lifecycle activity.
+
+---
 
 ## Purpose
 
-Project Detail must give an operator a fast, truthful at-a-glance view of where a Project stands without creating a second lifecycle or duplicating Order, Shipment, Installation, Invoice, or Finance sources of truth.
+Project Progress is an **at-a-glance, read-only Project overview** derived from canonical Project, Order, Invoice, shipment/installation-related Order state, and Project lifecycle history.
 
-## UI contract
+PB-1 does **not** make Project Progress a second source of truth. It summarizes existing canonical records and leaves authoritative financial and fulfillment rollups to later Project packages.
 
-The Project Detail surface includes a shared-Admin `Project Progress` card/rail using the conventions in `modulex-admin/AdminUICheck.md` and `modulex-admin/docs/ADMIN_UI_GUIDE.md`:
+---
 
-- `ComponentCard` owns the surface.
-- `Badge` communicates current/done/pending/progress states.
-- `ADMIN_TEXT_STYLES` owns light/dark text contrast.
-- Loading, error, Retry and empty states are explicit.
-- No route-local colors, borders, radii, shadows, buttons or ad-hoc status chips.
-- At 1280/1366 widths the progress card stacks to preserve the Project Settings form; at sufficiently wide desktop widths it may render as a right-side rail.
+## Accepted UI Contract
 
-## Lifecycle dimension
+### Full-width compact overview
 
-The authoritative Project lifecycle remains `customer_projects.status`:
+- Project Progress is a **full-width card in the normal Project Detail flow**.
+- There is **no Project Progress sidebar, side rail, or desktop-only right column**.
+- The layout must remain compact and responsive rather than reserving a persistent narrow column.
+- Project Settings and the dedicated Activity card remain normal full-width Project Detail sections below/around the overview according to the page flow.
+
+### Lifecycle flow
+
+Render the PB-1 lifecycle as one horizontal, wrapping badge flow:
 
 ```text
-DRAFT
-QUOTED
-APPROVED
-ORDERED
-IN_PROGRESS
-COMPLETED
-CANCELLED
+Draft → Quoted → Approved → Ordered → In Progress → Completed
 ```
 
-The progress UI may visualize lifecycle history as Done / Current / Pending, but it must not invent additional Project lifecycle states such as Delivered, Installed, Revised, Invoiced, or Paid.
+Each lifecycle badge communicates one of:
+
+- `Done`
+- `Current`
+- `Pending`
+
+The current Project status remains authoritative. Historical lifecycle history may prove an earlier state was attained; it must not invent a transition that was never recorded.
+
+`Cancelled` is an explicit Project status badge, not a seventh step inserted into the normal completion flow.
+
+### Responsive overview blocks
+
+Below Lifecycle, Project Progress exposes four compact responsive blocks:
+
+1. **Orders**
+2. **Delivery**
+3. **Installation**
+4. **Commercial**
+
+On wide screens these may share one row; on narrower screens they wrap naturally using the shared Admin responsive grid conventions. No block becomes a separate sidebar.
+
+---
 
 ## Orders
 
-- Only active child Orders participate in progress summaries.
-- `cancelled` Orders are excluded from active counts and fulfillment/commercial denominators.
-- Order revision events remain Order revision/audit events; they do not become Project lifecycle states.
+- Count only **active child Orders**.
+- Cancelled Orders are excluded from the active count and progress calculations.
+- The accepted PB-1 progress signal is `Confirmed or later / active Orders`.
+- Cancelled Orders remain discoverable through the explicit cancelled-order workflow; they are not treated as active Project work.
+
+---
 
 ## Delivery
 
-PB-1 delivery progress is a read-only approximation derived from canonical active child Order lifecycle and `fulfillment_type`:
+PB-1 Delivery is a **read-only derived summary**, not the authoritative Project delivery rollup.
 
-- `pickup` Orders are excluded from Delivery progress.
-- Delivery completion is inferred only from existing Order states that are at/after delivery.
-- No new Project delivery status is persisted.
+- Derive eligibility from existing Order `fulfillment_type` semantics.
+- Customer Pickup Orders are excluded from Delivery progress.
+- Preserve existing Order/Shipment lifecycle ownership.
+- Do not introduce new delivery mutation behavior from Project Progress.
 
-The full authoritative Project delivery rollup across child Shipments remains PB-5.
+Authoritative multi-delivery Project rollup remains **PB-5**.
+
+---
 
 ## Installation
 
-PB-1 installation progress is a read-only approximation:
+PB-1 Installation is a **read-only derived summary**, not the authoritative Project installation rollup.
 
-- only active Orders with `fulfillment_type = delivery_installation` participate;
-- completion is inferred from the existing canonical Order lifecycle;
-- no new Project installation state is persisted.
+- Count only Orders whose existing fulfillment semantics require installation.
+- Preserve the existing Order/Installation lifecycle as source of truth.
+- Do not introduce Project-level installation mutations in PB-1.
 
-The full authoritative Project installation rollup across Installation records remains PB-5.
+Authoritative multi-installation Project rollup remains **PB-5**.
+
+---
 
 ## Commercial
 
-PB-1 Commercial progress is intentionally count/status only:
+PB-1 Commercial is deliberately bounded to **count/status visibility**.
 
-- invoiced Orders / active Orders;
-- paid Invoices / non-void Invoices.
+Allowed PB-1 signals include:
 
-It must not calculate Project sales, cost, gross profit, margin, collected amount, balance, or payment ledger state.
+- Invoiced Orders / active Orders
+- Paid Invoices / Invoices
 
-Financial amount rollups remain PB-2 and the payment ledger remains PB-3.
+PB-1 Commercial must **not** present Project financial amount rollups such as revenue, cost, gross profit, margin, paid amount, balance, receivables, or cash flow.
 
-## Recent Activity
+Those authoritative amount rollups remain **PB-2 / PB-3**.
 
-Recent Activity may combine truthful canonical events from:
+---
 
-- `customer_project_status_history`;
-- `customer_order_status_history`;
-- `customer_order_revisions`;
-- non-void `customer_invoices`.
+## Dedicated Activity
 
-Events are descriptive history, not workflow milestones. Actor names are shown when current RLS permits resolving the referenced profile; otherwise the UI fails safely to `Modulex user` / `System` rather than weakening RLS.
+Project lifecycle/audit history lives in the separate **Activity** card on Project Detail.
 
-## Safety boundary
+- Project Progress must **not** contain a duplicate `Recent Activity` block.
+- The dedicated Activity card is the official PB-1 Project lifecycle timeline.
+- It reads `customer_project_status_history`, displays the status transition in readable form, preserves newest-first chronology, and shows the actor when `changed_by` resolves to a profile.
+- Missing actor identity falls back to a neutral system/user label; the UI must not fabricate a person.
+- Order revision/status history remains owned by the Order domain and is not copied into the Project lifecycle audit timeline merely to make the card look busier.
 
-This PB-1 feature is read-only and introduces:
+---
 
-- no migration;
-- no new persisted Project workflow state;
-- no Store/Portal projection;
-- no change to canonical Order, Shipment, Installation, Invoice, pricing, reservation, revision, or finance contracts.
+## Admin UI / Accessibility Lock
+
+Project Progress and Activity must continue to use shared Modulex Admin primitives/tokens:
+
+- `ComponentCard`
+- `Badge`
+- shared Admin text tokens
+- shared Admin table primitives for Activity
+- runtime locale formatting rather than a hard-coded display locale
+- light/dark-mode contrast compatible with `AdminUICheck.md` and `ADMIN_UI_GUIDE.md`
+
+The accepted responsive behavior must remain valid across the Admin resolution matrix without horizontal page overflow.
+
+---
+
+## Safety / Ownership Boundaries
+
+- Project Progress is read-only in PB-1.
+- No additional Project Progress schema/migration is introduced by this presentation layer.
+- Cancelled Orders do not contribute to active Project progress.
+- Financial amount rollups remain deferred to PB-2/PB-3.
+- Authoritative delivery/install Project rollups remain deferred to PB-5.
+- Store / Customer Portal / Dealer Portal Project projection remains unchanged in PB-1.
+- Do not update `modulex-store/STORE_ROADMAP.md` for this design-only closeout because no Store/portal behavior changed.
+
+---
+
+## Acceptance Lock
+
+Accepted PB-1 presentation:
+
+```text
+Project Detail
+  ├── Project summary
+  ├── Project Progress  ← full-width compact overview
+  │    ├── Lifecycle badges
+  │    └── Orders | Delivery | Installation | Commercial
+  ├── Project Settings (permission-gated)
+  ├── Orders
+  └── Activity          ← dedicated Project lifecycle/audit timeline
+```
+
+Do not restore the discarded Project Progress sidebar/right-rail design or duplicate `Recent Activity` inside Project Progress without a new explicit product decision.
