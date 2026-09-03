@@ -22,6 +22,8 @@ const stoneMedia = read("src/lib/vendor-catalog/stone-media.ts");
 const stoneContentSource = read("src/lib/vendor-catalog/stone-content.ts");
 const approvalDispatcher = read("src/lib/vendor-catalog/approval.ts");
 const backfillRoute = read("src/app/api/vendor-catalog/stone/backfill-approved/route.ts");
+const backfillUi = read("src/app/(admin)/products/vendor-imports/StoneContentBackfill.tsx");
+const vendorPage = read("src/app/(admin)/products/vendor-imports/page.tsx");
 
 assert.match(stoneApproval, /archiveStoneProductContent/);
 assert.match(stoneApproval, /buildStoneProductDescription/);
@@ -48,6 +50,10 @@ assert.match(backfillRoute, /authorizeVendorCatalogAdmin/);
 assert.match(backfillRoute, /review_status/);
 assert.match(backfillRoute, /APPROVED/);
 assert.match(backfillRoute, /approveStoneVendorCatalogItem/);
+assert.match(backfillUi, /\/api\/vendor-catalog\/stone\/backfill-approved/);
+assert.match(backfillUi, /Backfill Approved Content/);
+assert.match(backfillUi, /refreshSession\(\)/);
+assert.match(vendorPage, /StoneContentBackfill/);
 
 const stoneContent = await importTranspiled(stoneContentSource);
 
