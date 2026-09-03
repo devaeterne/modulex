@@ -157,6 +157,16 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
     () => (project?.orders ?? []).filter((order) => order.status !== "cancelled"),
     [project]
   );
+  const orderTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const order of activeOrders) {
+      const currencyCode = order.currency_code || "USD";
+      const amount = Number(order.grand_total ?? 0);
+      if (!Number.isFinite(amount)) continue;
+      totals.set(currencyCode, (totals.get(currencyCode) ?? 0) + amount);
+    }
+    return Array.from(totals, ([currencyCode, amount]) => ({ currencyCode, amount }));
+  }, [activeOrders]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -432,6 +442,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
             projectId={project.id}
             canManageProjectPayments={canManageProjectPayments}
             canViewCostMargin={canViewProjectFinancials}
+            orderTotals={orderTotals}
           />
         ) : (
           <Alert variant="warning" title="Finance access restricted" message="You do not have permission to view Project customer collection status." />

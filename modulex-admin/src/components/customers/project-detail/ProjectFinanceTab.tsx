@@ -25,6 +25,7 @@ import {
   loadProjectPaymentLedger,
   recordProjectPayment,
   reverseProjectPayment,
+  type ProjectPaymentCurrencySummary,
   type ProjectPaymentLedger,
 } from "@/lib/customers/project-payments";
 import {
@@ -33,10 +34,16 @@ import {
   type ProjectPaymentStatus,
 } from "@/lib/customers/project-payment-status";
 
+type OrderTotalReference = {
+  currencyCode: string;
+  amount: number;
+};
+
 type Props = {
   projectId: string;
   canManageProjectPayments: boolean;
   canViewCostMargin: boolean;
+  orderTotals: OrderTotalReference[];
 };
 
 type BadgeColor = "success" | "warning" | "error" | "info" | "light";
@@ -65,7 +72,19 @@ function todayInput() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function ProjectFinanceTab({ projectId, canManageProjectPayments, canViewCostMargin }: Props) {
+function emptyCurrencySummary(currencyCode: string): ProjectPaymentCurrencySummary {
+  return {
+    currencyCode,
+    expected: 0,
+    received: 0,
+    allocated: 0,
+    unallocatedCredit: 0,
+    remaining: 0,
+    overdue: 0,
+  };
+}
+
+export default function ProjectFinanceTab({ projectId, canManageProjectPayments, canViewCostMargin, orderTotals }: Props) {
   const [ledger, setLedger] = useState<ProjectPaymentLedger | null>(null);
   const [status, setStatus] = useState<ProjectPaymentStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,6 +169,20 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
     [ledger]
   );
 
+  const commercialSummaries = useMemo(() => {
+    const ledgerByCurrency = new Map((ledger?.currencies ?? []).map((summary) => [summary.currencyCode, summary]));
+    const orderByCurrency = new Map(orderTotals.map((total) => [total.currencyCode, total.amount]));
+    const currencies = new Set([...ledgerByCurrency.keys(), ...orderByCurrency.keys()]);
+
+    return Array.from(currencies).sort().map((currencyCode) => {
+      const summary = ledgerByCurrency.get(currencyCode) ?? emptyCurrencySummary(currencyCode);
+      const orderValue = orderByCurrency.get(currencyCode) ?? 0;
+      const customerBalance = Math.max(summary.expected - summary.received, 0);
+      const planDifference = summary.expected - orderValue;
+      return { summary, orderValue, customerBalance, planDifference };
+    });
+  }, [ledger, orderTotals]);
+
   async function runAction(action: () => Promise<unknown>, successMessage: string) {
     setSaving(true);
     setError(null);
@@ -214,27 +247,45 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
       {message ? <Alert variant="success" title="Project payment updated" message={message} /> : null}
 
       <ComponentCard
-        title="Customer Receivables"
-        desc="Payment plan and actual customer cash are separate from invoice issuance. Currency totals are never silently converted."
+        title="Commercial Overview"
+        desc="Order Value is a reference, Payment Plan is the expected collection schedule, and Collected is actual customer cash. Open Requirements can remain while equivalent Unallocated Credit is already on hand. Currency totals are never silently converted."
       >
         {loading && !ledger ? <p className="text-sm" role="status">Loading Project payment ledger…</p> : null}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {(ledger?.currencies ?? []).map((summary) => (
-            <div key={summary.currencyCode} className="contents">
-              <Metric label={`${summary.currencyCode} Expected`} value={money(summary.expected, summary.currencyCode)} />
-              <Metric label="Received" value={money(summary.received, summary.currencyCode)} />
-              <Metric label="Remaining" value={money(summary.remaining, summary.currencyCode)} />
-              <Metric label="Overdue" value={money(summary.overdue, summary.currencyCode)} />
-              <Metric label="Unallocated Credit" value={money(summary.unallocatedCredit, summary.currencyCode)} />
-            </div>
-          ))}
-          {!loading && (ledger?.currencies.length ?? 0) === 0 ? (
-            <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>No customer payment plan or payment transaction has been recorded yet.</p>
+        <div className="space-y-6">
+          {commercialSummaries.map(({ summary, orderValue, customerBalance, planDifference }) => {
+            const differenceDirection = planDifference > 0 ? "above" : "below";
+            return (
+              <div key={summary.currencyCode} className="space-y-4">
+                {commercialSummaries.length > 1 ? (
+                  <p className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>{summary.currencyCode}</p>
+                ) : null}
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <Metric label="Order Value" value={money(orderValue, summary.currencyCode)} />
+                  <Metric label="Payment Plan" value={money(summary.expected, summary.currencyCode)} />
+                  <Metric label="Collected" value={money(summary.received, summary.currencyCode)} />
+                  <Metric label="Customer Balance" value={money(customerBalance, summary.currencyCode)} />
+                  <Metric label="Applied" value={money(summary.allocated, summary.currencyCode)} />
+                  <Metric label="Unallocated Credit" value={money(summary.unallocatedCredit, summary.currencyCode)} />
+                  <Metric label="Open Requirements" value={money(summary.remaining, summary.currencyCode)} />
+                  <Metric label="Overdue" value={money(summary.overdue, summary.currencyCode)} />
+                </div>
+                {Math.abs(planDifference) > 0.005 ? (
+                  <Alert
+                    variant="warning"
+                    title="Payment plan / Order value difference"
+                    message={`Payment plan is ${money(Math.abs(planDifference), summary.currencyCode)} ${differenceDirection} the current Project Order value. Order totals are a reference only; this does not block payment planning.`}
+                  />
+                ) : null}
+              </div>
+            );
+          })}
+          {!loading && commercialSummaries.length === 0 ? (
+            <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>No active Order value, customer payment plan, or payment transaction has been recorded yet.</p>
           ) : null}
         </div>
       </ComponentCard>
 
-      <ComponentCard title="Payment Plan" desc="Order totals are a reference; milestones are not locked 1:1 to Orders.">
+      <ComponentCard title="Payment Plan" desc="Order totals are a reference; milestones are not locked 1:1 to Orders. Applied means customer cash explicitly allocated to that milestone.">
         <TableViewport>
           <Table variant="admin" minWidth="standard">
             <TableHeader variant="admin">
@@ -242,7 +293,7 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
                 <TableCell isHeader variant="admin">Milestone</TableCell>
                 <TableCell isHeader variant="admin">Due</TableCell>
                 <TableCell isHeader variant="admin">Expected</TableCell>
-                <TableCell isHeader variant="admin">Received</TableCell>
+                <TableCell isHeader variant="admin">Applied</TableCell>
                 <TableCell isHeader variant="admin">Remaining</TableCell>
                 <TableCell isHeader variant="admin">Status</TableCell>
               </TableRow>
