@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import SectionTitle from "@/components/common/SectionTitle";
 import SummaryRow from "@/components/common/SummaryRow";
@@ -8,6 +8,7 @@ import FormHint from "@/components/form/FormHint";
 import Label from "@/components/form/Label";
 import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
+import SearchableSelect from "@/components/form/SearchableSelect";
 import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
@@ -139,12 +140,10 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [stoneTypeId, setStoneTypeId] = useState("");
   const [stoneProductId, setStoneProductId] = useState("");
-  const [stoneSearch, setStoneSearch] = useState("");
   const [materialBandId, setMaterialBandId] = useState("");
   const [priceGroupId, setPriceGroupId] = useState("");
   const [edgeId, setEdgeId] = useState("");
   const [sinkId, setSinkId] = useState("");
-  const [sinkSearch, setSinkSearch] = useState("");
   const [manualSinkPrice, setManualSinkPrice] = useState("");
   const [sqft, setSqft] = useState("");
   const [edgeLinearFt, setEdgeLinearFt] = useState("0");
@@ -255,18 +254,9 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
     return () => { mounted = false; };
   }, [orderId, orderItemId, orderContext?.lineNo]);
 
-  const filteredStones = useMemo(() => {
-    const query = stoneSearch.trim().toLowerCase();
-    return stones.filter((row) => {
-      if (stoneTypeId && row.stone_type_id !== stoneTypeId) return false;
-      if (!query) return true;
-      return `${row.name} ${row.sku ?? ""}`.toLowerCase().includes(query);
-    });
-  }, [stones, stoneSearch, stoneTypeId]);
-  const filteredSinks = useMemo(() => {
-    const query = sinkSearch.trim().toLowerCase();
-    return query ? sinks.filter((row) => row.label.toLowerCase().includes(query)) : sinks;
-  }, [sinks, sinkSearch]);
+  const stoneOptions = stones
+    .filter((row) => !stoneTypeId || row.stone_type_id === stoneTypeId)
+    .map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name }));
   const selectedStone = stones.find((row) => row.id === stoneProductId);
   const selectedBand = materialBands.find((row) => row.id === materialBandId);
   const defaultBand = materialBands.find((row) => row.id === selectedStone?.material_price_band_id);
@@ -394,21 +384,19 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
               <Select options={types} value={stoneTypeId} placeholder="Select Stone Type" allowEmpty onChange={(value) => { setStoneTypeId(value); setStoneProductId(""); setMaterialBandId(""); setResult(null); }} />
             </Field>
             <Field label="Stone" required>
-              <div className="space-y-2">
-                <Input ariaLabel="Search stone by name or SKU" placeholder="Search stone by name or SKU" value={stoneSearch} onChange={(event) => setStoneSearch(event.target.value)} />
-                <Select
-                  options={filteredStones.map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name }))}
-                  value={stoneProductId}
-                  placeholder="Select Stone"
-                  onChange={(value) => {
-                    const nextStone = stones.find((row) => row.id === value);
-                    setStoneProductId(value);
-                    setMaterialBandId(nextStone?.material_price_band_id ?? "");
-                    setResult(null);
-                  }}
-                  required
-                />
-              </div>
+              <SearchableSelect
+                options={stoneOptions}
+                value={stoneProductId}
+                placeholder="Select Stone"
+                searchPlaceholder="Search stone by name or SKU"
+                onChange={(value) => {
+                  const nextStone = stones.find((row) => row.id === value);
+                  setStoneProductId(value);
+                  setMaterialBandId(nextStone?.material_price_band_id ?? "");
+                  setResult(null);
+                }}
+                required
+              />
             </Field>
             <Field label="Material price band" required hint={materialBandHint}>
               <Select
@@ -432,20 +420,18 @@ export default function CountertopConfigurator({ orderId, orderItemId, orderCont
               <Input type="number" step="0.0001" min="0" value={edgeLinearFt} onChange={(event) => { setEdgeLinearFt(event.target.value); setResult(null); }} />
             </Field>
             <Field label="Sink (optional)">
-              <div className="space-y-2">
-                <Input ariaLabel="Search sink by name or SKU" placeholder="Search sink by name or SKU" value={sinkSearch} onChange={(event) => setSinkSearch(event.target.value)} />
-                <Select
-                  options={filteredSinks}
-                  value={sinkId}
-                  placeholder="No sink"
-                  allowEmpty
-                  onChange={(value) => {
-                    if (value !== sinkId) setManualSinkPrice("");
-                    setSinkId(value);
-                    setResult(null);
-                  }}
-                />
-              </div>
+              <SearchableSelect
+                options={sinks}
+                value={sinkId}
+                placeholder="No sink"
+                searchPlaceholder="Search sink by name or SKU"
+                allowEmpty
+                onChange={(value) => {
+                  if (value !== sinkId) setManualSinkPrice("");
+                  setSinkId(value);
+                  setResult(null);
+                }}
+              />
             </Field>
             <Field
               label="Manual sink price fallback (optional)"
