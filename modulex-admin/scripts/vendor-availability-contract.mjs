@@ -59,9 +59,15 @@ assert.match(
 assert.doesNotMatch(adapters, /available === false/);
 assert.match(adapters, /availability:\s*normalizeKarranAvailability\(\)/);
 assert.match(adapters, /normalizeRuvatiAvailability/);
-assert.match(adapters, /OUT_OF_STOCK/);
-assert.match(adapters, /UNAVAILABLE/);
-assert.match(adapters, /UNKNOWN/);
+assert.match(adapters, /product\.is_in_stock\s*===\s*false/);
+assert.match(adapters, /status:\s*"OUT_OF_STOCK"/);
+assert.match(adapters, /product\.is_in_stock\s*===\s*true/);
+assert.match(adapters, /status:\s*"AVAILABLE"/);
+assert.match(adapters, /status:\s*"UNKNOWN"/);
+assert.doesNotMatch(
+  adapters,
+  /product\.is_purchasable\s*===\s*false[\s\S]{0,180}?status:\s*"UNAVAILABLE"/
+);
 assert.doesNotMatch(adapters, /low_stock_remaining/);
 assert.match(adapters, /stockQuantity:\s*null/);
 assert.match(adapters, /source:\s*"product-sitemap\.xml"/);
