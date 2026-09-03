@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
+import SearchableSelect from "@/components/form/SearchableSelect";
 import Input from "@/components/form/input/InputField";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   Table,
   TableBody,
@@ -33,6 +35,7 @@ type ProfileOption = { id: string; full_name: string | null; email: string | nul
 type ProjectReferenceData = { customers: CustomerOption[]; profiles: ProfileOption[] };
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const REFERENCE_RESULT_LIMIT = 50;
 
 const statusOptions: Array<{ value: "all" | ProjectStatus; label: string }> = [
   { value: "all", label: "All statuses" },
@@ -65,19 +68,32 @@ function displayDate(value: string | null) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
 }
 
+function mergeSelectedRows<T extends { id: string }>(nextRows: T[], previousRows: T[], selectedIds: string[]) {
+  const nextIds = new Set(nextRows.map((row) => row.id));
+  const selected = new Set(selectedIds.filter(Boolean));
+  const preserved = previousRows.filter((row) => selected.has(row.id) && !nextIds.has(row.id));
+  return [...preserved, ...nextRows];
+}
+
 export default function ProjectsWorkspace() {
   const router = useRouter();
   const reloadRequestId = useRef(0);
+  const customerOptionRequestId = useRef(0);
+  const profileOptionRequestId = useRef(0);
   const [projects, setProjects] = useState<CustomerProject[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
   const [canManageProjects, setCanManageProjects] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [customerOptionsLoading, setCustomerOptionsLoading] = useState(false);
+  const [profileOptionsLoading, setProfileOptionsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | ProjectStatus>("all");
+  const [customerFilterId, setCustomerFilterId] = useState("");
+  const [salesRepFilterId, setSalesRepFilterId] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(25);
   const [totalCount, setTotalCount] = useState(0);
@@ -88,32 +104,57 @@ export default function ProjectsWorkspace() {
 
   const customerOptions = useMemo(() => customers.map((item) => ({ value: item.id, label: item.name })), [customers]);
   const salesRepOptions = useMemo(
-    () => profiles.filter((item) => ["super_admin", "admin", "sales"].includes(item.role)).map((item) => ({ value: item.id, label: item.full_name || item.email || "Unnamed user" })),
+    () => profiles.map((item) => ({ value: item.id, label: item.full_name || item.email || "Unnamed user" })),
     [profiles]
   );
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const startRow = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRow = Math.min(currentPage * pageSize, totalCount);
 
-  const loadReferenceData = useCallback(async (): Promise<ProjectReferenceData> => {
-    const [customersResult, profilesResult] = await Promise.all([
-      supabase.from("customers").select("id, name, sales_rep_id").order("name"),
-      supabase.from("profiles").select("id, full_name, email, role, is_active").eq("is_active", true).order("full_name"),
-    ]);
-    const firstError = customersResult.error || profilesResult.error;
-    if (firstError) throw firstError;
-    return {
-      customers: (customersResult.data ?? []) as CustomerOption[],
-      profiles: (profilesResult.data ?? []) as ProfileOption[],
-    };
+  const loadCustomerOptions = useCallback(async (queryText = "") => {
+    let query = supabase
+      .from("customers")
+      .select("id, name, sales_rep_id")
+      .order("name")
+      .limit(REFERENCE_RESULT_LIMIT);
+    const normalized = queryText.trim();
+    if (normalized) query = query.ilike("name", `%${normalized}%`);
+    const result = await query;
+    if (result.error) throw result.error;
+    return (result.data ?? []) as CustomerOption[];
   }, []);
+
+  const loadSalesRepOptions = useCallback(async (queryText = "") => {
+    let query = supabase
+      .from("profiles")
+      .select("id, full_name, email, role, is_active")
+      .eq("is_active", true)
+      .in("role", ["super_admin", "admin", "sales"])
+      .order("full_name")
+      .limit(REFERENCE_RESULT_LIMIT);
+    const normalized = queryText.trim();
+    if (normalized) query = query.ilike("full_name", `%${normalized}%`);
+    const result = await query;
+    if (result.error) throw result.error;
+    return (result.data ?? []) as ProfileOption[];
+  }, []);
+
+  const loadReferenceData = useCallback(async (): Promise<ProjectReferenceData> => {
+    const [nextCustomers, nextProfiles] = await Promise.all([
+      loadCustomerOptions(),
+      loadSalesRepOptions(),
+    ]);
+    return { customers: nextCustomers, profiles: nextProfiles };
+  }, [loadCustomerOptions, loadSalesRepOptions]);
 
   const loadProjects = useCallback(() => listCustomerProjects({
     search: search || null,
     status: status === "all" ? null : status,
+    customerId: customerFilterId || null,
+    salesRepId: salesRepFilterId || null,
     limit: pageSize,
     offset: (currentPage - 1) * pageSize,
-  }), [currentPage, pageSize, search, status]);
+  }), [currentPage, customerFilterId, pageSize, salesRepFilterId, search, status]);
 
   const reload = useCallback(async () => {
     const requestId = ++reloadRequestId.current;
@@ -124,18 +165,17 @@ export default function ProjectsWorkspace() {
       if (requestId !== reloadRequestId.current) return;
       if (profileError) throw profileError;
 
-      const nextCanManageProjects = Boolean(profile && hasPermission(profile.roles, "projects.manage"));
       const [projectResult, referenceData] = await Promise.all([
         loadProjects(),
-        nextCanManageProjects ? loadReferenceData() : Promise.resolve<ProjectReferenceData | null>(null),
+        loadReferenceData(),
       ]);
       if (requestId !== reloadRequestId.current) return;
 
-      setCanManageProjects(nextCanManageProjects);
+      setCanManageProjects(Boolean(profile && hasPermission(profile.roles, "projects.manage")));
       setProjects(projectResult.items);
       setTotalCount(projectResult.total_count);
-      setCustomers(referenceData?.customers ?? []);
-      setProfiles(referenceData?.profiles ?? []);
+      setCustomers(referenceData.customers);
+      setProfiles(referenceData.profiles);
     } catch (loadError) {
       if (requestId !== reloadRequestId.current) return;
       setError(loadError instanceof Error ? loadError.message : "Projects could not be loaded.");
@@ -143,6 +183,38 @@ export default function ProjectsWorkspace() {
       if (requestId === reloadRequestId.current) setLoading(false);
     }
   }, [loadProjects, loadReferenceData]);
+
+  const searchCustomers = useCallback(async (queryText: string) => {
+    const requestId = ++customerOptionRequestId.current;
+    setCustomerOptionsLoading(true);
+    try {
+      const nextRows = await loadCustomerOptions(queryText);
+      if (requestId !== customerOptionRequestId.current) return;
+      setCustomers((previousRows) => mergeSelectedRows(nextRows, previousRows, [customerId, customerFilterId]));
+    } catch (searchError) {
+      if (requestId === customerOptionRequestId.current) {
+        setError(searchError instanceof Error ? searchError.message : "Customer options could not be loaded.");
+      }
+    } finally {
+      if (requestId === customerOptionRequestId.current) setCustomerOptionsLoading(false);
+    }
+  }, [customerFilterId, customerId, loadCustomerOptions]);
+
+  const searchSalesReps = useCallback(async (queryText: string) => {
+    const requestId = ++profileOptionRequestId.current;
+    setProfileOptionsLoading(true);
+    try {
+      const nextRows = await loadSalesRepOptions(queryText);
+      if (requestId !== profileOptionRequestId.current) return;
+      setProfiles((previousRows) => mergeSelectedRows(nextRows, previousRows, [salesRepId, salesRepFilterId]));
+    } catch (searchError) {
+      if (requestId === profileOptionRequestId.current) {
+        setError(searchError instanceof Error ? searchError.message : "Sales Rep options could not be loaded.");
+      }
+    } finally {
+      if (requestId === profileOptionRequestId.current) setProfileOptionsLoading(false);
+    }
+  }, [loadSalesRepOptions, salesRepFilterId, salesRepId]);
 
   useEffect(() => {
     void reload();
@@ -208,7 +280,17 @@ export default function ProjectsWorkspace() {
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <Label htmlFor="project-customer">Customer</Label>
-              <Select id="project-customer" options={customerOptions} value={customerId} onChange={handleCustomerChange} placeholder="Select customer" />
+              <SearchableSelect
+                options={customerOptions}
+                value={customerId}
+                onChange={handleCustomerChange}
+                onSearchChange={searchCustomers}
+                loading={customerOptionsLoading}
+                placeholder="Select customer"
+                searchPlaceholder="Search customers by name"
+                noResultsText="No matching customers."
+                required
+              />
             </div>
             <div>
               <Label htmlFor="project-name">Project name</Label>
@@ -216,7 +298,17 @@ export default function ProjectsWorkspace() {
             </div>
             <div>
               <Label htmlFor="project-sales-rep">Sales Rep</Label>
-              <Select id="project-sales-rep" options={salesRepOptions} value={salesRepId} onChange={setSalesRepId} placeholder="Select sales rep" allowEmpty />
+              <SearchableSelect
+                options={salesRepOptions}
+                value={salesRepId}
+                onChange={setSalesRepId}
+                onSearchChange={searchSalesReps}
+                loading={profileOptionsLoading}
+                placeholder="Select sales rep"
+                searchPlaceholder="Search sales reps by name"
+                noResultsText="No matching Sales Reps."
+                allowEmpty
+              />
             </div>
             <div>
               <Label htmlFor="project-target-date">Target date</Label>
@@ -230,7 +322,7 @@ export default function ProjectsWorkspace() {
       ) : null}
 
       <ComponentCard title="Projects" desc="Project ownership is separate from who created an Order.">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px_160px]">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_220px_220px_180px_140px]">
           <div>
             <Label htmlFor="project-search">Search</Label>
             <Input
@@ -241,6 +333,42 @@ export default function ProjectsWorkspace() {
                 setCurrentPage(1);
               }}
               placeholder="Project #, customer or project name"
+            />
+          </div>
+          <div>
+            <Label>Customer</Label>
+            <SearchableSelect
+              options={customerOptions}
+              value={customerFilterId}
+              onChange={(value) => {
+                setCustomerFilterId(value);
+                setCurrentPage(1);
+              }}
+              onSearchChange={searchCustomers}
+              loading={customerOptionsLoading}
+              placeholder="All customers"
+              searchPlaceholder="Search customers by name"
+              noResultsText="No matching customers."
+              allowEmpty
+              ariaLabel="Filter Projects by Customer"
+            />
+          </div>
+          <div>
+            <Label>Sales Rep</Label>
+            <SearchableSelect
+              options={salesRepOptions}
+              value={salesRepFilterId}
+              onChange={(value) => {
+                setSalesRepFilterId(value);
+                setCurrentPage(1);
+              }}
+              onSearchChange={searchSalesReps}
+              loading={profileOptionsLoading}
+              placeholder="All sales reps"
+              searchPlaceholder="Search sales reps by name"
+              noResultsText="No matching Sales Reps."
+              allowEmpty
+              ariaLabel="Filter Projects by Sales Rep"
             />
           </div>
           <div>
@@ -305,7 +433,7 @@ export default function ProjectsWorkspace() {
           </Table>
         </TableViewport>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${ADMIN_TEXT_STYLES.body}`}>
           <p className="text-sm" aria-live="polite">
             {totalCount === 0 ? "0 projects" : `${startRow}–${endRow} of ${totalCount} projects`}
           </p>
