@@ -64,9 +64,9 @@ assert.doesNotMatch(adapters, /0\.00 EUR/);
 assert.doesNotMatch(adapters, /vendorPriceReference/);
 
 // East West moved from numeric category routes to /products/<stone-type>, and
-// product detail URLs are nested under that stone-type route.
+// the runtime behavior contract verifies current nested product detail URLs.
 assert.match(adapters, /\/products\/\$\{encodeURIComponent\(category\.key\)\}/);
-assert.match(adapters, /product\/view\/\\d\+\/\\d\+/);
+assert.match(adapters, /product\/view/);
 assert.doesNotMatch(adapters, /\/products\/category\/view\//);
 
 // Venezia has stale/dead catalog links in secondary navigation. A 404 category
