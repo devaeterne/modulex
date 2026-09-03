@@ -9,6 +9,7 @@ Current Admin next action: **Review/merge Vendor Catalog availability/bulk appro
 ## Customer read performance cleanup
 
 - [~] Deduplicate Customers summary, Customer Detail, and Order Detail initial reads without adding persistent client caching or changing mutation behavior.
+  - Main baseline: `7411c20d7d02bd6432d6c61196b34405429f11e1`.
   - Customers summary reuses `get_customer_dashboard` with zero recent-row limits while preserving the directory's exact filtered count and server-side range.
   - Customer and order detail consumers share only concurrent in-flight reads; settled requests are removed immediately so mutation-driven reloads cannot reuse stale data.
   - Keep this package `[~]` until the draft PR contracts, full Admin verification, and a post-deploy authenticated production browser re-audit confirm the duplicate calls are removed.
