@@ -31,6 +31,12 @@ const fulfillmentCompatibility = read(fulfillmentCompatibilityPath);
 const productLifecycle = read(productLifecyclePath);
 const shipmentDetail = read("src/components/customers/CustomerShipmentDetailRBAC.tsx");
 const installationDetail = read("src/components/customers/CustomerInstallationDetail.tsx");
+const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
+const orderRevisionHistory = read("src/components/customers/CustomerOrderRevisionHistory.tsx");
+const orderDetailPage = read("src/app/(admin)/customers/[id]/orders/[orderId]/page.tsx");
+const orderEditActions = read("src/components/customers/CustomerOrderEditActions.tsx");
+const orderDomain = read("src/lib/customers/order-domain.ts");
+const customerTypes = read("src/lib/customers/types.ts");
 const permissions = read("src/lib/auth/permissions.ts");
 const storePortalContract = read("../modulex-store/scripts/store-portal-contract.mjs");
 const portalExperienceContract = read("../modulex-store/scripts/portal-experience-contract.mjs");
@@ -50,6 +56,24 @@ assert.match(legacyCompatibility, /update of\s+price_group_id,\s*payment_method_
 assert.doesNotMatch(legacyCompatibility, /update of[^\n]+\bstatus\b/i, "legacy confirmed orders must not be revalidated only because their status advances");
 assert.match(productLifecycle, /p\.status\s*<>\s*'active'/i, "order confirmation must reject inactive or archived products");
 assert.match(productLifecycle, /active products/i, "product lifecycle rejection must explain the active-product requirement");
+
+// Order Detail Admin UI: readable, actor-aware, shared-primitives only.
+assert.match(orderDetail, /ADMIN_TEXT_STYLES/, "Order Detail must use shared light/dark Admin text tokens");
+assert.doesNotMatch(orderDetail, /Intl\.DateTimeFormat\("en-US"/, "Order Detail dates must use the runtime locale instead of hardcoded en-US");
+assert.match(orderDetail, /describeOrderStatusActivity/, "Order status timeline must explain lifecycle changes in human-readable text");
+assert.match(orderDetail, /orderStatusActor/, "Order status timeline must identify the actor when available");
+assert.match(orderDetail, />By<|variant="admin">By<\/TableCell>/, "Order status timeline must expose who made the change");
+assert.match(orderDetail, />Note<|variant="admin">Note<\/TableCell>/, "Order status timeline must expose status notes");
+assert.match(orderDomain, /customer_order_status_history_changed_by_fkey/, "Order detail loader must resolve status-history actors through the reviewed FK");
+assert.match(customerTypes, /actor\??:/, "Order status history type must model the resolved actor");
+assert.doesNotMatch(orderDetail, /`-\$\{money\(order\.discount_amount/, "Zero order discounts must not render as negative zero");
+assert.match(orderRevisionHistory, /ComponentCard/, "Order Revisions must use the shared ComponentCard primitive");
+assert.match(orderRevisionHistory, /Alert/, "Order Revisions must expose query failures through the shared Alert primitive");
+assert.match(orderRevisionHistory, /Retry/, "Order Revisions must provide a retry action after load failure");
+assert.doesNotMatch(orderRevisionHistory, /Intl\.DateTimeFormat\("en-US"/, "Order Revisions dates must use the runtime locale instead of hardcoded en-US");
+assert.doesNotMatch(orderRevisionHistory, /rounded-2xl border border-gray-200 bg-white/, "Order Revisions must not own a feature-local card appearance");
+assert.match(orderDetailPage, /CustomerOrderEditActions[\s\S]*CreateInstallationFromOrder|CreateInstallationFromOrder[\s\S]*CustomerOrderEditActions/, "Order page actions must remain grouped near the page heading");
+assert.match(orderEditActions, /ADMIN_BUTTON_VARIANTS|Button/, "Edit Order action must consume a shared Admin button primitive/token");
 
 // Shipments: strict warehouse flow, no backwards jumps or order-state regression.
 assert.match(sql, /customer_shipment_status_transition_allowed/i, "shipment transition helper must exist");
