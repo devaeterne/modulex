@@ -22,6 +22,9 @@ export default function CustomerOrderDetailPage() {
         <PermissionVisible permission="projects.view">
           <CustomerOrderProjectLink />
         </PermissionVisible>
+        <PermissionVisible permission="orders.manage">
+          <CustomerOrderEditActions />
+        </PermissionVisible>
         <PermissionVisible permission="shipments.manage">
           <CreateShipmentFromOrderButton />
         </PermissionVisible>
@@ -31,9 +34,6 @@ export default function CustomerOrderDetailPage() {
       </div>
       <PermissionVisible permission="installations.manage">
         <CreateInstallationFromOrder />
-      </PermissionVisible>
-      <PermissionVisible permission="orders.manage">
-        <CustomerOrderEditActions />
       </PermissionVisible>
       <CustomerOrderDetail />
       <CustomerOrderRevisionHistory />
