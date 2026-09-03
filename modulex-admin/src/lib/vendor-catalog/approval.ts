@@ -68,7 +68,8 @@ async function loadCompletedApproval(
   const baseProductCode = product?.base_product_code ?? product?.sku ?? null;
 
   let storeProductContentId: string | null = null;
-  if (state.catalog_domain !== "stone" && baseProductCode) {
+  let archivedImageCount = 0;
+  if (baseProductCode) {
     const { data: storeContent, error: storeError } = await supabaseAdmin
       .from("store_product_content")
       .select("id")
@@ -77,12 +78,27 @@ async function loadCompletedApproval(
       .maybeSingle();
     if (storeError) throw storeError;
     storeProductContentId = storeContent?.id ?? null;
+
+    if (storeProductContentId) {
+      const { count, error: mediaError } = await supabaseAdmin
+        .from("store_product_media")
+        .select("id", { count: "exact", head: true })
+        .eq("product_content_id", storeProductContentId)
+        .eq("media_type", "image");
+      if (mediaError) throw mediaError;
+      archivedImageCount = count ?? 0;
+    }
   }
+
+  // Older Stone approvals predate Store draft/media creation. Treat those rows
+  // as repairable rather than complete so the normal idempotent approval path
+  // can backfill content without creating another canonical product.
+  if (state.catalog_domain === "stone" && !storeProductContentId) return null;
 
   return {
     productId: state.canonical_product_id,
     storeProductContentId,
-    archivedImageCount: 0,
+    archivedImageCount,
     baseProductCode,
     alreadyApproved: true,
   };
