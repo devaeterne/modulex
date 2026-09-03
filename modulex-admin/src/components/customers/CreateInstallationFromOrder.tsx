@@ -10,6 +10,7 @@ import TextArea from "@/components/form/input/TextArea";
 import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
+import { loadCustomerOrderRecord } from "@/lib/customers/order-domain";
 import type { OrderFulfillmentType, ProfileLookup } from "@/lib/customers/types";
 import { isValidPhone, sanitizePhoneInput } from "@/lib/validation";
 
@@ -30,16 +31,12 @@ export default function CreateInstallationFromOrder() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase
-      .from("customer_orders")
-      .select("fulfillment_type")
-      .eq("id", params.orderId)
-      .single()
-      .then(({ data, error }) => {
-        if (error) setErrorMessage(error.message);
-        else setFulfillmentType((data?.fulfillment_type as OrderFulfillmentType | null) ?? "delivery");
+    loadCustomerOrderRecord(params.id, params.orderId)
+      .then((order) => setFulfillmentType(order.fulfillment_type ?? "delivery"))
+      .catch((error: unknown) => {
+        setErrorMessage(error instanceof Error ? error.message : "Unable to load order.");
       });
-  }, [params.orderId]);
+  }, [params.id, params.orderId]);
 
   useEffect(() => {
     if (!open || profiles.length) return;

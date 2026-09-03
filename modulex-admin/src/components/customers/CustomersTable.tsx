@@ -27,6 +27,14 @@ const CUSTOMER_STATUSES: CustomerStatus[] = ["active", "inactive", "blocked", "p
 
 type PortalFilter = "all" | "enabled" | "disabled";
 type Summary = { total: number; active: number; prospects: number; portal: number };
+type CustomerDashboardSummary = {
+  stats: {
+    total_customers: number;
+    active_customers: number;
+    prospects: number;
+    portal_enabled: number;
+  };
+};
 
 function statusColor(status: CustomerStatus): "success" | "error" | "warning" | "light" {
   if (status === "active") return "success";
@@ -160,26 +168,22 @@ export default function CustomersTable() {
   const endRow = Math.min(currentPage * pageSize, filteredCount);
 
   const loadSummary = useCallback(async () => {
-    const [totalResult, activeResult, prospectsResult, portalResult] = await Promise.all([
-      supabase.from("customers").select("id", { count: "exact", head: true }),
-      supabase.from("customers").select("id", { count: "exact", head: true }).eq("status", "active"),
-      supabase.from("customers").select("id", { count: "exact", head: true }).eq("status", "prospect"),
-      supabase.from("customers").select("id", { count: "exact", head: true }).eq("portal_enabled", true),
-    ]);
+    const { data, error } = await supabase.rpc("get_customer_dashboard", {
+      p_recent_orders: 0,
+      p_recent_customers: 0,
+    });
 
-    const firstError =
-      totalResult.error || activeResult.error || prospectsResult.error || portalResult.error;
-
-    if (firstError) {
-      setErrorMessage(firstError.message);
+    if (error) {
+      setErrorMessage(error.message);
       return;
     }
 
+    const { stats } = data as CustomerDashboardSummary;
     setSummary({
-      total: totalResult.count ?? 0,
-      active: activeResult.count ?? 0,
-      prospects: prospectsResult.count ?? 0,
-      portal: portalResult.count ?? 0,
+      total: stats.total_customers,
+      active: stats.active_customers,
+      prospects: stats.prospects,
+      portal: stats.portal_enabled,
     });
   }, []);
 

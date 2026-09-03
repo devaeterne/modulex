@@ -4,6 +4,8 @@ import process from "node:process";
 
 const root = process.cwd();
 const domainPath = path.join(root, "src/lib/customers/order-domain.ts");
+const readDedupPath = path.join(root, "src/lib/customers/read-dedup.ts");
+const installation = fs.readFileSync(path.join(root, "src/components/customers/CreateInstallationFromOrder.tsx"), "utf8");
 const newOrder = fs.readFileSync(path.join(root, "src/components/customers/NewCustomerOrder.tsx"), "utf8");
 const editOrder = fs.readFileSync(path.join(root, "src/components/customers/EditCustomerOrder.tsx"), "utf8");
 const detailOrder = fs.readFileSync(path.join(root, "src/components/customers/CustomerOrderDetail.tsx"), "utf8");
@@ -17,13 +19,16 @@ function assert(condition, message) {
 }
 
 assert(fs.existsSync(domainPath), "A1.2B must define src/lib/customers/order-domain.ts");
+assert(fs.existsSync(readDedupPath), "Order detail must define the shared customer read dedup adapter");
 
 const domain = fs.readFileSync(domainPath, "utf8");
+const readDedup = fs.readFileSync(readDedupPath, "utf8");
 
 for (const exportedName of [
   "loadCreateOrderContext",
   "loadEditOrderContext",
   "loadOrderDetail",
+  "loadCustomerOrderRecord",
   "loadOrderPrices",
   "createCustomerOrder",
   "updateCustomerOrder",
@@ -61,6 +66,12 @@ assert(!editOrder.includes('.from("product_prices")'), "edit UI price reads must
 assert(!detailOrder.includes('.from("customer_orders")'), "detail UI order reads must be centralized in the order domain adapter");
 assert(!detailOrder.includes('.from("customer_order_items")'), "detail UI item reads must be centralized in the order domain adapter");
 assert(!detailOrder.includes('.from("customer_order_status_history")'), "detail UI history reads must be centralized in the order domain adapter");
+
+assert(readDedup.includes("loadCustomerOrderRecord"), "shared read adapter must expose an in-flight customer order read");
+assert(domain.includes("loadCustomerOrderRecord(customerId, orderId)"), "order detail and revision policy must consume the shared order record read");
+assert(installation.includes('from "@/lib/customers/order-domain"'), "installation scheduling surface must consume the shared order domain adapter");
+assert(installation.includes("loadCustomerOrderRecord(params.id, params.orderId)"), "installation scheduling must reuse the shared order record read");
+assert(!installation.includes('.from("customer_orders")'), "installation scheduling must not issue a second customer_orders read during page mount");
 
 assert(domain.includes('.rpc("create_customer_order"'), "order domain adapter must retain create_customer_order as the create boundary");
 assert(domain.includes('.rpc("update_customer_order"'), "order domain adapter must retain update_customer_order as the edit boundary");

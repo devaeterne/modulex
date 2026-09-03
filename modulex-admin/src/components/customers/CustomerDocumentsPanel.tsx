@@ -10,6 +10,7 @@ import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { loadCustomerDocuments } from "@/lib/customers/read-dedup";
 import type { CustomerDocument } from "@/lib/customers/types";
 
 const bucket = "customer-documents";
@@ -30,25 +31,21 @@ export default function CustomerDocumentsPanel({ customerId }: { customerId: str
   const [error, setError] = useState<string | null>(null);
 
   const loadDocuments = useCallback(async () => {
-    const { data, error: loadError } = await supabase
-      .from("customer_documents")
-      .select("*")
-      .eq("customer_id", customerId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
-    if (loadError) throw loadError;
-    setDocuments((data ?? []) as CustomerDocument[]);
+    const data = await loadCustomerDocuments(customerId);
+    setDocuments(data);
   }, [customerId]);
 
   useEffect(() => {
     async function initialize() {
       try {
-        const { profile, error: profileError } = await getCurrentProfile();
+        const [{ profile, error: profileError }] = await Promise.all([
+          getCurrentProfile(),
+          loadDocuments(),
+        ]);
         if (profileError) throw profileError;
         const role = profile?.role ?? "";
         setCanUpload(["super_admin", "admin", "sales"].includes(role));
         setCanManagePortal(["super_admin", "admin"].includes(role));
-        await loadDocuments();
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "Unable to load customer documents.");
       }

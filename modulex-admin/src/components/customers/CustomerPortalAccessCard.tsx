@@ -11,6 +11,7 @@ import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { loadCustomerRecord } from "@/lib/customers/read-dedup";
 import type { CustomerPortalUser } from "@/lib/customers/types";
 
 function titleCase(value: string) {
@@ -28,13 +29,13 @@ export default function CustomerPortalAccessCard({ customerId }: { customerId: s
   const [form, setForm] = useState({ full_name: "", login_email: "", portal_role: "buyer" as "admin" | "buyer" | "viewer", is_primary: false });
 
   async function load() {
-    const [{ profile }, customerResult, usersResult] = await Promise.all([
+    const [{ profile }, customer, usersResult] = await Promise.all([
       getCurrentProfile(),
-      supabase.from("customers").select("portal_enabled").eq("id", customerId).single(),
+      loadCustomerRecord(customerId),
       supabase.from("customer_portal_users").select("*").eq("customer_id", customerId).order("is_primary", { ascending: false }).order("created_at"),
     ]);
     setCanManage(["super_admin", "admin"].includes(profile?.role ?? ""));
-    setPortalEnabled(Boolean(customerResult.data?.portal_enabled));
+    setPortalEnabled(Boolean(customer.portal_enabled));
     setUsers((usersResult.data ?? []) as CustomerPortalUser[]);
     setLoading(false);
   }

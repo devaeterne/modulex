@@ -15,6 +15,7 @@ import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { loadCustomerDocuments, loadCustomerRecord } from "@/lib/customers/read-dedup";
 import type {
   Customer,
   CustomerActivity,
@@ -88,7 +89,10 @@ export default function CustomerCard() {
     setIsLoading(true);
     setErrorMessage(null);
     const [customerResult, typesResult, groupsResult, profilesResult, termsResult, contactsResult, addressesResult, commercialResult, notesResult, documentsResult, activityResult] = await Promise.all([
-      supabase.from("customers").select("*").eq("id", customerId).single(),
+      loadCustomerRecord(customerId).then(
+        (data) => ({ data, error: null }),
+        (error: Error) => ({ data: null, error })
+      ),
       supabase.from("customer_types").select("id, system_key, name, sort_order, is_active").eq("is_active", true).order("sort_order"),
       supabase.from("price_groups").select("id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only").eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
       supabase.from("profiles").select("id, full_name, email, role, is_active").eq("is_active", true).order("full_name"),
@@ -97,7 +101,10 @@ export default function CustomerCard() {
       supabase.from("customer_addresses").select("*").eq("customer_id", customerId).order("is_default_shipping", { ascending: false }).order("address_name"),
       supabase.from("customer_commercial_settings").select("*").eq("customer_id", customerId).maybeSingle(),
       supabase.from("customer_notes").select("*").eq("customer_id", customerId).order("is_pinned", { ascending: false }).order("created_at", { ascending: false }),
-      supabase.from("customer_documents").select("*").eq("customer_id", customerId).eq("is_active", true).order("created_at", { ascending: false }),
+      loadCustomerDocuments(customerId).then(
+        (data) => ({ data, error: null }),
+        (error: Error) => ({ data: null, error })
+      ),
       supabase.from("customer_activity").select("*").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(100),
     ]);
     const firstError = customerResult.error || typesResult.error || groupsResult.error || profilesResult.error || termsResult.error || contactsResult.error || addressesResult.error || commercialResult.error || notesResult.error || documentsResult.error || activityResult.error;
@@ -118,10 +125,9 @@ export default function CustomerCard() {
 
   useEffect(() => {
     async function initialize() {
-      const { profile, error } = await getCurrentProfile();
+      const [{ profile, error }] = await Promise.all([getCurrentProfile(), loadData()]);
       if (error) { setErrorMessage(error.message); setIsLoading(false); return; }
       setCanEdit(["super_admin", "admin", "sales"].includes(profile?.role ?? ""));
-      await loadData();
     }
     void initialize();
   }, [customerId]);
