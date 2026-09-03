@@ -34,12 +34,14 @@ const migration = readRepo("modulex-store/supabase/migrations/20260903143000_cus
 const hardening = readRepo("modulex-store/supabase/migrations/20260903143500_customer_project_payment_ledger_hardening.sql");
 const invoiceRoleGuard = readRepo("modulex-store/supabase/migrations/20260903144000_customer_project_payment_invoice_role_guard.sql");
 const allSql = `${migration}\n${hardening}\n${invoiceRoleGuard}`;
+const salesPermissions = permissions.match(/sales:\s*\[([\s\S]*?)\],\s*finance:/)?.[1] ?? "";
+const financePermissions = permissions.match(/finance:\s*\[([\s\S]*?)\],\s*hr:/)?.[1] ?? "";
 
 assert(permissions.includes('"project_payments.view"'), "PB-3A requires project_payments.view");
 assert(permissions.includes('"project_payments.manage"'), "PB-3A requires project_payments.manage");
-assert(/sales:\s*\[[\s\S]*?"project_payments\.view"/.test(permissions), "Sales must receive project_payments.view");
-assert(!/sales:\s*\[[\s\S]*?"project_payments\.manage"/.test(permissions), "Sales must not receive project_payments.manage");
-assert(/finance:\s*\[[\s\S]*?"project_payments\.manage"/.test(permissions), "Finance must receive project_payments.manage");
+assert(salesPermissions.includes('"project_payments.view"'), "Sales must receive project_payments.view");
+assert(!salesPermissions.includes('"project_payments.manage"'), "Sales must not receive project_payments.manage");
+assert(financePermissions.includes('"project_payments.manage"'), "Finance must receive project_payments.manage");
 
 assert(paymentDomain.includes('.rpc("get_customer_project_payment_ledger"'), "Finance/Admin must use authoritative Project payment ledger RPC");
 assert(paymentDomain.includes('.rpc("create_customer_project_payment_requirement"'), "Project payment domain must create requirements through RPC");
