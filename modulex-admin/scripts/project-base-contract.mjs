@@ -76,6 +76,13 @@ assert(
   !projectsWorkspace.includes("await Promise.all([loadReferenceData(), loadProjects()]);"),
   "Projects view-only users must not be forced to load create-only Customer/Profile references"
 );
+assert(
+  projectsWorkspace.includes("useRef") &&
+    projectsWorkspace.includes("reloadRequestId") &&
+    projectsWorkspace.includes("++reloadRequestId.current") &&
+    projectsWorkspace.includes("requestId !== reloadRequestId.current"),
+  "Projects list must ignore stale async reload responses when filters change rapidly"
+);
 
 assert(
   customerOrdersList.includes('if (status === "all") query = query.neq("status", "cancelled")'),
