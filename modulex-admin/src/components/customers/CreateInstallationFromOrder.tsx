@@ -9,6 +9,7 @@ import Select from "@/components/form/Select";
 import TextArea from "@/components/form/input/TextArea";
 import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
+import { authenticatedFetch } from "@/lib/auth/authenticated-fetch";
 import { supabase } from "@/lib/supabase/client";
 import { loadCustomerOrderRecord } from "@/lib/customers/order-domain";
 import type { OrderFulfillmentType, ProfileLookup } from "@/lib/customers/types";
@@ -70,7 +71,12 @@ export default function CreateInstallationFromOrder() {
       p_shipment_id: null,
     });
     if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
-    router.push(`/customers/${params.id}/installations/${data}`);
+
+    const installationId = String(data);
+    void authenticatedFetch(`/api/admin/google-calendar/installations/${installationId}/sync`, { method: "POST" })
+      .catch(() => undefined);
+
+    router.push(`/customers/${params.id}/installations/${installationId}`);
     router.refresh();
   }
 
