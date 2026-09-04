@@ -8,7 +8,7 @@ Current package: **PB-5 — Delivery & Installation Rollup — implementation / 
 
 Current status: **PB-1, PB-2, PB-3A and PB-3B are completed Project capabilities. PB-4 Project Expenses/Outgoings is intentionally removed from the Project workstream and owned by Finance. PB-5 is implemented on an isolated branch as a read-only Project projection over canonical Order, Shipment, Installation and Procurement truth; production DDL has not been applied.**
 
-Next action: **Complete PB-5 CI/Advisor/PR review, let the Project owner merge/deploy, then perform the separately approved production DB acceptance. After PB-5 closes, continue with PB-6 Participants & Commission Ledger.**
+Next action: **Complete PB-5 final-head Admin UI/Project CI and PR review, let the Project owner merge/deploy, then perform the separately approved production DB acceptance. After PB-5 closes, continue with PB-6 Participants & Commission Ledger.**
 
 This file is the operational source of truth for the Project Base workstream. When asked where Project Base stands, read this file first and report the current package, completed packages, acceptance evidence, blockers and next action.
 
@@ -250,8 +250,9 @@ Accepted capabilities:
 - [x] detailed Admin/Finance boundaries and sanitized Sales procurement status.
 - [x] production RPC hardening / acceptance completed.
 - [x] Sales-safe `get_customer_project_procurement_status` exposes requirement/order/delivery states without vendor/cost detail.
+- [x] Project Detail now renders the approved role-aware `ProjectProcurementTab`; PB-5 verification restored the intended PB-3B workspace wiring that had remained a placeholder on `main`.
 
-**Status: MERGED / DEPLOYED / ACCEPTED.**
+**Status: MERGED / DEPLOYED / ACCEPTED; WORKSPACE INTEGRATION RESTORED IN PB-5 PR.**
 
 ---
 
@@ -282,9 +283,10 @@ Goal: Project-level fulfillment visibility without changing ownership of Shipmen
 - [x] no duplicate Project fulfillment table/ledger.
 - [x] no Store/Portal projection.
 - [x] TDD RED contract committed before implementation.
-- [x] package-specific CI workflow added.
+- [x] PB-5 contract wired into the consolidated `.github/workflows/admin-project-base.yml` job; no package-specific workflow wrapper remains.
+- [x] Admin Project Base fresh runs #220 and #221 are green on the PB-5 branch after restoring PB-3B workspace wiring.
 - [x] acceptance artifact added: `docs/acceptance/pb-5-project-fulfillment.md`.
-- [ ] final-head CI green.
+- [ ] final-head Admin UI Foundation green.
 - [ ] owner merge.
 - [ ] separate post-merge production DDL/RPC acceptance after explicit owner approval.
 - [ ] production Admin deploy after DB acceptance.
@@ -351,12 +353,12 @@ When required:
 
 As of 2026-09-04:
 
-- execution-time `main`: `2438c8aa735bd9d97f64a677935e370bd42a1082`.
-- open PRs at PB-5 start: none.
+- execution-time `main` incorporated into PB-5 branch: `190da5745fe2b6972deabff0d11c16263cd5c0f5`.
+- open PRs at PB-5 start: none; current PB-5 draft PR: #296.
 - PB-1: merged/deployed/accepted.
 - PB-2: merged/deployed/accepted.
 - PB-3A: merged/deployed/accepted.
-- PB-3B: merged/deployed/accepted.
+- PB-3B: merged/deployed/accepted; role-aware workspace integration restored in PR #296.
 - PB-4: intentionally delegated to Finance; Project will consume stable Finance interfaces only when needed.
 - PB-5 branch: `feat/project-pb5-fulfillment-rollup`.
 - PB-5 production schema inspection: read-only only; no migration/RPC/data mutation applied.
