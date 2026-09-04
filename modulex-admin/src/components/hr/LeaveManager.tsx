@@ -1,7 +1,27 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import StatTile from "@/components/common/StatTile";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableStateRow,
+  TableViewport,
+} from "@/components/ui/table";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
 
 type Employee = {
@@ -57,15 +77,16 @@ type BalanceRow = {
   pendingHours: number;
 };
 
+type Notice = {
+  variant: "success" | "error" | "warning" | "info";
+  title: string;
+  message: string;
+};
+
+type StatusColor = "primary" | "success" | "error" | "warning" | "info" | "light";
+
 const PRIMARY_LEAVE_CODES = ["PTO", "SICK", "UNPAID"] as const;
 const BALANCE_PAGE_SIZE = 10;
-
-const inputClass =
-  "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const cardClass =
-  "rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]";
-const secondaryButtonClass =
-  "h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-transparent dark:text-gray-300 dark:hover:bg-white/[0.04]";
 
 function employeeName(row: Employee) {
   return `${row.employee_number} · ${row.first_name} ${row.last_name}`;
@@ -87,20 +108,51 @@ function formatHours(value: number) {
   }).format(Number(value) || 0)}h`;
 }
 
-function BalanceSummary({ item }: { item?: BalanceItem }) {
-  if (!item) {
-    return <span className="text-gray-400">—</span>;
+function formatDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+}
+
+function formatStatus(value: string) {
+  return value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function requestStatusColor(status: string): StatusColor {
+  switch (status) {
+    case "approved":
+      return "success";
+    case "rejected":
+      return "error";
+    case "pending":
+      return "warning";
+    case "cancelled":
+      return "light";
+    default:
+      return "info";
   }
+}
+
+function BalanceSummary({ item }: { item?: BalanceItem }) {
+  if (!item) return <span>—</span>;
+
+  const usedHours = Number(item.balance.used_hours || 0);
 
   return (
-    <div className="min-w-28">
-      <p className="font-semibold text-gray-800 dark:text-white/90">
+    <div className="min-w-24">
+      <p className={`${ADMIN_TEXT_STYLES.strong} font-semibold`}>
         {formatHours(available(item.balance))}
-        <span className="ml-1 font-normal text-gray-500">available</span>
       </p>
-      <p className="mt-0.5 text-xs text-gray-500">
-        {formatHours(Number(item.balance.used_hours))} used
-      </p>
+      {usedHours > 0 ? (
+        <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 text-xs`}>
+          {formatHours(usedHours)} used
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -116,8 +168,11 @@ export default function LeaveManager() {
   const [balanceSearch, setBalanceSearch] = useState("");
   const [balancePage, setBalancePage] = useState(1);
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
+  const [requestOpen, setRequestOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loadingBalances, setLoadingBalances] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   const [employeeId, setEmployeeId] = useState("");
   const [leaveTypeId, setLeaveTypeId] = useState("");
@@ -125,13 +180,16 @@ export default function LeaveManager() {
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
   const [hours, setHours] = useState("8");
   const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
 
   const [typeCode, setTypeCode] = useState("");
   const [typeName, setTypeName] = useState("");
   const [typeHours, setTypeHours] = useState("0");
   const [typePaid, setTypePaid] = useState(true);
+
+  function showError(title: string, message: string, error: unknown) {
+    console.error(title, error);
+    setNotice({ variant: "error", title, message });
+  }
 
   async function load(targetYear: number) {
     const [employeeResult, typeResult, requestResult, balanceResult, yearResult] =
@@ -196,9 +254,7 @@ export default function LeaveManager() {
     setBalances((balanceResult.data ?? []) as LeaveBalance[]);
     setBalanceYears(nextYears);
 
-    if (!employeeId && nextEmployees[0]) {
-      setEmployeeId(nextEmployees[0].id);
-    }
+    if (!employeeId && nextEmployees[0]) setEmployeeId(nextEmployees[0].id);
     if (!leaveTypeId) {
       const firstActiveType = nextTypes.find((type) => type.is_active);
       if (firstActiveType) setLeaveTypeId(firstActiveType.id);
@@ -207,7 +263,11 @@ export default function LeaveManager() {
 
   useEffect(() => {
     void load(currentYear).catch((error) =>
-      setMessage(error instanceof Error ? error.message : "Leave data could not be loaded."),
+      showError(
+        "Leave data unavailable",
+        "Leave requests and balances could not be loaded. Try refreshing the page.",
+        error,
+      ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -215,23 +275,36 @@ export default function LeaveManager() {
   async function submitRequest(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
-    setMessage(null);
+    setNotice(null);
 
-    const { error } = await supabase.from("hr_leave_requests").insert({
-      employee_id: employeeId,
-      leave_type_id: leaveTypeId,
-      start_date: startDate,
-      end_date: endDate,
-      requested_hours: Number(hours),
-      employee_note: note.trim() || null,
-    });
+    try {
+      const { error } = await supabase.from("hr_leave_requests").insert({
+        employee_id: employeeId,
+        leave_type_id: leaveTypeId,
+        start_date: startDate,
+        end_date: endDate,
+        requested_hours: Number(hours),
+        employee_note: note.trim() || null,
+      });
+      if (error) throw error;
 
-    setBusy(false);
-    if (error) return setMessage(error.message);
-
-    setMessage("Leave request created.");
-    setNote("");
-    await load(balanceYear);
+      setNote("");
+      setRequestOpen(false);
+      setNotice({
+        variant: "success",
+        title: "Request created",
+        message: "The leave request is ready for review.",
+      });
+      await load(balanceYear);
+    } catch (error) {
+      showError(
+        "Request not created",
+        "The leave request could not be saved. Check the form and try again.",
+        error,
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function decide(
@@ -243,50 +316,89 @@ export default function LeaveManager() {
         ? window.prompt("Approval note (optional)")
         : window.prompt("Decision note (optional)");
 
-    const { error } = await supabase.rpc("set_hr_leave_request_status", {
-      p_request_id: id,
-      p_status: status,
-      p_decision_note: decision || null,
-    });
+    setNotice(null);
+    try {
+      const { error } = await supabase.rpc("set_hr_leave_request_status", {
+        p_request_id: id,
+        p_status: status,
+        p_decision_note: decision || null,
+      });
+      if (error) throw error;
 
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage(`Request ${status}.`);
+      setNotice({
+        variant: "success",
+        title: `Request ${status}`,
+        message: "The request status and leave balance data were refreshed.",
+      });
       await load(balanceYear);
+    } catch (error) {
+      showError(
+        "Request status not updated",
+        "The request could not be updated. Please try again.",
+        error,
+      );
     }
   }
 
   async function initializeBalances(year: number) {
     setBusy(true);
-    const { data, error } = await supabase.rpc("initialize_hr_leave_balances", {
-      p_year: year,
-    });
-    setBusy(false);
+    setNotice(null);
 
-    if (error) return setMessage(error.message);
+    try {
+      const { data, error } = await supabase.rpc("initialize_hr_leave_balances", {
+        p_year: year,
+      });
+      if (error) throw error;
 
-    setMessage(`${Number(data ?? 0)} leave balance record(s) initialized for ${year}.`);
-    await load(year);
+      setNotice({
+        variant: "success",
+        title: `${year} balances initialized`,
+        message: `${Number(data ?? 0)} balance record(s) were created.`,
+      });
+      await load(year);
+    } catch (error) {
+      showError(
+        "Balances not initialized",
+        `Annual balances for ${year} could not be initialized. Please try again.`,
+        error,
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function createLeaveType(event: FormEvent) {
     event.preventDefault();
+    setBusy(true);
+    setNotice(null);
 
-    const { error } = await supabase.from("hr_leave_types").insert({
-      code: typeCode.trim().toUpperCase(),
-      name: typeName.trim(),
-      paid: typePaid,
-      default_annual_hours: Number(typeHours || 0),
-    });
+    try {
+      const { error } = await supabase.from("hr_leave_types").insert({
+        code: typeCode.trim().toUpperCase(),
+        name: typeName.trim(),
+        paid: typePaid,
+        default_annual_hours: Number(typeHours || 0),
+      });
+      if (error) throw error;
 
-    if (error) return setMessage(error.message);
-
-    setTypeCode("");
-    setTypeName("");
-    setTypeHours("0");
-    setMessage("Leave type created.");
-    await load(balanceYear);
+      setTypeCode("");
+      setTypeName("");
+      setTypeHours("0");
+      setNotice({
+        variant: "success",
+        title: "Leave type added",
+        message: "The leave policy is now available for requests and annual balances.",
+      });
+      await load(balanceYear);
+    } catch (error) {
+      showError(
+        "Leave type not added",
+        "The leave type could not be saved. Check the code and try again.",
+        error,
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function changeBalanceYear(year: number) {
@@ -296,12 +408,16 @@ export default function LeaveManager() {
     setBalancePage(1);
     setExpandedEmployeeId(null);
     setLoadingBalances(true);
-    setMessage(null);
+    setNotice(null);
 
     try {
       await load(year);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Leave balances could not be loaded.");
+      showError(
+        "Balances unavailable",
+        `Balances for ${year} could not be loaded. Please try again.`,
+        error,
+      );
     } finally {
       setLoadingBalances(false);
     }
@@ -400,274 +516,174 @@ export default function LeaveManager() {
     setExpandedEmployeeId(null);
   }
 
+  const employeeOptions = employees.map((employee) => ({
+    value: employee.id,
+    label: employeeName(employee),
+  }));
+  const leaveTypeOptions = leaveTypes
+    .filter((type) => type.is_active)
+    .map((type) => ({
+      value: type.id,
+      label: `${type.name} · ${type.paid ? "Paid" : "Unpaid"}`,
+    }));
+  const yearOptions = balanceYears.map((year) => ({
+    value: String(year),
+    label: String(year),
+  }));
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-          Leave & PTO
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Manage leave policies, annual balances, requests and approvals.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className={`${ADMIN_TEXT_STYLES.muted} text-sm`}>
+            Manage leave requests, approvals and annual employee balances from one workspace.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button variant="outline" onClick={() => setSettingsOpen(true)}>
+            Leave settings
+          </Button>
+          <Button onClick={() => setRequestOpen(true)}>New Leave Request</Button>
+        </div>
       </div>
 
-      {message ? (
-        <div className={`${cardClass} text-sm text-gray-700 dark:text-gray-300`}>
-          {message}
-        </div>
+      {notice ? (
+        <Alert variant={notice.variant} title={notice.title} message={notice.message} />
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          ["Pending requests", pending],
-          ["Approved upcoming", approved],
-          [`${balanceYear} used hours`, formatHours(used)],
-        ].map(([label, value]) => (
-          <div key={String(label)} className={cardClass}>
-            <p className="text-sm text-gray-500">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
-              {value}
-            </p>
-          </div>
-        ))}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatTile label="Pending requests" value={pending} tone={pending > 0 ? "warning" : "neutral"} />
+        <StatTile label="Approved upcoming" value={approved} tone={approved > 0 ? "success" : "neutral"} />
+        <StatTile label={`${balanceYear} used hours`} value={formatHours(used)} />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <form onSubmit={submitRequest} className={`${cardClass} space-y-4`}>
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">
-            New Leave Request
-          </h2>
-
-          <label className="block text-sm text-gray-600 dark:text-gray-300">
-            Employee
-            <select
-              className={`${inputClass} mt-1`}
-              value={employeeId}
-              onChange={(event) => setEmployeeId(event.target.value)}
-              required
-            >
-              <option value="">Select employee</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employeeName(employee)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block text-sm text-gray-600 dark:text-gray-300">
-            Leave type
-            <select
-              className={`${inputClass} mt-1`}
-              value={leaveTypeId}
-              onChange={(event) => setLeaveTypeId(event.target.value)}
-              required
-            >
-              {leaveTypes
-                .filter((type) => type.is_active)
-                .map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                    {type.paid ? " · Paid" : " · Unpaid"}
-                  </option>
-                ))}
-            </select>
-          </label>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm text-gray-600 dark:text-gray-300">
-              From
-              <input
-                type="date"
-                className={`${inputClass} mt-1`}
-                value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
-              />
-            </label>
-            <label className="block text-sm text-gray-600 dark:text-gray-300">
-              To
-              <input
-                type="date"
-                className={`${inputClass} mt-1`}
-                value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
-              />
-            </label>
-          </div>
-
-          <label className="block text-sm text-gray-600 dark:text-gray-300">
-            Hours
-            <input
-              type="number"
-              min="0.25"
-              step="0.25"
-              className={`${inputClass} mt-1`}
-              value={hours}
-              onChange={(event) => setHours(event.target.value)}
-            />
-          </label>
-
-          <label className="block text-sm text-gray-600 dark:text-gray-300">
-            Note
-            <textarea
-              className="mt-1 min-h-20 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
-          </label>
-
-          <button
-            disabled={busy}
-            className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Create Request
-          </button>
-        </form>
-
-        <div className={`${cardClass} min-w-0 overflow-hidden p-0`}>
-          <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-800">
-            <h2 className="font-semibold text-gray-800 dark:text-white/90">
-              Requests
-            </h2>
-          </div>
-          <div className="max-h-[520px] overflow-auto">
-            <table className="min-w-[760px] text-sm">
-              <thead className="sticky top-0 z-10 bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-gray-900">
-                <tr>
-                  <th className="px-4 py-3">Employee</th>
-                  <th className="px-4 py-3">Leave</th>
-                  <th className="px-4 py-3">Dates</th>
-                  <th className="px-4 py-3 text-right">Hours</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+      <ComponentCard
+        title="Requests"
+        desc="Review pending leave and keep upcoming approved absences visible."
+        className="min-w-0"
+      >
+        <div className="max-h-[360px] overflow-y-auto">
+          <TableViewport>
+            <Table variant="admin" minWidth="standard">
+              <TableHeader variant="admin" className="sticky top-0 z-10">
+                <TableRow>
+                  <TableCell isHeader variant="admin">Employee</TableCell>
+                  <TableCell isHeader variant="admin">Leave</TableCell>
+                  <TableCell isHeader variant="admin">Dates</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Hours</TableCell>
+                  <TableCell isHeader variant="admin">Status</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Actions</TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody variant="admin">
                 {requests.map((request) => (
-                  <tr key={request.id}>
-                    <td className="px-4 py-3 font-medium text-gray-800 dark:text-white/90">
-                      {employeeMap.get(request.employee_id)
-                        ? employeeName(employeeMap.get(request.employee_id)!)
-                        : request.employee_id}
-                    </td>
-                    <td className="px-4 py-3">
+                  <TableRow key={request.id}>
+                    <TableCell variant="admin">
+                      <span className={`${ADMIN_TEXT_STYLES.strong} font-medium`}>
+                        {employeeMap.get(request.employee_id)
+                          ? employeeName(employeeMap.get(request.employee_id)!)
+                          : request.employee_id}
+                      </span>
+                    </TableCell>
+                    <TableCell variant="admin">
                       {typeMap.get(request.leave_type_id)?.name ?? request.leave_type_id}
-                    </td>
-                    <td className="px-4 py-3">
-                      {request.start_date} → {request.end_date}
-                    </td>
-                    <td className="px-4 py-3 text-right">
+                    </TableCell>
+                    <TableCell variant="admin">
+                      {formatDate(request.start_date)} → {formatDate(request.end_date)}
+                    </TableCell>
+                    <TableCell variant="admin" className="text-right">
                       {formatHours(Number(request.requested_hours))}
-                    </td>
-                    <td className="px-4 py-3 capitalize">{request.status}</td>
-                    <td className="px-4 py-3 text-right">
+                    </TableCell>
+                    <TableCell variant="admin">
+                      <Badge color={requestStatusColor(request.status)} size="sm">
+                        {formatStatus(request.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell variant="admin" className="text-right">
                       {request.status === "pending" ? (
-                        <div className="flex justify-end gap-3">
-                          <button
-                            type="button"
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             onClick={() => void decide(request.id, "approved")}
-                            className="text-xs font-medium text-success-600"
                           >
                             Approve
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
                             onClick={() => void decide(request.id, "rejected")}
-                            className="text-xs font-medium text-error-600"
                           >
                             Reject
-                          </button>
+                          </Button>
                         </div>
                       ) : null}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {requests.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
-                      No leave requests.
-                    </td>
-                  </tr>
+                  <TableStateRow colSpan={6}>No leave requests yet.</TableStateRow>
                 ) : null}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </TableViewport>
         </div>
-      </div>
+      </ComponentCard>
 
-      <div className={`${cardClass} overflow-hidden p-0`}>
-        <div className="border-b border-gray-200 px-4 py-4 dark:border-gray-800">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      <ComponentCard
+        title={`${balanceYear} Balances`}
+        desc="One row per employee. Open a row for entitlement, carryover and adjustment details."
+        className="min-w-0"
+      >
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="grid flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_140px] lg:max-w-xl">
             <div>
-              <h2 className="font-semibold text-gray-800 dark:text-white/90">
-                {balanceYear} Balances
-              </h2>
-              <p className="mt-1 text-xs text-gray-500">
-                One row per employee. Open a row for entitlement and adjustment details.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <input
+              <Label htmlFor="leave-balance-search">Search employee</Label>
+              <Input
+                id="leave-balance-search"
                 type="search"
                 value={balanceSearch}
                 onChange={(event) => updateBalanceSearch(event.target.value)}
-                placeholder="Search employee"
-                aria-label="Search leave balances by employee"
-                className={`${inputClass} sm:w-56`}
+                placeholder="Name or employee number"
+                ariaLabel="Search leave balances by employee"
               />
-              <select
-                value={balanceYear}
-                onChange={(event) => void changeBalanceYear(Number(event.target.value))}
-                aria-label="Balance year"
-                className={`${inputClass} sm:w-28`}
-              >
-                {balanceYears.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => void initializeBalances(balanceYear)}
-                disabled={busy || loadingBalances}
-                className={secondaryButtonClass}
-              >
-                Initialize {balanceYear}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(true)}
-                className={secondaryButtonClass}
-              >
-                Leave settings
-              </button>
+            </div>
+            <div>
+              <Label htmlFor="leave-balance-year">Year</Label>
+              <Select
+                id="leave-balance-year"
+                options={yearOptions}
+                value={String(balanceYear)}
+                onChange={(value) => void changeBalanceYear(Number(value))}
+                ariaLabel="Balance year"
+              />
             </div>
           </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void initializeBalances(balanceYear)}
+            disabled={busy || loadingBalances}
+          >
+            Initialize {balanceYear}
+          </Button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-[920px] text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-white/[0.02]">
-              <tr>
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">PTO</th>
-                <th className="px-4 py-3">Sick</th>
-                <th className="px-4 py-3">Unpaid</th>
-                <th className="px-4 py-3 text-right">Pending</th>
-                <th className="w-12 px-4 py-3">
-                  <span className="sr-only">Details</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+        <TableViewport>
+          <Table variant="admin" minWidth="standard">
+            <TableHeader variant="admin">
+              <TableRow>
+                <TableCell isHeader variant="admin">Employee</TableCell>
+                <TableCell isHeader variant="admin">PTO</TableCell>
+                <TableCell isHeader variant="admin">Sick</TableCell>
+                <TableCell isHeader variant="admin">Unpaid</TableCell>
+                <TableCell isHeader variant="admin" className="text-right">Pending</TableCell>
+                <TableCell isHeader variant="admin" className="text-right">Details</TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody variant="admin">
               {loadingBalances ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
-                    Loading balances…
-                  </td>
-                </tr>
+                <TableStateRow colSpan={6}>Loading balances…</TableStateRow>
               ) : null}
 
               {!loadingBalances &&
@@ -676,266 +692,353 @@ export default function LeaveManager() {
 
                   return (
                     <Fragment key={row.employee.id}>
-                      <tr className="align-top">
-                        <td className="px-4 py-4">
-                          <p className="font-medium text-gray-800 dark:text-white/90">
+                      <TableRow className="align-top">
+                        <TableCell variant="admin">
+                          <p className={`${ADMIN_TEXT_STYLES.strong} font-medium`}>
                             {row.employee.first_name} {row.employee.last_name}
                           </p>
-                          <p className="mt-0.5 text-xs text-gray-500">
+                          <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 text-xs`}>
                             {row.employee.employee_number}
                           </p>
-                        </td>
+                        </TableCell>
                         {PRIMARY_LEAVE_CODES.map((code) => (
-                          <td key={code} className="px-4 py-4">
+                          <TableCell key={code} variant="admin">
                             <BalanceSummary item={row.byCode[code]} />
-                          </td>
+                          </TableCell>
                         ))}
-                        <td className="px-4 py-4 text-right font-medium text-gray-700 dark:text-gray-300">
-                          {formatHours(row.pendingHours)}
-                        </td>
-                        <td className="px-4 py-4 text-right">
-                          <button
-                            type="button"
+                        <TableCell variant="admin" className="text-right font-medium">
+                          {row.pendingHours > 0 ? formatHours(row.pendingHours) : "—"}
+                        </TableCell>
+                        <TableCell variant="admin" className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             aria-expanded={expanded}
                             aria-label={`${expanded ? "Collapse" : "Expand"} ${employeeName(row.employee)} balances`}
                             onClick={() =>
                               setExpandedEmployeeId(expanded ? null : row.employee.id)
                             }
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 hover:text-gray-800 dark:border-gray-700 dark:hover:bg-white/[0.04] dark:hover:text-white"
                           >
-                            <span
-                              aria-hidden="true"
-                              className={`text-base transition-transform ${expanded ? "rotate-180" : ""}`}
-                            >
-                              ⌄
-                            </span>
-                          </button>
-                        </td>
-                      </tr>
+                            {expanded ? "Hide" : "View"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
 
                       {expanded ? (
-                        <tr>
-                          <td
-                            colSpan={6}
-                            className="bg-gray-50/70 px-4 py-4 dark:bg-white/[0.02]"
-                          >
+                        <TableRow>
+                          <TableCell colSpan={6} variant="admin">
                             <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                               {row.balances.map((item) => (
-                                <div
+                                <ComponentCard
                                   key={item.balance.id}
-                                  className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900"
+                                  title={item.leaveType?.name ?? "Leave"}
+                                  desc={`${item.leaveType?.code ?? "Custom"} · ${
+                                    item.leaveType?.paid ? "Paid" : "Unpaid"
+                                  }`}
                                 >
-                                  <div className="flex items-start justify-between gap-3">
+                                  <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-3">
                                     <div>
-                                      <p className="font-medium text-gray-800 dark:text-white/90">
-                                        {item.leaveType?.name ?? "Leave"}
-                                      </p>
-                                      <p className="mt-0.5 text-xs uppercase tracking-wide text-gray-500">
-                                        {item.leaveType?.code ?? "Custom"}
-                                      </p>
-                                    </div>
-                                    <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
-                                      {formatHours(available(item.balance))} available
-                                    </p>
-                                  </div>
-                                  <dl className="mt-4 grid grid-cols-3 gap-x-4 gap-y-3 text-xs">
-                                    <div>
-                                      <dt className="text-gray-500">Entitled</dt>
-                                      <dd className="mt-1 font-medium text-gray-700 dark:text-gray-300">
+                                      <dt className={ADMIN_TEXT_STYLES.muted}>Entitled</dt>
+                                      <dd className="mt-1 font-medium">
                                         {formatHours(Number(item.balance.entitled_hours))}
                                       </dd>
                                     </div>
                                     <div>
-                                      <dt className="text-gray-500">Carried</dt>
-                                      <dd className="mt-1 font-medium text-gray-700 dark:text-gray-300">
+                                      <dt className={ADMIN_TEXT_STYLES.muted}>Carried</dt>
+                                      <dd className="mt-1 font-medium">
                                         {formatHours(Number(item.balance.carried_hours))}
                                       </dd>
                                     </div>
                                     <div>
-                                      <dt className="text-gray-500">Adjusted</dt>
-                                      <dd className="mt-1 font-medium text-gray-700 dark:text-gray-300">
+                                      <dt className={ADMIN_TEXT_STYLES.muted}>Adjusted</dt>
+                                      <dd className="mt-1 font-medium">
                                         {formatHours(Number(item.balance.adjusted_hours))}
                                       </dd>
                                     </div>
                                     <div>
-                                      <dt className="text-gray-500">Used</dt>
-                                      <dd className="mt-1 font-medium text-gray-700 dark:text-gray-300">
+                                      <dt className={ADMIN_TEXT_STYLES.muted}>Used</dt>
+                                      <dd className="mt-1 font-medium">
                                         {formatHours(Number(item.balance.used_hours))}
                                       </dd>
                                     </div>
                                     <div>
-                                      <dt className="text-gray-500">Pending</dt>
-                                      <dd className="mt-1 font-medium text-gray-700 dark:text-gray-300">
+                                      <dt className={ADMIN_TEXT_STYLES.muted}>Pending</dt>
+                                      <dd className="mt-1 font-medium">
                                         {formatHours(Number(item.balance.pending_hours))}
                                       </dd>
                                     </div>
                                     <div>
-                                      <dt className="text-gray-500">Available</dt>
-                                      <dd className="mt-1 font-semibold text-gray-800 dark:text-white/90">
+                                      <dt className={ADMIN_TEXT_STYLES.muted}>Available</dt>
+                                      <dd className="mt-1 font-semibold">
                                         {formatHours(available(item.balance))}
                                       </dd>
                                     </div>
                                   </dl>
-                                </div>
+                                </ComponentCard>
                               ))}
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ) : null}
                     </Fragment>
                   );
                 })}
 
               {!loadingBalances && filteredBalanceRows.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
-                    <p className="font-medium text-gray-700 dark:text-gray-300">
-                      {balanceSearch ? "No employees match this search." : `No ${balanceYear} balances yet.`}
-                    </p>
-                    {!balanceSearch ? (
-                      <p className="mt-1 text-sm text-gray-500">
-                        Initialize the selected year when you are ready to create annual balances.
-                      </p>
-                    ) : null}
-                  </td>
-                </tr>
+                <TableStateRow colSpan={6}>
+                  {balanceSearch
+                    ? "No employees match this search."
+                    : `No ${balanceYear} balances yet. Initialize this year when you are ready.`}
+                </TableStateRow>
               ) : null}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableViewport>
 
         {filteredBalanceRows.length > 0 ? (
-          <div className="flex flex-col gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-500 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
-            <span>
+          <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <span className={ADMIN_TEXT_STYLES.muted}>
               Showing {pageStart + 1}-
               {Math.min(pageStart + BALANCE_PAGE_SIZE, filteredBalanceRows.length)} of{" "}
               {filteredBalanceRows.length} employees
             </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
                 disabled={safeBalancePage <= 1}
                 onClick={() => {
                   setBalancePage((page) => Math.max(1, page - 1));
                   setExpandedEmployeeId(null);
                 }}
-                className="h-8 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300"
               >
                 Previous
-              </button>
+              </Button>
               <span className="min-w-16 text-center text-xs">
                 {safeBalancePage} / {totalBalancePages}
               </span>
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant="outline"
                 disabled={safeBalancePage >= totalBalancePages}
                 onClick={() => {
                   setBalancePage((page) => Math.min(totalBalancePages, page + 1));
                   setExpandedEmployeeId(null);
                 }}
-                className="h-8 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-700 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300"
               >
                 Next
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
-      </div>
+      </ComponentCard>
+
+      <Modal
+        isOpen={requestOpen}
+        onClose={() => setRequestOpen(false)}
+        className="w-full max-w-xl p-6 sm:p-8"
+        ariaLabelledBy="new-leave-request-title"
+      >
+        <div className="pr-12">
+          <h2 id="new-leave-request-title" className={`${ADMIN_TEXT_STYLES.strong} text-xl font-semibold`}>
+            New Leave Request
+          </h2>
+          <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-sm`}>
+            Record a leave request for an employee and send it into the approval workflow.
+          </p>
+        </div>
+
+        <form onSubmit={submitRequest} className="mt-6 space-y-4">
+          <div>
+            <Label htmlFor="leave-request-employee">Employee</Label>
+            <Select
+              id="leave-request-employee"
+              options={employeeOptions}
+              value={employeeId}
+              onChange={setEmployeeId}
+              placeholder="Select employee"
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="leave-request-type">Leave type</Label>
+            <Select
+              id="leave-request-type"
+              options={leaveTypeOptions}
+              value={leaveTypeId}
+              onChange={setLeaveTypeId}
+              placeholder="Select leave type"
+              required
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="leave-request-from">From</Label>
+              <Input
+                id="leave-request-from"
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="leave-request-to">To</Label>
+              <Input
+                id="leave-request-to"
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="leave-request-hours">Hours</Label>
+            <Input
+              id="leave-request-hours"
+              type="number"
+              min="0.25"
+              step="0.25"
+              value={hours}
+              onChange={(event) => setHours(event.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="leave-request-note">Note</Label>
+            <TextArea
+              id="leave-request-note"
+              rows={4}
+              value={note}
+              onChange={setNote}
+              placeholder="Optional context for the approver"
+            />
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setRequestOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              Create Request
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        className="relative w-full max-w-2xl p-6 sm:p-7"
+        className="w-full max-w-2xl p-6 sm:p-8"
         ariaLabelledBy="leave-settings-title"
       >
         <div className="pr-12">
-          <h2
-            id="leave-settings-title"
-            className="text-xl font-semibold text-gray-800 dark:text-white/90"
-          >
+          <h2 id="leave-settings-title" className={`${ADMIN_TEXT_STYLES.strong} text-xl font-semibold`}>
             Leave settings
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Configure leave types without keeping policy administration in the daily
-            request workflow.
+          <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-sm`}>
+            Configure leave types without keeping policy administration in the daily request workflow.
           </p>
         </div>
 
         <form onSubmit={createLeaveType} className="mt-6 space-y-4">
           <div>
-            <h3 className="font-semibold text-gray-800 dark:text-white/90">
-              Leave types
-            </h3>
-            <p className="mt-1 text-xs text-gray-500">
+            <h3 className={`${ADMIN_TEXT_STYLES.strong} font-semibold`}>Leave types</h3>
+            <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-xs`}>
               PTO, sick, unpaid and company-specific policies.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <input
-              className={inputClass}
-              placeholder="Code"
-              value={typeCode}
-              onChange={(event) => setTypeCode(event.target.value)}
-              required
-            />
-            <input
-              className={inputClass}
-              placeholder="Name"
-              value={typeName}
-              onChange={(event) => setTypeName(event.target.value)}
-              required
+            <div>
+              <Label htmlFor="leave-type-code">Code</Label>
+              <Input
+                id="leave-type-code"
+                placeholder="PTO"
+                value={typeCode}
+                onChange={(event) => setTypeCode(event.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="leave-type-name">Name</Label>
+              <Input
+                id="leave-type-name"
+                placeholder="Paid Time Off"
+                value={typeName}
+                onChange={(event) => setTypeName(event.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label htmlFor="leave-type-hours">Annual hours</Label>
+            <Input
+              id="leave-type-hours"
+              type="number"
+              min="0"
+              step="0.25"
+              value={typeHours}
+              onChange={(event) => setTypeHours(event.target.value)}
             />
           </div>
 
-          <input
-            className={inputClass}
-            type="number"
-            min="0"
-            step="0.25"
-            placeholder="Annual hours"
-            value={typeHours}
-            onChange={(event) => setTypeHours(event.target.value)}
-          />
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={typePaid}
-                onChange={(event) => setTypePaid(event.target.checked)}
-              />
-              Paid leave
-            </label>
-            <button
-              disabled={busy}
-              className="h-9 rounded-lg bg-brand-500 px-3 text-sm font-medium text-white disabled:opacity-50"
-            >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Checkbox
+              id="leave-type-paid"
+              checked={typePaid}
+              onChange={setTypePaid}
+              label="Paid leave"
+            />
+            <Button type="submit" size="sm" disabled={busy}>
               Add Leave Type
-            </button>
+            </Button>
           </div>
         </form>
 
-        <div className="mt-6 max-h-72 space-y-2 overflow-y-auto border-t border-gray-200 pt-4 dark:border-gray-800">
-          {leaveTypes.map((type) => (
-            <div
-              key={type.id}
-              className="flex items-center justify-between gap-4 rounded-lg bg-gray-50 px-3 py-2.5 text-sm dark:bg-white/[0.03]"
-            >
-              <div>
-                <p className="font-medium text-gray-800 dark:text-white/90">
-                  {type.code} · {type.name}
-                </p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {type.paid ? "Paid" : "Unpaid"} ·{" "}
-                  {formatHours(Number(type.default_annual_hours))} annual default
-                </p>
-              </div>
-              <span className="text-xs text-gray-500">
-                {type.is_active ? "Active" : "Inactive"}
-              </span>
-            </div>
-          ))}
+        <div className="mt-6">
+          <TableViewport>
+            <Table variant="admin">
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell isHeader variant="admin">Type</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Annual default</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Status</TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody variant="admin">
+                {leaveTypes.map((type) => (
+                  <TableRow key={type.id}>
+                    <TableCell variant="admin">
+                      <p className={`${ADMIN_TEXT_STYLES.strong} font-medium`}>
+                        {type.code} · {type.name}
+                      </p>
+                      <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 text-xs`}>
+                        {type.paid ? "Paid" : "Unpaid"}
+                      </p>
+                    </TableCell>
+                    <TableCell variant="admin" className="text-right">
+                      {formatHours(Number(type.default_annual_hours))}
+                    </TableCell>
+                    <TableCell variant="admin" className="text-right">
+                      <Badge color={type.is_active ? "success" : "light"} size="sm">
+                        {type.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {leaveTypes.length === 0 ? (
+                  <TableStateRow colSpan={3}>No leave types configured.</TableStateRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </TableViewport>
         </div>
       </Modal>
     </div>
