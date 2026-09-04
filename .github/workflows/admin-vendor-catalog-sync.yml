@@ -78,9 +78,3 @@ jobs:
       - run: node scripts/marble-systems-stale-product-contract.mjs
       - run: node scripts/vendor-approval-idempotency-contract.mjs
       - run: node scripts/vendor-availability-contract.mjs
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key

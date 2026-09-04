@@ -2,13 +2,36 @@ name: Admin A1 Core Operations
 
 on:
   push:
-    branches:
-      - feat/a1-core-operations-hardening-active
-  pull_request:
     paths:
-      - "modulex-admin/**"
+      - "modulex-admin/src/app/(admin)/customers/**/orders/**"
+      - "modulex-admin/src/components/customers/CustomerOrder*.tsx"
+      - "modulex-admin/src/components/customers/CustomerShipmentDetailRBAC.tsx"
+      - "modulex-admin/src/components/customers/CustomerInstallationDetail.tsx"
+      - "modulex-admin/src/lib/auth/permissions.ts"
+      - "modulex-admin/scripts/a1-*.mjs"
+      - "modulex-admin/scripts/order-*.mjs"
+      - "modulex-admin/scripts/store-portal-admin-contract.mjs"
+      - "modulex-admin/sql/a1-*.sql"
       - "modulex-store/scripts/store-portal-contract.mjs"
       - "modulex-store/scripts/portal-experience-contract.mjs"
+      - "modulex-store/supabase/migrations/*order*.sql"
+      - "modulex-store/supabase/migrations/*fulfillment*.sql"
+      - ".github/workflows/admin-a1-core-operations.yml"
+  pull_request:
+    paths:
+      - "modulex-admin/src/app/(admin)/customers/**/orders/**"
+      - "modulex-admin/src/components/customers/CustomerOrder*.tsx"
+      - "modulex-admin/src/components/customers/CustomerShipmentDetailRBAC.tsx"
+      - "modulex-admin/src/components/customers/CustomerInstallationDetail.tsx"
+      - "modulex-admin/src/lib/auth/permissions.ts"
+      - "modulex-admin/scripts/a1-*.mjs"
+      - "modulex-admin/scripts/order-*.mjs"
+      - "modulex-admin/scripts/store-portal-admin-contract.mjs"
+      - "modulex-admin/sql/a1-*.sql"
+      - "modulex-store/scripts/store-portal-contract.mjs"
+      - "modulex-store/scripts/portal-experience-contract.mjs"
+      - "modulex-store/supabase/migrations/*order*.sql"
+      - "modulex-store/supabase/migrations/*fulfillment*.sql"
       - ".github/workflows/admin-a1-core-operations.yml"
 
 concurrency:
@@ -25,33 +48,17 @@ jobs:
       run:
         working-directory: modulex-admin
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
-      - name: Install
-        run: npm ci
-      - name: A1 core operations contract
-        run: npm run smoke:a1-core-operations
-      - name: Order domain regression
-        run: npm run smoke:order-domain
-      - name: Order lifecycle regression
-        run: npm run smoke:order-lifecycle
-      - name: Store portal Admin regression
-        run: npm run smoke:store-portal-admin
-      - name: RBAC regression
-        run: npm run smoke:rbac
-      - name: Lint
-        run: npm run lint
-      - name: Production build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
-        run: npm run build
+      - run: npm ci
+      - run: npm run smoke:a1-core-operations
+      - run: npm run smoke:order-domain
+      - run: npm run smoke:order-lifecycle
+      - run: npm run smoke:store-portal-admin
 
   store-portal-boundary-verification:
     runs-on: ubuntu-latest
@@ -59,25 +66,12 @@ jobs:
       run:
         working-directory: modulex-store
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: modulex-store/package-lock.json
-      - name: Install
-        run: npm ci
-      - name: Store portal order projection
-        run: npm run smoke:store-portal
-      - name: Fulfillment portal projection
-        run: npm run smoke:portal-experience
-      - name: Scoped lint
-        run: npx eslint scripts/store-portal-contract.mjs scripts/portal-experience-contract.mjs
-      - name: Production build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
-          NEXT_PUBLIC_SITE_URL: https://oakwellcabinetry.com
-        run: npm run build
+      - run: npm ci
+      - run: npm run smoke:store-portal
+      - run: npm run smoke:portal-experience

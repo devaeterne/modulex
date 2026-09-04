@@ -3,15 +3,27 @@ name: Admin Project Base
 on:
   pull_request:
     paths:
-      - "modulex-admin/**"
-      - "modulex-store/supabase/migrations/**"
-      - ".github/workflows/admin-project-base.yml"
+      - "modulex-admin/src/app/(admin)/projects/**"
+      - "modulex-admin/src/components/projects/**"
+      - "modulex-admin/src/lib/projects/**"
+      - "modulex-admin/scripts/project-*.mjs"
+      - "modulex-admin/scripts/countertop-sink-fallback-contract.mjs"
+      - "modulex-admin/sql/project-*.sql"
+      - "modulex-store/supabase/migrations/*project*.sql"
+      - "modulex-store/supabase/migrations/*procurement*.sql"
+      - "modulex-store/supabase/migrations/*payment*.sql"
       - "docs/PROJECT_BASE_PLAN.md"
+      - "docs/acceptance/*project*.md"
+      - "docs/acceptance/*payment*.md"
+      - ".github/workflows/admin-project-base.yml"
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   project-base-contract:

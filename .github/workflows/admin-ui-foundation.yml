@@ -4,53 +4,23 @@ on:
   pull_request:
     paths:
       - "AGENTS.md"
-      - "modulex-admin/ADMIN_ROADMAP.md"
+      - "docs/CI_WORKFLOW_ARCHITECTURE.md"
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
-      - "modulex-admin/src/**"
-      - "modulex-admin/scripts/admin-ui-contract.mjs"
-      - "modulex-admin/scripts/admin-ui-strict-contract.mjs"
-      - "modulex-admin/scripts/admin-ui-strict-contract.test.mjs"
-      - "modulex-admin/scripts/countertop-ui-contract.mjs"
-      - "modulex-admin/scripts/countertop-domain-contract.mjs"
-      - "modulex-admin/scripts/countertop-material-band-selection-contract.mjs"
-      - "modulex-admin/scripts/order-countertop-context-contract.mjs"
-      - "modulex-admin/scripts/order-countertop-initiation-contract.mjs"
-      - "modulex-admin/scripts/order-manual-service-line-contract.mjs"
-      - "modulex-admin/scripts/admin-table-system-contract.mjs"
-      - "modulex-admin/scripts/admin-theme-design-contract.mjs"
-      - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
-      - "modulex-admin/scripts/admin-resolution-matrix-contract.mjs"
-      - "modulex-admin/scripts/api-timing-contract.mjs"
-      - "modulex-admin/package.json"
+      - "modulex-admin/**"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
-      - ".github/workflows/admin-ui-foundation.yml"
+      - ".github/workflows/**"
   push:
     paths:
       - "AGENTS.md"
-      - "modulex-admin/ADMIN_ROADMAP.md"
+      - "docs/CI_WORKFLOW_ARCHITECTURE.md"
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
-      - "modulex-admin/src/**"
-      - "modulex-admin/scripts/admin-ui-contract.mjs"
-      - "modulex-admin/scripts/admin-ui-strict-contract.mjs"
-      - "modulex-admin/scripts/admin-ui-strict-contract.test.mjs"
-      - "modulex-admin/scripts/countertop-ui-contract.mjs"
-      - "modulex-admin/scripts/countertop-domain-contract.mjs"
-      - "modulex-admin/scripts/countertop-material-band-selection-contract.mjs"
-      - "modulex-admin/scripts/order-countertop-context-contract.mjs"
-      - "modulex-admin/scripts/order-countertop-initiation-contract.mjs"
-      - "modulex-admin/scripts/order-manual-service-line-contract.mjs"
-      - "modulex-admin/scripts/admin-table-system-contract.mjs"
-      - "modulex-admin/scripts/admin-theme-design-contract.mjs"
-      - "modulex-admin/scripts/admin-full-route-regression-contract.mjs"
-      - "modulex-admin/scripts/admin-resolution-matrix-contract.mjs"
-      - "modulex-admin/scripts/api-timing-contract.mjs"
-      - "modulex-admin/package.json"
+      - "modulex-admin/**"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
-      - ".github/workflows/admin-ui-foundation.yml"
+      - ".github/workflows/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -71,10 +41,12 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
+      - name: CI workflow architecture contract
+        run: npm run smoke:ci-workflow-architecture
       - name: API timing contract
         run: npm run smoke:api-timing
       - name: Admin UI strict self-test
@@ -93,11 +65,40 @@ jobs:
       - run: node scripts/admin-theme-design-contract.mjs
       - run: node scripts/admin-full-route-regression-contract.mjs
       - run: node scripts/admin-resolution-matrix-contract.mjs
-      - run: npm run smoke:admin-ui
-      - run: npm run smoke:production-surface
-      - run: npm run smoke:rbac
-      - run: npm run typecheck
-      - run: npm run lint
+      - name: Approvals UI contract
+        run: node scripts/approvals-ui-contract.mjs
+      - name: Commercial documents contract
+        run: node scripts/commercial-document-contract.mjs
+      - name: Customers UI contract
+        run: node scripts/customers-ui-contract.mjs
+      - name: Dashboard shell contract
+        run: node scripts/dashboard-shell-ui-contract.mjs
+      - name: General settings UI contract
+        run: node scripts/general-settings-ui-contract.mjs
+      - name: Mobile shell UI contract
+        run: node scripts/mobile-shell-ui-contract.mjs
+      - name: Personnel UI contract
+        run: node scripts/personnel-ui-contract.mjs
+      - name: Leave UI contract
+        run: node scripts/leave-ui-contract.mjs
+      - name: Request Center UI contract
+        run: node scripts/request-center-ui-contract.mjs
+      - name: Request Center admin contract
+        run: npm run smoke:requests-admin
+      - name: Users and Store UI contract
+        run: node scripts/users-store-ui-contract.mjs
+      - name: Admin users contract
+        run: npm run smoke:admin-users
+      - name: Admin UI regression
+        run: npm run smoke:admin-ui
+      - name: Production surface regression
+        run: npm run smoke:production-surface
+      - name: RBAC regression
+        run: npm run smoke:rbac
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
       - name: Build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
