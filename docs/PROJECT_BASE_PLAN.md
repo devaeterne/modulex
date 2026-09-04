@@ -4,11 +4,11 @@ Last reviewed: 2026-09-04
 Active branch: `feat/project-pb5-fulfillment-rollup`
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
-Current package: **PB-5 — Delivery & Installation Rollup — implementation / PR acceptance**
+Current package: **PB-5 — Delivery & Installation Rollup — owner merge gate**
 
-Current status: **PB-1, PB-2, PB-3A and PB-3B are completed Project capabilities. PB-4 Project Expenses/Outgoings is intentionally removed from the Project workstream and owned by Finance. PB-5 is implemented on an isolated branch as a read-only Project projection over canonical Order, Shipment, Installation and Procurement truth; production DDL has not been applied.**
+Current status: **PB-1, PB-2, PB-3A and PB-3B are completed Project capabilities. PB-4 Project Expenses/Outgoings is intentionally removed from the Project workstream and owned by Finance. PB-5 implementation and final-head code/CI acceptance are complete on draft PR #296; production PB-5 DDL/RPC has not been applied.**
 
-Next action: **Complete PB-5 final-head Admin UI/Project CI and PR review, let the Project owner merge/deploy, then perform the separately approved production DB acceptance. After PB-5 closes, continue with PB-6 Participants & Commission Ledger.**
+Next action: **Project owner reviews/merges PR #296. After explicit owner approval, perform the separate production DB acceptance and Admin deployment. After PB-5 closes in production, continue with PB-6 Participants & Commission Ledger.**
 
 This file is the operational source of truth for the Project Base workstream. When asked where Project Base stands, read this file first and report the current package, completed packages, acceptance evidence, blockers and next action.
 
@@ -284,19 +284,22 @@ Goal: Project-level fulfillment visibility without changing ownership of Shipmen
 - [x] no Store/Portal projection.
 - [x] TDD RED contract committed before implementation.
 - [x] PB-5 contract wired into the consolidated `.github/workflows/admin-project-base.yml` job; no package-specific workflow wrapper remains.
-- [x] Admin Project Base fresh runs #220 and #221 are green on the PB-5 branch after restoring PB-3B workspace wiring.
-- [x] acceptance artifact added: `docs/acceptance/pb-5-project-fulfillment.md`.
-- [ ] final-head Admin UI Foundation green.
+- [x] PB-3B role-aware Procurement workspace integration restored using its approved permission model; permanent Project Procurement contract is green.
+- [x] final implementation head `0d77c2c60acdbe53bc26b6613c0b886e66875d65`: Admin Project Base #223 GREEN.
+- [x] final implementation head `0d77c2c60acdbe53bc26b6613c0b886e66875d65`: Admin UI Foundation #1244 GREEN, including TypeScript, ESLint, Admin consistency and production build.
+- [x] fresh production Security + Performance Advisor review found no PB-5-specific production finding; PB-5 DDL remains unapplied and existing unrelated project-wide backlog remains out of scope.
+- [x] acceptance artifact: `docs/acceptance/pb-5-project-fulfillment.md`.
 - [ ] owner merge.
 - [ ] separate post-merge production DDL/RPC acceptance after explicit owner approval.
 - [ ] production Admin deploy after DB acceptance.
+- [ ] signed-in Project Fulfillment UI acceptance after the production RPC is installed.
 
 Repository migration/RPC source:
 
 - `modulex-admin/sql/project-pb5-fulfillment-rollup.sql`
 - `public.get_customer_project_fulfillment(uuid)` → private role-guarded projection implementation.
 
-**Status: CODE IMPLEMENTED; PR/CI ACCEPTANCE IN PROGRESS. PRODUCTION UNCHANGED.**
+**Status: CODE + CI ACCEPTED; OWNER MERGE / PRODUCTION DB ACCEPTANCE PENDING. PRODUCTION UNCHANGED.**
 
 ---
 
@@ -354,14 +357,17 @@ When required:
 As of 2026-09-04:
 
 - execution-time `main` incorporated into PB-5 branch: `190da5745fe2b6972deabff0d11c16263cd5c0f5`.
-- open PRs at PB-5 start: none; current PB-5 draft PR: #296.
+- current PB-5 draft PR: #296.
+- final implementation verification head before documentation-only closeout: `0d77c2c60acdbe53bc26b6613c0b886e66875d65`.
+- Admin Project Base #223: GREEN.
+- Admin UI Foundation #1244: GREEN, including TypeScript, lint and production build.
 - PB-1: merged/deployed/accepted.
 - PB-2: merged/deployed/accepted.
 - PB-3A: merged/deployed/accepted.
 - PB-3B: merged/deployed/accepted; role-aware workspace integration restored in PR #296.
 - PB-4: intentionally delegated to Finance; Project will consume stable Finance interfaces only when needed.
 - PB-5 branch: `feat/project-pb5-fulfillment-rollup`.
-- PB-5 production schema inspection: read-only only; no migration/RPC/data mutation applied.
+- PB-5 production schema inspection and Advisor review: read-only only; no PB-5 migration/RPC/data mutation applied.
 - Store public/Customer Portal/Dealer Portal behavior: unchanged by PB-5.
 - next Project package after PB-5 owner merge/deploy acceptance: **PB-6 Participants & Commission Ledger**.
 
