@@ -40,6 +40,10 @@ expect(sql.includes("new.source_document_type = 'hr_payroll_item'"), "Payroll It
 expect(sql.includes("public.hr_payroll_items"), "Payroll Item links must validate against canonical HR payroll items");
 expect(sql.includes("new.employee_id is distinct from v_payroll_employee"), "Payroll Item attribution must match the linked Employee");
 expect(sql.includes("transaction_kind = 'employee_payment'"), "Employee payment posting must have a dedicated invariant");
+expect(sql.includes("old.status is distinct from 'draft'"), "Employee payment posting validator must execute on draft-to-posted transition rather than skip it");
+expect(sql.includes("new.status is distinct from 'posted'"), "Employee payment posting validator must execute when the new status becomes posted");
+expect(!sql.includes("old.status is not distinct from 'draft'"), "Employee payment posting validator must not invert the draft transition guard");
+expect(!sql.includes("new.status is not distinct from 'posted'"), "Employee payment posting validator must not invert the posted transition guard");
 expect(sql.includes("count(distinct l.employee_id)"), "Posted employee payments must resolve exactly one Employee");
 expect(sql.includes("coalesce(sum(l.allocated_amount),0)"), "Employee payment posting must reconcile allocated amount");
 expect(sql.includes("v_allocated_total is distinct from v_transaction.amount"), "Employee payment allocation must equal the Finance amount");
