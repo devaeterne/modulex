@@ -84,7 +84,7 @@
     "autoprefixer": "^10.4.22",
     "dotenv": "^17.4.2",
     "flatpickr": "^4.6.13",
-    "html5-qrcode": "^2.8.8",
+    "html5-qrcode": "^2.3.8",
     "next": "^16.1.6",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
