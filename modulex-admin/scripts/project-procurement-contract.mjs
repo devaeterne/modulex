@@ -10,6 +10,8 @@ const coreMigration = "modulex-store/supabase/migrations/20260904102000_customer
 const syncMigration = "modulex-store/supabase/migrations/20260904102500_customer_project_procurement_order_sync.sql";
 const operationsMigration = "modulex-store/supabase/migrations/20260904103000_customer_project_procurement_operations.sql";
 const executeHardeningMigration = "modulex-store/supabase/migrations/20260904114000_customer_project_procurement_rpc_execute_hardening.sql";
+const reservationAlignmentMigration = "modulex-store/supabase/migrations/20260904133500_customer_order_procurement_reservation_alignment.sql";
+const reservationAlignmentSql = "modulex-admin/sql/project-order-procurement-reservation-alignment.sql";
 const adapter = "modulex-admin/src/lib/customers/project-procurement.ts";
 const component = "modulex-admin/src/components/customers/project-detail/ProjectProcurementTab.tsx";
 const workspacePath = "modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx";
@@ -95,6 +97,65 @@ assert.doesNotMatch(
   executeHardening,
   /grant\s+execute\s+on\s+function\s+private\.[\s\S]*?\s+to\s+anon\b/i,
   "PB-3B private RPC cores must not be executable by anon",
+);
+
+assert.equal(
+  exists(reservationAlignmentMigration),
+  true,
+  "Order reservation / Project Procurement alignment migration must exist",
+);
+assert.equal(
+  exists(reservationAlignmentSql),
+  true,
+  "Admin SQL mirror for reservation / procurement alignment must exist",
+);
+const reservationAlignment = read(reservationAlignmentMigration);
+assert.equal(
+  reservationAlignment,
+  read(reservationAlignmentSql),
+  "Admin SQL mirror and Supabase migration must stay byte-identical",
+);
+for (const token of [
+  "reserve_customer_order_item_stock",
+  "inventory_tracking",
+  "reservable",
+  "customer_order_reservations",
+  "get_customer_order_procurement_components",
+  "sync_customer_order_procurement",
+  "trg_customer_order_stock_status_sync",
+  "trg_customer_order_project_procurement_sync",
+  "trg_customer_order_z_project_procurement_sync",
+  "customer_project_procurement_requirements",
+]) assert.match(reservationAlignment, new RegExp(token));
+assert.match(
+  reservationAlignment,
+  /if\s+not\s+coalesce\(v_item\.inventory_tracking,\s*false\)\s+or\s+not\s+coalesce\(v_item\.reservable,\s*false\)/i,
+  "Non-reservable or non-inventory-tracked products must bypass stock reservation",
+);
+assert.doesNotMatch(
+  reservationAlignment,
+  /ORDER_STOCK_SHORTAGE[\s\S]*raise\s+exception/i,
+  "Stock shortage must not abort confirmation after partial reservation",
+);
+assert.match(
+  reservationAlignment,
+  /greatest\([\s\S]*oi\.quantity[\s\S]*consumed_quantity[\s\S]*reserved_quantity[\s\S]*0[\s\S]*\)/i,
+  "Reservable procurement demand must be the unfulfilled quantity after stock consumption/reservation",
+);
+assert.match(
+  reservationAlignment,
+  /drop\s+trigger\s+if\s+exists\s+trg_customer_order_project_procurement_sync/i,
+  "Legacy procurement status trigger must be replaced",
+);
+assert.match(
+  reservationAlignment,
+  /create\s+trigger\s+trg_customer_order_z_project_procurement_sync/i,
+  "Procurement sync trigger must run after stock reservation by trigger name ordering",
+);
+assert.match(
+  reservationAlignment,
+  /for\s+v_order_id\s+in[\s\S]*customer_orders[\s\S]*project_id\s+is\s+not\s+null[\s\S]*status\s+<>\s+'draft'[\s\S]*status\s+<>\s+'cancelled'[\s\S]*sync_customer_order_procurement/i,
+  "Existing active non-Draft Project Orders must be backfilled idempotently",
 );
 
 assert.equal(exists(adapter), true, "Project Procurement adapter must exist");
