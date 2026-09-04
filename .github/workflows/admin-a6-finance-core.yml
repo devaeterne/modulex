@@ -8,6 +8,7 @@ on:
       - "modulex-admin/src/app/(admin)/approvals/**"
       - "modulex-admin/src/app/(admin)/pricing/cost-margin/**"
       - "modulex-admin/src/app/(admin)/settings/general/tax-rules/**"
+      - "modulex-admin/src/app/(admin)/settings/payment-methods/**"
       - "modulex-admin/src/app/(admin)/reports/**"
       - "modulex-admin/src/components/finance/**"
       - "modulex-admin/src/components/hr/PayrollManager.tsx"
