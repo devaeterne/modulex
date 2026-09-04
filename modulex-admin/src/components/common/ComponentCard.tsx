@@ -3,7 +3,7 @@ import { ADMIN_SURFACE_CARD } from "@/components/ui/theme/adminTheme";
 
 interface ComponentCardProps {
   title: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   desc?: string;
   headerAction?: React.ReactNode;
@@ -34,7 +34,7 @@ const ComponentCard: React.FC<ComponentCardProps> = ({
         {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </div>
 
-      {!collapsed ? (
+      {!collapsed && children ? (
         <div className="border-t border-gray-100 p-4 dark:border-gray-800 sm:p-6">
           <div className="space-y-6">{children}</div>
         </div>
