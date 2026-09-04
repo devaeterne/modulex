@@ -482,11 +482,11 @@ export default function CustomersTable() {
       )}
 
       {!isLoading && (
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <SummaryCard label="Total Customers" value={summary.total} />
-          <SummaryCard label="Active" value={summary.active} type="success" />
-          <SummaryCard label="Prospects" value={summary.prospects} type="warning" />
-          <SummaryCard label="Portal Enabled" value={summary.portal} type="brand" />
+          <SummaryCard label="Active" value={summary.active} />
+          <SummaryCard label="Prospects" value={summary.prospects} />
+          <SummaryCard label="Portal Enabled" value={summary.portal} />
         </div>
       )}
 
@@ -502,217 +502,216 @@ export default function CustomersTable() {
           </div>
         }
       >
-        <div>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div />
-          </div>
-        </div>
-
-        <div className="p-5 sm:p-6">
-          {filtersOpen && (
-            <ComponentCard title="Filters" desc="Server-side filters are reflected in the URL so views can be shared or revisited.">
-              <div className="mb-4 flex items-center justify-between">
-                <div />
-                {activeFilterCount > 0 && (
-                  <Button
-                    type="button"
-                    onClick={clearFilters}
-                    variant="outline"
-                  >
-                    Clear All
-                  </Button>
-                )}
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
-                <div className="xl:col-span-2">
-                  <FilterLabel>Search</FilterLabel>
-                  <Input
-                    value={searchQuery}
-                    onChange={(event) => {
-                      setSearchQuery(event.target.value);
-                      resetToFirstPage();
-                    }}
-                    placeholder="Code, company, email, tax number..."
-                  />
-                </div>
-
-                <div>
-                  <FilterLabel>Status</FilterLabel>
-                  <Select
-                    value={statusFilter}
-                    onChange={(value) => {
-                      setStatusFilter(value as "all" | CustomerStatus);
-                      resetToFirstPage();
-                    }}
-                    options={[
-                      { value: "all", label: "All Statuses" },
-                      ...CUSTOMER_STATUSES.map((value) => ({ value, label: titleCase(value) })),
-                    ]}
-                  />
-                </div>
-
-                <div>
-                  <FilterLabel>Customer Type</FilterLabel>
-                  <Select
-                    value={typeFilter}
-                    onChange={(value) => {
-                      setTypeFilter(value);
-                      resetToFirstPage();
-                    }}
-                    options={customerTypes.map((item) => ({ value: item.id, label: item.name }))}
-                    placeholder="All Types"
-                    allowEmpty
-                  />
-                </div>
-
-                <div>
-                  <FilterLabel>Price Group</FilterLabel>
-                  <Select
-                    value={priceGroupFilter}
-                    onChange={(value) => {
-                      setPriceGroupFilter(value);
-                      resetToFirstPage();
-                    }}
-                    options={priceGroups.map((item) => ({ value: item.id, label: item.name }))}
-                    placeholder="All Groups"
-                    allowEmpty
-                  />
-                </div>
-
-                <div>
-                  <FilterLabel>Country</FilterLabel>
-                  <Input
-                    value={countryFilter}
-                    maxLength={2}
-                    placeholder="US"
-                    onChange={(event) => {
-                      setCountryFilter(event.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2));
-                      resetToFirstPage();
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <FilterLabel>Portal</FilterLabel>
-                  <Select
-                    value={portalFilter}
-                    onChange={(value) => {
-                      setPortalFilter(value as PortalFilter);
-                      resetToFirstPage();
-                    }}
-                    options={[
-                      { value: "all", label: "All" },
-                      { value: "enabled", label: "Enabled" },
-                      { value: "disabled", label: "Disabled" },
-                    ]}
-                  />
-                </div>
-
-                <div className="xl:col-span-2">
-                  <FilterLabel>Sales Representative</FilterLabel>
-                  <Select
-                    value={salesRepFilter}
-                    onChange={(value) => {
-                      setSalesRepFilter(value);
-                      resetToFirstPage();
-                    }}
-                    options={profiles
-                      .filter((item) => ["super_admin", "admin", "sales"].includes(item.role))
-                      .map((item) => ({ value: item.id, label: item.full_name || item.email || "" }))}
-                    placeholder="All Representatives"
-                    allowEmpty
-                  />
-                </div>
-              </div>
-            </ComponentCard>
-          )}
-
-          {isLoading ? (
-            <div className="flex min-h-[360px] items-center justify-center">
-              <FormHint>Loading customers...</FormHint>
+        {filtersOpen && (
+          <ComponentCard title="Filters" desc="Server-side filters are reflected in the URL so views can be shared or revisited.">
+            <div className="mb-4 flex items-center justify-between">
+              <div />
+              {activeFilterCount > 0 && (
+                <Button
+                  type="button"
+                  onClick={clearFilters}
+                  variant="outline"
+                >
+                  Clear All
+                </Button>
+              )}
             </div>
-          ) : (
-            <>
-              <TableViewport>
-                  <Table variant="admin" minWidth="wide">
-                    <TableHeader variant="admin">
-                      <TableRow>
-                        {["Customer", "Type", "Contact", "Country", "Price Group", "Sales Rep", "Portal", "Status", ""].map((label) => (
-                          <TableCell isHeader
-                            key={label || "action"}
-                            className="whitespace-nowrap px-4 py-3 text-left text-xs font-medium uppercase tracking-wide"
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
+              <div className="xl:col-span-2">
+                <FilterLabel>Search</FilterLabel>
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value);
+                    resetToFirstPage();
+                  }}
+                  placeholder="Code, company, email, tax number..."
+                />
+              </div>
+
+              <div>
+                <FilterLabel>Status</FilterLabel>
+                <Select
+                  value={statusFilter}
+                  onChange={(value) => {
+                    setStatusFilter(value as "all" | CustomerStatus);
+                    resetToFirstPage();
+                  }}
+                  options={[
+                    { value: "all", label: "All Statuses" },
+                    ...CUSTOMER_STATUSES.map((value) => ({ value, label: titleCase(value) })),
+                  ]}
+                />
+              </div>
+
+              <div>
+                <FilterLabel>Customer Type</FilterLabel>
+                <Select
+                  value={typeFilter}
+                  onChange={(value) => {
+                    setTypeFilter(value);
+                    resetToFirstPage();
+                  }}
+                  options={customerTypes.map((item) => ({ value: item.id, label: item.name }))}
+                  placeholder="All Types"
+                  allowEmpty
+                />
+              </div>
+
+              <div>
+                <FilterLabel>Price Group</FilterLabel>
+                <Select
+                  value={priceGroupFilter}
+                  onChange={(value) => {
+                    setPriceGroupFilter(value);
+                    resetToFirstPage();
+                  }}
+                  options={priceGroups.map((item) => ({ value: item.id, label: item.name }))}
+                  placeholder="All Groups"
+                  allowEmpty
+                />
+              </div>
+
+              <div>
+                <FilterLabel>Country</FilterLabel>
+                <Input
+                  value={countryFilter}
+                  maxLength={2}
+                  placeholder="US"
+                  onChange={(event) => {
+                    setCountryFilter(event.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2));
+                    resetToFirstPage();
+                  }}
+                />
+              </div>
+
+              <div>
+                <FilterLabel>Portal</FilterLabel>
+                <Select
+                  value={portalFilter}
+                  onChange={(value) => {
+                    setPortalFilter(value as PortalFilter);
+                    resetToFirstPage();
+                  }}
+                  options={[
+                    { value: "all", label: "All" },
+                    { value: "enabled", label: "Enabled" },
+                    { value: "disabled", label: "Disabled" },
+                  ]}
+                />
+              </div>
+
+              <div className="xl:col-span-2">
+                <FilterLabel>Sales Representative</FilterLabel>
+                <Select
+                  value={salesRepFilter}
+                  onChange={(value) => {
+                    setSalesRepFilter(value);
+                    resetToFirstPage();
+                  }}
+                  options={profiles
+                    .filter((item) => ["super_admin", "admin", "sales"].includes(item.role))
+                    .map((item) => ({ value: item.id, label: item.full_name || item.email || "" }))}
+                  placeholder="All Representatives"
+                  allowEmpty
+                />
+              </div>
+            </div>
+          </ComponentCard>
+        )}
+
+        {isLoading ? (
+          <div className="flex min-h-[360px] items-center justify-center">
+            <FormHint>Loading customers...</FormHint>
+          </div>
+        ) : (
+          <>
+            <TableViewport>
+              <Table variant="admin" minWidth="standard">
+                <TableHeader variant="admin">
+                  <TableRow>
+                    {["Customer", "Type", "Contact", "Country", "Price Group", "Sales Rep", "Portal", "Status", ""].map((label) => (
+                      <TableCell
+                        isHeader
+                        variant="admin"
+                        key={label || "action"}
+                        className="whitespace-nowrap text-left"
+                      >
+                        {label}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+
+                <TableBody variant="admin">
+                  {customers.length === 0 ? (
+                    <TableRow>
+                      <TableCell variant="admin" colSpan={9} className="py-12 text-center">
+                        No customers found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    customers.map((customer) => (
+                      <TableRow key={customer.id}>
+                        <TableCell variant="admin" className="min-w-[180px] px-4 py-3">
+                          <Link
+                            href={`/customers/${customer.id}`}
+                            className="block max-w-[220px] truncate font-semibold"
+                            title={customer.name}
                           >
-                            {label}
-                          </TableCell>
-                        ))}
+                            {customer.name}
+                          </Link>
+                          <p className="mt-0.5 whitespace-nowrap text-xs">{customer.customer_code}</p>
+                        </TableCell>
+                        <TableCell variant="admin" className="min-w-[130px] whitespace-nowrap px-4 py-3">
+                          {customer.customer_type_id ? typeMap.get(customer.customer_type_id) ?? "—" : "—"}
+                        </TableCell>
+                        <TableCell variant="admin" className="min-w-[240px] max-w-[300px] px-4 py-3">
+                          <p className="truncate text-sm" title={customer.email ?? undefined}>{customer.email || "—"}</p>
+                          {customer.phone && <p className="mt-0.5 whitespace-nowrap text-xs">{customer.phone}</p>}
+                        </TableCell>
+                        <TableCell variant="admin" className="whitespace-nowrap px-4 py-3">{customer.country_code || "—"}</TableCell>
+                        <TableCell variant="admin" className="min-w-[120px] whitespace-nowrap px-4 py-3 font-medium">
+                          {customer.price_group_id ? groupMap.get(customer.price_group_id) ?? "—" : "—"}
+                        </TableCell>
+                        <TableCell variant="admin" className="min-w-[150px] max-w-[220px] px-4 py-3">
+                          <span className="block truncate" title={customer.sales_rep_id ? profileMap.get(customer.sales_rep_id) ?? undefined : undefined}>
+                            {customer.sales_rep_id ? profileMap.get(customer.sales_rep_id) ?? "—" : "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell variant="admin" className="whitespace-nowrap px-4 py-3">
+                          <Badge color={customer.portal_enabled ? "info" : "light"}>
+                            {customer.portal_enabled ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell variant="admin" className="whitespace-nowrap px-4 py-3">
+                          <Badge color={statusColor(customer.status)}>
+                            {titleCase(customer.status)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell variant="admin" className="whitespace-nowrap px-4 py-3 text-right">
+                          <Link
+                            href={`/customers/${customer.id}`}
+                            className="text-sm font-medium"
+                          >
+                            Open
+                          </Link>
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableViewport>
 
-                    <TableBody className="divide-y">
-                      {customers.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={9} className="px-4 py-12 text-center text-sm">
-                            No customers found.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        customers.map((customer) => (
-                          <TableRow key={customer.id}>
-                            <TableCell className="px-4 py-3">
-                              <Link
-                                href={`/customers/${customer.id}`}
-                                className="font-semibold"
-                              >
-                                {customer.name}
-                              </Link>
-                              <p className="mt-0.5 text-xs">{customer.customer_code}</p>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-sm">
-                              {customer.customer_type_id ? typeMap.get(customer.customer_type_id) ?? "—" : "—"}
-                            </TableCell>
-                            <TableCell className="px-4 py-3">
-                              <p className="text-sm">{customer.email || "—"}</p>
-                              {customer.phone && <p className="mt-0.5 text-xs">{customer.phone}</p>}
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-sm">{customer.country_code || "—"}</TableCell>
-                            <TableCell className="px-4 py-3 text-sm font-medium">
-                              {customer.price_group_id ? groupMap.get(customer.price_group_id) ?? "—" : "—"}
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-sm">
-                              {customer.sales_rep_id ? profileMap.get(customer.sales_rep_id) ?? "—" : "—"}
-                            </TableCell>
-                            <TableCell className="px-4 py-3">
-                              <Badge color={customer.portal_enabled ? "info" : "light"}>
-                                {customer.portal_enabled ? "Enabled" : "Disabled"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="px-4 py-3">
-                              <Badge color={statusColor(customer.status)}>
-                                {titleCase(customer.status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-right">
-                              <Link
-                                href={`/customers/${customer.id}`}
-                                className="text-sm font-medium"
-                              >
-                                Open
-                              </Link>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-              </TableViewport>
+            <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm">
+                Showing <span className="font-medium">{startRow}–{endRow}</span> of <span className="font-medium">{filteredCount}</span>
+              </p>
 
-              <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm">
-                  Showing <span className="font-medium">{startRow}–{endRow}</span> of <span className="font-medium">{filteredCount}</span>
-                </p>
-
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="w-full sm:w-36">
                   <Select
                     value={String(pageSize)}
                     onChange={(value) => {
@@ -721,117 +720,117 @@ export default function CustomersTable() {
                     }}
                     options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} / page` }))}
                   />
-                  <Button
-                    type="button"
-                    disabled={currentPage <= 1}
-                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                    variant="outline"
-                  >
-                    Previous
-                  </Button>
-                  <span className="flex h-10 min-w-[90px] items-center justify-center px-3 text-xs">
-                    {currentPage} / {totalPages}
-                  </span>
-                  <Button
-                    type="button"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                    variant="outline"
-                  >
-                    Next
-                  </Button>
                 </div>
+                <Button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  variant="outline"
+                >
+                  Previous
+                </Button>
+                <span className="flex h-10 min-w-[72px] items-center justify-center px-2 text-xs">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  variant="outline"
+                >
+                  Next
+                </Button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </ComponentCard>
 
       <Modal isOpen={createOpen} onClose={() => setCreateOpen(false)} ariaLabel="New Customer" className="max-h-[90vh] max-w-3xl overflow-y-auto">
-          <ComponentCard title="New Customer" desc="Create the customer master record. More details can be added from the customer card.">
-            <div className="flex items-center justify-between border-b px-6 py-5">
-              <div />
-            </div>
+        <ComponentCard title="New Customer" desc="Create the customer master record. More details can be added from the customer card.">
+          <div className="flex items-center justify-between border-b px-6 py-5">
+            <div />
+          </div>
 
-            <div className="grid gap-4 p-6 md:grid-cols-2">
-              <Field label="Company / Customer Name" required>
-                <Input
-                  value={newCustomer.name}
-                  onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))}
-                />
-              </Field>
-              <Field label="Legal Name">
-                <Input
-                  value={newCustomer.legal_name}
-                  onChange={(event) => setNewCustomer((current) => ({ ...current, legal_name: event.target.value }))}
-                />
-              </Field>
-              <Field label="Customer Type">
-                <Select
-                  value={newCustomer.customer_type_id}
-                  onChange={(value) => setNewCustomer((current) => ({ ...current, customer_type_id: value }))}
-                  options={customerTypes.map((item) => ({ value: item.id, label: item.name }))}
-                  placeholder="Default (Company)"
-                  allowEmpty
-                />
-              </Field>
-              <Field label="Status">
-                <Select
-                  value={newCustomer.status}
-                  onChange={(value) => setNewCustomer((current) => ({ ...current, status: value as CustomerStatus }))}
-                  options={CUSTOMER_STATUSES.map((value) => ({ value, label: titleCase(value) }))}
-                />
-              </Field>
-              <Field label="Email">
-                <Input
-                  type="email"
-                  value={newCustomer.email}
-                  onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))}
-                />
-              </Field>
-              <Field label="Phone">
-                <Input
-                  value={newCustomer.phone}
-                  onChange={(event) => setNewCustomer((current) => ({ ...current, phone: event.target.value }))}
-                />
-              </Field>
-              <Field label="Country Code">
-                <Input
-                  maxLength={2}
-                  placeholder="US"
-                  value={newCustomer.country_code}
-                  onChange={(event) => setNewCustomer((current) => ({ ...current, country_code: event.target.value.toUpperCase() }))}
-                />
-              </Field>
-              <Field label="Price Group">
-                <Select
-                  value={newCustomer.price_group_id}
-                  onChange={(value) => setNewCustomer((current) => ({ ...current, price_group_id: value }))}
-                  options={priceGroups.map((item) => ({ value: item.id, label: item.name }))}
-                  placeholder="Default (List / Base)"
-                  allowEmpty
-                />
-              </Field>
-              <Field label="Sales Representative">
-                <Select
-                  value={newCustomer.sales_rep_id}
-                  onChange={(value) => setNewCustomer((current) => ({ ...current, sales_rep_id: value }))}
-                  options={profiles
-                    .filter((item) => ["super_admin", "admin", "sales"].includes(item.role))
-                    .map((item) => ({ value: item.id, label: item.full_name || item.email || "" }))}
-                  placeholder="Unassigned"
-                  allowEmpty
-                />
-              </Field>
-            </div>
+          <div className="grid gap-4 p-6 md:grid-cols-2">
+            <Field label="Company / Customer Name" required>
+              <Input
+                value={newCustomer.name}
+                onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))}
+              />
+            </Field>
+            <Field label="Legal Name">
+              <Input
+                value={newCustomer.legal_name}
+                onChange={(event) => setNewCustomer((current) => ({ ...current, legal_name: event.target.value }))}
+              />
+            </Field>
+            <Field label="Customer Type">
+              <Select
+                value={newCustomer.customer_type_id}
+                onChange={(value) => setNewCustomer((current) => ({ ...current, customer_type_id: value }))}
+                options={customerTypes.map((item) => ({ value: item.id, label: item.name }))}
+                placeholder="Default (Company)"
+                allowEmpty
+              />
+            </Field>
+            <Field label="Status">
+              <Select
+                value={newCustomer.status}
+                onChange={(value) => setNewCustomer((current) => ({ ...current, status: value as CustomerStatus }))}
+                options={CUSTOMER_STATUSES.map((value) => ({ value, label: titleCase(value) }))}
+              />
+            </Field>
+            <Field label="Email">
+              <Input
+                type="email"
+                value={newCustomer.email}
+                onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))}
+              />
+            </Field>
+            <Field label="Phone">
+              <Input
+                value={newCustomer.phone}
+                onChange={(event) => setNewCustomer((current) => ({ ...current, phone: event.target.value }))}
+              />
+            </Field>
+            <Field label="Country Code">
+              <Input
+                maxLength={2}
+                placeholder="US"
+                value={newCustomer.country_code}
+                onChange={(event) => setNewCustomer((current) => ({ ...current, country_code: event.target.value.toUpperCase() }))}
+              />
+            </Field>
+            <Field label="Price Group">
+              <Select
+                value={newCustomer.price_group_id}
+                onChange={(value) => setNewCustomer((current) => ({ ...current, price_group_id: value }))}
+                options={priceGroups.map((item) => ({ value: item.id, label: item.name }))}
+                placeholder="Default (List / Base)"
+                allowEmpty
+              />
+            </Field>
+            <Field label="Sales Representative">
+              <Select
+                value={newCustomer.sales_rep_id}
+                onChange={(value) => setNewCustomer((current) => ({ ...current, sales_rep_id: value }))}
+                options={profiles
+                  .filter((item) => ["super_admin", "admin", "sales"].includes(item.role))
+                  .map((item) => ({ value: item.id, label: item.full_name || item.email || "" }))}
+                placeholder="Unassigned"
+                allowEmpty
+              />
+            </Field>
+          </div>
 
-            <div className="flex justify-end gap-2 border-t px-6 py-4">
-              <Button type="button" onClick={() => setCreateOpen(false)} variant="outline">Cancel</Button>
-              <Button type="button" onClick={createCustomer} disabled={isSaving}>
-                {isSaving ? "Creating..." : "Create Customer"}
-              </Button>
-            </div>
-          </ComponentCard>
+          <div className="flex justify-end gap-2 border-t px-6 py-4">
+            <Button type="button" onClick={() => setCreateOpen(false)} variant="outline">Cancel</Button>
+            <Button type="button" onClick={createCustomer} disabled={isSaving}>
+              {isSaving ? "Creating..." : "Create Customer"}
+            </Button>
+          </div>
+        </ComponentCard>
       </Modal>
     </div>
   );
@@ -863,18 +862,13 @@ function Field({
 function SummaryCard({
   label,
   value,
-  type = "default",
 }: {
   label: string;
   value: number;
-  type?: "default" | "success" | "warning" | "brand";
 }) {
   return (
     <ComponentCard title={label}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-2xl font-semibold">{value}</p>
-        {type !== "default" && <Badge color={type === "brand" ? "info" : type}>{label}</Badge>}
-      </div>
+      <p className="text-2xl font-semibold">{value}</p>
     </ComponentCard>
   );
 }
