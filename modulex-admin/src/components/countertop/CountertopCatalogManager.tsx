@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
+import ProductImageThumbnail from "@/components/common/ProductImageThumbnail";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
@@ -33,9 +34,20 @@ type ProductRow = {
   id: string;
   name: string;
   sku: string;
+  base_product_code: string | null;
   status: "active" | "inactive" | "archived";
   brand_id: string;
   product_type_id: string;
+};
+type ProductImage = { url: string; alt: string };
+type ProductContentRow = { id: string; base_product_code: string };
+type ProductMediaRow = {
+  product_content_id: string;
+  url: string;
+  alt_text: string | null;
+  title: string | null;
+  sort_order: number;
+  is_primary: boolean;
 };
 type StoneProfileRow = {
   product_id: string;
@@ -66,6 +78,11 @@ type CatalogRowActionsProps = {
   disabled: boolean;
   onEdit: () => void;
   onToggleStatus: () => void | Promise<void>;
+};
+type CatalogProductIdentityProps = {
+  product: ProductRow;
+  image?: ProductImage;
+  onPreview: (image: ProductImage) => void;
 };
 
 const EMPTY_STONE: StoneDraft = {
@@ -114,6 +131,84 @@ function sinkPriceSummary(row: SinkCatalogRow, priceGroups: PriceGroupRow[]) {
     range: minimum === maximum ? money(minimum) : `${money(minimum)} – ${money(maximum)}`,
     detail: `${amounts.length}/${priceGroups.length} price groups`,
   };
+}
+
+async function loadCatalogProductImages(products: ProductRow[]): Promise<Record<string, ProductImage>> {
+  const baseProductCodes = Array.from(
+    new Set(products.map((product) => product.base_product_code || product.sku).filter(Boolean))
+  );
+  if (baseProductCodes.length === 0) return {};
+
+  const { data: contentRows, error: contentError } = await supabase
+    .from("store_product_content")
+    .select("id,base_product_code")
+    .in("base_product_code", baseProductCodes);
+  if (contentError) {
+    console.error("[Countertop Catalog] product thumbnail content load failed", contentError);
+    return {};
+  }
+
+  const contents = (contentRows ?? []) as ProductContentRow[];
+  const contentIds = contents.map((content) => content.id);
+  if (contentIds.length === 0) return {};
+
+  const { data: mediaRows, error: mediaError } = await supabase
+    .from("store_product_media")
+    .select("product_content_id,url,alt_text,title,sort_order,is_primary")
+    .in("product_content_id", contentIds)
+    .eq("media_type", "image")
+    .order("is_primary", { ascending: false })
+    .order("sort_order", { ascending: true });
+  if (mediaError) {
+    console.error("[Countertop Catalog] product thumbnail media load failed", mediaError);
+    return {};
+  }
+
+  const firstImageByContentId = new Map<string, ProductMediaRow>();
+  for (const media of (mediaRows ?? []) as ProductMediaRow[]) {
+    if (!firstImageByContentId.has(media.product_content_id)) {
+      firstImageByContentId.set(media.product_content_id, media);
+    }
+  }
+
+  const imageByBaseProductCode = new Map<string, ProductImage>();
+  for (const content of contents) {
+    const media = firstImageByContentId.get(content.id);
+    if (!media) continue;
+    imageByBaseProductCode.set(content.base_product_code, {
+      url: media.url,
+      alt: media.alt_text || media.title || "Product image",
+    });
+  }
+
+  const nextImages: Record<string, ProductImage> = {};
+  for (const product of products) {
+    const image = imageByBaseProductCode.get(product.base_product_code || product.sku);
+    if (!image) continue;
+    nextImages[product.id] = {
+      ...image,
+      alt: image.alt === "Product image" ? product.name : image.alt,
+    };
+  }
+  return nextImages;
+}
+
+function CatalogProductIdentity({ product, image, onPreview }: CatalogProductIdentityProps) {
+  return (
+    <div className="flex min-w-[240px] items-center gap-3">
+      <ProductImageThumbnail
+        image={image}
+        actionLabel={`View ${product.name} image`}
+        onClick={() => {
+          if (image) onPreview(image);
+        }}
+      />
+      <div className="min-w-0 space-y-1">
+        <div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{product.name}</div>
+        <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{product.sku}</div>
+      </div>
+    </div>
+  );
 }
 
 function CatalogRowActions({ product, disabled, onEdit, onToggleStatus }: CatalogRowActionsProps) {
@@ -172,6 +267,8 @@ export default function CountertopCatalogManager() {
   const [priceGroups, setPriceGroups] = useState<PriceGroupRow[]>([]);
   const [stones, setStones] = useState<StoneCatalogRow[]>([]);
   const [sinks, setSinks] = useState<SinkCatalogRow[]>([]);
+  const [productImages, setProductImages] = useState<Record<string, ProductImage>>({});
+  const [previewImage, setPreviewImage] = useState<ProductImage | null>(null);
   const [stoneDraft, setStoneDraft] = useState<StoneDraft>(EMPTY_STONE);
   const [sinkDraft, setSinkDraft] = useState<SinkDraft>(EMPTY_SINK);
   const [editor, setEditor] = useState<CatalogEditor>(null);
@@ -231,6 +328,8 @@ export default function CountertopCatalogManager() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setProductImages({});
+    setPreviewImage(null);
     const [brandResult, stoneTypeResult, bandResult, priceGroupResult, productTypeResult] = await Promise.all([
       supabase.from("product_brands").select("id,name").eq("status", "active").order("name"),
       supabase.from("countertop_stone_types").select("id,name").eq("is_active", true).order("name"),
@@ -253,7 +352,7 @@ export default function CountertopCatalogManager() {
       return false;
     }
     const [productResult, profileResult] = await Promise.all([
-      supabase.from("products").select("id,name,sku,status,brand_id,product_type_id").in("product_type_id", [stoneType.id, sinkType.id]).neq("status", "archived").order("name"),
+      supabase.from("products").select("id,name,sku,base_product_code,status,brand_id,product_type_id").in("product_type_id", [stoneType.id, sinkType.id]).neq("status", "archived").order("name"),
       supabase.from("countertop_stone_product_profiles").select("product_id,stone_type_id,material_price_band_id,vendor_name,source_ref,is_active"),
     ]);
     if (productResult.error || profileResult.error) {
@@ -267,9 +366,12 @@ export default function CountertopCatalogManager() {
     const stoneProducts = products.filter((row) => row.product_type_id === stoneType.id);
     const sinkProducts = products.filter((row) => row.product_type_id === sinkType.id);
     const sinkIds = sinkProducts.map((row) => row.id);
-    const priceResult = sinkIds.length
-      ? await supabase.from("product_prices").select("product_id,price_group_id,amount").in("product_id", sinkIds).eq("currency_code", "USD").eq("is_active", true).is("valid_to", null)
-      : { data: [] as ProductPriceRow[], error: null };
+    const [priceResult, nextProductImages] = await Promise.all([
+      sinkIds.length
+        ? supabase.from("product_prices").select("product_id,price_group_id,amount").in("product_id", sinkIds).eq("currency_code", "USD").eq("is_active", true).is("valid_to", null)
+        : Promise.resolve({ data: [] as ProductPriceRow[], error: null }),
+      loadCatalogProductImages(products),
+    ]);
     if (priceResult.error) {
       setError(priceResult.error.message || "Unable to load sink prices.");
       setLoading(false);
@@ -285,6 +387,7 @@ export default function CountertopCatalogManager() {
     setStoneTypes((stoneTypeResult.data ?? []) as StoneTypeRow[]);
     setBands((bandResult.data ?? []) as BandRow[]);
     setPriceGroups((priceGroupResult.data ?? []).map((row) => ({ id: row.id, name: row.name, sort_order: row.sort_order })) as PriceGroupRow[]);
+    setProductImages(nextProductImages);
     setStones(stoneProducts.flatMap((product) => {
       const profile = profileByProduct.get(product.id);
       return profile ? [{ ...product, ...profile }] : [];
@@ -483,10 +586,7 @@ export default function CountertopCatalogManager() {
                   ) : activeCatalog === "stone" ? pagedStones.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell variant="admin">
-                        <div className="space-y-1">
-                          <div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{row.name}</div>
-                          <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{row.sku}</div>
-                        </div>
+                        <CatalogProductIdentity product={row} image={productImages[row.id]} onPreview={setPreviewImage} />
                       </TableCell>
                       <TableCell variant="admin">
                         <div className="space-y-1">
@@ -504,10 +604,7 @@ export default function CountertopCatalogManager() {
                     return (
                       <TableRow key={row.id}>
                         <TableCell variant="admin">
-                          <div className="space-y-1">
-                            <div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{row.name}</div>
-                            <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{row.sku}</div>
-                          </div>
+                          <CatalogProductIdentity product={row} image={productImages[row.id]} onPreview={setPreviewImage} />
                         </TableCell>
                         <TableCell variant="admin">{brandById.get(row.brand_id) ?? "—"}</TableCell>
                         <TableCell variant="admin">
@@ -551,6 +648,24 @@ export default function CountertopCatalogManager() {
           </div>
         </div>
       </ComponentCard>
+
+      <Modal
+        isOpen={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        ariaLabel="Countertop product image preview"
+        className="m-4 max-w-5xl overflow-hidden"
+      >
+        {previewImage ? (
+          <div className="flex max-h-[calc(100vh-4rem)] items-center justify-center p-4 sm:p-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewImage.url}
+              alt={previewImage.alt}
+              className="max-h-[calc(100vh-7rem)] w-full object-contain"
+            />
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal isOpen={editor === "stone"} onClose={closeEditor} className="m-4 max-h-[90vh] max-w-3xl overflow-y-auto p-6" ariaLabel="Stone editor">
         <div className="space-y-6">

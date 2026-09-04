@@ -8,6 +8,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const catalog = read("src/components/countertop/CountertopCatalogManager.tsx");
 const setup = read("src/components/countertop/CountertopReferenceManager.tsx");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
+const thumbnail = read("src/components/common/ProductImageThumbnail.tsx");
 const catalogPage = read("src/app/(admin)/pricing/countertop/catalog/page.tsx");
 const setupPage = read("src/app/(admin)/pricing/countertop/settings/page.tsx");
 
@@ -39,6 +40,29 @@ assert(catalog.includes('["Stone", "Details", "Price Band", "Status", "Actions"]
 assert(catalog.includes('["Sink", "Brand", "Pricing", "Status", "Actions"]'), "Sink table must use the compact five-column scan model");
 assert(!catalog.includes('priceGroups.map((group) => <TableCell key={group.id} isHeader'), "Sink table must not render one visible header per Price Group");
 assert(catalog.includes("setCurrentPage(1)"), "Catalog filter and tab changes must be able to reset pagination");
+
+// Keep Countertop thumbnails and lightbox behavior aligned with the canonical Product List media contract.
+assert(
+  catalog.includes('.from("store_product_content")') &&
+    catalog.includes('.in("base_product_code"') &&
+    catalog.includes('.from("store_product_media")') &&
+    catalog.includes('.in("product_content_id"') &&
+    catalog.includes('.eq("media_type", "image")'),
+  "Countertop Catalog thumbnails must batch-load canonical Store product media without per-row queries"
+);
+assert(
+  catalog.includes("productImages") &&
+    catalog.includes("previewImage") &&
+    catalog.includes("ProductImageThumbnail") &&
+    catalog.includes('actionLabel={`View ${product.name} image`}') &&
+    catalog.includes('ariaLabel="Countertop product image preview"'),
+  "Countertop Catalog must render shared clickable product thumbnails with an accessible lightbox preview"
+);
+assert(
+  thumbnail.includes('className="h-12 w-12 shrink-0 p-0"') &&
+    thumbnail.includes('className="h-12 w-12 object-contain"'),
+  "Shared product thumbnail must own the compact 48px Product List scan pattern"
+);
 
 assert(configurator.includes('import SectionTitle from "@/components/common/SectionTitle"'), "Countertop configurator section headings must use the shared SectionTitle tone");
 assert(configurator.includes("<SectionTitle>Additional services</SectionTitle>"), "Additional services heading must use the shared dark-mode-safe SectionTitle");
