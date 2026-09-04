@@ -159,6 +159,7 @@ begin
   derived_rows as (
     select
       r.*,
+      (r.fulfillment_type = 'delivery_installation' or r.active_installation_count > 0) as installation_relevant,
       case
         when not r.is_active then 'cancelled_history'
         when r.fulfillment_type = 'pickup' then 'customer_pickup'
@@ -170,7 +171,7 @@ begin
       end as delivery_state,
       case
         when not r.is_active then 'cancelled_history'
-        when r.fulfillment_type <> 'delivery_installation' then 'not_required'
+        when r.fulfillment_type <> 'delivery_installation' and r.active_installation_count = 0 then 'not_required'
         when r.active_installation_count = 0 then 'not_scheduled'
         when r.completed_installation_count = r.active_installation_count then 'completed'
         when r.completed_installation_count > 0 then 'partial'
@@ -194,7 +195,7 @@ begin
       count(*) filter (where not d.is_active)::int as cancelled_order_count,
       coalesce(sum(d.blocker_count) filter (where d.is_active), 0)::int as procurement_blocker_count,
       count(*) filter (where d.is_active and d.fulfillment_type <> 'pickup')::int as delivery_required_count,
-      count(*) filter (where d.is_active and d.fulfillment_type = 'delivery_installation')::int as installation_required_count,
+      count(*) filter (where d.is_active and d.installation_relevant)::int as installation_required_count,
       case
         when count(*) filter (where d.is_active and d.fulfillment_type <> 'pickup') = 0 then 'not_required'
         when bool_and(d.delivery_state = 'delivered') filter (where d.is_active and d.fulfillment_type <> 'pickup') then 'delivered'
@@ -203,11 +204,11 @@ begin
         else 'pending'
       end as delivery_state,
       case
-        when count(*) filter (where d.is_active and d.fulfillment_type = 'delivery_installation') = 0 then 'not_required'
-        when bool_and(d.installation_state = 'completed') filter (where d.is_active and d.fulfillment_type = 'delivery_installation') then 'completed'
-        when bool_or(d.installation_state in ('completed','partial')) filter (where d.is_active and d.fulfillment_type = 'delivery_installation') then 'partial'
-        when bool_or(d.installation_state = 'in_progress') filter (where d.is_active and d.fulfillment_type = 'delivery_installation') then 'in_progress'
-        when bool_or(d.installation_state = 'scheduled') filter (where d.is_active and d.fulfillment_type = 'delivery_installation') then 'scheduled'
+        when count(*) filter (where d.is_active and d.installation_relevant) = 0 then 'not_required'
+        when bool_and(d.installation_state = 'completed') filter (where d.is_active and d.installation_relevant) then 'completed'
+        when bool_or(d.installation_state in ('completed','partial')) filter (where d.is_active and d.installation_relevant) then 'partial'
+        when bool_or(d.installation_state = 'in_progress') filter (where d.is_active and d.installation_relevant) then 'in_progress'
+        when bool_or(d.installation_state = 'scheduled') filter (where d.is_active and d.installation_relevant) then 'scheduled'
         else 'not_scheduled'
       end as installation_state
     from derived_rows d
