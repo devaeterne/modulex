@@ -2,70 +2,73 @@
 
 ## Goal
 
-Add an Oakwell-first Google Calendar integration to Modulex Admin using one company-level Google OAuth connection and one Google Calendar per Modulex Project, while keeping all operational settings manageable from Admin instead of hardcoding business behavior.
+Add an Oakwell-first Google Calendar integration to Modulex Admin using one Google OAuth connection and one Modulex-created Google Calendar per Project, while keeping all operational behavior manageable from Admin instead of hardcoding customer-specific values.
 
-Modulex remains the canonical source of project scheduling truth. Google Calendar is an outbound synchronization target and convenience surface, not the authoritative project ledger.
+Modulex remains the canonical source of scheduling truth. Google Calendar is an outbound projection and convenience surface only.
 
-## Current baseline and constraints
+## Current architecture and scope
 
-- Repository: `devaeterne/modulex`.
-- Baseline `main`: `7309065ce00f4dee44985328a8d73482440cd501`.
-- The current Admin roadmap defines `modulex-admin` as the operational control plane and requires mutable production business configuration to be managed through Admin/Supabase rather than source-code edits or manual SQL.
-- Existing Admin UI must continue to use the shared Modulex components and the `ADMIN_UI_GUIDE.md` rules.
-- Service-role, OAuth client secret, refresh token, or equivalent elevated credentials must never be exposed to browser code.
-- First production consumer is Oakwell, but the schema must be company-scoped so future Modulex companies do not require a breaking migration.
-- Initial sync direction is one-way: Modulex -> Google Calendar.
+- Repository baseline before this design work: `7309065ce00f4dee44985328a8d73482440cd501`.
+- Modulex is currently single-company. Company-facing configuration is a singleton in `public.general_settings` (`id = 1`), not a multi-tenant `company_id` model.
+- V1 must follow that existing singleton architecture instead of introducing speculative tenancy solely for Google Calendar.
+- All customer-changeable Calendar behavior must be stored in DB-backed Admin settings and require no deploy to edit.
+- OAuth client secret, token-encryption key, refresh token, service-role/elevated credentials, authorization codes, and access tokens must never be exposed to browser code.
+- V1 sync direction is Modulex -> Google only.
+- Store, Customer Portal, and Dealer Portal behavior are unchanged.
+
+A future multi-company Modulex architecture may add tenant/company ownership to these tables in the same migration program that makes the rest of Modulex multi-tenant. V1 must not pretend that tenant boundary already exists.
 
 ## Google authorization model
 
 Create one Google Cloud project and one OAuth 2.0 Web Application client for the Modulex Admin deployment.
 
-The Google OAuth client ID/secret are application deployment secrets, not editable business settings. They live only in server-side environment/secret storage. Admin may show whether the Google OAuth application is configured, but must never reveal the secret.
+Server-only environment configuration:
 
-Use the narrow Google Calendar scope:
+- `GOOGLE_CALENDAR_CLIENT_ID`
+- `GOOGLE_CALENDAR_CLIENT_SECRET`
+- `GOOGLE_CALENDAR_REDIRECT_URI` only if the existing canonical Admin origin cannot derive it safely
+- `GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY`
+
+The OAuth client values are deployment/application configuration, not customer business settings. Admin may display configured/not-configured state but never the client secret or encryption key.
+
+Request the narrow Calendar scope:
 
 `https://www.googleapis.com/auth/calendar.app.created`
 
-This scope permits Modulex to create secondary calendars and manage events on calendars created by Modulex, without requesting blanket access to every calendar in the user's account.
+This permits Modulex to create secondary calendars and manage events on calendars created by Modulex without requesting broad access to every calendar in the connected Google account.
 
-Request OAuth with `access_type=offline` so the server can obtain and use a refresh token when the user is not present. Use a CSRF-safe `state` value bound to the authenticated Modulex session/company and callback intent.
+Request `access_type=offline` so the server can obtain a refresh token and continue synchronization when the user is not present.
 
-The first version does not request broad calendar read access, calendar list access, ACL access, or free/busy access. Those capabilities require a later explicit scope expansion and product decision.
+OAuth `state` must be cryptographically protected or server-persisted, short-lived, tied to the authenticated initiating user/session, and resistant to replay/callback swapping.
 
-## Ownership model
+V1 does not request arbitrary calendar browsing, Calendar List access, ACL access, free/busy access, or broad event access. Adding those scopes is a separate product/security decision.
 
-There are three distinct ownership layers.
+## Secret and token protection
 
-1. **Application credential**
-   - Google OAuth client ID/secret.
-   - Deployment-level server secret.
-   - Not editable in Admin.
+Refresh tokens are encrypted before storage using application-layer AES-256-GCM with the dedicated server-only `GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY`.
 
-2. **Company connection**
-   - One active Google account connection for Oakwell in v1.
-   - Stored company-scoped.
-   - Connect, reconnect, disconnect, health/status, and last sync information are managed from Admin.
+Store a versioned encrypted envelope containing ciphertext plus the required IV/authentication-tag material. Encryption and decryption occur only in server code. The DB never stores or receives the encryption key.
 
-3. **Project calendar binding**
-   - Each Modulex Project can have zero or one Modulex-created Google Calendar binding in v1.
-   - Calendar identity is stored per Project.
-   - A Project may disable synchronization without deleting its Google Calendar.
+The credential table is not directly readable by normal authenticated browser/PostgREST flows. Browser-facing status responses expose only non-sensitive metadata such as connection state, account email, timestamps, and normalized error state.
+
+Do not persist access tokens as canonical credentials. They are short-lived and obtained/refreshed server-side from the encrypted refresh token when needed.
+
+Disconnect retires the stored credential and stops synchronization. Reconnect performs a fresh OAuth flow and replaces the stored encrypted refresh token only after a valid callback.
 
 ## Data model
 
-Add company-scoped integration tables rather than placing provider tokens or calendar IDs directly on Project rows.
+### `calendar_integration_credentials`
 
-### `company_calendar_integrations`
+Single-company singleton credential record.
 
 Suggested fields:
 
-- `id uuid primary key`
-- `company_id uuid not null`
-- `provider text not null` constrained to `google`
-- `status text not null` constrained to states such as `connected`, `disconnected`, `error`
+- `id smallint primary key default 1`
+- `provider text not null default 'google'`
+- `status text not null` with reviewed states such as `connected`, `disconnected`, `error`
 - `provider_account_id text`
 - `provider_account_email text`
-- `refresh_token_encrypted text`
+- `encrypted_refresh_token text`
 - `granted_scopes text[]`
 - `connected_by uuid`
 - `connected_at timestamptz`
@@ -75,40 +78,50 @@ Suggested fields:
 - `last_error_code text`
 - `created_at timestamptz`
 - `updated_at timestamptz`
+- singleton constraint `id = 1`
 
-Only one active Google Calendar integration per company is required in v1. Enforce that contract with an appropriate partial unique constraint/index.
+The table must not be broadly granted to `authenticated`. Credential mutation/read is server-only through the reviewed elevated boundary.
 
-Do not persist long-lived Google access tokens as canonical credentials. Access tokens are short-lived and should be refreshed server-side from the stored refresh token as needed.
+### `calendar_integration_settings`
 
-### `company_calendar_settings`
+DB-backed settings editable from Admin.
 
 Suggested fields:
 
-- `company_id uuid primary key`
-- `provider text not null default 'google'`
+- `id smallint primary key default 1`
 - `enabled boolean not null default false`
 - `auto_create_project_calendar boolean not null default true`
-- `calendar_name_template text not null`
-- `default_timezone text not null`
+- `calendar_name_template text not null default '{project_no} - {customer_name}'`
+- `timezone_override text null`
 - `sync_measurements boolean not null default true`
-- `sync_installations boolean not null default true`
 - `sync_deliveries boolean not null default true`
-- `sync_customer_appointments boolean not null default true`
+- `sync_installations boolean not null default true`
+- `sync_customer_appointments boolean not null default false`
+- `created_by uuid`
+- `updated_by uuid`
 - `created_at timestamptz`
 - `updated_at timestamptz`
+- singleton constraint `id = 1`
 
-The initial default calendar name template should be equivalent to `{project_no} - {customer_name}`, but it is persisted configuration and editable from Admin. Template validation must reject unknown placeholders and empty resolved names.
+Timezone resolution:
+
+1. `calendar_integration_settings.timezone_override` when explicitly set;
+2. otherwise canonical `general_settings.timezone`.
+
+This avoids duplicating the company timezone while still allowing a Calendar-specific override from Admin.
+
+Calendar name templates are configuration, not source-code constants. V1 supports a small allowlist of placeholders discovered from canonical Project data, beginning with `{project_no}`, `{project_name}` where available, and `{customer_name}`. Unknown placeholders and an empty resolved name fail validation.
 
 ### `project_calendar_bindings`
+
+One Google Calendar binding per Project in v1.
 
 Suggested fields:
 
 - `id uuid primary key`
-- `company_id uuid not null`
 - `project_id uuid not null unique`
-- `calendar_integration_id uuid not null`
 - `provider text not null default 'google'`
-- `provider_calendar_id text not null`
+- `provider_calendar_id text not null unique`
 - `provider_calendar_name text not null`
 - `timezone text not null`
 - `sync_enabled boolean not null default true`
@@ -119,22 +132,21 @@ Suggested fields:
 - `last_error_at timestamptz`
 - `last_error_code text`
 
-The binding owns only the projection relationship; it does not become project scheduling truth.
+The binding is projection metadata only; it never becomes scheduling truth.
 
 ### `project_calendar_event_links`
 
-Use a separate event-link table so sync is idempotent and existing Google events are updated rather than duplicated.
+Maps canonical Modulex scheduling records to provider events so retries are idempotent.
 
 Suggested fields:
 
 - `id uuid primary key`
-- `company_id uuid not null`
 - `project_id uuid not null`
 - `project_calendar_binding_id uuid not null`
 - `source_type text not null`
 - `source_id uuid not null`
 - `provider_event_id text not null`
-- `source_revision text` or equivalent deterministic source fingerprint
+- `source_fingerprint text`
 - `sync_status text not null`
 - `last_synced_at timestamptz`
 - `last_error_at timestamptz`
@@ -142,225 +154,222 @@ Suggested fields:
 - `created_at timestamptz`
 - `updated_at timestamptz`
 
-Enforce uniqueness on the logical source-to-provider mapping, for example `(project_calendar_binding_id, source_type, source_id)`.
-
-## Secret protection
-
-OAuth client secret remains in deployment secret storage.
-
-Google refresh tokens are server-side credentials and must not be readable through ordinary authenticated PostgREST access. The implementation should use the repository's existing server/elevated boundary rather than making token columns generally selectable.
-
-If refresh-token encryption at rest is implemented in PostgreSQL, the encryption key must remain outside the database in deployment secret storage. If the existing Modulex runtime already has a reviewed secret-storage/encryption convention, reuse it rather than introducing a parallel mechanism.
-
-Disconnect must revoke/retire the Modulex credential relationship and mark the integration disconnected. Historical project/calendar IDs may remain for audit and diagnosis, but no further sync may execute through a disconnected integration.
+Enforce uniqueness on `(project_calendar_binding_id, source_type, source_id)` so the same Modulex record cannot silently create duplicate Google events.
 
 ## Admin settings UX
 
-Add a Google Calendar section under the existing Admin Settings/Integrations surface, following the shared Admin UI guide.
+Add a Google Calendar section under the existing Admin Settings/Integrations area and compose it exclusively from reviewed shared Admin primitives.
 
-The company-level screen exposes:
+Expose:
 
-- integration configured/not configured state;
-- connected/disconnected/error status;
+- Google integration configured/not configured;
+- connected/disconnected/error state;
 - connected Google account email;
-- Connect Google Calendar;
+- Connect;
 - Reconnect;
-- Disconnect;
-- default timezone;
-- project calendar name template;
+- Disconnect with confirmation;
+- integration enabled toggle;
 - auto-create project calendar toggle;
+- calendar name template;
+- optional timezone override, with the current `general_settings.timezone` shown as the fallback;
 - event-type sync toggles;
-- last successful sync/error state where available.
+- last success/error metadata;
+- validation and retry states.
 
-OAuth client secret is never displayed or editable in the browser.
+These settings are persisted to Supabase and can be changed later without touching source code or Vercel environment values.
 
-Business settings are DB-backed. Changing these settings must not require a deploy.
+OAuth app credentials are intentionally excluded from this UI because they are application secrets, not ordinary editable company settings.
 
 ## Project UX
 
-Add a Calendar section/tab to Project detail using existing Project detail composition patterns.
+Add a Calendar section/tab to Project detail using current Project composition conventions.
 
-For a Project with no binding:
+When no binding exists:
 
-- show company integration availability;
-- allow an authorized user to create the project's Google Calendar when integration is connected;
-- if auto-create is enabled, project creation or the first eligible scheduling action may create the binding through the same idempotent server boundary.
+- show whether Google Calendar is connected/enabled;
+- allow an authorized user to create the Project Calendar;
+- if auto-create is enabled, creation may occur through the same idempotent server service after Project creation or when the first eligible schedule item needs projection.
 
-For a Project with a binding:
+When a binding exists:
 
-- show provider calendar name;
+- show Calendar name;
 - show sync enabled/disabled;
-- show last synchronization/error state;
-- provide Open in Google Calendar where a safe provider URL can be derived;
+- show last sync/error state;
+- expose Open in Google Calendar if a safe provider URL can be built;
 - allow sync enable/disable;
-- allow calendar name changes through Modulex only if the Google API and v1 authorization contract supports changing the Modulex-created calendar cleanly;
-- do not offer arbitrary selection of unrelated user calendars in v1 because `calendar.app.created` intentionally avoids broad calendar access.
+- allow an explicit Modulex-driven calendar rename action when supported by the Calendar API;
+- expose manual retry/resync.
 
-The requested manageable behavior therefore applies to Modulex-created calendar settings and binding behavior, not to browsing every calendar in the connected Google account.
+V1 does not browse or select unrelated calendars in the connected account because the narrow `calendar.app.created` scope is intentional.
 
-## Event projection
+## Canonical event sources
 
-V1 synchronizes only Modulex scheduling entities for which the repository already has canonical records and stable identifiers.
+V1 projects only scheduling records that already exist canonically in Modulex. Implementation must inspect the live repository schema/RPCs before wiring each source and must not create a parallel scheduling ledger merely to feed Google.
 
-Target event types are configurable at company level and initially include:
+Initial candidates:
 
-- measurement;
-- delivery;
-- installation;
-- customer appointment, only if a canonical Project-related appointment entity already exists in the current schema.
+- deliveries/shipments with canonical scheduled date/time;
+- installations with canonical scheduled date/time;
+- measurements only if the current Project/Order model has a stable canonical measurement record or field;
+- customer appointments only if a stable Project-related appointment entity already exists.
 
-Implementation must inspect current canonical Project/Order/Shipment/Installation/appointment contracts before mapping each type. It must not invent a parallel scheduling record merely to satisfy Google Calendar.
+If a candidate has no canonical source today, its Admin toggle may remain unavailable/disabled until that Modulex domain exists. Do not invent data.
 
-Every projection uses a deterministic source mapping and event link so retries are idempotent.
+## Google event projection
 
-Typical Google event content may include:
+A projected event may contain only operationally necessary, non-sensitive fields derived from the canonical source:
 
-- event summary with operation type and project/customer label;
-- start/end from canonical Modulex scheduling timestamps;
-- Modulex project/order reference in description;
-- non-sensitive operational location when the canonical source explicitly contains a customer/project site address and existing authorization permits its use.
+- summary containing operation type plus Project/customer label;
+- start/end;
+- Modulex Project/Order reference;
+- approved project/site location when already canonical and permitted;
+- concise operational description.
 
-Do not put internal cost, margin, finance details, private notes, credentials, or unrelated personal data into Google events.
+Never project internal cost, margin, financial information, private notes, credentials, unrelated personal data, or hidden Admin metadata.
 
 ## Synchronization behavior
 
 V1 is strictly Modulex -> Google.
 
-- Creating an eligible Modulex scheduling record creates or updates the corresponding Google event.
-- Updating its relevant scheduling fields updates the same Google event.
-- Cancelling/removing an eligible source follows the source's existing lifecycle semantics. If the canonical source is cancelled, the Google event should be cancelled/deleted according to an explicit projection rule; Modulex history must remain intact.
-- Deleting or editing an event directly in Google does not mutate Modulex.
-- Google-side drift is repaired on the next explicit or automatic Modulex sync when practical.
+- Eligible canonical create/update -> create or update the mapped Google event.
+- Existing event link -> update the same provider event, never create a duplicate because of a retry.
+- Source cancellation -> apply an explicit provider cancellation/deletion projection while retaining Modulex history.
+- Google-side edit/delete -> never mutate Modulex.
+- Google-side drift may be repaired by explicit/manual resync or the next relevant Modulex projection.
 
-Synchronization failures must not roll back valid Modulex business mutations unless the existing transaction contract explicitly requires external side effects to be atomic. Persist or surface sync failure state separately and allow retry.
+A valid Modulex business mutation must not be rolled back merely because Google is temporarily unavailable. Provider failure is recorded separately and surfaced as retryable sync state.
+
+Disabling an event type stops future projection/updates for that type but does not destructively delete already-created Google events in v1. Re-enabling resumes from canonical Modulex state.
+
+Disabling the integration or disconnecting Google stops all new sync attempts while preserving Modulex records and historical binding/event-link metadata.
 
 ## Server/API boundaries
 
-All Google OAuth and Calendar API interaction runs server-side.
+All Google interaction is server-side.
 
-Expected server routes/services include:
+Expected units:
 
-- OAuth start endpoint;
-- OAuth callback endpoint;
-- connection status/read endpoint if not served directly by an existing server component boundary;
-- disconnect/reconnect action;
-- company settings read/update action;
-- project calendar create/status/update action;
-- project calendar sync/retry action;
-- shared Google OAuth/token refresh service;
-- shared Calendar API client/service;
-- shared event projection mapper.
+- OAuth start route;
+- OAuth callback route;
+- server-only credential repository/encryption helper;
+- Google OAuth/token refresh client;
+- Google Calendar client;
+- integration settings read/update boundary;
+- connect/reconnect/disconnect actions;
+- project calendar create/rename/status/sync boundary;
+- event projection mapper/service.
 
-Protected mutation routes must reuse Modulex authorization conventions. Company integration/settings changes require an administrative/settings capability. Project-level calendar actions require the same Project authorization boundary as other Project operational mutations plus any integration-specific capability adopted by the existing RBAC system.
+Protected actions reuse existing Modulex auth/RBAC patterns. Integration configuration is Admin/Super Admin only unless the current permission model provides a narrower reviewed Settings capability. Project-level sync actions require the existing Project operational permission boundary as well as an active integration.
 
-OAuth `state` must be signed or server-persisted, short-lived, single-use where practical, and must bind at minimum the Modulex company and initiating authenticated user/session to prevent callback swapping.
+No elevated key, OAuth token, or encryption key is ever sent to client components.
 
-## Company scoping and authorization
+## Database integrity and authorization
 
-Every integration, setting, binding, and event-link row carries or derives company scope.
+Because Modulex is single-company today, v1 does not add a fake `company_id` column.
 
-DB constraints/triggers/RPCs must fail closed on cross-company mismatches:
+The DB must still fail closed on structural mismatches:
 
-- Project company must equal binding company.
-- Binding company must equal integration company.
-- Event-link company/project/binding relationships must reconcile.
+- binding `project_id` must reference a real Project;
+- event link Project must equal the Project of its binding;
+- event link source identity must satisfy the source-type contract;
+- one binding per Project;
+- one credential/settings singleton;
+- provider/calendar/event IDs must satisfy uniqueness rules required for idempotency.
 
-RLS/grants/RPC authorization must prevent users from accessing another company's integration metadata or triggering sync against it.
+Browser-safe settings/status projections must never include encrypted credential material.
 
-Sensitive credential material must be excluded from normal Admin projections even for authorized Admin users; the UI needs status metadata, not the token itself.
+Schema/RLS/grants/functions follow the existing Admin security conventions and are covered by Supabase Security/Performance Advisor verification.
 
 ## Error handling and observability
 
-Use normalized internal error codes rather than persisting raw Google responses containing potentially sensitive data.
+Persist normalized internal error codes, not raw provider payloads.
 
-Relevant conditions include:
+Relevant states include:
 
-- OAuth application not configured;
+- OAuth app not configured;
 - consent denied;
-- missing refresh token after connection/reconnection flow;
+- OAuth state invalid/expired/replayed;
+- callback missing refresh token;
+- refresh token decrypt failure;
 - token revoked/invalid grant;
-- Google Calendar API quota/transient error;
+- Google transient/quota failure;
 - provider calendar missing;
 - provider event missing;
-- unsupported/invalid timezone;
-- invalid calendar name template;
-- integration disconnected;
-- company/project mismatch.
+- invalid timezone;
+- invalid name template;
+- integration disabled/disconnected;
+- Project binding mismatch.
 
-Transient Google failures should be retryable. Invalid or revoked credentials should move the company integration to an error/reconnect-required state.
+Do not log authorization codes, access tokens, refresh tokens, OAuth client secret, encryption key, or complete Google credential responses.
 
-Do not log access tokens, refresh tokens, authorization codes, OAuth client secrets, or full Google credential responses.
+Credential errors become reconnect-required. Transient provider failures remain retryable.
 
-## Configuration changes
+## Rollout
 
-Admin setting edits affect future sync behavior without source-code changes.
+1. Add Admin roadmap entry and focused design/contract tests.
+2. Add schema, constraints, RLS/grants, singleton settings, credential storage boundary, and canonical mirrored SQL/migration required by Modulex conventions.
+3. Add server-side AES-GCM token encryption and OAuth/token client.
+4. Add company-level Connect/Reconnect/Disconnect and Admin settings UI.
+5. Add Project Calendar binding/status/create/rename/retry UI and server actions.
+6. Wire one canonical event source at a time, starting with the clearest existing scheduled domain.
+7. Add remaining canonical event sources that actually exist.
+8. Run targeted tests, Admin UI strict, Project/RBAC regressions, typecheck, lint, build, and Supabase advisors.
+9. Configure Google Cloud OAuth and Vercel server secrets for Oakwell.
+10. After merge/deploy/migration acceptance, connect the Oakwell account manually from Admin and verify one test Project end-to-end before enabling broad auto-create behavior.
 
-- Calendar naming template changes apply to newly created calendars by default; existing calendars are not silently renamed unless the user explicitly requests a rename/sync-name action.
-- Disabling an event type stops future projection for that type. V1 retains already-created provider events and stops future updates until re-enabled, avoiding destructive surprises.
-- Disabling company integration stops new sync attempts while preserving Modulex project data and binding history.
-- Disconnecting Google requires explicit confirmation and stops all sync.
+No live Google calendar writes occur merely because the migration is deployed.
 
-## Rollout sequence
+## Required tests
 
-1. Add schema, constraints, RLS/grants/RPC boundaries, and Admin roadmap entry.
-2. Add server-only Google OAuth/token service using deployment secrets.
-3. Add company connection/settings endpoints and Admin Settings/Integrations UI.
-4. Add Project calendar binding/create/status UI and service.
-5. Add outbound event projection for each existing canonical scheduling entity one at a time.
-6. Add retry/error status surfaces.
-7. Configure the Oakwell Google Cloud OAuth application and production environment secrets.
-8. Connect the Oakwell Google account from production Admin.
-9. Create and verify a test Project calendar before enabling broader auto-create behavior.
+TDD coverage must include:
 
-Production OAuth connection and live Calendar writes are explicit acceptance operations; they must not occur automatically from migration deployment alone.
-
-## Testing and verification
-
-Follow TDD for the implementation.
-
-Required automated coverage includes:
-
-- calendar name-template validation and rendering;
-- company/project/binding cross-scope rejection;
-- integration settings authorization;
-- OAuth state validation, expiry/replay boundary, and callback failure states;
-- credential response sanitization;
-- token refresh handling without browser token exposure;
-- idempotent project calendar creation;
+- template allowlist, validation, and rendering;
+- timezone fallback/override;
+- settings authorization and persistence;
+- browser responses never exposing encrypted token/secret material;
+- AES-GCM encrypt/decrypt and tamper failure;
+- OAuth state validation, expiry, and replay rejection;
+- callback/refresh-token failure handling;
+- idempotent Project Calendar creation;
 - idempotent event create/update projection;
-- disconnected/revoked integration failure behavior;
-- event-type configuration behavior;
-- no token/secret exposure in Admin responses;
+- binding/source mismatch rejection;
+- disabled/disconnected behavior;
+- provider missing-calendar/event recovery behavior;
+- event-type toggle behavior;
 - Project UI loading/empty/connected/error/permission states;
-- Admin UI strict contract and Project/Admin regressions.
+- Admin Settings UI states;
+- Admin UI strict contract;
+- existing Project Base and RBAC regressions affected by the package.
 
-Because the package changes schema/RLS/grants/functions, final verification includes Supabase Security and Performance Advisors.
+Final verification includes TypeScript, lint, production build, focused smoke/contracts, and Supabase Security + Performance Advisors because schema/RLS/grants/functions change.
 
-Final application verification includes targeted contracts, Admin UI strict checks, RBAC checks, TypeScript, lint, production build, and existing Project Base regressions affected by the change.
+## Production acceptance
 
-Production acceptance after deploy should prove:
+After merge, migration, and deploy:
 
-- Oakwell Admin can connect Google successfully;
-- refresh token remains server-only;
-- Admin can edit timezone/template/sync toggles without deploy;
-- one test Project creates exactly one secondary Google Calendar;
-- repeated creation remains idempotent;
+- Admin shows OAuth application configured without exposing credentials;
+- Oakwell Admin can connect one Google account;
+- stored refresh token is encrypted and inaccessible to browser/PostgREST users;
+- Admin can change calendar template, timezone behavior, auto-create, enabled state, and event-type toggles without deploy;
+- one test Project creates exactly one Modulex-managed secondary Google Calendar;
+- repeated create/resync remains idempotent;
 - one canonical scheduling change creates/updates exactly one Google event;
-- Google-side failure does not corrupt Modulex business state;
-- disconnect stops sync and exposes reconnect-required state.
+- Google API failure does not corrupt Modulex business data;
+- disconnect immediately stops sync and exposes reconnect-required state.
 
 ## Out of scope for v1
 
 - Google -> Modulex bidirectional synchronization;
-- arbitrary browsing or selecting every calendar in the user's Google account;
+- arbitrary Google Calendar browsing/selection;
 - employee personal-calendar synchronization;
 - free/busy scheduling;
-- calendar sharing/ACL management;
-- customer invitations/attendees unless separately approved;
-- Store or Customer/Dealer Portal Calendar UI;
-- replacing canonical Modulex Project, Shipment, Installation, appointment, or fulfillment records with Google entities;
-- hardcoded Oakwell email address, calendar names, timezone, event-type choices, or Project naming rules.
+- Calendar ACL/sharing management;
+- customer attendee invitations unless separately approved;
+- Store/Portal Calendar UI;
+- replacing Modulex Project/Shipment/Installation/appointment truth with Google entities;
+- introducing Modulex multi-tenancy solely for this integration;
+- hardcoded Oakwell email, timezone, calendar names, event-type selections, Project naming rules, or customer-specific identifiers.
 
-## Design decision summary
+## Decision summary
 
-Use one server-configured Google OAuth client for Modulex, one company-level Google connection for Oakwell, and one Modulex-created secondary Google Calendar per Project. Keep credentials at the server boundary, keep business behavior in company-scoped DB settings managed from Admin, and synchronize only from canonical Modulex records to Google in v1.
+Use one server-configured Google OAuth client, one singleton Oakwell Google connection, and one Modulex-created Google Calendar per Project. Store business behavior in DB-backed Admin settings, encrypt the refresh token at the server boundary with AES-256-GCM, reuse `general_settings.timezone` unless an Admin override is set, and keep synchronization strictly Modulex -> Google in v1.
