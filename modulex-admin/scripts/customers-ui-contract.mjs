@@ -41,4 +41,17 @@ const customerPage = read("src/app/(admin)/customers/page.tsx");
 expect(customerPage.includes('ADMIN_TEXT_STYLES'), "Customer directory route must use shared admin text tokens for light/dark contrast");
 expect(customerPage.includes('className={ADMIN_TEXT_STYLES.body}'), "Customer directory content must inherit the shared body text token so standalone summary and pagination text stays readable in dark mode");
 
+const orders = read("src/components/customers/CustomerOrdersList.tsx");
+expect(orders.includes('ADMIN_TEXT_STYLES'), "Customer Orders must use shared admin text tokens for light/dark contrast");
+expect(orders.includes('ADMIN_TEXT_STYLES.body'), "Customer Orders content must inherit readable body text in dark mode");
+expect(orders.includes('ADMIN_TEXT_STYLES.strong'), "Customer Orders summary values must use the shared strong text token");
+expect(orders.includes('grid grid-cols-2 gap-3 md:grid-cols-4'), "Customer Orders summary metrics must collapse into one row from tablet widths upward");
+expect(!orders.includes('title={selectedCustomer ? `${selectedCustomer.name} Orders` : "Customer Orders"}'), "Global Customer Orders summary must not be wrapped in a redundant outer card");
+expect(orders.includes('<TableHeader variant="admin">') && orders.includes('<TableBody variant="admin">'), "Customer Orders table must retain the canonical admin table theme");
+const ordersTableStart = orders.indexOf("<TableHeader");
+const ordersTableEnd = orders.indexOf("</Table>", ordersTableStart);
+const ordersTableMarkup = orders.slice(ordersTableStart, ordersTableEnd);
+const orderTableCellTags = [...ordersTableMarkup.matchAll(/<TableCell\b[^>]*>/g)].map((match) => match[0]);
+expect(orderTableCellTags.length > 0 && orderTableCellTags.every((tag) => tag.includes('variant="admin"')), "Every Customer Orders table cell must retain the admin variant");
+
 console.log("customers UI contract: ok");
