@@ -1,6 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Select from "@/components/form/Select";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import { Modal } from "@/components/ui/modal";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import {
   EMPLOYMENT_STATUS_LABELS,
@@ -11,11 +21,6 @@ import {
   type HrEmployee,
   type HrPosition,
 } from "@/lib/hr/types";
-
-const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const textareaClass = "min-h-24 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const primaryButton = "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50";
-const secondaryButton = "inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300";
 
 type EmployeeForm = {
   first_name: string;
@@ -41,6 +46,20 @@ type EmployeeForm = {
   postal_code: string;
   country: string;
   notes: string;
+};
+
+type EmployeeFinancePayment = {
+  transaction_id: string;
+  transaction_kind: string;
+  transaction_at: string;
+  posted_at: string | null;
+  amount: number;
+  currency_code: string;
+  reference_no: string | null;
+  source_account_name: string | null;
+  payroll_item_id: string | null;
+  period_code: string | null;
+  payment_status: string;
 };
 
 const emptyForm: EmployeeForm = {
@@ -102,6 +121,17 @@ function optional(value: string) {
   return normalized || null;
 }
 
+function paymentMoney(value: number, currency: string) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(value || 0));
+}
+
+function employeeStatusColor(status: EmploymentStatus) {
+  if (status === "active") return "success" as const;
+  if (status === "terminated") return "error" as const;
+  if (status === "on_leave") return "warning" as const;
+  return "primary" as const;
+}
+
 export default function EmployeeDirectory() {
   const [employees, setEmployees] = useState<HrEmployee[]>([]);
   const [departments, setDepartments] = useState<HrDepartment[]>([]);
@@ -116,6 +146,10 @@ export default function EmployeeDirectory() {
   const [editing, setEditing] = useState<HrEmployee | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
+  const [paymentEmployee, setPaymentEmployee] = useState<HrEmployee | null>(null);
+  const [payments, setPayments] = useState<EmployeeFinancePayment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -155,6 +189,16 @@ export default function EmployeeDirectory() {
     return employee ? `${employee.first_name} ${employee.last_name}` : "—";
   };
 
+  const statusOptions = Object.entries(EMPLOYMENT_STATUS_LABELS).map(([value, label]) => ({ value, label }));
+  const employmentTypeOptions = Object.entries(EMPLOYMENT_TYPE_LABELS).map(([value, label]) => ({ value, label }));
+  const departmentOptions = departments.filter((department) => department.is_active).map((department) => ({ value: department.id, label: department.name }));
+  const positionOptions = positions
+    .filter((position) => position.is_active && (!form.department_id || !position.department_id || position.department_id === form.department_id))
+    .map((position) => ({ value: position.id, label: position.title }));
+  const managerOptions = employees
+    .filter((employee) => employee.id !== editing?.id && employee.employment_status !== "terminated")
+    .map((employee) => ({ value: employee.id, label: `${employee.first_name} ${employee.last_name} (${employee.employee_number})` }));
+
   function openCreate() {
     setEditing(null);
     setForm(emptyForm);
@@ -175,6 +219,23 @@ export default function EmployeeDirectory() {
     setModalOpen(false);
     setEditing(null);
     setForm(emptyForm);
+  }
+
+  async function openPayments(employee: HrEmployee) {
+    setPaymentEmployee(employee);
+    setPayments([]);
+    setPaymentError(null);
+    setPaymentsLoading(true);
+    const { data, error: paymentsError } = await supabase.rpc("get_hr_employee_finance_payments", { p_employee_id: employee.id });
+    if (paymentsError) setPaymentError(paymentsError.message);
+    else setPayments((data ?? []) as EmployeeFinancePayment[]);
+    setPaymentsLoading(false);
+  }
+
+  function closePayments() {
+    setPaymentEmployee(null);
+    setPayments([]);
+    setPaymentError(null);
   }
 
   async function save(event: FormEvent) {
@@ -235,90 +296,121 @@ export default function EmployeeDirectory() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div><h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Employees</h1><p className="mt-1 text-sm text-gray-500">Employee master records and employment status.</p></div>
-          <button className={primaryButton} onClick={openCreate}>+ Add Employee</button>
+    <div className="space-y-6">
+      {error ? <Alert variant="error" title="Personnel error" message={error} /> : null}
+      {success ? <Alert variant="success" title="Personnel updated" message={success} /> : null}
+
+      <ComponentCard
+        title="Employees"
+        desc="Employee master records and employment status. Finance payment history is linked read-only; payment entry remains in Finance."
+        headerAction={<Button onClick={openCreate}>Add Employee</Button>}
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          <Field label="Search"><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, employee no, email or phone" /></Field>
+          <Field label="Status"><Select options={[{ value: "all", label: "All statuses" }, ...statusOptions]} value={statusFilter} onChange={(value) => setStatusFilter(value as "all" | EmploymentStatus)} /></Field>
+          <Field label="Department"><Select options={[{ value: "all", label: "All departments" }, ...departmentOptions]} value={departmentFilter} onChange={setDepartmentFilter} /></Field>
         </div>
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <input className={inputClass} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, employee no, email or phone" />
-          <select className={inputClass} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | EmploymentStatus)}><option value="all">All statuses</option>{Object.entries(EMPLOYMENT_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-          <select className={inputClass} value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)}><option value="all">All departments</option>{departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select>
+
+        <TableViewport>
+          <Table variant="admin" minWidth="extraWide">
+            <TableHeader variant="admin"><TableRow><TableCell isHeader variant="admin">Employee</TableCell><TableCell isHeader variant="admin">Status</TableCell><TableCell isHeader variant="admin">Employment</TableCell><TableCell isHeader variant="admin">Department</TableCell><TableCell isHeader variant="admin">Position</TableCell><TableCell isHeader variant="admin">Manager</TableCell><TableCell isHeader variant="admin">Hire Date</TableCell><TableCell isHeader variant="admin">Actions</TableCell></TableRow></TableHeader>
+            <TableBody variant="admin">
+              {loading ? <TableStateRow colSpan={8}>Loading employees...</TableStateRow> : filtered.length === 0 ? <TableStateRow colSpan={8}>No employees found.</TableStateRow> : filtered.map((employee) => (
+                <TableRow key={employee.id}>
+                  <TableCell variant="admin"><div className="font-medium">{employee.preferred_name || `${employee.first_name} ${employee.last_name}`}</div><div className="text-xs">{employee.employee_number}{employee.work_email ? ` · ${employee.work_email}` : ""}</div></TableCell>
+                  <TableCell variant="admin"><Badge color={employeeStatusColor(employee.employment_status)}>{EMPLOYMENT_STATUS_LABELS[employee.employment_status]}</Badge></TableCell>
+                  <TableCell variant="admin">{EMPLOYMENT_TYPE_LABELS[employee.employment_type]}</TableCell>
+                  <TableCell variant="admin">{departmentName(employee.department_id)}</TableCell>
+                  <TableCell variant="admin">{positionName(employee.position_id)}</TableCell>
+                  <TableCell variant="admin">{managerName(employee.manager_id)}</TableCell>
+                  <TableCell variant="admin">{employee.hire_date || "—"}</TableCell>
+                  <TableCell variant="admin"><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void openPayments(employee)}>Payments</Button><Button size="sm" variant="outline" onClick={() => openEdit(employee)}>Edit</Button></div></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableViewport>
+      </ComponentCard>
+
+      <Modal isOpen={modalOpen} onClose={closeModal} className="max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto" ariaLabel={editing ? "Edit employee" : "Add employee"}>
+        <div className="space-y-6 p-6">
+          <div className="pr-12"><h2 className="text-lg font-semibold">{editing ? `Edit ${editing.employee_number}` : "Add Employee"}</h2><p className="mt-1 text-sm">Employee Master only — payroll and tax-sensitive data are managed separately.</p></div>
+          <form onSubmit={save} className="space-y-6">
+            <FormSection title="Identity & Contact">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Field label="First Name *"><Input required value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} /></Field>
+                <Field label="Last Name *"><Input required value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} /></Field>
+                <Field label="Preferred Name"><Input value={form.preferred_name} onChange={(event) => setForm({ ...form, preferred_name: event.target.value })} /></Field>
+                <Field label="Work Email"><Input type="email" value={form.work_email} onChange={(event) => setForm({ ...form, work_email: event.target.value })} /></Field>
+                <Field label="Personal Email"><Input type="email" value={form.personal_email} onChange={(event) => setForm({ ...form, personal_email: event.target.value })} /></Field>
+                <Field label="Phone"><Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></Field>
+                <Field label="Date of Birth"><Input type="date" value={form.date_of_birth} onChange={(event) => setForm({ ...form, date_of_birth: event.target.value })} /></Field>
+              </div>
+            </FormSection>
+
+            <FormSection title="Employment">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Field label="Status"><Select options={statusOptions} value={form.employment_status} onChange={(value) => setForm({ ...form, employment_status: value as EmploymentStatus })} /></Field>
+                <Field label="Employment Type"><Select options={employmentTypeOptions} value={form.employment_type} onChange={(value) => setForm({ ...form, employment_type: value as EmploymentType })} /></Field>
+                <Field label="Hire Date"><Input type="date" value={form.hire_date} onChange={(event) => setForm({ ...form, hire_date: event.target.value })} /></Field>
+                <Field label="Department"><Select options={departmentOptions} value={form.department_id} allowEmpty placeholder="No department" onChange={(value) => setForm({ ...form, department_id: value, position_id: positions.find((position) => position.id === form.position_id && (!value || position.department_id === value)) ? form.position_id : "" })} /></Field>
+                <Field label="Position"><Select options={positionOptions} value={form.position_id} allowEmpty placeholder="No position" onChange={(value) => setForm({ ...form, position_id: value })} /></Field>
+                <Field label="Manager"><Select options={managerOptions} value={form.manager_id} allowEmpty placeholder="No manager" onChange={(value) => setForm({ ...form, manager_id: value })} /></Field>
+                <Field label="Work Location"><Input value={form.work_location} onChange={(event) => setForm({ ...form, work_location: event.target.value })} /></Field>
+                <Field label="Termination Date"><Input type="date" value={form.termination_date} onChange={(event) => setForm({ ...form, termination_date: event.target.value })} /></Field>
+                <Field label="Termination Reason"><Input value={form.termination_reason} onChange={(event) => setForm({ ...form, termination_reason: event.target.value })} /></Field>
+              </div>
+            </FormSection>
+
+            <FormSection title="Home Address">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Field label="Address Line 1"><Input value={form.address_line1} onChange={(event) => setForm({ ...form, address_line1: event.target.value })} /></Field>
+                <Field label="Address Line 2"><Input value={form.address_line2} onChange={(event) => setForm({ ...form, address_line2: event.target.value })} /></Field>
+                <Field label="City"><Input value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} /></Field>
+                <Field label="State"><Input value={form.state_region} onChange={(event) => setForm({ ...form, state_region: event.target.value })} /></Field>
+                <Field label="ZIP Code"><Input value={form.postal_code} onChange={(event) => setForm({ ...form, postal_code: event.target.value })} /></Field>
+                <Field label="Country"><Input value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} /></Field>
+              </div>
+            </FormSection>
+
+            <FormSection title="Internal Notes"><TextArea value={form.notes} onChange={(value) => setForm({ ...form, notes: value })} rows={4} placeholder="Internal HR notes" /></FormSection>
+            <div className="flex justify-end gap-3"><Button type="button" variant="outline" onClick={closeModal}>Cancel</Button><Button type="submit" disabled={saving}>{saving ? "Saving..." : editing ? "Save Changes" : "Create Employee"}</Button></div>
+          </form>
         </div>
-      </div>
+      </Modal>
 
-      {error && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{error}</div>}
-      {success && <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">{success}</div>}
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-        <div className="overflow-x-auto"><table className="min-w-[1050px] w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Employee","Status","Employment","Department","Position","Manager","Hire Date","Actions"].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{heading}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-          {loading ? <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-500">Loading employees...</td></tr> : filtered.length === 0 ? <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-500">No employees found.</td></tr> : filtered.map((employee) => <tr key={employee.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
-            <td className="px-4 py-4"><p className="text-sm font-medium text-gray-800 dark:text-white/90">{employee.preferred_name || `${employee.first_name} ${employee.last_name}`}</p><p className="mt-0.5 text-xs text-gray-500">{employee.employee_number}{employee.work_email ? ` · ${employee.work_email}` : ""}</p></td>
-            <td className="px-4 py-4"><span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-white/[0.06] dark:text-gray-300">{EMPLOYMENT_STATUS_LABELS[employee.employment_status]}</span></td>
-            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{EMPLOYMENT_TYPE_LABELS[employee.employment_type]}</td>
-            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{departmentName(employee.department_id)}</td>
-            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{positionName(employee.position_id)}</td>
-            <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{managerName(employee.manager_id)}</td>
-            <td className="px-4 py-4 text-sm text-gray-500">{employee.hire_date || "—"}</td>
-            <td className="px-4 py-4"><button className={secondaryButton} onClick={() => openEdit(employee)}>Edit</button></td>
-          </tr>)}</tbody></table></div>
-      </div>
-
-      {modalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4">
-          <div className="max-h-[calc(100vh-32px)] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-xl dark:bg-gray-900">
-            <div className="sticky top-0 z-10 flex items-start justify-between border-b border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-gray-900">
-              <div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">{editing ? `Edit ${editing.employee_number}` : "Add Employee"}</h2><p className="mt-1 text-sm text-gray-500">Employee Master only — payroll and tax-sensitive data are managed separately.</p></div>
-              <button className="text-gray-400 hover:text-gray-700" onClick={closeModal}>✕</button>
-            </div>
-            <form onSubmit={save} className="space-y-6 p-6">
-              <Section title="Identity & Contact"><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Field label="First Name *"><input required className={inputClass} value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} /></Field>
-                <Field label="Last Name *"><input required className={inputClass} value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} /></Field>
-                <Field label="Preferred Name"><input className={inputClass} value={form.preferred_name} onChange={(e) => setForm({ ...form, preferred_name: e.target.value })} /></Field>
-                <Field label="Work Email"><input type="email" className={inputClass} value={form.work_email} onChange={(e) => setForm({ ...form, work_email: e.target.value })} /></Field>
-                <Field label="Personal Email"><input type="email" className={inputClass} value={form.personal_email} onChange={(e) => setForm({ ...form, personal_email: e.target.value })} /></Field>
-                <Field label="Phone"><input className={inputClass} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-                <Field label="Date of Birth"><input type="date" className={inputClass} value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} /></Field>
-              </div></Section>
-
-              <Section title="Employment"><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Field label="Status"><select className={inputClass} value={form.employment_status} onChange={(e) => setForm({ ...form, employment_status: e.target.value as EmploymentStatus })}>{Object.entries(EMPLOYMENT_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-                <Field label="Employment Type"><select className={inputClass} value={form.employment_type} onChange={(e) => setForm({ ...form, employment_type: e.target.value as EmploymentType })}>{Object.entries(EMPLOYMENT_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
-                <Field label="Hire Date"><input type="date" className={inputClass} value={form.hire_date} onChange={(e) => setForm({ ...form, hire_date: e.target.value })} /></Field>
-                <Field label="Department"><select className={inputClass} value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value, position_id: positions.find((p) => p.id === form.position_id && (!e.target.value || p.department_id === e.target.value)) ? form.position_id : "" })}><option value="">No department</option>{departments.filter((d) => d.is_active).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></Field>
-                <Field label="Position"><select className={inputClass} value={form.position_id} onChange={(e) => setForm({ ...form, position_id: e.target.value })}><option value="">No position</option>{positions.filter((p) => p.is_active && (!form.department_id || !p.department_id || p.department_id === form.department_id)).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select></Field>
-                <Field label="Manager"><select className={inputClass} value={form.manager_id} onChange={(e) => setForm({ ...form, manager_id: e.target.value })}><option value="">No manager</option>{employees.filter((item) => item.id !== editing?.id && item.employment_status !== "terminated").map((item) => <option key={item.id} value={item.id}>{item.first_name} {item.last_name} ({item.employee_number})</option>)}</select></Field>
-                <Field label="Work Location"><input className={inputClass} value={form.work_location} onChange={(e) => setForm({ ...form, work_location: e.target.value })} /></Field>
-                <Field label="Termination Date"><input type="date" className={inputClass} value={form.termination_date} onChange={(e) => setForm({ ...form, termination_date: e.target.value })} /></Field>
-                <Field label="Termination Reason"><input className={inputClass} value={form.termination_reason} onChange={(e) => setForm({ ...form, termination_reason: e.target.value })} /></Field>
-              </div></Section>
-
-              <Section title="Home Address"><div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Field label="Address Line 1"><input className={inputClass} value={form.address_line1} onChange={(e) => setForm({ ...form, address_line1: e.target.value })} /></Field>
-                <Field label="Address Line 2"><input className={inputClass} value={form.address_line2} onChange={(e) => setForm({ ...form, address_line2: e.target.value })} /></Field>
-                <Field label="City"><input className={inputClass} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field>
-                <Field label="State"><input className={inputClass} value={form.state_region} onChange={(e) => setForm({ ...form, state_region: e.target.value })} /></Field>
-                <Field label="ZIP Code"><input className={inputClass} value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} /></Field>
-                <Field label="Country"><input className={inputClass} value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} /></Field>
-              </div></Section>
-
-              <Section title="Internal Notes"><textarea className={textareaClass} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Internal HR notes" /></Section>
-
-              <div className="flex justify-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800"><button type="button" className={secondaryButton} onClick={closeModal}>Cancel</button><button type="submit" disabled={saving} className={primaryButton}>{saving ? "Saving..." : editing ? "Save Changes" : "Create Employee"}</button></div>
-            </form>
-          </div>
+      <Modal isOpen={Boolean(paymentEmployee)} onClose={closePayments} className="max-h-[calc(100vh-2rem)] w-full max-w-5xl overflow-y-auto" ariaLabel="Employee Finance payment history">
+        <div className="space-y-6 p-6">
+          <div className="pr-12"><h2 className="text-lg font-semibold">Payments · {paymentEmployee ? paymentEmployee.preferred_name || `${paymentEmployee.first_name} ${paymentEmployee.last_name}` : "Employee"}</h2><p className="mt-1 text-sm">Finance payment history — read-only projection of posted Finance employee payments and reversals.</p></div>
+          {paymentError ? <Alert variant="error" title="Payment history error" message={paymentError} /> : null}
+          <TableViewport>
+            <Table variant="admin" minWidth="wide">
+              <TableHeader variant="admin"><TableRow><TableCell isHeader variant="admin">Date</TableCell><TableCell isHeader variant="admin">Reference</TableCell><TableCell isHeader variant="admin">Payroll</TableCell><TableCell isHeader variant="admin">Account</TableCell><TableCell isHeader variant="admin">Status</TableCell><TableCell isHeader variant="admin" className="text-right">Amount</TableCell></TableRow></TableHeader>
+              <TableBody variant="admin">
+                {paymentsLoading ? <TableStateRow colSpan={6}>Loading Finance payment history...</TableStateRow> : payments.length === 0 ? <TableStateRow colSpan={6}>No posted Finance payments are linked to this employee.</TableStateRow> : payments.map((payment) => (
+                  <TableRow key={`${payment.transaction_id}-${payment.payroll_item_id ?? "employee"}`}>
+                    <TableCell variant="admin">{new Date(payment.transaction_at).toLocaleString()}</TableCell>
+                    <TableCell variant="admin"><div className="font-medium">{payment.reference_no || payment.transaction_kind.replaceAll("_", " ")}</div><div className="text-xs">{payment.transaction_id}</div></TableCell>
+                    <TableCell variant="admin">{payment.period_code || "—"}</TableCell>
+                    <TableCell variant="admin">{payment.source_account_name || "—"}</TableCell>
+                    <TableCell variant="admin"><Badge color={payment.payment_status === "reversed" ? "error" : "success"}>{payment.payment_status}</Badge></TableCell>
+                    <TableCell variant="admin" className="text-right font-semibold">{paymentMoney(payment.amount, payment.currency_code)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableViewport>
+          <div className="flex justify-end"><Button variant="outline" onClick={closePayments}>Close</Button></div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section><h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">{title}</h3>{children}</section>;
+function FormSection({ title, children }: { title: string; children: ReactNode }) {
+  return <section className="space-y-4"><h3 className="text-sm font-semibold uppercase tracking-wide">{title}</h3>{children}</section>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>{children}</label>;
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return <div><Label>{label}</Label><div className="mt-1.5">{children}</div></div>;
 }
