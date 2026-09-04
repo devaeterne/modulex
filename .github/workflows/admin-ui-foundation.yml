@@ -10,6 +10,7 @@ on:
       - "modulex-admin/**"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
+      - "modulex-store/supabase/migrations/*calendar*.sql"
       - ".github/workflows/**"
   push:
     paths:
@@ -20,6 +21,7 @@ on:
       - "modulex-admin/**"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
+      - "modulex-store/supabase/migrations/*calendar*.sql"
       - ".github/workflows/**"
 
 concurrency:
@@ -95,6 +97,8 @@ jobs:
         run: npm run smoke:production-surface
       - name: RBAC regression
         run: npm run smoke:rbac
+      - name: Google Calendar integration contract
+        run: node scripts/google-calendar-integration-contract.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
