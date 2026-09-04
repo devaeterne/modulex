@@ -1,4 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import Label from "@/components/form/Label";
+import {
+  ADMIN_CONTROL_DISABLED,
+  ADMIN_FIELD_BASE,
+  ADMIN_FIELD_STATES,
+  ADMIN_FOCUS_RING,
+  ADMIN_SURFACE_POPOVER,
+} from "@/components/ui/theme/adminTheme";
 
 interface Option {
   value: string;
@@ -7,155 +15,189 @@ interface Option {
 }
 
 interface MultiSelectProps {
+  id?: string;
   label: string;
   options: Option[];
   defaultSelected?: string[];
   onChange?: (selected: string[]) => void;
   disabled?: boolean;
+  placeholder?: string;
 }
 
 const MultiSelect: React.FC<MultiSelectProps> = ({
+  id,
   label,
   options,
   defaultSelected = [],
   onChange,
   disabled = false,
+  placeholder = "Select options",
 }) => {
-  const [selectedOptions, setSelectedOptions] =
-    useState<string[]>(defaultSelected);
+  const generatedId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>(defaultSelected);
   const [isOpen, setIsOpen] = useState(false);
+
+  const triggerId = id ?? `multi-select-${generatedId}`;
+  const listboxId = `${triggerId}-listbox`;
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setIsOpen(false);
+        window.requestAnimationFrame(() => triggerRef.current?.focus());
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (disabled) setIsOpen(false);
+  }, [disabled]);
+
+  const selectedValuesText = useMemo(
+    () =>
+      selectedOptions
+        .map((value) => options.find((option) => option.value === value)?.text)
+        .filter((value): value is string => Boolean(value)),
+    [options, selectedOptions]
+  );
 
   const toggleDropdown = () => {
     if (disabled) return;
-    setIsOpen((prev) => !prev);
+    setIsOpen((current) => !current);
   };
 
   const handleSelect = (optionValue: string) => {
-    const newSelectedOptions = selectedOptions.includes(optionValue)
+    const nextSelectedOptions = selectedOptions.includes(optionValue)
       ? selectedOptions.filter((value) => value !== optionValue)
       : [...selectedOptions, optionValue];
 
-    setSelectedOptions(newSelectedOptions);
-    if (onChange) onChange(newSelectedOptions);
+    setSelectedOptions(nextSelectedOptions);
+    onChange?.(nextSelectedOptions);
   };
 
-  const removeOption = (index: number, value: string) => {
-    const newSelectedOptions = selectedOptions.filter((opt) => opt !== value);
-    setSelectedOptions(newSelectedOptions);
-    if (onChange) onChange(newSelectedOptions);
-  };
-
-  const selectedValuesText = selectedOptions.map(
-    (value) => options.find((option) => option.value === value)?.text || ""
-  );
+  const stateClass = disabled ? ADMIN_FIELD_STATES.disabled : ADMIN_FIELD_STATES.default;
 
   return (
-    <div className="w-full">
-      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-        {label}
-      </label>
+    <div ref={rootRef} className="w-full">
+      <Label htmlFor={triggerId}>{label}</Label>
 
-      <div className="relative z-20 inline-block w-full">
-        <div className="relative flex flex-col items-center">
-          <div onClick={toggleDropdown}  className="w-full">
-            <div className="mb-2 flex h-11 rounded-lg border border-gray-300 py-1.5 pl-3 pr-3 shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:focus:border-brand-300">
-              <div className="flex flex-wrap flex-auto gap-2">
-                {selectedValuesText.length > 0 ? (
-                  selectedValuesText.map((text, index) => (
-                    <div
-                      key={index}
-                      className="group flex items-center justify-center rounded-full border-[0.7px] border-transparent bg-gray-100 py-1 pl-2.5 pr-2 text-sm text-gray-800 hover:border-gray-200 dark:bg-gray-800 dark:text-white/90 dark:hover:border-gray-800"
-                    >
-                      <span className="flex-initial max-w-full">{text}</span>
-                      <div className="flex flex-row-reverse flex-auto">
-                        <div
-                          onClick={() =>
-                            removeOption(index, selectedOptions[index])
-                          }
-                          className="pl-2 text-gray-500 cursor-pointer group-hover:text-gray-400 dark:text-gray-400"
-                        >
-                          <svg
-                            className="fill-current"
-                            role="button"
-                            width="14"
-                            height="14"
-                            viewBox="0 0 14 14"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              clipRule="evenodd"
-                              d="M3.40717 4.46881C3.11428 4.17591 3.11428 3.70104 3.40717 3.40815C3.70006 3.11525 4.17494 3.11525 4.46783 3.40815L6.99943 5.93975L9.53095 3.40822C9.82385 3.11533 10.2987 3.11533 10.5916 3.40822C10.8845 3.70112 10.8845 4.17599 10.5916 4.46888L8.06009 7.00041L10.5916 9.53193C10.8845 9.82482 10.8845 10.2997 10.5916 10.5926C10.2987 10.8855 9.82385 10.8855 9.53095 10.5926L6.99943 8.06107L4.46783 10.5927C4.17494 10.8856 3.70006 10.8856 3.40717 10.5927C3.11428 10.2998 3.11428 9.8249 3.40717 9.53201L5.93877 7.00041L3.40717 4.46881Z"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <input
-                    placeholder="Select option"
-                    className="w-full h-full p-1 pr-2 text-sm bg-transparent border-0 outline-hidden appearance-none placeholder:text-gray-800 focus:border-0 focus:outline-hidden focus:ring-0 dark:placeholder:text-white/90"
-                    readOnly
-                    value="Select option"
-                  />
-                )}
-              </div>
-              <div className="flex items-center py-1 pl-1 pr-1 w-7">
-                <button
-                  type="button"
-                  onClick={toggleDropdown} 
-                  className="w-5 h-5 text-gray-700 outline-hidden cursor-pointer focus:outline-hidden dark:text-gray-400"
+      <div className="relative w-full">
+        <button
+          ref={triggerRef}
+          id={triggerId}
+          type="button"
+          disabled={disabled}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
+          onClick={toggleDropdown}
+          className={`${ADMIN_FIELD_BASE} ${stateClass} ${ADMIN_FOCUS_RING} ${ADMIN_CONTROL_DISABLED} flex h-auto min-h-11 items-center justify-between gap-3 py-1.5 pr-3 text-left`}
+        >
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {selectedValuesText.length > 0 ? (
+              selectedValuesText.map((text) => (
+                <span
+                  key={text}
+                  className="max-w-full rounded-full bg-gray-100 px-2.5 py-1 text-sm text-gray-800 dark:bg-gray-800 dark:text-white/90"
                 >
-                  <svg
-                    className={`stroke-current ${isOpen ? "rotate-180" : ""}`}
-                    width="20"
-                    height="20"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M4.79175 7.39551L10.0001 12.6038L15.2084 7.39551"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
+                  {text}
+                </span>
+              ))
+            ) : (
+              <span className="text-sm text-gray-400 dark:text-white/30">{placeholder}</span>
+            )}
+          </span>
 
-          {isOpen && (
-            <div
-              className="absolute left-0 z-40 w-full overflow-y-auto bg-white rounded-lg shadow-sm top-full max-h-select dark:bg-gray-900"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex flex-col">
-                {options.map((option, index) => (
-                  <div key={index}>
-                    <div
-                      className={`w-full cursor-pointer rounded-t border-b border-gray-200 dark:border-gray-800 ${
-                        selectedOptions.includes(option.value)
-                          ? "bg-brand-50/60 dark:bg-brand-500/10"
-                          : "hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                      }`}
+          <svg
+            aria-hidden="true"
+            className={`h-5 w-5 shrink-0 stroke-current text-gray-500 transition-transform dark:text-gray-400 ${
+              isOpen ? "rotate-180" : ""
+            }`}
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M4.79175 7.39551L10.0001 12.6038L15.2084 7.39551"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        {isOpen ? (
+          <div
+            id={listboxId}
+            role="listbox"
+            aria-multiselectable="true"
+            className={`${ADMIN_SURFACE_POPOVER} absolute left-0 top-[calc(100%+0.375rem)] z-40 max-h-select w-full overflow-y-auto p-1`}
+          >
+            {options.length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                {options.map((option) => {
+                  const isSelected = selectedOptions.includes(option.value);
+
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
                       onClick={() => handleSelect(option.value)}
+                      className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${ADMIN_FOCUS_RING} ${
+                        isSelected
+                          ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
+                          : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/[0.04]"
+                      }`}
                     >
-                      <div className="relative flex w-full items-center p-2 pl-2">
-                        <div className="mx-2 leading-6 text-gray-800 dark:text-white/90">
-                          {option.text}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                      <span className="min-w-0 flex-1">{option.text}</span>
+                      {isSelected ? (
+                        <svg
+                          aria-hidden="true"
+                          className="h-4 w-4 shrink-0 stroke-current"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                        >
+                          <path
+                            d="m3.5 8 3 3 6-6"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-          )}
-        </div>
+            ) : (
+              <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No options available.</p>
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );
