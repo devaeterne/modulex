@@ -5,6 +5,8 @@ on:
     paths:
       - "AGENTS.md"
       - "docs/CI_WORKFLOW_ARCHITECTURE.md"
+      - "modulex-admin/AdminUICheck.md"
+      - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
@@ -13,6 +15,8 @@ on:
     paths:
       - "AGENTS.md"
       - "docs/CI_WORKFLOW_ARCHITECTURE.md"
+      - "modulex-admin/AdminUICheck.md"
+      - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
