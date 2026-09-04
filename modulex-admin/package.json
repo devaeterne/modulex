@@ -16,7 +16,7 @@
     "smoke:val-4-inventory-validation": "node scripts/val-4-inventory-warehouses-validation-contract.mjs",
     "smoke:pricing-product-types": "node scripts/pricing-product-type-contract.mjs",
     "smoke:rbac": "node scripts/rbac-smoke.mjs",
-    "smoke:a6-finance-core": "node scripts/a6-finance-core-contract.mjs",
+    "smoke:a6-finance-core": "node scripts/a6-finance-core-contract.mjs && node scripts/a6-finance-core-hardening-contract.mjs",
     "smoke:production-surface": "node scripts/admin-production-surface-contract.mjs",
     "smoke:dashboard-ui": "node scripts/dashboard-shell-ui-contract.mjs",
     "smoke:admin-ui": "node scripts/admin-ui-contract.mjs",
