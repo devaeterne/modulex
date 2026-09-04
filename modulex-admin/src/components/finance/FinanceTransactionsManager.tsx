@@ -34,7 +34,6 @@ import {
 } from "@/lib/finance/core";
 
 const kindOptions = [
-  { value: "expense", label: "Expense" },
   { value: "customer_receipt", label: "Customer receipt" },
   { value: "vendor_payment", label: "Vendor payment" },
   { value: "employee_payment", label: "Employee payment" },
@@ -50,7 +49,11 @@ const statusFilterOptions = [
   { value: "voided", label: "Voided" },
 ];
 
-const kindFilterOptions = [...kindOptions, { value: "reversal", label: "Reversal" }];
+const kindFilterOptions = [
+  { value: "expense", label: "Expense" },
+  ...kindOptions,
+  { value: "reversal", label: "Reversal" },
+];
 
 function localDateTimeValue() {
   const now = new Date();
@@ -77,7 +80,7 @@ export default function FinanceTransactionsManager() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ variant: "success" | "error"; text: string } | null>(null);
 
-  const [kind, setKind] = useState<FinanceTransactionKind>("expense");
+  const [kind, setKind] = useState<FinanceTransactionKind>("customer_receipt");
   const [sourceAccountId, setSourceAccountId] = useState("");
   const [destinationAccountId, setDestinationAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -327,7 +330,7 @@ export default function FinanceTransactionsManager() {
             <div><Label htmlFor="finance-at">Transaction time</Label><Input id="finance-at" type="datetime-local" value={transactionAt} onChange={(event) => setTransactionAt(event.target.value)} required /></div>
             <div><Label htmlFor="finance-source">Source account</Label><Select id="finance-source" options={accountOptions} value={sourceAccountId} allowEmpty placeholder="No source account" onChange={chooseSource} /></div>
             <div><Label htmlFor="finance-destination">Destination account</Label><Select id="finance-destination" options={destinationOptions} value={destinationAccountId} allowEmpty placeholder="No destination account" onChange={chooseDestination} /></div>
-            <div><Label htmlFor="finance-category">Category</Label><Select id="finance-category" options={categoryOptions} value={categoryId} allowEmpty placeholder={kind === "expense" ? "Select expense category" : "Optional category"} onChange={setCategoryId} /></div>
+            <div><Label htmlFor="finance-category">Category</Label><Select id="finance-category" options={categoryOptions} value={categoryId} allowEmpty placeholder="Optional category" onChange={setCategoryId} /></div>
             <div><Label htmlFor="finance-reference">Reference</Label><Input id="finance-reference" value={referenceNo} onChange={(event) => setReferenceNo(event.target.value)} /></div>
             {kind === "employee_payment" ? (
               <>
