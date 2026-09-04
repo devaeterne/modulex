@@ -15,6 +15,8 @@ const domainPath = "src/lib/customers/project-participants-commission-domain.ts"
 const panelPath = "src/components/customers/project-detail/ProjectParticipantsCommissionPanel.tsx";
 const eventDomainPath = "src/lib/customers/project-commission-events.ts";
 const roleManagerPath = "src/components/customers/project-detail/ProjectParticipantRoleManager.tsx";
+const settingsOverviewPath = "src/components/settings/GeneralSettingsOverview.tsx";
+const settingsRoutePath = "src/app/(admin)/settings/general/project-participant-roles/page.tsx";
 const migrationPath = "../modulex-store/supabase/migrations/20260905004500_customer_project_commission_access_basis.sql";
 const mirrorPath = "sql/project-pb6-commission-access-basis.sql";
 
@@ -25,6 +27,8 @@ for (const [file, message] of [
   [panelPath, "PB-6 panel must exist"],
   [eventDomainPath, "PB-6 event domain must exist"],
   [roleManagerPath, "PB-6 role manager must exist"],
+  [settingsOverviewPath, "General Settings overview must exist"],
+  [settingsRoutePath, "Project Participant Roles General Settings route must exist"],
   [migrationPath, "PB-6 access/basis migration must exist"],
   [mirrorPath, "PB-6 access/basis Admin SQL mirror must exist"],
 ]) assert.equal(exists(file), true, message);
@@ -34,16 +38,25 @@ const page = read(pagePath);
 const domain = read(domainPath);
 const panel = read(panelPath);
 const eventDomain = read(eventDomainPath);
+const roleManager = read(roleManagerPath);
+const settingsOverview = read(settingsOverviewPath);
+const settingsRoute = read(settingsRoutePath);
 const migration = read(migrationPath);
 const mirror = read(mirrorPath);
 
 assert.equal(migration, mirror, "PB-6 access/basis migration and Admin SQL mirror must stay byte-identical");
 
 assert.match(workspace, /Participants & Commission/, "Project workspace must expose Participants & Commission as a tab");
-assert.match(workspace, /ProjectParticipantsCommissionPanel/, "Project workspace must own the PB-6 panel");
-assert.match(workspace, /ProjectParticipantRoleManager/, "Project workspace tab must own participant-role configuration");
+assert.match(workspace, /ProjectParticipantsCommissionPanel/, "Project workspace must own the PB-6 commission panel");
 assert.match(workspace, /super_admin[\s\S]*admin[\s\S]*finance|finance[\s\S]*admin[\s\S]*super_admin/, "PB-6 tab visibility must be restricted to Finance/Admin/Super Admin");
 assert.doesNotMatch(page, /ProjectParticipantsCommissionPanel|ProjectParticipantRoleManager/, "PB-6 must not render outside the Project tab workspace");
+
+assert.match(settingsOverview, /Project Participant Roles/, "General Settings overview must expose Project Participant Roles");
+assert.match(settingsOverview, /\/settings\/general\/project-participant-roles/, "General Settings overview must link to Project Participant Roles");
+assert.match(settingsRoute, /ProjectParticipantRoleManager/, "Project Participant Roles settings route must render the role manager");
+assert.match(roleManager, /usePathname/, "Participant role manager must know which route is rendering it");
+assert.match(roleManager, /\/settings\/general\/project-participant-roles/, "Participant role manager must render only on its General Settings route");
+assert.match(roleManager, /Participant Roles[\s\S]*Save Participant Role/i, "General Settings must retain participant-role configuration behavior");
 
 assert.match(domain, /const PB6_INTERNAL_ROLES = \["super_admin", "admin", "finance"\]/, "PB-6 client access must use one internal role boundary");
 assert.doesNotMatch(domain, /PB6_INTERNAL_ROLES[^\n]*sales/, "Sales must not be part of PB-6 internal detail access");
