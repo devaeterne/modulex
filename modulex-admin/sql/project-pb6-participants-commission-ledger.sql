@@ -277,7 +277,7 @@ as $$
       nullif(btrim(concat_ws(' ', he.first_name, he.last_name)), ''),
       nullif(btrim(cc.first_name || ' ' || cc.last_name), ''),
       nullif(btrim(p.full_name), ''), p.email, 'Unnamed participant'
-    ),
+    ) as display_name,
     pp.is_active, pp.source, pp.started_at, pp.ended_at
   from public.project_participants pp
   join public.project_participant_roles pr on pr.id = pp.role_id
