@@ -1,0 +1,35 @@
+name: Temporary PB-6 replay alias safety
+
+on:
+  push:
+    branches:
+      - fix/pb6-project-tab-permissions-percentage-basis
+    paths:
+      - "modulex-admin/scripts/apply-pb6-replay-alias.mjs"
+      - ".github/workflows/tmp-pb6-replay-alias.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/pb6-project-tab-permissions-percentage-basis
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply replay alias safety
+        working-directory: modulex-admin
+        run: node scripts/apply-pb6-replay-alias.mjs
+      - name: Commit alias safety and remove temporary machinery
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm modulex-admin/scripts/apply-pb6-replay-alias.mjs .github/workflows/tmp-pb6-replay-alias.yml
+          git add modulex-store/supabase/migrations/20260904150000_customer_project_participants_commission_ledger.sql \
+                  modulex-admin/sql/project-pb6-participants-commission-ledger.sql
+          git commit -m "fix(project): keep PB-6 migration replayable"
+          git push origin HEAD:fix/pb6-project-tab-permissions-percentage-basis
