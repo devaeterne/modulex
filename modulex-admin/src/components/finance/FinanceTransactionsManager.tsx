@@ -14,6 +14,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import {
   createFinanceTransactionDraft,
+  deleteFinanceTransactionDraft,
   getFinanceAccounts,
   getFinanceCategories,
   getFinanceTransactionsPage,
@@ -165,6 +166,21 @@ export default function FinanceTransactionsManager() {
     }
   }
 
+  async function deleteDraft(transaction: FinanceTransaction) {
+    if (!canManage || busyId || transaction.status !== "draft") return;
+    if (!window.confirm("Delete this Finance draft? This action is only available before posting.")) return;
+    setBusyId(transaction.id);
+    try {
+      await deleteFinanceTransactionDraft(transaction.id);
+      setMessage({ variant: "success", text: "Finance draft deleted. No posted money history was changed." });
+      await load(offset);
+    } catch (error) {
+      setMessage({ variant: "error", text: error instanceof Error ? error.message : "Finance draft could not be deleted." });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function post(transaction: FinanceTransaction) {
     if (!canManage || busyId) return;
     setBusyId(transaction.id);
@@ -240,7 +256,7 @@ export default function FinanceTransactionsManager() {
           </form>
         </ComponentCard>
       ) : (
-        <Alert variant="info" title="Read-only Finance access" message="Your role can review Finance transactions but cannot create, post, void or reverse them." />
+        <Alert variant="info" title="Read-only Finance access" message="Your role can review Finance transactions but cannot create, delete, post, void or reverse them." />
       )}
 
       {canManage ? (
@@ -257,7 +273,7 @@ export default function FinanceTransactionsManager() {
         </div>
       ) : null}
 
-      <ComponentCard title="Transactions" desc="Posted rows are immutable money history. Voids and reversals remain visible for audit.">
+      <ComponentCard title="Transactions" desc="Posted rows are immutable money history. Drafts can be deleted before posting; voids and reversals remain visible for audit.">
         <div className="grid gap-4 md:grid-cols-4">
           <div><Label htmlFor="finance-status-filter">Status</Label><Select id="finance-status-filter" options={statusFilterOptions} value={statusFilter} allowEmpty placeholder="All statuses" onChange={setStatusFilter} /></div>
           <div><Label htmlFor="finance-kind-filter">Type</Label><Select id="finance-kind-filter" options={kindFilterOptions} value={kindFilter} allowEmpty placeholder="All transaction types" onChange={setKindFilter} /></div>
@@ -282,6 +298,7 @@ export default function FinanceTransactionsManager() {
                     {canManage ? (
                       <div className="flex flex-wrap gap-2">
                         {transaction.status === "draft" ? <Button size="sm" onClick={() => void post(transaction)} disabled={Boolean(busyId)}>Post</Button> : null}
+                        {transaction.status === "draft" ? <Button size="sm" variant="danger" onClick={() => void deleteDraft(transaction)} disabled={Boolean(busyId)}>Delete Draft</Button> : null}
                         {transaction.status === "posted" && transaction.transaction_kind !== "reversal" ? <Button size="sm" variant="outline" onClick={() => void voidTransaction(transaction)} disabled={Boolean(busyId)}>Void</Button> : null}
                         {transaction.status === "posted" ? <Button size="sm" variant="danger" onClick={() => void reverse(transaction)} disabled={Boolean(busyId)}>Reverse</Button> : null}
                         {transaction.status === "voided" ? "—" : null}
