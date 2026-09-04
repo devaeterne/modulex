@@ -31,6 +31,7 @@ At that snapshot the expected whole-Project 2% commission is approximately USD 1
 - PostgreSQL recalculates the authoritative basis again at create time and stores that value as the immutable obligation snapshot.
 - Whole-Project basis uses active Order `grand_total`; category/product basis uses matching active Order item `line_total`.
 - Empty/zero and mixed-currency scopes fail closed.
+- The original PB-6 migration and Admin SQL mirror also include the `display_name` alias replay fix, so this branch does not depend on PR #309 for fresh database bootstrap.
 
 ## TDD
 
