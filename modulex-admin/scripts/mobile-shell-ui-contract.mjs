@@ -44,11 +44,7 @@ expect(userDropdown.includes('href="/profile"'), "Profile navigation must remain
 expect(userDropdown.includes("signOut()") && userDropdown.includes('window.location.replace("/signin")'), "Sign-out flow must remain intact");
 expect(userDropdown.includes("disabled={isSigningOut}"), "Sign-out must retain its busy-state guard");
 expect(userDropdown.includes("focus:ring-3") && userDropdown.includes("focus:ring-brand-500/10"), "User trigger focus treatment must match the TailAdmin header controls");
-expect(
-  workflow.includes("name: Admin UI Foundation") &&
-    workflow.includes('      - "modulex-admin/**"') &&
-    workflow.includes("run: node scripts/mobile-shell-ui-contract.mjs"),
-  "Admin UI Foundation must own mobile shell changes and execute the mobile shell contract",
-);
+expect(workflow.includes('"modulex-admin/**"'), "Consolidated Admin UI workflow must watch Modulex Admin changes");
+expect(workflow.includes("node scripts/mobile-shell-ui-contract.mjs"), "Consolidated Admin UI workflow must retain the Mobile shell contract");
 
 console.log("mobile shell UI contract: ok");

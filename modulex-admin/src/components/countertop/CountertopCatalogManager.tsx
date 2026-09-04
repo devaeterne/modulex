@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
@@ -8,7 +8,10 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { Dropdown } from "@/components/ui/dropdown/Dropdown";
+import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { Modal } from "@/components/ui/modal";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   Table,
   TableBody,
@@ -57,17 +60,109 @@ type StoneDraft = {
 };
 type SinkDraft = { product_id?: string; name: string; sku: string; brand_id: string; prices: Record<string, string> };
 type CatalogEditor = "stone" | "sink" | null;
+type CatalogTab = "stone" | "sink";
+type CatalogRowActionsProps = {
+  product: ProductRow;
+  disabled: boolean;
+  onEdit: () => void;
+  onToggleStatus: () => void | Promise<void>;
+};
 
 const EMPTY_STONE: StoneDraft = {
   name: "", sku: "", brand_id: "", stone_type_id: "", material_price_band_id: "", vendor_name: "", source_ref: "",
 };
 const EMPTY_SINK: SinkDraft = { name: "", sku: "", brand_id: "", prices: {} };
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const STATUS_OPTIONS: Option[] = [
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+];
 
 function money(value: string | number) {
   const amount = Number(value);
   return Number.isFinite(amount)
     ? new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(amount)
     : "—";
+}
+
+function getPageNumbers(currentPage: number, totalPages: number) {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+  const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+  return Array.from({ length: 5 }, (_, index) => start + index);
+}
+
+function sinkPriceSummary(row: SinkCatalogRow, priceGroups: PriceGroupRow[]) {
+  const amounts = priceGroups.flatMap((group) => {
+    const rawAmount = row.prices[group.id];
+    if (rawAmount === undefined) return [];
+    const amount = Number(rawAmount);
+    return Number.isFinite(amount) ? [amount] : [];
+  });
+
+  if (amounts.length === 0) {
+    return {
+      range: "—",
+      detail: priceGroups.length ? `0/${priceGroups.length} price groups` : "No active price groups",
+    };
+  }
+
+  const minimum = Math.min(...amounts);
+  const maximum = Math.max(...amounts);
+  return {
+    range: minimum === maximum ? money(minimum) : `${money(minimum)} – ${money(maximum)}`,
+    detail: `${amounts.length}/${priceGroups.length} price groups`,
+  };
+}
+
+function CatalogRowActions({ product, disabled, onEdit, onToggleStatus }: CatalogRowActionsProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const closeMenu = useCallback(() => setIsOpen(false), []);
+
+  return (
+    <span ref={anchorRef} className="relative inline-flex">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="dropdown-toggle"
+        aria-label={`Actions for ${product.name}`}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        disabled={disabled}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        …
+      </Button>
+      <Dropdown
+        isOpen={isOpen}
+        onClose={closeMenu}
+        portal
+        anchorRef={anchorRef}
+        role="menu"
+        ariaLabel={`Actions for ${product.name}`}
+        className="w-44 p-2"
+      >
+        <DropdownItem
+          onClick={() => {
+            closeMenu();
+            onEdit();
+          }}
+        >
+          Edit
+        </DropdownItem>
+        <DropdownItem
+          onClick={() => {
+            closeMenu();
+            void onToggleStatus();
+          }}
+        >
+          {product.status === "active" ? "Deactivate" : "Activate"}
+        </DropdownItem>
+      </Dropdown>
+    </span>
+  );
 }
 
 export default function CountertopCatalogManager() {
@@ -80,6 +175,11 @@ export default function CountertopCatalogManager() {
   const [stoneDraft, setStoneDraft] = useState<StoneDraft>(EMPTY_STONE);
   const [sinkDraft, setSinkDraft] = useState<SinkDraft>(EMPTY_SINK);
   const [editor, setEditor] = useState<CatalogEditor>(null);
+  const [activeCatalog, setActiveCatalog] = useState<CatalogTab>("stone");
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(25);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<"stone" | "sink" | "status" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +191,42 @@ export default function CountertopCatalogManager() {
   const brandById = useMemo(() => new Map(brands.map((row) => [row.id, row.name])), [brands]);
   const stoneTypeById = useMemo(() => new Map(stoneTypes.map((row) => [row.id, row.name])), [stoneTypes]);
   const bandById = useMemo(() => new Map(bands.map((row) => [row.id, `${row.code} — ${money(row.price_per_sqft)} / sq ft`])), [bands]);
+  const normalizedQuery = catalogQuery.trim().toLowerCase();
+
+  const filteredStones = useMemo(() => stones.filter((row) => {
+    if (statusFilter && row.status !== statusFilter) return false;
+    if (!normalizedQuery) return true;
+    return [
+      row.name,
+      row.sku,
+      brandById.get(row.brand_id),
+      stoneTypeById.get(row.stone_type_id),
+      bandById.get(row.material_price_band_id),
+      row.vendor_name,
+    ].some((value) => value?.toLowerCase().includes(normalizedQuery));
+  }), [bandById, brandById, normalizedQuery, statusFilter, stoneTypeById, stones]);
+
+  const filteredSinks = useMemo(() => sinks.filter((row) => {
+    if (statusFilter && row.status !== statusFilter) return false;
+    if (!normalizedQuery) return true;
+    return [row.name, row.sku, brandById.get(row.brand_id)]
+      .some((value) => value?.toLowerCase().includes(normalizedQuery));
+  }), [brandById, normalizedQuery, sinks, statusFilter]);
+
+  const activeCount = activeCatalog === "stone" ? filteredStones.length : filteredSinks.length;
+  const totalPages = Math.max(1, Math.ceil(activeCount / pageSize));
+  const pageStartIndex = (currentPage - 1) * pageSize;
+  const pagedStones = useMemo(
+    () => filteredStones.slice(pageStartIndex, pageStartIndex + pageSize),
+    [filteredStones, pageSize, pageStartIndex]
+  );
+  const pagedSinks = useMemo(
+    () => filteredSinks.slice(pageStartIndex, pageStartIndex + pageSize),
+    [filteredSinks, pageSize, pageStartIndex]
+  );
+  const pageNumbers = useMemo(() => getPageNumbers(currentPage, totalPages), [currentPage, totalPages]);
+  const firstVisibleRow = activeCount === 0 ? 0 : pageStartIndex + 1;
+  const lastVisibleRow = Math.min(pageStartIndex + pageSize, activeCount);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -159,6 +295,9 @@ export default function CountertopCatalogManager() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   function resetMessages() { setError(null); setMessage(null); }
   function openNewStone() { resetMessages(); setStoneDraft(EMPTY_STONE); setEditor("stone"); }
@@ -176,6 +315,24 @@ export default function CountertopCatalogManager() {
     resetMessages();
     setSinkDraft({ product_id: row.id, name: row.name, sku: row.sku, brand_id: row.brand_id, prices: { ...row.prices } });
     setEditor("sink");
+  }
+  function changeCatalog(tab: CatalogTab) {
+    setActiveCatalog(tab);
+    setCurrentPage(1);
+  }
+  function changeQuery(value: string) {
+    setCatalogQuery(value);
+    setCurrentPage(1);
+  }
+  function changeStatus(value: string) {
+    setStatusFilter(value);
+    setCurrentPage(1);
+  }
+  function changePageSize(value: string) {
+    const nextPageSize = Number(value);
+    if (!PAGE_SIZE_OPTIONS.includes(nextPageSize as (typeof PAGE_SIZE_OPTIONS)[number])) return;
+    setPageSize(nextPageSize);
+    setCurrentPage(1);
   }
 
   async function saveStone() {
@@ -226,57 +383,178 @@ export default function CountertopCatalogManager() {
     if (await load()) setMessage(`${product.name} is now ${nextStatus}.`);
   }
 
+  const addAction = activeCatalog === "stone"
+    ? <Button onClick={openNewStone}>Add Stone</Button>
+    : <Button onClick={openNewSink}>Add Sink</Button>;
+  const cardDescription = activeCatalog === "stone"
+    ? "Stone products use Material Price Bands for catalog $/sq ft pricing."
+    : "Sink prices remain maintained across every active order-eligible Price Group.";
+  const emptyMessage = activeCatalog === "stone" ? "No Stone products match these filters." : "No Sink products match these filters.";
+
   return (
     <div className="space-y-6">
       {error ? <div className="space-y-3"><Alert variant="error" title="Countertop Catalog" message={error} /><Button variant="outline" size="sm" onClick={() => void load()}>Retry</Button></div> : null}
       {message ? <Alert variant="success" title="Countertop Catalog" message={message} /> : null}
 
-      <ComponentCard title="Stones" desc="Stone products use the selected Material Price Band for catalog $/sq ft pricing." headerAction={<Button onClick={openNewStone}>Add Stone</Button>}>
-        <TableViewport>
-          <Table variant="admin" minWidth="wide">
-            <TableHeader variant="admin"><TableRow>
-              {["Stone","SKU","Brand","Stone Type","Material Price Band","Vendor","Status","Actions"].map((heading) => <TableCell key={heading} isHeader variant="admin">{heading}</TableCell>)}
-            </TableRow></TableHeader>
-            <TableBody variant="admin">
-              {loading ? <TableStateRow colSpan={8}>Loading Stone products…</TableStateRow> : stones.length === 0 ? <TableStateRow colSpan={8}>No Stone products.</TableStateRow> : stones.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell variant="admin" className="font-medium">{row.name}</TableCell><TableCell variant="admin">{row.sku}</TableCell>
-                  <TableCell variant="admin">{brandById.get(row.brand_id) ?? "—"}</TableCell><TableCell variant="admin">{stoneTypeById.get(row.stone_type_id) ?? "—"}</TableCell>
-                  <TableCell variant="admin">{bandById.get(row.material_price_band_id) ?? "—"}</TableCell><TableCell variant="admin">{row.vendor_name || "—"}</TableCell>
-                  <TableCell variant="admin"><Badge color={row.status === "active" ? "success" : "light"}>{row.status === "active" ? "Active" : "Inactive"}</Badge></TableCell>
-                  <TableCell variant="admin"><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => editStone(row)}>Edit</Button><Button variant="outline" size="sm" disabled={saving === "status"} onClick={() => void toggleStatus(row)}>{row.status === "active" ? "Deactivate" : "Activate"}</Button></div></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableViewport>
-      </ComponentCard>
+      <ComponentCard title="Catalog" desc={cardDescription} headerAction={addAction}>
+        <div className="space-y-5">
+          <div role="tablist" aria-label="Countertop catalog type" className="flex flex-wrap gap-2">
+            <Button
+              id="countertop-tab-stone"
+              role="tab"
+              aria-selected={activeCatalog === "stone"}
+              aria-controls="countertop-panel-stone"
+              variant={activeCatalog === "stone" ? "primary" : "outline"}
+              size="sm"
+              onClick={() => changeCatalog("stone")}
+            >
+              Stones ({stones.length})
+            </Button>
+            <Button
+              id="countertop-tab-sink"
+              role="tab"
+              aria-selected={activeCatalog === "sink"}
+              aria-controls="countertop-panel-sink"
+              variant={activeCatalog === "sink" ? "primary" : "outline"}
+              size="sm"
+              onClick={() => changeCatalog("sink")}
+            >
+              Sinks ({sinks.length})
+            </Button>
+          </div>
 
-      <ComponentCard title="Sinks" desc="Sink prices are maintained for every active order-eligible commercial Price Group." headerAction={<Button onClick={openNewSink}>Add Sink</Button>}>
-        <TableViewport>
-          <Table variant="admin" minWidth="extraWide">
-            <TableHeader variant="admin"><TableRow>
-              <TableCell isHeader variant="admin">Sink</TableCell><TableCell isHeader variant="admin">SKU</TableCell><TableCell isHeader variant="admin">Brand</TableCell><TableCell isHeader variant="admin">Status</TableCell>
-              {priceGroups.map((group) => <TableCell key={group.id} isHeader variant="admin">{group.name}</TableCell>)}
-              <TableCell isHeader variant="admin">Actions</TableCell>
-            </TableRow></TableHeader>
-            <TableBody variant="admin">
-              {loading ? <TableStateRow colSpan={5 + priceGroups.length}>Loading Sink products…</TableStateRow> : sinks.length === 0 ? <TableStateRow colSpan={5 + priceGroups.length}>No Sink products.</TableStateRow> : sinks.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell variant="admin" className="font-medium">{row.name}</TableCell><TableCell variant="admin">{row.sku}</TableCell><TableCell variant="admin">{brandById.get(row.brand_id) ?? "—"}</TableCell>
-                  <TableCell variant="admin"><Badge color={row.status === "active" ? "success" : "light"}>{row.status === "active" ? "Active" : "Inactive"}</Badge></TableCell>
-                  {priceGroups.map((group) => <TableCell key={group.id} variant="admin">{row.prices[group.id] === undefined ? "—" : money(row.prices[group.id])}</TableCell>)}
-                  <TableCell variant="admin"><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => editSink(row)}>Edit</Button><Button variant="outline" size="sm" disabled={saving === "status"} onClick={() => void toggleStatus(row)}>{row.status === "active" ? "Deactivate" : "Activate"}</Button></div></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableViewport>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="countertop-catalog-search">Search</Label>
+              <Input
+                id="countertop-catalog-search"
+                placeholder="Search catalog"
+                value={catalogQuery}
+                ariaLabel={`Search ${activeCatalog === "stone" ? "Stones" : "Sinks"}`}
+                onChange={(event) => changeQuery(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="countertop-catalog-status">Status</Label>
+              <Select
+                id="countertop-catalog-status"
+                value={statusFilter}
+                options={STATUS_OPTIONS}
+                placeholder="All statuses"
+                allowEmpty
+                ariaLabel="Filter Countertop Catalog by status"
+                onChange={changeStatus}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="countertop-catalog-page-size">Rows per page</Label>
+              <Select
+                id="countertop-catalog-page-size"
+                value={String(pageSize)}
+                options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} rows` }))}
+                placeholder="Rows per page"
+                ariaLabel="Countertop Catalog rows per page"
+                onChange={changePageSize}
+              />
+            </div>
+          </div>
+
+          <div
+            id={activeCatalog === "stone" ? "countertop-panel-stone" : "countertop-panel-sink"}
+            role="tabpanel"
+            aria-labelledby={activeCatalog === "stone" ? "countertop-tab-stone" : "countertop-tab-sink"}
+            className="space-y-4"
+          >
+            <TableViewport>
+              <Table variant="admin" minWidth="standard">
+                <TableHeader variant="admin">
+                  <TableRow>
+                    {(activeCatalog === "stone"
+                      ? ["Stone", "Details", "Price Band", "Status", "Actions"]
+                      : ["Sink", "Brand", "Pricing", "Status", "Actions"]
+                    ).map((heading) => <TableCell key={heading} isHeader variant="admin">{heading}</TableCell>)}
+                  </TableRow>
+                </TableHeader>
+                <TableBody variant="admin">
+                  {loading ? (
+                    <TableStateRow colSpan={5}>Loading {activeCatalog === "stone" ? "Stone" : "Sink"} products…</TableStateRow>
+                  ) : activeCount === 0 ? (
+                    <TableStateRow colSpan={5}>{emptyMessage}</TableStateRow>
+                  ) : activeCatalog === "stone" ? pagedStones.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell variant="admin">
+                        <div className="space-y-1">
+                          <div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{row.name}</div>
+                          <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{row.sku}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell variant="admin">
+                        <div className="space-y-1">
+                          <div>{brandById.get(row.brand_id) ?? "—"}</div>
+                          <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{stoneTypeById.get(row.stone_type_id) ?? "—"}</div>
+                          {row.vendor_name ? <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Vendor: {row.vendor_name}</div> : null}
+                        </div>
+                      </TableCell>
+                      <TableCell variant="admin">{bandById.get(row.material_price_band_id) ?? "—"}</TableCell>
+                      <TableCell variant="admin"><Badge color={row.status === "active" ? "success" : "light"}>{row.status === "active" ? "Active" : "Inactive"}</Badge></TableCell>
+                      <TableCell variant="admin"><CatalogRowActions product={row} disabled={saving === "status"} onEdit={() => editStone(row)} onToggleStatus={() => toggleStatus(row)} /></TableCell>
+                    </TableRow>
+                  )) : pagedSinks.map((row) => {
+                    const summary = sinkPriceSummary(row, priceGroups);
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell variant="admin">
+                          <div className="space-y-1">
+                            <div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{row.name}</div>
+                            <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{row.sku}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell variant="admin">{brandById.get(row.brand_id) ?? "—"}</TableCell>
+                        <TableCell variant="admin">
+                          <div className="space-y-1">
+                            <div className={ADMIN_TEXT_STYLES.strong}>{summary.range}</div>
+                            <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{summary.detail}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell variant="admin"><Badge color={row.status === "active" ? "success" : "light"}>{row.status === "active" ? "Active" : "Inactive"}</Badge></TableCell>
+                        <TableCell variant="admin"><CatalogRowActions product={row} disabled={saving === "status"} onEdit={() => editSink(row)} onToggleStatus={() => toggleStatus(row)} /></TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableViewport>
+
+            {!loading ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>
+                  Showing {firstVisibleRow}–{lastVisibleRow} of {activeCount}
+                </div>
+                <div className="flex flex-wrap items-center gap-2" aria-label="Countertop Catalog pagination">
+                  <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</Button>
+                  {pageNumbers.map((page) => (
+                    <Button
+                      key={page}
+                      variant={page === currentPage ? "primary" : "outline"}
+                      size="sm"
+                      aria-current={page === currentPage ? "page" : undefined}
+                      aria-label={`Page ${page}`}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                  <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
       </ComponentCard>
 
       <Modal isOpen={editor === "stone"} onClose={closeEditor} className="m-4 max-h-[90vh] max-w-3xl overflow-y-auto p-6" ariaLabel="Stone editor">
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold">{stoneDraft.product_id ? "Edit Stone" : "Add Stone"}</h3>
+          <h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>{stoneDraft.product_id ? "Edit Stone" : "Add Stone"}</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div><Label htmlFor="stone-name">Stone Name *</Label><Input id="stone-name" value={stoneDraft.name} onChange={(event) => setStoneDraft((draft) => ({ ...draft, name: event.target.value }))} /></div>
             <div><Label htmlFor="stone-sku">SKU *</Label><Input id="stone-sku" value={stoneDraft.sku} onChange={(event) => setStoneDraft((draft) => ({ ...draft, sku: event.target.value }))} /></div>
@@ -292,13 +570,13 @@ export default function CountertopCatalogManager() {
 
       <Modal isOpen={editor === "sink"} onClose={closeEditor} className="m-4 max-h-[90vh] max-w-3xl overflow-y-auto p-6" ariaLabel="Sink editor">
         <div className="space-y-6">
-          <h3 className="text-lg font-semibold">{sinkDraft.product_id ? "Edit Sink" : "Add Sink"}</h3>
+          <h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>{sinkDraft.product_id ? "Edit Sink" : "Add Sink"}</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div><Label htmlFor="sink-name">Sink Name *</Label><Input id="sink-name" value={sinkDraft.name} onChange={(event) => setSinkDraft((draft) => ({ ...draft, name: event.target.value }))} /></div>
             <div><Label htmlFor="sink-sku">SKU *</Label><Input id="sink-sku" value={sinkDraft.sku} onChange={(event) => setSinkDraft((draft) => ({ ...draft, sku: event.target.value }))} /></div>
             <div className="md:col-span-2"><Label htmlFor="sink-brand">Brand *</Label><Select id="sink-brand" value={sinkDraft.brand_id} options={brandOptions} placeholder="Select brand" onChange={(value) => setSinkDraft((draft) => ({ ...draft, brand_id: value }))} /></div>
           </div>
-          <div className="space-y-4"><h4 className="text-base font-semibold">Sink prices</h4><div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-4"><h4 className={`text-base font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Sink prices</h4><div className="grid gap-4 md:grid-cols-2">
             {priceGroups.map((group) => <div key={group.id}><Label htmlFor={`sink-price-${group.id}`}>{group.name} *</Label><Input id={`sink-price-${group.id}`} type="number" min={0} step="0.01" value={sinkDraft.prices[group.id] ?? ""} onChange={(event) => setSinkDraft((draft) => ({ ...draft, prices: { ...draft.prices, [group.id]: event.target.value } }))} /></div>)}
           </div></div>
           <div className="flex justify-end gap-3"><Button variant="outline" disabled={saving === "sink"} onClick={closeEditor}>Cancel</Button><Button disabled={saving === "sink"} onClick={() => void saveSink()}>{saving === "sink" ? "Saving…" : "Save Sink"}</Button></div>

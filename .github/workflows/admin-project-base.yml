@@ -53,5 +53,7 @@ jobs:
         run: node scripts/project-finance-simple-flow-contract.mjs
       - name: Project Procurement contract
         run: node scripts/project-procurement-contract.mjs
+      - name: Project PB-5 Fulfillment contract
+        run: node scripts/project-pb5-fulfillment-contract.mjs
       - name: Countertop Sink fallback contract
         run: node scripts/countertop-sink-fallback-contract.mjs
