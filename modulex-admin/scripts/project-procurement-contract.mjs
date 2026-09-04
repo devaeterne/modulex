@@ -122,7 +122,6 @@ for (const token of [
   "customer_order_reservations",
   "get_customer_order_procurement_components",
   "sync_customer_order_procurement",
-  "trg_customer_order_stock_status_sync",
   "trg_customer_order_project_procurement_sync",
   "trg_customer_order_z_project_procurement_sync",
   "customer_project_procurement_requirements",
@@ -132,10 +131,15 @@ assert.match(
   /if\s+not\s+coalesce\(v_item\.inventory_tracking,\s*false\)\s+or\s+not\s+coalesce\(v_item\.reservable,\s*false\)/i,
   "Non-reservable or non-inventory-tracked products must bypass stock reservation",
 );
-assert.doesNotMatch(
+assert.match(
   reservationAlignment,
-  /ORDER_STOCK_SHORTAGE[\s\S]*raise\s+exception/i,
-  "Stock shortage must not abort confirmation after partial reservation",
+  /if\s+v_needed\s*>\s*0\s+and\s+v_item\.project_id\s+is\s+null[\s\S]*raise\s+exception\s+'STANDALONE_STOCK_SHORTAGE/i,
+  "Standalone Orders must remain fail-closed when sellable stock is short",
+);
+assert.match(
+  reservationAlignment,
+  /Project-linked shortage is intentionally non-fatal/i,
+  "Project-linked stock shortage must fall through to Procurement instead of aborting confirmation",
 );
 assert.match(
   reservationAlignment,
