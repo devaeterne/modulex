@@ -34,6 +34,16 @@ assert.match(core, /source_kind/);
 assert.match(core, /is_current/);
 
 assert.equal(exists(syncMigration), true, "PB-3B order-sync migration must exist");
+const sync = read(syncMigration);
+assert.match(sync, /customer_orders/);
+assert.match(sync, /project_id/);
+assert.match(sync, /confirmed/);
+assert.match(sync, /cancelled/);
+assert.match(sync, /customer_activity/);
+assert.match(sync, /order_revised/);
+assert.match(sync, /sync_customer_order_procurement/);
+assert.doesNotMatch(sync, /insert\s+into\s+public\.inventory_movements/i);
+
 assert.equal(exists(operationsMigration), true, "PB-3B operations migration must exist");
 assert.equal(exists(adapter), true, "Project Procurement adapter must exist");
 assert.equal(exists(component), true, "Project Procurement tab must exist");
