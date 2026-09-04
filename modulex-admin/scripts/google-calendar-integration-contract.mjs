@@ -23,6 +23,9 @@ const [
   envSource,
   canonicalSql,
   migrationSql,
+  repositorySource,
+  oauthSource,
+  calendarSource,
 ] = await Promise.all([
   source("src/lib/google-calendar/config.ts"),
   source("src/lib/google-calendar/crypto.ts"),
@@ -31,6 +34,9 @@ const [
   source(".env.example"),
   source("sql/google-calendar-project-integration.sql"),
   source(migrationPath),
+  source("src/lib/google-calendar/repository.ts"),
+  source("src/lib/google-calendar/google-oauth.ts"),
+  source("src/lib/google-calendar/google-calendar.ts"),
 ]);
 
 assert.match(configSource, /GOOGLE_CALENDAR_CLIENT_ID/);
@@ -72,4 +78,37 @@ for (const sql of [canonicalSql, migrationSql]) {
 
 assert.equal(canonicalSql.trim(), migrationSql.trim(), "Canonical SQL and migration must stay mirrored exactly.");
 
-console.log("Google Calendar integration foundation and persistence contract passed.");
+assert.match(repositorySource, /getCalendarIntegrationSettings/);
+assert.match(repositorySource, /updateCalendarIntegrationSettings/);
+assert.match(repositorySource, /saveConnectedGoogleCredential/);
+assert.match(repositorySource, /retireGoogleCredential/);
+assert.match(repositorySource, /createCalendarOAuthState/);
+assert.match(repositorySource, /consumeCalendarOAuthState/);
+assert.match(repositorySource, /getProjectCalendarBinding/);
+assert.match(repositorySource, /upsertProjectCalendarBinding/);
+assert.match(repositorySource, /getProjectCalendarEventLink/);
+assert.match(repositorySource, /upsertProjectCalendarEventLink/);
+assert.doesNotMatch(repositorySource, /NEXT_PUBLIC_GOOGLE/);
+
+assert.match(oauthSource, /accounts\.google\.com\/o\/oauth2\/v2\/auth/);
+assert.match(oauthSource, /oauth2\.googleapis\.com\/token/);
+assert.match(oauthSource, /openidconnect\.googleapis\.com\/v1\/userinfo/);
+assert.match(oauthSource, /createGoogleAuthorizationUrl/);
+assert.match(oauthSource, /exchangeGoogleAuthorizationCode/);
+assert.match(oauthSource, /refreshGoogleAccessToken/);
+assert.match(oauthSource, /revokeGoogleRefreshToken/);
+assert.match(oauthSource, /randomBytes\(32\)/);
+assert.match(oauthSource, /createHash\("sha256"\)/);
+assert.match(oauthSource, /timingSafeEqual/);
+assert.doesNotMatch(oauthSource, /console\.(log|info|warn|error)\([^\n]*(access_token|refresh_token|client_secret)/i);
+
+assert.match(calendarSource, /www\.googleapis\.com\/calendar\/v3\/calendars/);
+assert.match(calendarSource, /createGoogleProjectCalendar/);
+assert.match(calendarSource, /renameGoogleProjectCalendar/);
+assert.match(calendarSource, /createGoogleCalendarEvent/);
+assert.match(calendarSource, /updateGoogleCalendarEvent/);
+assert.match(calendarSource, /deleteGoogleCalendarEvent/);
+assert.match(calendarSource, /GoogleCalendarProviderError/);
+assert.doesNotMatch(calendarSource, /console\.(log|info|warn|error)\([^\n]*(accessToken|refreshToken)/i);
+
+console.log("Google Calendar integration foundation, persistence, and server-boundary contract passed.");
