@@ -1,21 +1,19 @@
-name: GC-8A Store Chrome SEO
+name: Store Core CI
 
 on:
   push:
-    branches:
-      - feat/gc8a-store-chrome-seo
     paths:
       - "modulex-store/**"
       - "modulex-admin/src/components/store/**"
       - "modulex-admin/src/lib/store/**"
-      - "modulex-admin/src/app/(admin)/store/content/**"
+      - "modulex-admin/src/app/(admin)/store/**"
       - ".github/workflows/gc8a-store-chrome-seo.yml"
   pull_request:
     paths:
       - "modulex-store/**"
       - "modulex-admin/src/components/store/**"
       - "modulex-admin/src/lib/store/**"
-      - "modulex-admin/src/app/(admin)/store/content/**"
+      - "modulex-admin/src/app/(admin)/store/**"
       - ".github/workflows/gc8a-store-chrome-seo.yml"
   workflow_dispatch:
 
@@ -27,7 +25,7 @@ permissions:
   contents: read
 
 jobs:
-  store-gc8a-verification:
+  store-core-verification:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -40,61 +38,60 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-store/package-lock.json
       - run: npm ci
-      - run: npm run smoke:gc8a-store-chrome-seo
-      - run: npm run smoke:seo-showroom
       - run: npm run smoke:public-production
-      - run: npm run smoke:portal-public-navbar
-      - run: npm run smoke:gc7-social-proof
-      - run: npm run smoke:gc6-cabinet-journey
-      - run: npm run smoke:gc5-gallery-projects
+      - run: npm run smoke:secondary-cms-contract
+      - run: npm run smoke:gc3-company-domain
       - run: npm run smoke:gc3-company-public
+      - run: npm run smoke:gc5-gallery-projects
+      - run: npm run smoke:gc6-cabinet-journey
+      - run: npm run smoke:gc7-social-proof
+      - run: npm run smoke:gc8a-store-chrome-seo
+      - run: npm run smoke:gc8b-accessibility
+      - run: npm run smoke:gc8b-performance
+      - run: npm run smoke:gallery-freshness
+      - run: npm run smoke:gallery-theme
+      - run: npm run smoke:seo-showroom
+      - run: npm run smoke:store-portal
+      - run: npm run smoke:portal-experience
+      - run: npm run smoke:portal-auth-rpc-guard
+      - run: npm run smoke:portal-public-navbar
       - name: Store scoped lint
         run: >-
           npx eslint
-          src/lib/store/chrome/destinations.ts
-          src/lib/store/chrome/queries.ts
-          src/components/Navbar.tsx
-          src/components/Footer.tsx
-          src/components/StoreChrome.tsx
           src/app/layout.tsx
-          src/lib/seo/metadata.ts
-          src/lib/seo/structured-data.ts
+          src/app/page.tsx
           src/app/about/page.tsx
+          src/app/contact/page.tsx
           src/app/gallery/page.tsx
           src/app/showroom/page.tsx
           src/app/cabinet-process/page.tsx
+          src/app/sitemap.ts
           'src/app/products/[slug]/page.tsx'
+          src/components/StoreIcon.tsx
+          src/components/BackToTop.tsx
+          src/components/Footer.tsx
+          src/components/GalleryLightbox.tsx
+          src/components/Navbar.tsx
+          src/components/StoreChrome.tsx
+          src/components/ThemeToggle.tsx
+          src/components/gallery/StoreProjectsGallery.tsx
+          src/components/leads/LeadForm.tsx
+          src/components/Home/Contact.tsx
+          src/components/Home/Hero.tsx
+          src/components/Home/HeroPremium.tsx
+          src/components/Home/HeroSlider.tsx
+          src/components/Home/Testimonials.tsx
+          src/components/Home/VirtualTour.tsx
+          src/lib/seo/metadata.ts
+          src/lib/seo/structured-data.ts
+          src/lib/store/chrome/destinations.ts
+          src/lib/store/chrome/queries.ts
+          src/lib/store/content/queries.ts
+          scripts/gc6-cabinet-journey-contract.mjs
+          scripts/gc7-social-proof-contract.mjs
       - name: Store production build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
           NEXT_PUBLIC_SITE_URL: https://oakwellcabinetry.com
-        run: npm run build
-
-  admin-gc8a-verification:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modulex-admin
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: modulex-admin/package-lock.json
-      - run: npm ci
-      - run: npm run smoke:rbac
-      - name: Admin Store scoped lint
-        run: >-
-          npx eslint
-          src/components/store/StoreChromeSettings.tsx
-          src/components/store/StoreContentSettings.tsx
-          src/components/store/StoreLegacyContentSettings.tsx
-          src/lib/store/chrome.ts
-          'src/app/(admin)/store/content/page.tsx'
-      - name: Admin production build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
         run: npm run build

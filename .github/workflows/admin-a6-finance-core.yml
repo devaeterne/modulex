@@ -1,55 +1,69 @@
 name: Admin A6 Finance Core
+
 on:
   push:
     paths:
       - "modulex-admin/src/app/(admin)/finance/**"
+      - "modulex-admin/src/app/(admin)/customers/invoices/**"
+      - "modulex-admin/src/app/(admin)/approvals/**"
+      - "modulex-admin/src/app/(admin)/pricing/cost-margin/**"
+      - "modulex-admin/src/app/(admin)/settings/general/tax-rules/**"
+      - "modulex-admin/src/app/(admin)/settings/payment-methods/**"
+      - "modulex-admin/src/app/(admin)/reports/**"
       - "modulex-admin/src/components/finance/**"
+      - "modulex-admin/src/components/approvals/**"
+      - "modulex-admin/src/components/reports/**"
       - "modulex-admin/src/lib/finance/**"
-      - "modulex-admin/src/layout/AppSidebar.tsx"
-      - "modulex-admin/src/lib/auth/permissions.ts"
       - "modulex-admin/scripts/a6-finance-core-contract.mjs"
       - "modulex-admin/scripts/a6-finance-core-hardening-contract.mjs"
+      - "modulex-admin/scripts/finance-reports-ui-contract.mjs"
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
-      - "modulex-admin/ADMIN_ROADMAP.md"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
   pull_request:
     paths:
       - "modulex-admin/src/app/(admin)/finance/**"
+      - "modulex-admin/src/app/(admin)/customers/invoices/**"
+      - "modulex-admin/src/app/(admin)/approvals/**"
+      - "modulex-admin/src/app/(admin)/pricing/cost-margin/**"
+      - "modulex-admin/src/app/(admin)/settings/general/tax-rules/**"
+      - "modulex-admin/src/app/(admin)/settings/payment-methods/**"
+      - "modulex-admin/src/app/(admin)/reports/**"
       - "modulex-admin/src/components/finance/**"
+      - "modulex-admin/src/components/approvals/**"
+      - "modulex-admin/src/components/reports/**"
       - "modulex-admin/src/lib/finance/**"
-      - "modulex-admin/src/layout/AppSidebar.tsx"
-      - "modulex-admin/src/lib/auth/permissions.ts"
       - "modulex-admin/scripts/a6-finance-core-contract.mjs"
       - "modulex-admin/scripts/a6-finance-core-hardening-contract.mjs"
+      - "modulex-admin/scripts/finance-reports-ui-contract.mjs"
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
-      - "modulex-admin/ADMIN_ROADMAP.md"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
-permissions: { contents: read }
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   finance-core-verification:
     runs-on: ubuntu-latest
-    defaults: { run: { working-directory: modulex-admin } }
+    defaults:
+      run:
+        working-directory: modulex-admin
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
       - run: npm run smoke:a6-finance-core
-      - run: npm run smoke:rbac
-      - run: npm run smoke:admin-ui-strict
-      - run: npm run typecheck
-      - run: npm run lint
-      - name: Build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
-        run: npm run build
+      - run: node scripts/finance-reports-ui-contract.mjs

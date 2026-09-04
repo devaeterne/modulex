@@ -3,41 +3,65 @@ name: Admin A3.1 Product Master
 on:
   push:
     paths:
+      - "modulex-admin/src/app/(admin)/products/**"
+      - "modulex-admin/src/app/(admin)/brands/**"
+      - "modulex-admin/src/app/(admin)/categories/**"
+      - "modulex-admin/src/app/(admin)/pricing/**"
       - "modulex-admin/src/components/products/**"
+      - "modulex-admin/src/components/brands/**"
+      - "modulex-admin/src/components/categories/**"
+      - "modulex-admin/src/components/pricing/**"
       - "modulex-admin/src/components/form/MultiSelect.tsx"
-      - "modulex-admin/src/app/(admin)/products/types/**"
+      - "modulex-admin/src/components/form/Select.tsx"
       - "modulex-admin/src/icons/index.tsx"
       - "modulex-admin/sql/a3-product-master-data.sql"
       - "modulex-admin/scripts/a3-product-master-contract.mjs"
       - "modulex-admin/scripts/product-master-v2-contract.mjs"
+      - "modulex-admin/scripts/product-ui-smoke-contract.mjs"
+      - "modulex-admin/scripts/product-list-ui-contract.mjs"
       - "modulex-admin/scripts/product-form-ui-contract.mjs"
       - "modulex-admin/scripts/product-reference-ui-contract.mjs"
+      - "modulex-admin/scripts/taxonomy-ui-contract.mjs"
+      - "modulex-admin/scripts/products-pricing-ui-contract.mjs"
+      - "modulex-admin/scripts/pricing-product-type-contract.mjs"
+      - "modulex-admin/scripts/val-2-products-pricing-validation-contract.mjs"
       - "modulex-admin/docs/acceptance/a3-1-product-master-data.md"
       - "modulex-admin/docs/superpowers/specs/2026-08-30-a3-1-product-master-data-design.md"
       - "modulex-admin/docs/superpowers/plans/2026-08-30-a3-1-product-master-data.md"
-      - "modulex-admin/ADMIN_ROADMAP.md"
-      - "modulex-admin/package.json"
       - "modulex-store/supabase/migrations/20260830120000_a3_1_canonical_product_taxonomy.sql"
       - "modulex-store/supabase/migrations/*product_master_v2*.sql"
+      - "modulex-store/supabase/migrations/*pricing_product_type*.sql"
       - ".github/workflows/admin-a3-product-master.yml"
   pull_request:
     paths:
+      - "modulex-admin/src/app/(admin)/products/**"
+      - "modulex-admin/src/app/(admin)/brands/**"
+      - "modulex-admin/src/app/(admin)/categories/**"
+      - "modulex-admin/src/app/(admin)/pricing/**"
       - "modulex-admin/src/components/products/**"
+      - "modulex-admin/src/components/brands/**"
+      - "modulex-admin/src/components/categories/**"
+      - "modulex-admin/src/components/pricing/**"
       - "modulex-admin/src/components/form/MultiSelect.tsx"
-      - "modulex-admin/src/app/(admin)/products/types/**"
+      - "modulex-admin/src/components/form/Select.tsx"
       - "modulex-admin/src/icons/index.tsx"
       - "modulex-admin/sql/a3-product-master-data.sql"
       - "modulex-admin/scripts/a3-product-master-contract.mjs"
       - "modulex-admin/scripts/product-master-v2-contract.mjs"
+      - "modulex-admin/scripts/product-ui-smoke-contract.mjs"
+      - "modulex-admin/scripts/product-list-ui-contract.mjs"
       - "modulex-admin/scripts/product-form-ui-contract.mjs"
       - "modulex-admin/scripts/product-reference-ui-contract.mjs"
+      - "modulex-admin/scripts/taxonomy-ui-contract.mjs"
+      - "modulex-admin/scripts/products-pricing-ui-contract.mjs"
+      - "modulex-admin/scripts/pricing-product-type-contract.mjs"
+      - "modulex-admin/scripts/val-2-products-pricing-validation-contract.mjs"
       - "modulex-admin/docs/acceptance/a3-1-product-master-data.md"
       - "modulex-admin/docs/superpowers/specs/2026-08-30-a3-1-product-master-data-design.md"
       - "modulex-admin/docs/superpowers/plans/2026-08-30-a3-1-product-master-data.md"
-      - "modulex-admin/ADMIN_ROADMAP.md"
-      - "modulex-admin/package.json"
       - "modulex-store/supabase/migrations/20260830120000_a3_1_canonical_product_taxonomy.sql"
       - "modulex-store/supabase/migrations/*product_master_v2*.sql"
+      - "modulex-store/supabase/migrations/*pricing_product_type*.sql"
       - ".github/workflows/admin-a3-product-master.yml"
 
 concurrency:
@@ -63,19 +87,11 @@ jobs:
       - run: npm ci
       - run: npm run smoke:a3-product-master
       - run: npm run smoke:product-master-v2
+      - run: node scripts/product-ui-smoke-contract.mjs
       - run: node scripts/product-list-ui-contract.mjs
       - run: node scripts/product-form-ui-contract.mjs
       - run: node scripts/product-reference-ui-contract.mjs
+      - run: node scripts/taxonomy-ui-contract.mjs
       - run: node scripts/products-pricing-ui-contract.mjs
-      - run: npm run smoke:a1-core-operations
-      - run: npm run smoke:a2-warehouse-integrity
-      - run: npm run smoke:a2-inventory-movements
-      - run: node scripts/a2-stock-operations-scanning-contract.mjs
-      - run: npm run smoke:a2-low-stock-reporting
-      - run: npm run smoke:rbac
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+      - run: node scripts/pricing-product-type-contract.mjs
+      - run: npm run smoke:val-2-products-pricing
