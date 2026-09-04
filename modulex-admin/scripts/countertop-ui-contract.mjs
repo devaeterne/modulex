@@ -59,6 +59,12 @@ assert(
   "Countertop Catalog must render shared clickable product thumbnails with an accessible lightbox preview"
 );
 assert(
+  catalog.includes('const visibleProducts = activeCatalog === "stone" ? pagedStones : pagedSinks;') &&
+    catalog.includes("loadCatalogProductImages(visibleProducts)") &&
+    !catalog.includes("loadCatalogProductImages(products)"),
+  "Countertop Catalog must load thumbnail metadata only for the visible page instead of the full Stone/Sink catalog"
+);
+assert(
   thumbnail.includes('className="h-12 w-12 shrink-0 p-0"') &&
     thumbnail.includes('className="h-12 w-12 object-contain"'),
   "Shared product thumbnail must own the compact 48px Product List scan pattern"
