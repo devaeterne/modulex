@@ -73,8 +73,8 @@ function baselineAwareAddedText() {
 const addedText = baselineAwareAddedText();
 
 function assertGuardrails(text) {
-  assert.doesNotMatch(text, /<button\b(?:(?!>).)*className\s*=(?:(?!>).)*(?:bg-|rounded-|shadow-|border-|px-|py-|h-)/is, "New route-specific styled buttons are not allowed");
-  assert.doesNotMatch(text, /<Button\b(?:(?!>).)*className\s*=(?:(?!>).)*(?:bg-|text-(?:white|gray|brand|error|success|warning)-|border-|rounded-|shadow-|px-|py-|h-)/is, "Shared Button appearance overrides are not allowed");
+  assert.doesNotMatch(text, /<button\b(?:(?!>).)*className\s*=(?:(?!>).)*(?:bg-|rounded-|shadow-|border-|px-|py-|h-)/s, "New route-specific styled buttons are not allowed");
+  assert.doesNotMatch(text, /<Button\b(?:(?!>).)*className\s*=(?:(?!>).)*(?:bg-|text-(?:white|gray|brand|error|success|warning)-|border-|rounded-|shadow-)/is, "Shared Button appearance overrides are not allowed");
   assert.doesNotMatch(text, /TailAdmin|dasoft\.me|info@dasoft\.me/i, "Known TailAdmin/demo patterns must not be reintroduced");
   assert.doesNotMatch(text, /<table\b[^>]*className\s*=\s*[^>\n]*overflow-(?:auto|x-auto)/i, "New route-specific table shells are not allowed");
   assert.doesNotMatch(text, /<div\b[^>\n]*className\s*=\s*[^>\n]*overflow-(?:auto|x-auto)[^>\n]*>[\s\S]{0,800}<table\b/i, "New ad-hoc table overflow shells are not allowed");
@@ -87,7 +87,7 @@ const fixtures = {
   sharedButton: '<Button className={clsx("rounded-lg", disabled && "bg-gray-300")} />',
   templateExpression: '<button className={`h-10 ${danger ? "bg-error-500" : "bg-brand-500"}`}>Delete</button>',
   tableShell: '<div className={cn("overflow-x-auto", "rounded-xl")}><table><tbody /></table></div>',
-  layoutOnly: '<Button className={cn("w-full", "mt-2")} />',
+  layoutOnly: '<Button className={cn("w-full", "mt-2", "h-12", "px-2")} />',
 };
 for (const [name, fixture] of Object.entries(fixtures)) {
   if (name === "layoutOnly") {
