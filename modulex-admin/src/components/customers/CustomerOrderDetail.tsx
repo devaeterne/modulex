@@ -155,9 +155,14 @@ export default function CustomerOrderDetail() {
     try {
       const context = await loadOrderDetail(customerId, orderId);
       const actorIds = Array.from(new Set(context.history.map((entry) => entry.changed_by).filter((value): value is string => Boolean(value))));
+      let nextActors: StatusActor[] = [];
+      if (actorIds.length > 0) {
+        const actorsResult = await supabase.from("profiles").select("id, full_name, email").in("id", actorIds);
+        if (!actorsResult.error) nextActors = (actorsResult.data ?? []) as StatusActor[];
+      }
+
       let customerContactId = context.customer.sales_rep_id;
       const projectId = (context.order as OrderWithProject).project_id ?? null;
-
       if (projectId) {
         const projectResult = await supabase
           .from("customer_projects")
@@ -169,11 +174,16 @@ export default function CustomerOrderDetail() {
         }
       }
 
-      const profileIds = Array.from(new Set([...actorIds, customerContactId].filter((value): value is string => Boolean(value))));
-      let nextActors: StatusActor[] = [];
-      if (profileIds.length > 0) {
-        const actorsResult = await supabase.from("profiles").select("id, full_name, email").in("id", profileIds);
-        if (!actorsResult.error) nextActors = (actorsResult.data ?? []) as StatusActor[];
+      let nextCustomerContact: StatusActor | null = null;
+      if (customerContactId) {
+        const contactResult = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .eq("id", customerContactId)
+          .maybeSingle();
+        if (!contactResult.error && contactResult.data) {
+          nextCustomerContact = contactResult.data as StatusActor;
+        }
       }
 
       setCustomer(context.customer);
@@ -181,7 +191,7 @@ export default function CustomerOrderDetail() {
       setItems(context.items);
       setHistory(context.history);
       setStatusActors(nextActors);
-      setCustomerContact(customerContactId ? nextActors.find((actor) => actor.id === customerContactId) ?? null : null);
+      setCustomerContact(nextCustomerContact);
       setPendingApprovals(context.pendingApprovals);
       setCanManage(context.canManage);
       setContextCanManageCountertop(context.canManageCountertop);
