@@ -32,6 +32,10 @@ on:
       - "modulex-admin/ADMIN_ROADMAP.md"
       - ".github/workflows/admin-a2-stock-operations-scanning.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

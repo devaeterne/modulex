@@ -4,6 +4,9 @@ on:
     paths: ["modulex-admin/src/app/(admin)/settings/general/**", "modulex-admin/src/components/settings/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/general-settings-ui-contract.mjs", ".github/workflows/admin-general-settings-ui.yml"]
   pull_request:
     paths: ["modulex-admin/src/app/(admin)/settings/general/**", "modulex-admin/src/components/settings/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/general-settings-ui-contract.mjs", ".github/workflows/admin-general-settings-ui.yml"]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions: { contents: read }
 jobs:
   settings-verification:

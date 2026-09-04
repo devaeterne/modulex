@@ -4,6 +4,9 @@ on:
     paths: ["modulex-admin/src/app/(admin)/customers/**", "modulex-admin/src/components/customers/**", "modulex-admin/scripts/customers-ui-contract.mjs", ".github/workflows/admin-customers-ui.yml"]
   pull_request:
     paths: ["modulex-admin/src/app/(admin)/customers/**", "modulex-admin/src/components/customers/**", "modulex-admin/scripts/customers-ui-contract.mjs", ".github/workflows/admin-customers-ui.yml"]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions: { contents: read }
 jobs:
   customers-verification:

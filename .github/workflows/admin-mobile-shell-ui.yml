@@ -20,6 +20,10 @@ on:
       - "modulex-admin/scripts/mobile-shell-ui-contract.mjs"
       - ".github/workflows/admin-mobile-shell-ui.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
