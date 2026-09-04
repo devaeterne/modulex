@@ -51,6 +51,8 @@ jobs:
         run: npm run smoke:ci-workflow-architecture
       - name: API timing contract
         run: npm run smoke:api-timing
+      - name: Google Calendar integration contract
+        run: node scripts/google-calendar-integration-contract.mjs
       - name: Admin UI strict self-test
         run: npm run smoke:admin-ui-strict:self-test
       - name: Admin UI strict changed-file gate
@@ -97,8 +99,6 @@ jobs:
         run: npm run smoke:production-surface
       - name: RBAC regression
         run: npm run smoke:rbac
-      - name: Google Calendar integration contract
-        run: node scripts/google-calendar-integration-contract.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
