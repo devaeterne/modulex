@@ -36,5 +36,9 @@ expect(tableCellTags.length > 0 && tableCellTags.every((tag) => tag.includes('va
 expect(directory.includes('grid grid-cols-2 gap-3 md:grid-cols-4'), "Customer summary metrics must collapse into one row from tablet widths upward");
 expect(!directory.includes('<div className="p-5 sm:p-6">'), "Customer directory must not add a second padded shell inside ComponentCard");
 expect(directory.includes('className="w-full sm:w-36"'), "Customer pagination page-size control must stay compact on desktop");
+expect(directory.includes('ADMIN_TEXT_STYLES'), "Customer directory standalone text must use shared admin text tokens for light/dark contrast");
+expect(directory.includes('text-2xl font-semibold ${ADMIN_TEXT_STYLES.strong}'), "Customer summary values must use the shared strong text token in dark mode");
+expect(directory.includes('text-sm ${ADMIN_TEXT_STYLES.muted}'), "Customer pagination summary must use the shared muted text token in dark mode");
+expect(directory.includes('text-xs ${ADMIN_TEXT_STYLES.muted}'), "Customer page indicator must use the shared muted text token in dark mode");
 
 console.log("customers UI contract: ok");
