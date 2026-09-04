@@ -51,7 +51,7 @@ expect(sql.includes("trg_validate_finance_employee_payment_posting"), "Employee 
 
 expect(sql.includes("source_document_type = 'hr_payroll_item'"), "Payroll settlement must select canonical Payroll Item Finance links");
 expect(sql.includes("t.status = 'posted'"), "Payroll settlement must count posted Finance history only");
-expect(sql.includes("reversal_of_transaction_id"), "Payroll settlement must account for Finance reversals");
+expect(sql.includes("t.transaction_kind in ('employee_payment','reversal')"), "Payroll settlement must account for compensating Finance reversals");
 expect(sql.includes("greatest(i.net_pay"), "Payroll settlement must derive remaining pay from HR net pay and Finance paid amount");
 
 for (const fn of [
