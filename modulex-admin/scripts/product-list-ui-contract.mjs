@@ -40,6 +40,21 @@ expect(
   /id\?:\s*string/.test(select) && /allowEmpty\?:\s*boolean/.test(select),
   "Shared Select must support accessible ids and selectable empty filter options"
 );
+expect(
+  select.includes('className="relative w-full"') &&
+    select.includes('aria-hidden="true"') &&
+    select.includes('pointer-events-none absolute right-3 top-1/2'),
+  "Shared Select must restore a full-width non-interactive dropdown chevron when appearance-none is used"
+);
+expect(
+  select.includes('"text-gray-400 dark:text-white/30"') &&
+    select.includes('className="bg-white text-gray-800 dark:bg-gray-900 dark:text-white/90"'),
+  "Shared Select placeholder and option text must follow the Admin light/dark field contrast contract"
+);
+expect(
+  !select.includes("data-placeholder"),
+  "Shared Select placeholder color must be driven deterministically by its effective value"
+);
 
 expect(
   table.includes('hasPermission(profile?.roles, "products.manage")'),

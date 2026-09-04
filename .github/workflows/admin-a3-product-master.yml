@@ -34,6 +34,10 @@ on:
       - "modulex-store/supabase/migrations/*product_master_v2*.sql"
       - ".github/workflows/admin-a3-product-master.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

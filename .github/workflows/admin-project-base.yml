@@ -9,6 +9,10 @@ on:
       - "docs/PROJECT_BASE_PLAN.md"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   project-base-contract:
     runs-on: ubuntu-latest

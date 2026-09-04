@@ -4,6 +4,9 @@ on:
     paths: ["modulex-admin/src/app/(admin)/personnel/**", "modulex-admin/src/components/hr/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/personnel-ui-contract.mjs", "modulex-admin/scripts/leave-ui-contract.mjs", ".github/workflows/admin-personnel-ui.yml"]
   pull_request:
     paths: ["modulex-admin/src/app/(admin)/personnel/**", "modulex-admin/src/components/hr/**", "modulex-admin/src/layout/AppSidebar.tsx", "modulex-admin/src/lib/auth/permissions.ts", "modulex-admin/scripts/personnel-ui-contract.mjs", "modulex-admin/scripts/leave-ui-contract.mjs", ".github/workflows/admin-personnel-ui.yml"]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions: { contents: read }
 jobs:
   personnel-verification:

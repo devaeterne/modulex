@@ -32,6 +32,10 @@ on:
       - "modulex-admin/tsconfig.typecheck.json"
       - ".github/workflows/admin-a2-low-stock-reporting.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
