@@ -62,7 +62,7 @@ assert.doesNotMatch(
 );
 assert.match(
   leaveManager,
-  /Showing \{pageStart \+ 1\}-\{Math\.min\(pageStart \+ BALANCE_PAGE_SIZE, filteredBalanceRows\.length\)\}/,
+  /Showing \{pageStart \+ 1\}-\s*\{Math\.min\(pageStart \+ BALANCE_PAGE_SIZE, filteredBalanceRows\.length\)\}/,
   "Pagination must communicate the visible employee range",
 );
 
