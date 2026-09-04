@@ -58,6 +58,7 @@ jobs:
       - run: npm run smoke:a1-core-operations
       - run: npm run smoke:order-domain
       - run: npm run smoke:order-lifecycle
+      - run: node scripts/order-status-action-guidance-contract.mjs
       - run: npm run smoke:store-portal-admin
 
   store-portal-boundary-verification:
