@@ -1,0 +1,37 @@
+name: Temporary PB-6 review fixes
+
+on:
+  push:
+    branches:
+      - fix/pb6-project-tab-permissions-percentage-basis
+    paths:
+      - "modulex-admin/scripts/apply-pb6-followup-review-fixes.mjs"
+      - ".github/workflows/tmp-pb6-followup-review-fixes.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/pb6-project-tab-permissions-percentage-basis
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply review fixes
+        working-directory: modulex-admin
+        run: node scripts/apply-pb6-followup-review-fixes.mjs
+      - name: Commit review fixes and remove temporary machinery
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm modulex-admin/scripts/apply-pb6-followup-review-fixes.mjs .github/workflows/tmp-pb6-followup-review-fixes.yml
+          git add modulex-admin/src/lib/customers/project-participants-commission-domain.ts \
+                  modulex-admin/src/lib/customers/project-commission-events.ts \
+                  modulex-admin/src/components/customers/project-detail/ProjectParticipantsCommissionPanel.tsx \
+                  modulex-admin/scripts/project-pb6-tab-access-percentage-basis-contract.mjs
+          git commit -m "fix(project): align PB-6 client guards with internal access"
+          git push origin HEAD:fix/pb6-project-tab-permissions-percentage-basis
