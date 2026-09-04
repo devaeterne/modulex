@@ -280,7 +280,7 @@ export default function CustomerOrderDetail() {
             <InfoBlock label="Internal owner" value={statusIssue.internalOwner} />
             <InfoBlock label="Customer contact" value={customerContactLabel(customerContact)} />
           </div>
-          <details className="mt-4 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+          <details className="mt-4">
             <summary className={`cursor-pointer text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>Technical detail</summary>
             <p className={`mt-2 whitespace-pre-wrap break-words text-xs ${ADMIN_TEXT_STYLES.body}`}>{statusIssue.technicalDetail}</p>
           </details>
