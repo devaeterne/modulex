@@ -9,6 +9,7 @@ const expect = (condition, message) => {
 
 const table = read("src/components/products/ProductsTable.tsx");
 const select = read("src/components/form/Select.tsx");
+const dropdown = read("src/components/ui/dropdown/Dropdown.tsx");
 const tracker = read("AdminUICheck.md");
 
 for (const sharedComponent of [
@@ -150,6 +151,38 @@ expect(
   table.includes('aria-live="polite"'),
   "Product List must announce dynamic status/results feedback"
 );
+
+expect(
+  table.includes('.from("store_product_content")') &&
+    table.includes('.in("base_product_code"') &&
+    table.includes('.from("store_product_media")') &&
+    table.includes('.in("product_content_id"') &&
+    table.includes('.eq("media_type", "image")'),
+  "Product List thumbnails must batch-load canonical Store product media without per-row queries"
+);
+expect(
+  table.includes("productImages") &&
+    table.includes("previewImage") &&
+    table.includes('aria-label={`View ${product.product_name} image`}') &&
+    table.includes('aria-label="Product image preview"'),
+  "Product List must render a clickable product thumbnail and an accessible lightbox preview"
+);
+expect(
+  table.includes("ProductRowActions") &&
+    table.includes('aria-label={`Actions for ${product.product_name}`}') &&
+    table.includes("Edit") &&
+    table.includes("Duplicate") &&
+    table.includes("Archive"),
+  "Product List row actions must be grouped behind a single accessible actions menu"
+);
+expect(
+  dropdown.includes("createPortal") &&
+    dropdown.includes("portal") &&
+    dropdown.includes("anchorRef") &&
+    dropdown.includes('position: "fixed"'),
+  "Shared Dropdown must support a fixed portal mode so Product List actions are not clipped by the table viewport"
+);
+
 expect(
   tracker.includes("### [x] 01 — Dashboard + shared shell") &&
     tracker.includes("### [x] 02 — Request Center") &&
