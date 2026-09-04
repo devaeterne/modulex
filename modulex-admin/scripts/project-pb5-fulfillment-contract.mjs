@@ -16,10 +16,11 @@ const exists = (file) => fs.existsSync(path.join(root, file));
 const sqlPath = "sql/project-pb5-fulfillment-rollup.sql";
 const componentPath = "src/components/customers/project-detail/ProjectFulfillmentTab.tsx";
 const workspacePath = "src/components/customers/ProjectDetailWorkspace.tsx";
-const domainPath = "src/lib/customers/project-domain.ts";
+const domainPath = "src/lib/customers/project-fulfillment-domain.ts";
 
 assert.equal(exists(sqlPath), true, "PB-5 fulfillment projection SQL must exist");
 assert.equal(exists(componentPath), true, "PB-5 Project Fulfillment tab must exist");
+assert.equal(exists(domainPath), true, "PB-5 fulfillment client domain must exist");
 
 const sql = read(sqlPath);
 const component = read(componentPath);
@@ -50,7 +51,9 @@ assert.match(sql, /revoke\s+all[\s\S]*from\s+public/i, "PB-5 RPC must revoke PUB
 assert.match(sql, /grant\s+execute[\s\S]*to\s+authenticated/i, "PB-5 RPC must grant authenticated execution explicitly");
 
 // Admin UI uses the narrow Project RPC and shared primitives.
-assert.match(domain, /get_customer_project_fulfillment/i, "Project domain must call the PB-5 narrow RPC");
+assert.match(domain, /get_customer_project_fulfillment/i, "Project fulfillment domain must call the PB-5 narrow RPC");
+assert.match(domain, /shipments\.view/i, "client boundary must preserve Shipment visibility");
+assert.match(domain, /installations\.view/i, "client boundary must preserve Installation visibility");
 assert.match(component, /ComponentCard/, "Fulfillment tab must use shared ComponentCard");
 assert.match(component, /TableViewport/, "Fulfillment rows must use shared Admin table primitives");
 assert.match(component, /Orders Ready/i, "Fulfillment summary must show Orders Ready");
