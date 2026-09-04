@@ -25,6 +25,7 @@ import {
   createCustomerProjectCommissionObligation,
   deactivateCustomerProjectParticipant,
   getCustomerProjectCommissions,
+  getCustomerProjectCommissionBasisPreview,
   getCustomerProjectParticipants,
   getProjectCommissionScopeOptions,
   getProjectParticipantAccess,
@@ -97,7 +98,6 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
   const [canManageParticipants, setCanManageParticipants] = useState(false);
   const [canViewCommissions, setCanViewCommissions] = useState(false);
   const [canManageCommissions, setCanManageCommissions] = useState(false);
-  const [isSalesOnly, setIsSalesOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -113,7 +113,9 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
   const [commissionScopeType, setCommissionScopeType] = useState<ProjectCommissionScopeType>("project");
   const [commissionScopeId, setCommissionScopeId] = useState("");
   const [commissionFlatAmount, setCommissionFlatAmount] = useState("");
-  const [commissionBasisAmount, setCommissionBasisAmount] = useState("");
+  const [commissionBasisPreview, setCommissionBasisPreview] = useState<number | null>(null);
+  const [commissionBasisPreviewError, setCommissionBasisPreviewError] = useState<string | null>(null);
+  const [loadingCommissionBasis, setLoadingCommissionBasis] = useState(false);
   const [commissionRate, setCommissionRate] = useState("");
   const [commissionCurrency, setCommissionCurrency] = useState("USD");
   const [commissionDescription, setCommissionDescription] = useState("");
@@ -136,7 +138,6 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
       setCanManageParticipants(access.canManageParticipants);
       setCanViewCommissions(access.canViewCommissions);
       setCanManageCommissions(access.canManageCommissions);
-      setIsSalesOnly(access.isSalesOnly);
 
       const [nextParticipants, nextRoles, nextCommissions, nextCandidates, scopeOptions] = await Promise.all([
         access.canViewParticipants ? getCustomerProjectParticipants(projectId) : Promise.resolve([]),
@@ -196,6 +197,48 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     setReversalEventId("");
     void loadEvents();
   }, [loadEvents]);
+
+  useEffect(() => {
+    let active = true;
+    if (commissionBasisType !== "percentage") {
+      setCommissionBasisPreview(null);
+      setCommissionBasisPreviewError(null);
+      setLoadingCommissionBasis(false);
+      return () => { active = false; };
+    }
+    if (commissionScopeType !== "project" && !commissionScopeId) {
+      setCommissionBasisPreview(null);
+      setCommissionBasisPreviewError(null);
+      setLoadingCommissionBasis(false);
+      return () => { active = false; };
+    }
+    if (!/^[A-Z]{3}$/.test(commissionCurrency.trim().toUpperCase())) {
+      setCommissionBasisPreview(null);
+      setCommissionBasisPreviewError("Enter a valid three-letter currency code.");
+      setLoadingCommissionBasis(false);
+      return () => { active = false; };
+    }
+
+    setLoadingCommissionBasis(true);
+    setCommissionBasisPreviewError(null);
+    void getCustomerProjectCommissionBasisPreview({
+      projectId,
+      scopeType: commissionScopeType,
+      currencyCode: commissionCurrency,
+      productCategoryId: commissionScopeType === "category" ? commissionScopeId || null : null,
+      productId: commissionScopeType === "product" ? commissionScopeId || null : null,
+    }).then((basis) => {
+      if (active) setCommissionBasisPreview(basis);
+    }).catch((previewError) => {
+      if (!active) return;
+      setCommissionBasisPreview(null);
+      setCommissionBasisPreviewError(previewError instanceof Error ? previewError.message : "Commission basis could not be calculated.");
+    }).finally(() => {
+      if (active) setLoadingCommissionBasis(false);
+    });
+
+    return () => { active = false; };
+  }, [commissionBasisType, commissionCurrency, commissionScopeId, commissionScopeType, projectId]);
 
   const participantRoleOptions = useMemo(
     () => roles.filter((role) => role.roleKey !== "sales_rep").map((role) => ({ value: role.roleKey, label: role.label })),
@@ -272,14 +315,12 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
         currencyCode: commissionCurrency,
         scopeType: commissionScopeType,
         flatAmount: commissionBasisType === "fixed" ? Number(commissionFlatAmount) : null,
-        basisAmount: commissionBasisType === "percentage" ? Number(commissionBasisAmount) : null,
         rate: commissionBasisType === "percentage" ? Number(commissionRate) : null,
         productCategoryId: commissionScopeType === "category" ? commissionScopeId || null : null,
         productId: commissionScopeType === "product" ? commissionScopeId || null : null,
         description: commissionDescription || null,
       });
       setCommissionFlatAmount("");
-      setCommissionBasisAmount("");
       setCommissionRate("");
       setCommissionDescription("");
       setCommissionScopeId("");
@@ -316,14 +357,6 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     <section className="space-y-6" aria-label="Project Participants and Commission">
       {error ? <div role="alert"><Alert variant="error" title="Participants & Commission action failed" message={error} /></div> : null}
       {message ? <div role="status"><Alert variant="success" title="Participants & Commission updated" message={message} /></div> : null}
-      {isSalesOnly ? (
-        <Alert
-          variant="info"
-          title="Sales commission privacy"
-          message="Commission rows are filtered by the database to your own Project participation. Finance payout detail remains Finance/Admin-only."
-        />
-      ) : null}
-
       {canViewParticipants ? (
         <ComponentCard
           title="Participants"
@@ -411,7 +444,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
               </TableHeader>
               <TableBody variant="admin">
                 {loading ? <TableStateRow colSpan={7}>Refreshing commission obligations…</TableStateRow> : null}
-                {!loading && commissions.length === 0 ? <TableStateRow colSpan={7}>{isSalesOnly ? "No commission obligation is visible for your Project participation." : "No commission obligations have been created."}</TableStateRow> : null}
+                {!loading && commissions.length === 0 ? <TableStateRow colSpan={7}>No commission obligations have been created.</TableStateRow> : null}
                 {!loading ? commissions.map((commission) => (
                   <TableRow key={commission.obligationId}>
                     <TableCell variant="admin">
@@ -464,13 +497,18 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                 </div>
               ) : (
                 <>
-                  <div>
-                    <Label htmlFor="pb6-commission-basis-amount">Basis amount snapshot</Label>
-                    <Input id="pb6-commission-basis-amount" type="number" min="0" step="0.01" value={commissionBasisAmount} onChange={(event) => setCommissionBasisAmount(event.target.value)} />
+                  <div className={`${ADMIN_SURFACE_CARD} p-3`}>
+                    <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Commission basis</p>
+                    <p className="font-medium">{loadingCommissionBasis ? "Calculating…" : commissionBasisPreview !== null ? money(commissionBasisPreview, commissionCurrency) : "Unavailable"}</p>
+                    {commissionBasisPreviewError ? <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{commissionBasisPreviewError}</p> : null}
                   </div>
                   <div>
                     <Label htmlFor="pb6-commission-rate">Rate %</Label>
                     <Input id="pb6-commission-rate" type="number" min="0" max="100" step="0.01" value={commissionRate} onChange={(event) => setCommissionRate(event.target.value)} />
+                  </div>
+                  <div className={`${ADMIN_SURFACE_CARD} p-3`}>
+                    <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Estimated commission</p>
+                    <p className="font-medium">{commissionBasisPreview !== null && Number(commissionRate) > 0 ? money((commissionBasisPreview * Number(commissionRate)) / 100, commissionCurrency) : "—"}</p>
                   </div>
                 </>
               )}
@@ -483,7 +521,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                 <Input id="pb6-commission-description" value={commissionDescription} onChange={(event) => setCommissionDescription(event.target.value)} />
               </div>
               <div className="flex justify-end md:col-span-2 xl:col-span-4">
-                <Button disabled={saving || !commissionParticipantId || (commissionScopeType !== "project" && !commissionScopeId)} onClick={() => void createCommission()}>{saving ? "Saving…" : "Create Pending Commission"}</Button>
+                <Button disabled={saving || !commissionParticipantId || (commissionScopeType !== "project" && !commissionScopeId) || (commissionBasisType === "percentage" && (loadingCommissionBasis || commissionBasisPreview === null))} onClick={() => void createCommission()}>{saving ? "Saving…" : "Create Pending Commission"}</Button>
               </div>
             </div>
           ) : null}

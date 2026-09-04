@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
 
+const PB6_INTERNAL_ROLES = ["super_admin", "admin", "finance"] as const;
+
 export type ProjectParticipantSubjectType = "employee" | "customer_contact" | "profile";
 export type ProjectCommissionBasisType = "fixed" | "percentage";
 export type ProjectCommissionScopeType = "project" | "category" | "product";
@@ -125,7 +127,7 @@ async function currentProfileOrThrow() {
 
 async function requireParticipantView() {
   const profile = await currentProfileOrThrow();
-  if (!hasAnyRole(profile, ["super_admin", "admin", "finance", "sales"])) {
+  if (!hasAnyRole(profile, PB6_INTERNAL_ROLES)) {
     throw new Error("You do not have permission to view Project participants.");
   }
   return profile;
@@ -141,7 +143,7 @@ async function requireParticipantManage() {
 
 async function requireCommissionView() {
   const profile = await currentProfileOrThrow();
-  if (!hasAnyRole(profile, ["super_admin", "admin", "finance", "sales"])) {
+  if (!hasAnyRole(profile, PB6_INTERNAL_ROLES)) {
     throw new Error("You do not have permission to view Project commissions.");
   }
   return profile;
@@ -149,7 +151,7 @@ async function requireCommissionView() {
 
 async function requireCommissionManage() {
   const profile = await currentProfileOrThrow();
-  if (!hasAnyRole(profile, ["super_admin", "admin", "finance"])) {
+  if (!hasAnyRole(profile, PB6_INTERNAL_ROLES)) {
     throw new Error("You do not have permission to manage Project commissions.");
   }
   return profile;
@@ -157,12 +159,12 @@ async function requireCommissionManage() {
 
 export async function getProjectParticipantAccess() {
   const profile = await currentProfileOrThrow();
+  const canViewInternal = hasAnyRole(profile, PB6_INTERNAL_ROLES);
   return {
-    canViewParticipants: hasAnyRole(profile, ["super_admin", "admin", "finance", "sales"]),
+    canViewParticipants: canViewInternal,
     canManageParticipants: hasAnyRole(profile, ["super_admin", "admin"]),
-    canViewCommissions: hasAnyRole(profile, ["super_admin", "admin", "finance", "sales"]),
-    canManageCommissions: hasAnyRole(profile, ["super_admin", "admin", "finance"]),
-    isSalesOnly: hasAnyRole(profile, ["sales"]) && !hasAnyRole(profile, ["super_admin", "admin", "finance"]),
+    canViewCommissions: canViewInternal,
+    canManageCommissions: canViewInternal,
   };
 }
 
@@ -365,6 +367,28 @@ export async function getProjectCommissionScopeOptions(projectId: string): Promi
   return { categories, products };
 }
 
+export async function getCustomerProjectCommissionBasisPreview(input: {
+  projectId: string;
+  scopeType: ProjectCommissionScopeType;
+  currencyCode: string;
+  productCategoryId?: string | null;
+  productId?: string | null;
+}) {
+  await requireCommissionManage();
+  const currencyCode = normalizeCurrency(input.currencyCode);
+  const { data, error } = await supabase.rpc("get_customer_project_commission_basis_preview", {
+    p_project_id: input.projectId,
+    p_scope_type: input.scopeType,
+    p_currency_code: currencyCode,
+    p_product_category_id: input.scopeType === "category" ? input.productCategoryId || null : null,
+    p_product_id: input.scopeType === "product" ? input.productId || null : null,
+  });
+  if (error) throw error;
+  const basis = Number(data);
+  if (!Number.isFinite(basis) || basis <= 0) throw new Error("Commission basis is unavailable for this Project scope.");
+  return basis;
+}
+
 export async function createCustomerProjectCommissionObligation(input: {
   projectId: string;
   participantId: string;
@@ -385,7 +409,6 @@ export async function createCustomerProjectCommissionObligation(input: {
   if (input.basisType === "fixed") {
     if (!Number.isFinite(input.flatAmount) || Number(input.flatAmount) <= 0) throw new Error("Fixed commission amount must be greater than zero.");
   } else {
-    if (!Number.isFinite(input.basisAmount) || Number(input.basisAmount) < 0) throw new Error("Commission basis amount cannot be negative.");
     if (!Number.isFinite(input.rate) || Number(input.rate) <= 0 || Number(input.rate) > 100) throw new Error("Commission percentage must be greater than zero and at most 100.");
   }
   if (input.scopeType === "category" && !input.productCategoryId) throw new Error("Category scope requires a Project category.");
@@ -397,7 +420,7 @@ export async function createCustomerProjectCommissionObligation(input: {
     p_basis_type: input.basisType,
     p_currency_code: currencyCode,
     p_scope_type: input.scopeType,
-    p_basis_amount: input.basisType === "percentage" ? Number(input.basisAmount) : null,
+    p_basis_amount: null,
     p_rate: input.basisType === "percentage" ? Number(input.rate) : null,
     p_flat_amount: input.basisType === "fixed" ? Number(input.flatAmount) : null,
     p_order_id: input.orderId || null,

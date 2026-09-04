@@ -129,6 +129,6 @@ assert.match(component, /ComponentCard/i, "PB-6 UI must use shared Admin primiti
 assert.match(component, /ADMIN_SURFACE_CARD[\s\S]*ADMIN_TEXT_STYLES/i, "PB-6 UI must use shared Admin appearance tokens");
 assert.match(component, /Project status does not auto-earn commission/i, "UI must not imply an invented automatic earning rule");
 assert.match(roleManager, /Participant Roles[\s\S]*Save Participant Role/i, "Admin UI must expose configurable participant roles");
-assert.match(page, /ProjectParticipantsCommissionPanel[\s\S]*ProjectParticipantRoleManager/i, "Project detail must render PB-6 participant/commission and role-management surfaces");
+assert.doesNotMatch(page, /ProjectParticipantsCommissionPanel|ProjectParticipantRoleManager/i, "Project page must delegate PB-6 rendering to the tab workspace");
 
 console.log("Project PB-6 participants + commission contract PASS");
