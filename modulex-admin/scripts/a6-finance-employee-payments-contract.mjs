@@ -39,7 +39,7 @@ for (const fn of [
 expect(sql.includes("new.source_document_type = 'hr_payroll_item'"), "Payroll Item attribution must use the canonical source-document type");
 expect(sql.includes("public.hr_payroll_items"), "Payroll Item links must validate against canonical HR payroll items");
 expect(sql.includes("new.employee_id is distinct from v_payroll_employee"), "Payroll Item attribution must match the linked Employee");
-expect(sql.includes("transaction_kind = 'employee_payment'"), "Employee payment posting must have a dedicated invariant");
+expect(sql.includes("new.transaction_kind <> 'employee_payment'"), "Employee payment posting must have a dedicated invariant guard");
 expect(sql.includes("old.status is distinct from 'draft'"), "Employee payment posting validator must execute on draft-to-posted transition rather than skip it");
 expect(sql.includes("new.status is distinct from 'posted'"), "Employee payment posting validator must execute when the new status becomes posted");
 expect(!sql.includes("old.status is not distinct from 'draft'"), "Employee payment posting validator must not invert the draft transition guard");
