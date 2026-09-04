@@ -321,6 +321,7 @@ export default function CountertopCatalogManager() {
     () => filteredSinks.slice(pageStartIndex, pageStartIndex + pageSize),
     [filteredSinks, pageSize, pageStartIndex]
   );
+  const visibleProducts = activeCatalog === "stone" ? pagedStones : pagedSinks;
   const pageNumbers = useMemo(() => getPageNumbers(currentPage, totalPages), [currentPage, totalPages]);
   const firstVisibleRow = activeCount === 0 ? 0 : pageStartIndex + 1;
   const lastVisibleRow = Math.min(pageStartIndex + pageSize, activeCount);
@@ -366,12 +367,9 @@ export default function CountertopCatalogManager() {
     const stoneProducts = products.filter((row) => row.product_type_id === stoneType.id);
     const sinkProducts = products.filter((row) => row.product_type_id === sinkType.id);
     const sinkIds = sinkProducts.map((row) => row.id);
-    const [priceResult, nextProductImages] = await Promise.all([
-      sinkIds.length
-        ? supabase.from("product_prices").select("product_id,price_group_id,amount").in("product_id", sinkIds).eq("currency_code", "USD").eq("is_active", true).is("valid_to", null)
-        : Promise.resolve({ data: [] as ProductPriceRow[], error: null }),
-      loadCatalogProductImages(products),
-    ]);
+    const priceResult = sinkIds.length
+      ? await supabase.from("product_prices").select("product_id,price_group_id,amount").in("product_id", sinkIds).eq("currency_code", "USD").eq("is_active", true).is("valid_to", null)
+      : { data: [] as ProductPriceRow[], error: null };
     if (priceResult.error) {
       setError(priceResult.error.message || "Unable to load sink prices.");
       setLoading(false);
@@ -387,7 +385,6 @@ export default function CountertopCatalogManager() {
     setStoneTypes((stoneTypeResult.data ?? []) as StoneTypeRow[]);
     setBands((bandResult.data ?? []) as BandRow[]);
     setPriceGroups((priceGroupResult.data ?? []).map((row) => ({ id: row.id, name: row.name, sort_order: row.sort_order })) as PriceGroupRow[]);
-    setProductImages(nextProductImages);
     setStones(stoneProducts.flatMap((product) => {
       const profile = profileByProduct.get(product.id);
       return profile ? [{ ...product, ...profile }] : [];
@@ -401,6 +398,16 @@ export default function CountertopCatalogManager() {
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, totalPages));
   }, [totalPages]);
+  useEffect(() => {
+    let cancelled = false;
+    setProductImages({});
+    void loadCatalogProductImages(visibleProducts).then((images) => {
+      if (!cancelled) setProductImages(images);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [visibleProducts]);
 
   function resetMessages() { setError(null); setMessage(null); }
   function openNewStone() { resetMessages(); setStoneDraft(EMPTY_STONE); setEditor("stone"); }
