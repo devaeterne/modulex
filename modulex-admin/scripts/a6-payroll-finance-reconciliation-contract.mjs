@@ -34,9 +34,10 @@ for (const fn of [
 
 expect(sql.includes("t.status = 'posted'"), "Settlement must derive from posted Finance history only");
 expect(sql.includes("t.transaction_kind in ('employee_payment','reversal')"), "Settlement must be reversal-aware");
+expect(sql.includes("old.status = 'posted' and new.status = 'voided' and new.transaction_kind = 'employee_payment'"), "Voiding a posted employee payment must recompute Payroll settlement");
 expect(sql.includes("v_is_fully_settled := v_paid_amount >= v_item.net_pay"), "HR effects must wait for full payroll settlement");
 expect(sql.includes("if not v_was_fully_settled and v_is_fully_settled then"), "Reconciliation must apply effects only on transition to fully settled");
-expect(sql.includes("elsif v_was_fully_settled and not v_is_fully_settled then"), "Reconciliation must revert effects if Finance reversals reopen payroll");
+expect(sql.includes("elsif v_was_fully_settled and not v_is_fully_settled then"), "Reconciliation must revert effects if Finance corrections reopen payroll");
 expect(sql.includes("v_variable_bonus is distinct from v_item.bonus_pay"), "Bonus source totals must reconcile to the payroll snapshot");
 expect(sql.includes("v_variable_commission is distinct from v_item.commission_pay"), "Commission source totals must reconcile to the payroll snapshot");
 expect(sql.includes("v_variable_other is distinct from v_item.other_earnings"), "Other earning source totals must reconcile to the payroll snapshot");
@@ -45,7 +46,9 @@ expect(sql.includes("v_advance_total is distinct from v_item.advance_repayment")
 expect(sql.includes("effect_type = 'variable_pay'"), "Variable-pay lifecycle changes must be ledgered");
 expect(sql.includes("effect_type = 'advance_repayment'"), "Advance repayment changes must be ledgered");
 expect(sql.includes("effect_status = 'reverted'"), "Reversal must preserve an explicit reverted effect state");
-expect(sql.includes("trg_reconcile_hr_payroll_finance_after_post"), "Finance posting must invoke payroll reconciliation through a DB trigger");
+expect(sql.includes("trg_reconcile_hr_payroll_finance_after_post"), "Finance status changes must invoke payroll reconciliation through a DB trigger");
+expect(sql.includes("if p_status = 'paid' then"), "Legacy manual Payroll paid status must be blocked");
+expect(sql.includes("Payroll paid status is Finance-derived"), "Manual Payroll paid rejection must explain the Finance source of truth");
 
 for (const signature of [
   "private.get_hr_payroll_finance_paid_amount(uuid)",
