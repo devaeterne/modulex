@@ -23,9 +23,11 @@ on:
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
       - "modulex-admin/sql/a6-finance-employee-payments.sql"
+      - "modulex-admin/sql/a6-finance-expenses.sql"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - "modulex-store/supabase/migrations/20260904150000_a6_finance_employee_payments.sql"
+      - "modulex-store/supabase/migrations/20260905050000_a6_finance_expenses.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
   pull_request:
     paths:
@@ -49,9 +51,11 @@ on:
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
       - "modulex-admin/sql/a6-finance-employee-payments.sql"
+      - "modulex-admin/sql/a6-finance-expenses.sql"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - "modulex-store/supabase/migrations/20260904150000_a6_finance_employee_payments.sql"
+      - "modulex-store/supabase/migrations/20260905050000_a6_finance_expenses.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
 
 concurrency:
