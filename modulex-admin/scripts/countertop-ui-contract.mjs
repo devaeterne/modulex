@@ -40,6 +40,26 @@ assert(catalog.includes('["Sink", "Brand", "Pricing", "Status", "Actions"]'), "S
 assert(!catalog.includes('priceGroups.map((group) => <TableCell key={group.id} isHeader'), "Sink table must not render one visible header per Price Group");
 assert(catalog.includes("setCurrentPage(1)"), "Catalog filter and tab changes must be able to reset pagination");
 
+assert(
+  catalog.includes('.from("store_product_content")') &&
+    catalog.includes('.in("base_product_code"') &&
+    catalog.includes('.from("store_product_media")') &&
+    catalog.includes('.in("product_content_id"') &&
+    catalog.includes('.eq("media_type", "image")'),
+  "Countertop Catalog thumbnails must batch-load canonical Store product media without per-row queries"
+);
+assert(
+  catalog.includes("productImages") &&
+    catalog.includes("previewImage") &&
+    catalog.includes('aria-label={`View ${product.name} image`}') &&
+    catalog.includes('ariaLabel="Countertop product image preview"'),
+  "Countertop Catalog must render clickable product thumbnails with an accessible lightbox preview"
+);
+assert(
+  catalog.includes("h-12 w-12") && catalog.includes("object-contain"),
+  "Countertop Catalog thumbnails must use the same compact 48px scan pattern as Product List"
+);
+
 assert(configurator.includes('import SectionTitle from "@/components/common/SectionTitle"'), "Countertop configurator section headings must use the shared SectionTitle tone");
 assert(configurator.includes("<SectionTitle>Additional services</SectionTitle>"), "Additional services heading must use the shared dark-mode-safe SectionTitle");
 assert(!configurator.includes('<h3 className="text-sm font-semibold">Additional services</h3>'), "Countertop configurator must not render a raw unthemed Additional services heading");
