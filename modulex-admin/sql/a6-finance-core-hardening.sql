@@ -1,4 +1,5 @@
--- A6-F1 hardening: guarded draft delete, historical inactive dimensions, and executable RPC wrappers.
+-- A6-F1 hardening: guarded draft delete, historical inactive dimensions, executable RPC wrappers,
+-- and DB-authoritative attribution/allocation reconciliation.
 -- This migration intentionally does not widen authenticated access to private Finance cores.
 
 create or replace function private.validate_finance_transaction_shape()
@@ -12,6 +13,7 @@ declare
   v_destination public.finance_accounts%rowtype;
   v_category public.finance_categories%rowtype;
   v_allow_inactive_history boolean := false;
+  v_allocated_total numeric(18,4) := 0;
 begin
   new.currency_code := upper(btrim(new.currency_code));
   new.reference_no := nullif(btrim(coalesce(new.reference_no,'')), '');
@@ -89,11 +91,91 @@ begin
     end if;
   end if;
 
+  select coalesce(sum(l.allocated_amount),0)::numeric(18,4)
+  into v_allocated_total
+  from public.finance_transaction_links l
+  where l.transaction_id = new.id;
+
+  if v_allocated_total > new.amount then
+    raise exception 'Finance transaction amount cannot be lower than its allocated total.' using errcode = '23514';
+  end if;
+
   new.updated_at := now();
   new.updated_by := auth.uid();
   return new;
 end;
 $function$;
+
+create or replace function private.validate_finance_transaction_link_context()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_transaction public.finance_transactions%rowtype;
+  v_order_project uuid;
+  v_order_customer uuid;
+  v_project_customer uuid;
+  v_other_allocated numeric(18,4) := 0;
+begin
+  select * into v_transaction
+  from public.finance_transactions
+  where id = new.transaction_id;
+
+  if v_transaction.id is null then
+    raise exception 'Finance transaction not found.' using errcode = '23503';
+  end if;
+
+  if new.order_id is not null then
+    select o.project_id, o.customer_id
+    into v_order_project, v_order_customer
+    from public.customer_orders o
+    where o.id = new.order_id;
+
+    if not found then
+      raise exception 'Finance attribution Order not found.' using errcode = '23503';
+    end if;
+    if new.project_id is not null and v_order_project is distinct from new.project_id then
+      raise exception 'Finance Order/Project attribution does not match.' using errcode = '23514';
+    end if;
+    if new.customer_id is not null and v_order_customer is distinct from new.customer_id then
+      raise exception 'Finance Order/Customer attribution does not match.' using errcode = '23514';
+    end if;
+  end if;
+
+  if new.project_id is not null then
+    select p.customer_id
+    into v_project_customer
+    from public.customer_projects p
+    where p.id = new.project_id;
+
+    if not found then
+      raise exception 'Finance attribution Project not found.' using errcode = '23503';
+    end if;
+    if new.customer_id is not null and v_project_customer is distinct from new.customer_id then
+      raise exception 'Finance Project/Customer attribution does not match.' using errcode = '23514';
+    end if;
+  end if;
+
+  select coalesce(sum(l.allocated_amount),0)::numeric(18,4)
+  into v_other_allocated
+  from public.finance_transaction_links l
+  where l.transaction_id = new.transaction_id
+    and l.id is distinct from new.id;
+
+  if v_other_allocated + new.allocated_amount > v_transaction.amount then
+    raise exception 'Finance allocated_amount total cannot exceed transaction amount.' using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$function$;
+
+drop trigger if exists trg_validate_finance_transaction_link_context on public.finance_transaction_links;
+create trigger trg_validate_finance_transaction_link_context
+before insert or update on public.finance_transaction_links
+for each row execute function private.validate_finance_transaction_link_context();
 
 create or replace function private.guard_finance_append_only()
 returns trigger
@@ -320,6 +402,7 @@ $function$;
 
 revoke all on function private.delete_finance_transaction_draft(uuid) from public,anon,authenticated;
 revoke all on function private.validate_finance_transaction_shape() from public,anon,authenticated;
+revoke all on function private.validate_finance_transaction_link_context() from public,anon,authenticated;
 revoke all on function private.guard_finance_append_only() from public,anon,authenticated;
 
 revoke all on function public.create_finance_account(text,text,text,text,text,text) from public,anon;
