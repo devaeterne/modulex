@@ -11,6 +11,7 @@ const routes = [
   ["src/app/(admin)/settings/general/email/page.tsx", "/settings/general/email", "settings.view"],
   ["src/app/(admin)/settings/general/notifications/page.tsx", "/settings/general/notifications", "settings.view"],
   ["src/app/(admin)/settings/general/email-notifications/page.tsx", "/settings/general/email-notifications", "settings.view"],
+  ["src/app/(admin)/settings/general/project-participant-roles/page.tsx", "/settings/general/project-participant-roles", "settings.view"],
 ];
 const sidebar = read("src/layout/AppSidebar.tsx");
 for (const [file, route, permission] of routes) {
@@ -26,6 +27,7 @@ const overview = read("src/components/settings/GeneralSettingsOverview.tsx");
 expect(overview.includes("ComponentCard"), "General Settings overview must use the shared ComponentCard for its page-intro surface");
 expect(!overview.includes("<section"), "General Settings overview must not reimplement the shared page-intro card surface");
 expect(overview.includes('<nav aria-label="General settings sections"'), "General Settings section links must remain an explicit navigation landmark");
+expect(overview.includes("Project Participant Roles"), "General Settings overview must link to Project Participant Roles");
 const sources = [...collect("src/components/settings"), ...routes.map(([file]) => read(file))].join("\n");
 expect(sources.includes("dark:"), "General Settings surfaces must support dark mode");
 expect(/\b(sm|md|lg|xl):/.test(sources) || sources.includes("overflow-x-auto"), "General Settings surfaces need responsive behavior");
