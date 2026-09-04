@@ -6,6 +6,7 @@ import ComponentCard from "@/components/common/ComponentCard";
 import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
 import ProjectFinanceTab from "@/components/customers/project-detail/ProjectFinanceTab";
 import ProjectFulfillmentTab from "@/components/customers/project-detail/ProjectFulfillmentTab";
+import ProjectProcurementTab from "@/components/customers/project-detail/ProjectProcurementTab";
 import ProjectPendingDomainTab from "@/components/customers/project-detail/ProjectPendingDomainTab";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
@@ -130,6 +131,10 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   const [canViewProjectFinancials, setCanViewProjectFinancials] = useState(false);
   const [canViewProjectPayments, setCanViewProjectPayments] = useState(false);
   const [canManageProjectPayments, setCanManageProjectPayments] = useState(false);
+  const [canViewProcurement, setCanViewProcurement] = useState(false);
+  const [canViewProcurementDetails, setCanViewProcurementDetails] = useState(false);
+  const [canManageProcurement, setCanManageProcurement] = useState(false);
+  const [canManageProcurementInvoices, setCanManageProcurementInvoices] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
@@ -196,6 +201,19 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
 
       const nextCanManageProjects = Boolean(profile && hasPermission(profile.roles, "projects.manage"));
       const nextCanViewProjectFinancials = Boolean(profile && hasPermission(profile.roles, "pricing.cost.view"));
+      const nextCanViewProcurement = Boolean(profile && hasPermission(profile.roles, "project_procurement.view"));
+      const nextCanManageProcurement = Boolean(profile && hasPermission(profile.roles, "project_procurement.manage"));
+      const nextCanManageProcurementInvoices = Boolean(
+        profile && (
+          hasPermission(profile.roles, "project_procurement.manage") ||
+          hasPermission(profile.roles, "finance.manage")
+        )
+      );
+      const nextCanViewProcurementDetails = Boolean(
+        profile &&
+        hasPermission(profile.roles, "project_procurement.view") &&
+        hasPermission(profile.roles, "pricing.cost.view")
+      );
       let nextProfiles: ProfileOption[] = [];
       if (nextCanManageProjects) {
         const profilesResult = await supabase
@@ -213,6 +231,10 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       setCanViewProjectFinancials(nextCanViewProjectFinancials);
       setCanViewProjectPayments(Boolean(profile && hasPermission(profile.roles, "project_payments.view")));
       setCanManageProjectPayments(Boolean(profile && hasPermission(profile.roles, "project_payments.manage")));
+      setCanViewProcurement(nextCanViewProcurement);
+      setCanViewProcurementDetails(nextCanViewProcurementDetails);
+      setCanManageProcurement(nextCanManageProcurement);
+      setCanManageProcurementInvoices(nextCanManageProcurementInvoices);
       setStandaloneOrders((ordersResult.data ?? []) as StandaloneOrder[]);
       setProjectActivity((activityResult.data ?? []) as ProjectStatusHistory[]);
       setProjectProfiles(nextProfiles);
@@ -451,9 +473,12 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       ) : null}
 
       {activeTab === "Procurement" ? (
-        <ProjectPendingDomainTab
-          title="Procurement"
-          description="Vendor order, expected delivery and purchase-price tracking will be connected in PB-3B without inventing placeholder procurement records."
+        <ProjectProcurementTab
+          projectId={project.id}
+          canViewProcurement={canViewProcurement}
+          canViewDetails={canViewProcurementDetails}
+          canManageProcurement={canManageProcurement}
+          canManageInvoices={canManageProcurementInvoices}
         />
       ) : null}
 
