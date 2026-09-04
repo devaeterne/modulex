@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
@@ -25,7 +26,11 @@ import {
   type ProjectParticipantRoleAdminRow,
 } from "@/lib/customers/project-participant-role-admin";
 
+const PARTICIPANT_ROLE_SETTINGS_PATH = "/settings/general/project-participant-roles";
+
 export default function ProjectParticipantRoleManager() {
+  const pathname = usePathname();
+  const isSettingsRoute = pathname === PARTICIPANT_ROLE_SETTINGS_PATH;
   const [canConfigure, setCanConfigure] = useState(false);
   const [roles, setRoles] = useState<ProjectParticipantRoleAdminRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +45,11 @@ export default function ProjectParticipantRoleManager() {
     setLoading(true);
     setError(null);
     try {
+      if (!isSettingsRoute) {
+        setCanConfigure(false);
+        setRoles([]);
+        return;
+      }
       const allowed = await canConfigureProjectParticipantRoles();
       setCanConfigure(allowed);
       if (!allowed) {
@@ -52,7 +62,7 @@ export default function ProjectParticipantRoleManager() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isSettingsRoute]);
 
   useEffect(() => {
     void load();
@@ -84,13 +94,14 @@ export default function ProjectParticipantRoleManager() {
     setMessage(null);
   }
 
+  if (!isSettingsRoute) return null;
   if (loading && !canConfigure) return null;
   if (!canConfigure) return null;
 
   return (
     <ComponentCard
-      title="Participant Roles"
-      desc="Configure Project participant roles. Structural roles such as Sales Rep remain required and cannot be deactivated."
+      title="Project Participant Roles"
+      desc="Configure reusable Project participant roles. Structural roles such as Sales Rep remain required and cannot be deactivated."
     >
       <div className="space-y-4">
         {error ? <div role="alert"><Alert variant="error" title="Participant role action failed" message={error} /></div> : null}
