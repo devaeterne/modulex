@@ -65,6 +65,20 @@ for (const token of [
 assert.doesNotMatch(ops, /insert\s+into\s+public\.inventory_movements/i);
 
 assert.equal(exists(adapter), true, "Project Procurement adapter must exist");
+const adapterSource = read(adapter);
+for (const token of [
+  "loadProjectProcurement",
+  "loadProjectProcurementStatus",
+  "resolveProjectProcurementVendor",
+  "createProjectProcurementCommitment",
+  "confirmProjectProcurementCommitment",
+  "cancelProjectProcurementCommitment",
+  "recordProjectProcurementDelivery",
+  "correctProjectProcurementDelivery",
+  "recordProjectProcurementInvoice",
+  "reverseProjectProcurementInvoiceAllocation",
+]) assert.match(adapterSource, new RegExp(token));
+
 assert.equal(exists(component), true, "Project Procurement tab must exist");
 
 const permissionSource = read(permissions);
