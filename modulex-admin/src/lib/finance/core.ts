@@ -90,6 +90,25 @@ export type FinanceOverview = {
   }>;
 };
 
+export type FinanceEmployeeOption = {
+  employee_id: string;
+  employee_number: string;
+  full_name: string;
+  employment_status: string;
+};
+
+export type FinancePayrollItemOption = {
+  payroll_item_id: string;
+  payroll_run_id: string;
+  period_code: string;
+  pay_date: string;
+  run_status: string;
+  net_pay: number;
+  paid_amount: number;
+  remaining_amount: number;
+  payment_status: "unpaid" | "partial" | "paid";
+};
+
 export type FinanceTransactionLinkInput = {
   project_id?: string | null;
   order_id?: string | null;
@@ -146,6 +165,20 @@ export async function getFinanceFxRates(limit = 100) {
   const { data, error } = await supabase.rpc("get_finance_fx_rates", { p_limit: limit });
   if (error) throw normalizeRpcError(error);
   return (data ?? []) as FinanceFxRate[];
+}
+
+export async function getFinanceEmployeeDirectory() {
+  const { data, error } = await supabase.rpc("get_finance_employee_directory");
+  if (error) throw normalizeRpcError(error);
+  return (data ?? []) as FinanceEmployeeOption[];
+}
+
+export async function getFinanceEmployeePayrollItems(employeeId: string) {
+  const { data, error } = await supabase.rpc("get_finance_employee_payroll_items", {
+    p_employee_id: employeeId,
+  });
+  if (error) throw normalizeRpcError(error);
+  return (data ?? []) as FinancePayrollItemOption[];
 }
 
 export async function getFinanceTransactionsPage(options?: {
