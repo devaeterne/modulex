@@ -27,7 +27,7 @@ type RawCommissionEvent = {
 async function requireCommissionView() {
   const { profile, error } = await getCurrentProfile();
   if (error) throw error;
-  if (!profile || !profile.roles.some((role) => ["super_admin", "admin", "finance", "sales"].includes(role))) {
+  if (!profile || !profile.roles.some((role) => ["super_admin", "admin", "finance"].includes(role))) {
     throw new Error("You do not have permission to view Project commission events.");
   }
 }
