@@ -11,6 +11,7 @@ on:
       - "modulex-admin/scripts/admin-ui-contract.mjs"
       - "modulex-admin/scripts/admin-ui-strict-contract.mjs"
       - "modulex-admin/scripts/admin-ui-strict-contract.test.mjs"
+      - "modulex-admin/scripts/ci-workflow-architecture-contract.mjs"
       - "modulex-admin/scripts/countertop-ui-contract.mjs"
       - "modulex-admin/scripts/countertop-domain-contract.mjs"
       - "modulex-admin/scripts/countertop-material-band-selection-contract.mjs"
@@ -36,6 +37,7 @@ on:
       - "modulex-admin/scripts/admin-ui-contract.mjs"
       - "modulex-admin/scripts/admin-ui-strict-contract.mjs"
       - "modulex-admin/scripts/admin-ui-strict-contract.test.mjs"
+      - "modulex-admin/scripts/ci-workflow-architecture-contract.mjs"
       - "modulex-admin/scripts/countertop-ui-contract.mjs"
       - "modulex-admin/scripts/countertop-domain-contract.mjs"
       - "modulex-admin/scripts/countertop-material-band-selection-contract.mjs"
@@ -75,6 +77,8 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
+      - name: CI workflow architecture contract
+        run: npm run smoke:ci-workflow-architecture
       - name: API timing contract
         run: npm run smoke:api-timing
       - name: Admin UI strict self-test
