@@ -37,4 +37,8 @@ expect(directory.includes('grid grid-cols-2 gap-3 md:grid-cols-4'), "Customer su
 expect(!directory.includes('<div className="p-5 sm:p-6">'), "Customer directory must not add a second padded shell inside ComponentCard");
 expect(directory.includes('className="w-full sm:w-36"'), "Customer pagination page-size control must stay compact on desktop");
 
+const customerPage = read("src/app/(admin)/customers/page.tsx");
+expect(customerPage.includes('ADMIN_TEXT_STYLES'), "Customer directory route must use shared admin text tokens for light/dark contrast");
+expect(customerPage.includes('className={ADMIN_TEXT_STYLES.body}'), "Customer directory content must inherit the shared body text token so standalone summary and pagination text stays readable in dark mode");
+
 console.log("customers UI contract: ok");
