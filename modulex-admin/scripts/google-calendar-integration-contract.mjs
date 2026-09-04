@@ -8,17 +8,29 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 async function source(relativePath) {
   try {
     return await readFile(path.join(root, relativePath), "utf8");
-  } catch (error) {
+  } catch {
     assert.fail(`Required Google Calendar integration file is missing: ${relativePath}`);
   }
 }
 
-const [configSource, cryptoSource, templateSource, authSource, envSource] = await Promise.all([
+const migrationPath = "../modulex-store/supabase/migrations/20260905170000_google_calendar_project_integration.sql";
+
+const [
+  configSource,
+  cryptoSource,
+  templateSource,
+  authSource,
+  envSource,
+  canonicalSql,
+  migrationSql,
+] = await Promise.all([
   source("src/lib/google-calendar/config.ts"),
   source("src/lib/google-calendar/crypto.ts"),
   source("src/lib/google-calendar/template.ts"),
   source("src/lib/auth/admin-api.ts"),
   source(".env.example"),
+  source("sql/google-calendar-project-integration.sql"),
+  source(migrationPath),
 ]);
 
 assert.match(configSource, /GOOGLE_CALENDAR_CLIENT_ID/);
@@ -38,4 +50,26 @@ assert.match(envSource, /GOOGLE_CALENDAR_CLIENT_SECRET=/);
 assert.match(envSource, /GOOGLE_CALENDAR_REDIRECT_URI=/);
 assert.match(envSource, /GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY=/);
 
-console.log("Google Calendar integration foundation contract passed.");
+for (const sql of [canonicalSql, migrationSql]) {
+  assert.match(sql, /create table if not exists public\.calendar_integration_credentials/i);
+  assert.match(sql, /create table if not exists public\.calendar_integration_settings/i);
+  assert.match(sql, /create table if not exists public\.calendar_oauth_states/i);
+  assert.match(sql, /create table if not exists public\.project_calendar_bindings/i);
+  assert.match(sql, /create table if not exists public\.project_calendar_event_links/i);
+  assert.match(sql, /project_id uuid not null references public\.customer_projects\(id\)/i);
+  assert.match(sql, /constraint calendar_integration_credentials_singleton check \(id = 1\)/i);
+  assert.match(sql, /constraint calendar_integration_settings_singleton check \(id = 1\)/i);
+  assert.match(sql, /unique \(project_id\)/i);
+  assert.match(sql, /unique \(project_calendar_binding_id, source_type, source_id\)/i);
+  assert.match(sql, /calendar_event_link_source_integrity/i);
+  assert.match(sql, /revoke all on public\.calendar_integration_credentials from anon, authenticated/i);
+  assert.match(sql, /revoke all on public\.calendar_oauth_states from anon, authenticated/i);
+  assert.match(sql, /grant all on public\.calendar_integration_credentials to service_role/i);
+  assert.match(sql, /grant all on public\.calendar_oauth_states to service_role/i);
+  assert.match(sql, /alter table public\.calendar_integration_credentials enable row level security/i);
+  assert.match(sql, /alter table public\.project_calendar_event_links enable row level security/i);
+}
+
+assert.equal(canonicalSql.trim(), migrationSql.trim(), "Canonical SQL and migration must stay mirrored exactly.");
+
+console.log("Google Calendar integration foundation and persistence contract passed.");
