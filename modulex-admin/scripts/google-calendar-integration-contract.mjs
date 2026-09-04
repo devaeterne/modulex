@@ -16,21 +16,10 @@ async function source(relativePath) {
 const migrationPath = "../modulex-store/supabase/migrations/20260905170000_google_calendar_project_integration.sql";
 
 const [
-  configSource,
-  cryptoSource,
-  templateSource,
-  authSource,
-  envSource,
-  canonicalSql,
-  migrationSql,
-  repositorySource,
-  oauthSource,
-  calendarSource,
-  accessSource,
-  oauthStartRoute,
-  oauthCallbackRoute,
-  statusRoute,
-  connectionRoute,
+  configSource, cryptoSource, templateSource, authSource, envSource,
+  canonicalSql, migrationSql, repositorySource, oauthSource, calendarSource,
+  accessSource, oauthStartRoute, oauthCallbackRoute, statusRoute, connectionRoute,
+  settingsPage, settingsComponent, integrationLink, generalSettingsPage, authFetchSource,
 ] = await Promise.all([
   source("src/lib/google-calendar/config.ts"),
   source("src/lib/google-calendar/crypto.ts"),
@@ -47,6 +36,11 @@ const [
   source("src/app/api/admin/google-calendar/oauth/callback/route.ts"),
   source("src/app/api/admin/google-calendar/status/route.ts"),
   source("src/app/api/admin/google-calendar/connection/route.ts"),
+  source("src/app/(admin)/settings/integrations/google-calendar/page.tsx"),
+  source("src/components/settings/GoogleCalendarSettings.tsx"),
+  source("src/components/settings/GoogleCalendarIntegrationLink.tsx"),
+  source("src/app/(admin)/settings/general/page.tsx"),
+  source("src/lib/auth/authenticated-fetch.ts"),
 ]);
 
 assert.match(configSource, /GOOGLE_CALENDAR_CLIENT_ID/);
@@ -85,7 +79,6 @@ for (const sql of [canonicalSql, migrationSql]) {
   assert.match(sql, /alter table public\.calendar_integration_credentials enable row level security/i);
   assert.match(sql, /alter table public\.project_calendar_event_links enable row level security/i);
 }
-
 assert.equal(canonicalSql.trim(), migrationSql.trim(), "Canonical SQL and migration must stay mirrored exactly.");
 
 assert.match(repositorySource, /getCalendarIntegrationSettings/);
@@ -151,10 +144,30 @@ assert.match(statusRoute, /sync_measurements: false/);
 assert.match(statusRoute, /sync_customer_appointments: false/);
 assert.match(statusRoute, /withApiTiming/);
 assert.doesNotMatch(statusRoute, /encrypted_refresh_token/);
-
 assert.match(connectionRoute, /requirePermission\(request, "settings\.manage"\)/);
 assert.match(connectionRoute, /revokeGoogleRefreshToken/);
 assert.match(connectionRoute, /retireGoogleCredential/);
 assert.match(connectionRoute, /withApiTiming/);
 
-console.log("Google Calendar integration foundation, persistence, server-boundary, and OAuth API contract passed.");
+assert.match(authFetchSource, /supabase\.auth\.getSession/);
+assert.match(authFetchSource, /Authorization: `Bearer \$\{token\}`/);
+assert.match(settingsPage, /PageBreadcrumb/);
+assert.match(settingsPage, /GoogleCalendarSettings/);
+assert.match(settingsComponent, /ComponentCard/);
+assert.match(settingsComponent, /Checkbox/);
+assert.match(settingsComponent, /Input/);
+assert.match(settingsComponent, /Button/);
+assert.match(settingsComponent, /Badge/);
+assert.match(settingsComponent, /Alert/);
+assert.match(settingsComponent, /\/api\/admin\/google-calendar\/status/);
+assert.match(settingsComponent, /\/api\/admin\/google-calendar\/oauth\/start/);
+assert.match(settingsComponent, /\/api\/admin\/google-calendar\/connection/);
+assert.match(settingsComponent, /Delivery.*not available|Delivery.*unavailable/is);
+assert.match(settingsComponent, /Measurement.*not available|Measurement.*unavailable/is);
+assert.match(settingsComponent, /Customer appointment.*not available|Customer appointment.*unavailable/is);
+assert.doesNotMatch(settingsComponent, /<(button|input|select|textarea|label)\b/i);
+assert.doesNotMatch(settingsComponent, /(GOOGLE_CALENDAR_CLIENT_SECRET|GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY|encrypted_refresh_token)/);
+assert.match(integrationLink, /\/settings\/integrations\/google-calendar/);
+assert.match(generalSettingsPage, /GoogleCalendarIntegrationLink/);
+
+console.log("Google Calendar integration foundation, persistence, APIs, and Admin settings UI contract passed.");
