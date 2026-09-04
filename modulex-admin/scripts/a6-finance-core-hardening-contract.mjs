@@ -85,3 +85,5 @@ expect(manager.includes('transaction.status === "draft"'), "Finance Transactions
 expect(manager.includes("Delete Draft"), "Finance Transactions UI must label the destructive draft action clearly");
 
 console.log("A6-F1 Finance Core hardening contract passed.");
+
+await import("./a6-finance-employee-payments-contract.mjs");
