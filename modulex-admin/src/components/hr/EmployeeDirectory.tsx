@@ -128,7 +128,7 @@ function paymentMoney(value: number, currency: string) {
 function employeeStatusColor(status: EmploymentStatus) {
   if (status === "active") return "success" as const;
   if (status === "terminated") return "error" as const;
-  if (status === "leave") return "warning" as const;
+  if (status === "on_leave") return "warning" as const;
   return "primary" as const;
 }
 
