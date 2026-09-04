@@ -89,3 +89,5 @@ expect(employees.includes("Payments"), "Employee Directory must expose Payments 
 expect(employees.includes("Finance payment history"), "Employee payment history must be identified as a Finance projection");
 
 console.log("A6 Finance Employee Payments contract passed.");
+
+await import("./a6-payroll-finance-reconciliation-contract.mjs");
