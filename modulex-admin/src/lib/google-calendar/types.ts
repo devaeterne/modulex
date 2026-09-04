@@ -1,5 +1,5 @@
 export type GoogleCalendarConnectionStatus = "connected" | "disconnected" | "error";
-export type GoogleCalendarSyncStatus = "pending" | "synced" | "error" | "skipped";
+export type GoogleCalendarSyncStatus = "pending" | "synced" | "error" | "skipped" | "cancelled";
 
 export type GoogleCalendarIntegrationSettings = {
   enabled: boolean;
