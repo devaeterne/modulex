@@ -60,39 +60,58 @@ const Select: React.FC<SelectProps> = ({
     : error
       ? ADMIN_FIELD_STATES.error
       : ADMIN_FIELD_STATES.default;
+  const placeholderClass = effectiveValue ? "" : "text-gray-400 dark:text-white/30";
+  const chevronClass = disabled
+    ? "text-gray-400 opacity-60 dark:text-gray-500"
+    : "text-gray-500 dark:text-gray-400";
 
   return (
-    <select
-      id={id}
-      name={name}
-      className={`${ADMIN_FIELD_BASE} ${stateClass} ${ADMIN_FOCUS_RING} ${ADMIN_CONTROL_DISABLED} pr-11 data-[placeholder=true]:text-gray-400 dark:data-[placeholder=true]:text-gray-400 ${className}`}
-      value={effectiveValue}
-      onChange={handleChange}
-      onBlur={onBlur}
-      disabled={disabled}
-      required={required}
-      aria-label={ariaLabel}
-      aria-describedby={ariaDescribedBy}
-      aria-invalid={error || undefined}
-      data-placeholder={effectiveValue ? undefined : "true"}
-    >
-      <option
-        value=""
-        disabled={!allowEmpty}
-        className="bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+    <div className="relative">
+      <select
+        id={id}
+        name={name}
+        className={`${ADMIN_FIELD_BASE} ${stateClass} ${ADMIN_FOCUS_RING} ${ADMIN_CONTROL_DISABLED} ${placeholderClass} pr-11 ${className}`}
+        value={effectiveValue}
+        onChange={handleChange}
+        onBlur={onBlur}
+        disabled={disabled}
+        required={required}
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={error || undefined}
       >
-        {placeholder}
-      </option>
-      {options.map((option) => (
         <option
-          key={option.value}
-          value={option.value}
-          className="bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+          value=""
+          disabled={!allowEmpty}
+          className="bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-400"
         >
-          {option.label}
+          {placeholder}
         </option>
-      ))}
-    </select>
+        {options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-white text-gray-800 dark:bg-gray-900 dark:text-white/90"
+          >
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        fill="none"
+        className={`pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 ${chevronClass}`}
+      >
+        <path
+          d="m6 8 4 4 4-4"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
   );
 };
 
