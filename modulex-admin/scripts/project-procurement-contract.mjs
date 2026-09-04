@@ -19,6 +19,25 @@ assert.equal(exists(operationsMigration), true, "PB-3B operations migration must
 assert.equal(exists(adapter), true, "Project Procurement adapter must exist");
 assert.equal(exists(component), true, "Project Procurement tab must exist");
 
+const core = read(coreMigration);
+for (const token of [
+  "customer_project_procurement_requirements",
+  "customer_project_procurement_commitments",
+  "customer_project_procurement_delivery_events",
+  "vendor_invoices",
+  "customer_project_procurement_invoice_allocations",
+  "customer_project_procurement_events",
+  "get_customer_order_procurement_components",
+  "resolve_customer_project_procurement_vendor",
+  "get_customer_project_procurement_cost",
+  "sync_customer_order_procurement",
+  "countertop_stone",
+  "countertop_sink",
+]) assert.match(core, new RegExp(token));
+assert.match(core, /slab_quantity/);
+assert.match(core, /source_kind/);
+assert.match(core, /is_current/);
+
 const permissionSource = read(permissions);
 assert.match(permissionSource, /project_procurement\.view/);
 assert.match(permissionSource, /project_procurement\.manage/);
