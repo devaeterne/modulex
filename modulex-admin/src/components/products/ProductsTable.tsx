@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
@@ -17,7 +16,7 @@ import Button from "@/components/ui/button/Button";
 import { Dropdown } from "@/components/ui/dropdown/Dropdown";
 import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { Modal } from "@/components/ui/modal";
-import { ADMIN_FOCUS_RING } from "@/components/ui/theme/adminTheme";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   Table,
   TableBody,
@@ -696,7 +695,7 @@ export default function ProductsTable() {
             </form>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button variant="outline" size="sm" onClick={() => void exportProductsCsv()} disabled={isExporting}>{isExporting ? "Exporting..." : "Export CSV"}</Button>
-              {canManage ? <Link href="/products/new" className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-3 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Add Product</Link> : null}
+              {canManage ? <Button size="sm" onClick={() => router.push("/products/new")}>Add Product</Button> : null}
             </div>
           </div>
 
@@ -726,19 +725,20 @@ export default function ProductsTable() {
           {errorMessage ? <div role="alert" className="space-y-3"><Alert variant="error" title="Product list error" message={errorMessage} /><Button variant="outline" size="sm" onClick={() => void loadProducts()}>Try again</Button></div> : null}
 
           <TableViewport>
-            <Table variant="admin" className="min-w-[1280px]">
+            <Table variant="admin" minWidth="wide">
               <TableHeader variant="admin"><TableRow>{["Product", "Type", "Brand / Category", "Variant / Stone", "UOM", "On Hand / Reserved / Available", "QR", "Status"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}{canManage ? <TableCell isHeader variant="admin" className="text-right">Actions</TableCell> : null}</TableRow></TableHeader>
               <TableBody variant="admin">
                 {isLoading ? <TableRow><TableCell variant="admin" colSpan={columnCount} className="py-10 text-center">Loading products...</TableCell></TableRow> : products.length === 0 ? <TableRow><TableCell variant="admin" colSpan={columnCount} className="py-10 text-center">No products found for the selected filters.</TableCell></TableRow> : products.map((product) => {
                   const isActionLoading = actionLoadingId === product.product_id;
                   const productImage = productImages[product.product_id];
-                  return <TableRow key={product.product_id} className="transition hover:bg-gray-50 dark:hover:bg-white/[0.03]">
+                  return <TableRow key={product.product_id}>
                     <TableCell variant="admin">
                       <div className="flex min-w-[260px] items-center gap-3">
                         {productImage ? (
-                          <button
-                            type="button"
-                            className={`${ADMIN_FOCUS_RING} block shrink-0`}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-12 w-12 shrink-0 p-0"
                             aria-label={`View ${product.product_name} image`}
                             onClick={() => setPreviewImage(productImage)}
                           >
@@ -746,16 +746,16 @@ export default function ProductsTable() {
                             <img
                               src={productImage.url}
                               alt={productImage.alt}
-                              className="h-12 w-12 rounded-lg border border-gray-200 bg-white object-contain dark:border-gray-800 dark:bg-gray-900"
+                              className="h-12 w-12 object-contain"
                               loading="lazy"
                             />
-                          </button>
+                          </Button>
                         ) : (
-                          <div aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-xs text-gray-400 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-500">—</div>
+                          <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center text-xs">—</span>
                         )}
                         <div className="min-w-0">
-                          <p className="font-medium text-gray-800 dark:text-white/90">{product.product_name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</p>
+                          <p className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{product.product_name}</p>
+                          <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</p>
                         </div>
                       </div>
                     </TableCell>
@@ -784,8 +784,8 @@ export default function ProductsTable() {
           </TableViewport>
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <p aria-live="polite" className="text-sm text-gray-500 dark:text-gray-400">Showing <span className="font-medium text-gray-700 dark:text-gray-300">{startRow}–{endRow}</span> of <span className="font-medium text-gray-700 dark:text-gray-300">{totalCount}</span> products</p>
-            <nav aria-label="Product list pagination" className="flex flex-wrap items-center gap-2"><Button variant="outline" size="sm" disabled={currentPage <= 1 || isLoading} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</Button>{pageNumbers.map((page) => <span key={page} aria-current={currentPage === page ? "page" : undefined}><Button variant={currentPage === page ? "primary" : "outline"} size="sm" disabled={isLoading} onClick={() => setCurrentPage(page)}>{page}</Button></span>)}<Button variant="outline" size="sm" disabled={currentPage >= totalPages || isLoading} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</Button><span className="text-xs text-gray-500 dark:text-gray-400">Page {currentPage} of {totalPages}</span></nav>
+            <p aria-live="polite" className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Showing <span className={`font-medium ${ADMIN_TEXT_STYLES.body}`}>{startRow}–{endRow}</span> of <span className={`font-medium ${ADMIN_TEXT_STYLES.body}`}>{totalCount}</span> products</p>
+            <nav aria-label="Product list pagination" className="flex flex-wrap items-center gap-2"><Button variant="outline" size="sm" disabled={currentPage <= 1 || isLoading} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</Button>{pageNumbers.map((page) => <span key={page} aria-current={currentPage === page ? "page" : undefined}><Button variant={currentPage === page ? "primary" : "outline"} size="sm" disabled={isLoading} onClick={() => setCurrentPage(page)}>{page}</Button></span>)}<Button variant="outline" size="sm" disabled={currentPage >= totalPages || isLoading} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</Button><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Page {currentPage} of {totalPages}</span></nav>
           </div>
         </ComponentCard>
       </div>
@@ -809,7 +809,7 @@ export default function ProductsTable() {
       </Modal>
 
       <Modal isOpen={Boolean(archiveTarget)} onClose={closeArchiveModal} showCloseButton={false} className="max-w-md p-6">
-        {archiveTarget ? <div role="dialog" aria-modal="true" aria-labelledby="archive-product-title" aria-describedby="archive-product-description"><h4 id="archive-product-title" className="text-lg font-semibold text-gray-900 dark:text-white">Archive product?</h4><p id="archive-product-description" className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">{archiveTarget.sku} will be archived. On-hand and reserved stock must be zero; archived status is terminal.</p><div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><span ref={archiveCancelRef}><Button variant="outline" size="sm" disabled={actionLoadingId === archiveTarget.product_id} onClick={closeArchiveModal}>Cancel</Button></span><Button size="sm" disabled={actionLoadingId === archiveTarget.product_id} onClick={() => void confirmArchiveProduct()}>{actionLoadingId === archiveTarget.product_id ? "Archiving..." : "Archive product"}</Button></div></div> : null}
+        {archiveTarget ? <div role="dialog" aria-modal="true" aria-labelledby="archive-product-title" aria-describedby="archive-product-description"><h4 id="archive-product-title" className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Archive product?</h4><p id="archive-product-description" className={`mt-2 text-sm leading-6 ${ADMIN_TEXT_STYLES.body}`}>{archiveTarget.sku} will be archived. On-hand and reserved stock must be zero; archived status is terminal.</p><div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><span ref={archiveCancelRef}><Button variant="outline" size="sm" disabled={actionLoadingId === archiveTarget.product_id} onClick={closeArchiveModal}>Cancel</Button></span><Button size="sm" disabled={actionLoadingId === archiveTarget.product_id} onClick={() => void confirmArchiveProduct()}>{actionLoadingId === archiveTarget.product_id ? "Archiving..." : "Archive product"}</Button></div></div> : null}
       </Modal>
     </>
   );
