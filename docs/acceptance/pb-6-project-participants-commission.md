@@ -97,17 +97,17 @@ The Project projection does not invent FX conversion. If posted payout links exi
 | --- | --- | --- | --- | --- | --- |
 | Super Admin / Admin | full read | full read | full read | visible | participant + role + commission manage |
 | Finance | read | full read | full read | visible | commission manage |
-| Sales | read | own obligations only | own history only | restricted | none |
+| Sales | no internal PB-6 surface | none | none | none | none |
 | HR / Warehouse / Shipping | no PB-6 surface | none | none | none | none |
 | anon / Store / Portal | none | none | none | none | none |
 
-Sales own-commission visibility resolves through canonical participant identity: `profile_id = auth.uid()` or `hr_employees.user_id = auth.uid()`. Historical own obligations remain visible after participation ends.
+Sales does not receive the internal Participants & Commission ledger. A later personal, summary-only projection may expose only the individual final receivable after Project completion; that projection is intentionally separate from the internal ledger.
 
 RLS is enabled on PB-6 tables. PUBLIC RPC execution is revoked and authenticated execution is explicitly granted only to guarded RPCs. Private PB-6 helper functions also have PUBLIC execution revoked.
 
 ## Admin surface
 
-Project Detail renders `ProjectParticipantsCommissionPanel` plus Admin-only `ProjectParticipantRoleManager` using shared Modulex Admin primitives and appearance tokens.
+Project Detail exposes a `Participants & Commission` tab using shared Modulex Admin primitives and appearance tokens. The tab is visible only to Finance, Admin, and Super Admin; participant-role configuration remains Admin/Super Admin-only inside that tab.
 
 The surface provides:
 
@@ -120,8 +120,8 @@ The surface provides:
 - commission event history;
 - explicit earned / approved / cancelled / adjustment / offset / reversal actions;
 - bounded reversal target selection from prior adjustment/offset events;
-- Sales own-commission privacy notice;
-- Finance payout state without exposing payout detail to Sales.
+- Finance payout state within the internal tab;
+- no Sales access to participant assignments, commission basis, event history, or payout detail.
 
 ## Repository sources
 

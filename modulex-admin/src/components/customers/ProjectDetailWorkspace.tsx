@@ -8,6 +8,8 @@ import ProjectFinanceTab from "@/components/customers/project-detail/ProjectFina
 import ProjectFulfillmentTab from "@/components/customers/project-detail/ProjectFulfillmentTab";
 import ProjectProcurementTab from "@/components/customers/project-detail/ProjectProcurementTab";
 import ProjectPendingDomainTab from "@/components/customers/project-detail/ProjectPendingDomainTab";
+import ProjectParticipantRoleManager from "@/components/customers/project-detail/ProjectParticipantRoleManager";
+import ProjectParticipantsCommissionPanel from "@/components/customers/project-detail/ProjectParticipantsCommissionPanel";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
 import Input from "@/components/form/input/InputField";
@@ -48,7 +50,7 @@ type ProjectStatusHistory = {
 };
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
 
-const PROJECT_TABS = ["Overview", "Orders", "Finance", "Procurement", "Fulfillment", "Documents", "Activity"] as const;
+const PROJECT_TABS = ["Overview", "Orders", "Finance", "Participants & Commission", "Procurement", "Fulfillment", "Documents", "Activity"] as const;
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const projectStatusOptions: Array<{ value: ProjectStatus; label: string }> = [
@@ -135,6 +137,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   const [canViewProcurementDetails, setCanViewProcurementDetails] = useState(false);
   const [canManageProcurement, setCanManageProcurement] = useState(false);
   const [canManageProcurementInvoices, setCanManageProcurementInvoices] = useState(false);
+  const [canViewParticipantsCommission, setCanViewParticipantsCommission] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
@@ -173,6 +176,11 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
     }
     return Array.from(totals, ([currencyCode, amount]) => ({ currencyCode, amount }));
   }, [activeOrders]);
+
+  const visibleProjectTabs = useMemo(
+    () => PROJECT_TABS.filter((tab) => tab !== "Participants & Commission" || canViewParticipantsCommission),
+    [canViewParticipantsCommission],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -214,6 +222,9 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         hasPermission(profile.roles, "project_procurement.view") &&
         hasPermission(profile.roles, "pricing.cost.view")
       );
+      const nextCanViewParticipantsCommission = Boolean(
+        profile && profile.roles.some((role) => ["super_admin", "admin", "finance"].includes(role)),
+      );
       let nextProfiles: ProfileOption[] = [];
       if (nextCanManageProjects) {
         const profilesResult = await supabase
@@ -235,6 +246,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       setCanViewProcurementDetails(nextCanViewProcurementDetails);
       setCanManageProcurement(nextCanManageProcurement);
       setCanManageProcurementInvoices(nextCanManageProcurementInvoices);
+      setCanViewParticipantsCommission(nextCanViewParticipantsCommission);
       setStandaloneOrders((ordersResult.data ?? []) as StandaloneOrder[]);
       setProjectActivity((activityResult.data ?? []) as ProjectStatusHistory[]);
       setProjectProfiles(nextProfiles);
@@ -252,10 +264,13 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
 
   useEffect(() => {
     const requestedTab = searchParams.get("tab");
-    if (requestedTab && PROJECT_TABS.includes(requestedTab as ProjectTab)) {
-      setActiveTab(requestedTab as ProjectTab);
+    if (!requestedTab || !PROJECT_TABS.includes(requestedTab as ProjectTab)) return;
+    if (requestedTab === "Participants & Commission" && !canViewParticipantsCommission) {
+      setActiveTab("Overview");
+      return;
     }
-  }, [searchParams]);
+    setActiveTab(requestedTab as ProjectTab);
+  }, [canViewParticipantsCommission, searchParams]);
 
   useEffect(() => {
     void load();
@@ -354,7 +369,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
 
       <div className="overflow-x-auto" role="tablist" aria-label="Project workspace sections">
         <div className="flex min-w-max gap-2">
-          {PROJECT_TABS.map((tab) => (
+          {visibleProjectTabs.map((tab) => (
             <Button
               key={tab}
               size="sm"
@@ -470,6 +485,13 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         ) : (
           <Alert variant="warning" title="Finance access restricted" message="You do not have permission to view Project customer collection status." />
         )
+      ) : null}
+
+      {activeTab === "Participants & Commission" && canViewParticipantsCommission ? (
+        <div className="space-y-6">
+          <ProjectParticipantsCommissionPanel projectId={project.id} />
+          <ProjectParticipantRoleManager />
+        </div>
       ) : null}
 
       {activeTab === "Procurement" ? (
