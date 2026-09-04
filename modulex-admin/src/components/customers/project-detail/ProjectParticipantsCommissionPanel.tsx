@@ -8,6 +8,7 @@ import Input from "@/components/form/input/InputField";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { ADMIN_SURFACE_CARD, ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   Table,
   TableBody,
@@ -67,8 +68,16 @@ function commissionBadge(status: ProjectCommissionObligation["status"]): BadgeCo
 }
 
 function basisLabel(commission: ProjectCommissionObligation) {
-  if (commission.basisType === "fixed") return `Fixed ${money(commission.flatAmount ?? commission.baseAmount, commission.currencyCode)}`;
+  if (commission.basisType === "fixed") {
+    return `Fixed ${money(commission.flatAmount ?? commission.baseAmount, commission.currencyCode)}`;
+  }
   return `${commission.rate ?? 0}% × ${money(commission.basisAmount ?? 0, commission.currencyCode)}`;
+}
+
+function payoutLabel(commission: ProjectCommissionObligation) {
+  if (commission.payoutCurrencyState === "restricted") return "Restricted";
+  if (commission.payoutCurrencyState === "mixed_currency") return "Mixed currency — review in Finance";
+  return money(commission.paidAmount ?? 0, commission.currencyCode);
 }
 
 export default function ProjectParticipantsCommissionPanel({ projectId }: Props) {
@@ -147,7 +156,9 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
         const firstParticipant = nextParticipants.find((participant) => participant.isActive);
         if (firstParticipant) setCommissionParticipantId(firstParticipant.id);
       }
-      if (!eventObligationId && nextCommissions.length > 0) setEventObligationId(nextCommissions[0].obligationId);
+      if (!eventObligationId && nextCommissions.length > 0) {
+        setEventObligationId(nextCommissions[0].obligationId);
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Project Participants & Commission could not be loaded.");
     } finally {
@@ -264,9 +275,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     );
   }
 
-  if (!canViewParticipants && !canViewCommissions) {
-    return null;
-  }
+  if (!canViewParticipants && !canViewCommissions) return null;
 
   return (
     <section className="space-y-6" aria-label="Project Participants and Commission">
@@ -333,33 +342,20 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
           </TableViewport>
 
           {canManageParticipants ? (
-            <div className="grid gap-4 rounded-lg border border-gray-200 p-4 dark:border-gray-800 lg:grid-cols-3">
+            <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 lg:grid-cols-3`}>
               <div>
                 <Label htmlFor="pb6-participant-role">Role</Label>
-                <Select
-                  id="pb6-participant-role"
-                  options={participantRoleOptions}
-                  value={participantRoleKey}
-                  onChange={setParticipantRoleKey}
-                  placeholder="Select role"
-                />
+                <Select id="pb6-participant-role" options={participantRoleOptions} value={participantRoleKey} onChange={setParticipantRoleKey} placeholder="Select role" />
               </div>
               <div>
                 <Label htmlFor="pb6-participant-person">Person</Label>
-                <Select
-                  id="pb6-participant-person"
-                  options={participantCandidateOptions}
-                  value={participantCandidate}
-                  onChange={setParticipantCandidate}
-                  placeholder="Select existing person"
-                  allowEmpty
-                />
+                <Select id="pb6-participant-person" options={participantCandidateOptions} value={participantCandidate} onChange={setParticipantCandidate} placeholder="Select existing person" allowEmpty />
               </div>
               <div>
                 <Label htmlFor="pb6-participant-notes">Notes</Label>
                 <Input id="pb6-participant-notes" value={participantNotes} onChange={(event) => setParticipantNotes(event.target.value)} />
               </div>
-              <div className="lg:col-span-3 flex justify-end">
+              <div className="flex justify-end lg:col-span-3">
                 <Button disabled={saving || !participantRoleKey || !participantCandidate} onClick={() => void addParticipant()}>
                   {saving ? "Saving…" : "Add Participant"}
                 </Button>
@@ -395,14 +391,14 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                     <TableCell variant="admin">
                       <div className="space-y-1">
                         <p className="font-medium">{commission.participantName}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{commission.roleLabel}</p>
+                        <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{commission.roleLabel}</p>
                       </div>
                     </TableCell>
                     <TableCell variant="admin">{statusLabel(commission.scopeType)}</TableCell>
                     <TableCell variant="admin">{basisLabel(commission)}</TableCell>
                     <TableCell variant="admin"><span className="font-medium">{money(commission.currentAmount, commission.currencyCode)}</span></TableCell>
                     <TableCell variant="admin"><Badge color={commissionBadge(commission.status)}>{statusLabel(commission.status)}</Badge></TableCell>
-                    <TableCell variant="admin">{commission.paidAmount === null ? "Restricted" : money(commission.paidAmount, commission.currencyCode)}</TableCell>
+                    <TableCell variant="admin">{payoutLabel(commission)}</TableCell>
                     <TableCell variant="admin">{displayDate(commission.createdAt)}</TableCell>
                   </TableRow>
                 )) : null}
@@ -412,16 +408,10 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
 
           {canManageCommissions ? (
             <div className="space-y-5">
-              <div className="grid gap-4 rounded-lg border border-gray-200 p-4 dark:border-gray-800 md:grid-cols-2 xl:grid-cols-4">
+              <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4`}>
                 <div>
                   <Label htmlFor="pb6-commission-participant">Participant</Label>
-                  <Select
-                    id="pb6-commission-participant"
-                    options={commissionParticipantOptions}
-                    value={commissionParticipantId}
-                    onChange={setCommissionParticipantId}
-                    placeholder="Select participant"
-                  />
+                  <Select id="pb6-commission-participant" options={commissionParticipantOptions} value={commissionParticipantId} onChange={setCommissionParticipantId} placeholder="Select participant" />
                 </div>
                 <div>
                   <Label htmlFor="pb6-commission-basis">Basis</Label>
@@ -486,14 +476,14 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                   <Label htmlFor="pb6-commission-description">Description</Label>
                   <Input id="pb6-commission-description" value={commissionDescription} onChange={(event) => setCommissionDescription(event.target.value)} />
                 </div>
-                <div className="md:col-span-2 xl:col-span-4 flex justify-end">
+                <div className="flex justify-end md:col-span-2 xl:col-span-4">
                   <Button disabled={saving || !commissionParticipantId || (commissionScopeType !== "project" && !commissionScopeId)} onClick={() => void createCommission()}>
                     {saving ? "Saving…" : "Create Pending Commission"}
                   </Button>
                 </div>
               </div>
 
-              <div className="grid gap-4 rounded-lg border border-gray-200 p-4 dark:border-gray-800 md:grid-cols-2 xl:grid-cols-5">
+              <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-5`}>
                 <div className="xl:col-span-2">
                   <Label htmlFor="pb6-event-obligation">Commission</Label>
                   <Select id="pb6-event-obligation" options={commissionOptions} value={eventObligationId} onChange={setEventObligationId} placeholder="Select commission" />
@@ -532,8 +522,8 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                     <Input id="pb6-event-reason" value={eventReason} onChange={(event) => setEventReason(event.target.value)} />
                   </div>
                 ) : null}
-                <div className="md:col-span-2 xl:col-span-5 flex items-center justify-between gap-3">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Corrections append new events; approved history is never edited in place.</p>
+                <div className="flex items-center justify-between gap-3 md:col-span-2 xl:col-span-5">
+                  <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Corrections append new events; approved history is never edited in place.</p>
                   <Button disabled={saving || !eventObligationId} onClick={() => void appendCommissionEvent()}>
                     {saving ? "Saving…" : "Append Commission Event"}
                   </Button>
