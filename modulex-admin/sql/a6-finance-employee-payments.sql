@@ -62,8 +62,8 @@ declare
   v_base_currency varchar(3);
 begin
   if tg_op <> 'UPDATE'
-     or old.status is not distinct from 'draft'
-     or new.status is not distinct from 'posted'
+     or old.status is distinct from 'draft'
+     or new.status is distinct from 'posted'
      or new.transaction_kind <> 'employee_payment' then
     return new;
   end if;
