@@ -5,8 +5,19 @@ const expect = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
+const page = read("src/app/(admin)/products/types/page.tsx");
 const manager = read("src/components/products/ProductMasterReferenceManager.tsx");
 const multiSelect = read("src/components/form/MultiSelect.tsx");
+const select = read("src/components/form/Select.tsx");
+
+expect(
+  page.includes('<ProductMasterReferenceManager kind="product_types" />'),
+  "Product Types route must use the canonical reference manager for list, add and edit flows"
+);
+expect(
+  manager.includes('"Add Product Type"') && manager.includes('"Edit Product Type"'),
+  "Product Types must keep both add and edit states in the canonical editor"
+);
 
 for (const id of [
   "reference-status",
@@ -23,16 +34,51 @@ for (const id of [
   );
 }
 
-expect(!multiSelect.includes("primary"), "MultiSelect must not use undefined primary tokens");
 expect(
-  multiSelect.includes('"bg-brand-50/60 dark:bg-brand-500/10"') &&
-    multiSelect.includes('"hover:bg-gray-50 dark:hover:bg-white/[0.02]"'),
-  "MultiSelect options must use the established TailAdmin selected and hover pattern"
+  select.includes('className="relative w-full"') &&
+    select.includes('pointer-events-none absolute right-3 top-1/2'),
+  "Product Type single-select controls must inherit the canonical shared dropdown indicator"
 );
+expect(
+  multiSelect.includes('import Label from "@/components/form/Label"') &&
+    multiSelect.includes("ADMIN_FIELD_BASE") &&
+    multiSelect.includes("ADMIN_FIELD_STATES") &&
+    multiSelect.includes("ADMIN_SURFACE_POPOVER"),
+  "Allowed Units must use the shared Admin field, label and popover appearance contract"
+);
+expect(
+  multiSelect.includes('aria-haspopup="listbox"') &&
+    multiSelect.includes("aria-expanded={isOpen}") &&
+    multiSelect.includes('role="listbox"') &&
+    multiSelect.includes('role="option"') &&
+    multiSelect.includes("aria-selected={isSelected}"),
+  "Allowed Units dropdown must expose listbox semantics and selection state"
+);
+expect(
+  multiSelect.includes('event.key === "Escape"') &&
+    multiSelect.includes("setIsOpen(false)"),
+  "Allowed Units dropdown must close on Escape"
+);
+expect(
+  multiSelect.includes("triggerRef") &&
+    multiSelect.includes("rootRef") &&
+    multiSelect.includes("contains(event.target as Node)"),
+  "Allowed Units dropdown must restore focus behavior and close when clicking outside"
+);
+expect(
+  !multiSelect.includes('<div onClick={toggleDropdown}') &&
+    !multiSelect.includes('value="Select option"'),
+  "Allowed Units must not double-toggle from nested click handlers or fake its placeholder with an input"
+);
+expect(
+  !multiSelect.includes("primary"),
+  "MultiSelect must not use undefined primary tokens"
+);
+
 expect(
   !/<small(?:>|\s+(?!className=))/.test(manager) &&
     manager.includes("text-gray-500 dark:text-gray-400"),
-  "Product reference helper text must use TailAdmin light and dark typography"
+  "Product reference helper text must keep explicit light and dark typography until migrated to a shared hint primitive"
 );
 
 expect(
