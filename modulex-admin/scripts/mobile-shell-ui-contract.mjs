@@ -11,7 +11,7 @@ const viewport = read("src/components/ui/responsive/adminViewport.ts");
 const css = read("src/layout/AppHeader.module.css");
 const notifications = read("src/components/header/NotificationDropdown.tsx");
 const userDropdown = read("src/components/header/UserDropdown.tsx");
-const workflow = read("../.github/workflows/admin-mobile-shell-ui.yml");
+const workflow = read("../.github/workflows/admin-ui-foundation.yml");
 
 expect(context.includes("usePathname"), "Sidebar context must observe route changes");
 expect(viewport.includes("ADMIN_DESKTOP_BREAKPOINT = 1024") && viewport.includes("width < ADMIN_DESKTOP_BREAKPOINT"), "Shared Admin viewport contract must keep the lg boundary at 1024px");
@@ -44,6 +44,11 @@ expect(userDropdown.includes('href="/profile"'), "Profile navigation must remain
 expect(userDropdown.includes("signOut()") && userDropdown.includes('window.location.replace("/signin")'), "Sign-out flow must remain intact");
 expect(userDropdown.includes("disabled={isSigningOut}"), "Sign-out must retain its busy-state guard");
 expect(userDropdown.includes("focus:ring-3") && userDropdown.includes("focus:ring-brand-500/10"), "User trigger focus treatment must match the TailAdmin header controls");
-expect(workflow.includes('modulex-admin/src/components/header/UserDropdown.tsx'), "Mobile shell workflow must watch UserDropdown changes");
+expect(
+  workflow.includes("name: Admin UI Foundation") &&
+    workflow.includes('      - "modulex-admin/**"') &&
+    workflow.includes("run: node scripts/mobile-shell-ui-contract.mjs"),
+  "Admin UI Foundation must own mobile shell changes and execute the mobile shell contract",
+);
 
 console.log("mobile shell UI contract: ok");
