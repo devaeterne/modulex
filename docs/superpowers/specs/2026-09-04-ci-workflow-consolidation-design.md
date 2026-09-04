@@ -41,7 +41,7 @@ The retained Admin domain workflows are:
 5. `admin-project-base.yml` — Project Base/payment/procurement contracts with project-only path filters.
 6. `admin-vendor-catalog-sync.yml` — Vendor/Stone catalog contracts only.
 
-Small feature UI contracts are consolidated into `admin-ui-foundation.yml` after the shared global UI gate instead of each owning a separate workflow. This includes approvals, commercial documents, customers, dashboard shell, general settings, mobile shell, personnel/leave, request center, and users/store UI contracts.
+Small feature UI contracts are consolidated into `admin-ui-foundation.yml` instead of each owning a separate workflow. After the single `npm ci`, cheap feature/domain contract checks run before expensive typecheck/lint/build so failures are fail-fast. This includes approvals, commercial documents, customers, dashboard shell, general settings, mobile shell, personnel/leave, request center, and users/store UI contracts.
 
 ### 3. Consolidate inventory checks
 
@@ -122,7 +122,19 @@ Store contracts remain as scripts; only the duplicate workflow wrappers are remo
 
 `gc5-branch-contract.yml` remains separate and unchanged in principle because it can generate, commit, and push a migration. It is the only write-capable workflow and must not use interruptible concurrency.
 
-### 10. Target workflow inventory
+### 10. Concurrency is part of the architecture
+
+Every retained read-only workflow that can run from PR/push events uses:
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+```
+
+`gc5-branch-contract.yml` is the intentional exception because it writes/commits/pushes migration changes. Manual-only Lighthouse execution does not need to cancel another manually requested baseline unless explicitly changed later.
+
+### 11. Target workflow inventory
 
 After consolidation the approved workflow inventory is 10 files:
 
@@ -159,7 +171,8 @@ A repository contract will enforce the mechanical part of the rule from the exis
 - `AdminUICheck.md` / `ADMIN_UI_GUIDE.md` is owned by a workflow other than Admin UI Foundation;
 - a retained Admin domain workflow reintroduces global `build`, `lint`, `typecheck`, `smoke:rbac`, or `smoke:production-surface` steps;
 - broad `modulex-admin/**` triggers reappear outside Admin UI Foundation;
-- broad normal-PR `modulex-store/**` triggers reappear outside Store Core CI.
+- broad normal-PR `modulex-store/**` triggers reappear outside Store Core CI;
+- an event-driven read-only retained workflow omits the approved concurrency/cancel policy.
 
 Updating the inventory is a policy change and therefore requires the explicit approval described above.
 
@@ -178,6 +191,10 @@ The CI architecture contract scans retained workflow YAML and asserts that Admin
 ### Trigger test
 
 The contract asserts that broad Admin/Store path filters exist only at their approved global owners and that specialized workflows are domain-scoped.
+
+### Concurrency test
+
+The contract asserts the standard concurrency block for all retained read-only event-driven workflows and explicitly exempts the GC-5 write workflow.
 
 ### Local/static verification
 
@@ -208,7 +225,7 @@ A normal Personnel/Leave UI PR should produce the Admin UI Foundation gate rathe
 
 A Product PR should produce Admin UI Foundation plus the Product domain workflow. Inventory, Project, GC-6, and GC-7 wrappers no longer run.
 
-A Store page PR should produce Store Core CI and, only when explicitly requested, the separate Lighthouse baseline. GC-6/GC-7/Showroom wrappers no longer multiply Store builds.
+A Store page PR should produce Store Core CI. The separate Lighthouse baseline is manual/post-deploy and does not create a second normal PR build. GC-6/GC-7/Showroom wrappers no longer multiply Store builds.
 
 ## Non-goals
 
