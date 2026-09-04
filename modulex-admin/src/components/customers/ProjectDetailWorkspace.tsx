@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
+import ProjectCalendarTab from "@/components/customers/project-detail/ProjectCalendarTab";
 import ProjectFinanceTab from "@/components/customers/project-detail/ProjectFinanceTab";
 import ProjectFulfillmentTab from "@/components/customers/project-detail/ProjectFulfillmentTab";
 import ProjectProcurementTab from "@/components/customers/project-detail/ProjectProcurementTab";
@@ -48,7 +49,7 @@ type ProjectStatusHistory = {
 };
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
 
-const PROJECT_TABS = ["Overview", "Orders", "Finance", "Procurement", "Fulfillment", "Documents", "Activity"] as const;
+const PROJECT_TABS = ["Overview", "Orders", "Finance", "Procurement", "Fulfillment", "Calendar", "Documents", "Activity"] as const;
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const projectStatusOptions: Array<{ value: ProjectStatus; label: string }> = [
@@ -484,6 +485,10 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
 
       {activeTab === "Fulfillment" ? (
         <ProjectFulfillmentTab projectId={project.id} />
+      ) : null}
+
+      {activeTab === "Calendar" ? (
+        <ProjectCalendarTab projectId={project.id} canManage={canManageProjects} />
       ) : null}
 
       {activeTab === "Documents" ? (
