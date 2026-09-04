@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
+import ProductImageThumbnail from "@/components/common/ProductImageThumbnail";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import Select from "@/components/form/Select";
@@ -195,20 +196,13 @@ async function loadCatalogProductImages(products: ProductRow[]): Promise<Record<
 function CatalogProductIdentity({ product, image, onPreview }: CatalogProductIdentityProps) {
   return (
     <div className="flex min-w-[240px] items-center gap-3">
-      {image ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-12 w-12 shrink-0 p-0"
-          aria-label={`View ${product.name} image`}
-          onClick={() => onPreview(image)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image.url} alt={image.alt} className="h-12 w-12 object-contain" loading="lazy" />
-        </Button>
-      ) : (
-        <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center text-xs">—</span>
-      )}
+      <ProductImageThumbnail
+        image={image}
+        actionLabel={`View ${product.name} image`}
+        onClick={() => {
+          if (image) onPreview(image);
+        }}
+      />
       <div className="min-w-0 space-y-1">
         <div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{product.name}</div>
         <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{product.sku}</div>
