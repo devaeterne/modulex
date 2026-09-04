@@ -22,6 +22,17 @@ These instructions apply repo-wide unless a more specific `AGENTS.md` overrides 
 - Avoid speculative refactors, migrations, indexes, abstractions, or cleanup.
 - Keep intermediate updates short; if there is no blocker or decision needed, continue working.
 
+## CI workflow governance
+
+- Treat `docs/CI_WORKFLOW_ARCHITECTURE.md` as the source of truth for the approved workflow inventory and responsibility boundaries.
+- Before adding any `.github/workflows/*` file, inspect existing workflow path coverage and contract commands for overlap.
+- Prefer extending an existing workflow whenever it can own the new contract without violating its responsibility boundary.
+- Do not create duplicate workflow wrappers that repeat `npm ci`, lint, typecheck, build, RBAC, production-surface, or an already-owned domain contract.
+- A genuinely new workflow file requires explicit user approval before creation. After approval, update the approved inventory and the CI architecture contract in the same change.
+- `Admin UI Foundation` is the sole global Admin UI/quality owner, including `AdminUICheck.md`, `ADMIN_UI_GUIDE.md`, Admin UI strict checks, production-surface, RBAC, typecheck, lint, and Admin build.
+- The normal broad Store PR gate is `Store Core CI`; GC-5 remains the specialized write-capable exception and must not be made interruptible.
+- Run `npm run smoke:ci-workflow-architecture` when workflow files or CI governance documentation change.
+
 ## Safety and production discipline
 
 - Never expose service-role/elevated credentials to browser code.
