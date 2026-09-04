@@ -1,4 +1,5 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Label from "@/components/form/Label";
 import {
   ADMIN_CONTROL_DISABLED,
@@ -36,40 +37,86 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   const generatedId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [selectedOptions, setSelectedOptions] = useState<string[]>(defaultSelected);
   const [isOpen, setIsOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
 
   const triggerId = id ?? `multi-select-${generatedId}`;
   const listboxId = `${triggerId}-listbox`;
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger || typeof window === "undefined") return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportPadding = 12;
+    const gap = 6;
+    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
+    const spaceAbove = rect.top - viewportPadding;
+    const openUpward = spaceBelow < 180 && spaceAbove > spaceBelow;
+    const availableSpace = Math.max(120, (openUpward ? spaceAbove : spaceBelow) - gap);
+    const width = Math.min(rect.width, window.innerWidth - viewportPadding * 2);
+    const left = Math.min(
+      Math.max(viewportPadding, rect.left),
+      Math.max(viewportPadding, window.innerWidth - width - viewportPadding)
+    );
+
+    setMenuStyle({
+      position: "fixed",
+      left,
+      width,
+      maxHeight: Math.min(320, availableSpace),
+      zIndex: 100000,
+      ...(openUpward
+        ? { bottom: window.innerHeight - rect.top + gap }
+        : { top: rect.bottom + gap }),
+    });
+  }, []);
+
+  const closeDropdown = useCallback((restoreFocus = false) => {
+    setIsOpen(false);
+    setMenuStyle(null);
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => triggerRef.current?.focus());
+    }
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
+      const target = event.target as Node;
+      if (!rootRef.current?.contains(target) && !menuRef.current?.contains(target)) {
+        closeDropdown();
       }
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        setIsOpen(false);
-        window.requestAnimationFrame(() => triggerRef.current?.focus());
+        closeDropdown(true);
       }
     };
 
+    const handleViewportChange = () => updateMenuPosition();
+
+    updateMenuPosition();
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
     };
-  }, [isOpen]);
+  }, [closeDropdown, isOpen, updateMenuPosition]);
 
   useEffect(() => {
-    if (disabled) setIsOpen(false);
-  }, [disabled]);
+    if (disabled && isOpen) closeDropdown();
+  }, [closeDropdown, disabled, isOpen]);
 
   const selectedValuesText = useMemo(
     () =>
@@ -81,7 +128,12 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
   const toggleDropdown = () => {
     if (disabled) return;
-    setIsOpen((current) => !current);
+    if (isOpen) {
+      closeDropdown();
+      return;
+    }
+    updateMenuPosition();
+    setIsOpen(true);
   };
 
   const handleSelect = (optionValue: string) => {
@@ -95,64 +147,16 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
   const stateClass = disabled ? ADMIN_FIELD_STATES.disabled : ADMIN_FIELD_STATES.default;
 
-  return (
-    <div ref={rootRef} className="w-full">
-      <Label htmlFor={triggerId}>{label}</Label>
-
-      <div className="relative w-full">
-        <button
-          ref={triggerRef}
-          id={triggerId}
-          type="button"
-          disabled={disabled}
-          aria-haspopup="listbox"
-          aria-expanded={isOpen}
-          aria-controls={listboxId}
-          onClick={toggleDropdown}
-          className={`${ADMIN_FIELD_BASE} ${stateClass} ${ADMIN_FOCUS_RING} ${ADMIN_CONTROL_DISABLED} flex h-auto min-h-11 items-center justify-between gap-3 py-1.5 pr-3 text-left`}
-        >
-          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {selectedValuesText.length > 0 ? (
-              selectedValuesText.map((text) => (
-                <span
-                  key={text}
-                  className="max-w-full rounded-full bg-gray-100 px-2.5 py-1 text-sm text-gray-800 dark:bg-gray-800 dark:text-white/90"
-                >
-                  {text}
-                </span>
-              ))
-            ) : (
-              <span className="text-sm text-gray-400 dark:text-white/30">{placeholder}</span>
-            )}
-          </span>
-
-          <svg
-            aria-hidden="true"
-            className={`h-5 w-5 shrink-0 stroke-current text-gray-500 transition-transform dark:text-gray-400 ${
-              isOpen ? "rotate-180" : ""
-            }`}
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M4.79175 7.39551L10.0001 12.6038L15.2084 7.39551"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-
-        {isOpen ? (
+  const menu =
+    isOpen && menuStyle && typeof document !== "undefined"
+      ? createPortal(
           <div
+            ref={menuRef}
             id={listboxId}
             role="listbox"
             aria-multiselectable="true"
-            className={`${ADMIN_SURFACE_POPOVER} absolute left-0 top-[calc(100%+0.375rem)] z-40 max-h-select w-full overflow-y-auto p-1`}
+            style={menuStyle}
+            className={`${ADMIN_SURFACE_POPOVER} overflow-y-auto p-1`}
           >
             {options.length > 0 ? (
               <div className="flex flex-col gap-0.5">
@@ -196,9 +200,63 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
             ) : (
               <p className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No options available.</p>
             )}
-          </div>
-        ) : null}
-      </div>
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <div ref={rootRef} className="w-full">
+      <Label htmlFor={triggerId}>{label}</Label>
+
+      <button
+        ref={triggerRef}
+        id={triggerId}
+        type="button"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listboxId}
+        onClick={toggleDropdown}
+        className={`${ADMIN_FIELD_BASE} ${stateClass} ${ADMIN_FOCUS_RING} ${ADMIN_CONTROL_DISABLED} flex h-auto min-h-11 items-center justify-between gap-3 py-1.5 pr-3 text-left`}
+      >
+        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          {selectedValuesText.length > 0 ? (
+            selectedValuesText.map((text) => (
+              <span
+                key={text}
+                className="max-w-full rounded-full bg-gray-100 px-2.5 py-1 text-sm text-gray-800 dark:bg-gray-800 dark:text-white/90"
+              >
+                {text}
+              </span>
+            ))
+          ) : (
+            <span className="text-sm text-gray-400 dark:text-white/30">{placeholder}</span>
+          )}
+        </span>
+
+        <svg
+          aria-hidden="true"
+          className={`h-5 w-5 shrink-0 stroke-current text-gray-500 transition-transform dark:text-gray-400 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+          width="20"
+          height="20"
+          viewBox="0 0 20 20"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M4.79175 7.39551L10.0001 12.6038L15.2084 7.39551"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+
+      {menu}
     </div>
   );
 };
