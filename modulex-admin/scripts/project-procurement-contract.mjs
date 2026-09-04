@@ -14,11 +14,6 @@ const component = "modulex-admin/src/components/customers/project-detail/Project
 const permissions = "modulex-admin/src/lib/auth/permissions.ts";
 
 assert.equal(exists(coreMigration), true, "PB-3B core migration must exist");
-assert.equal(exists(syncMigration), true, "PB-3B order-sync migration must exist");
-assert.equal(exists(operationsMigration), true, "PB-3B operations migration must exist");
-assert.equal(exists(adapter), true, "Project Procurement adapter must exist");
-assert.equal(exists(component), true, "Project Procurement tab must exist");
-
 const core = read(coreMigration);
 for (const token of [
   "customer_project_procurement_requirements",
@@ -37,6 +32,11 @@ for (const token of [
 assert.match(core, /slab_quantity/);
 assert.match(core, /source_kind/);
 assert.match(core, /is_current/);
+
+assert.equal(exists(syncMigration), true, "PB-3B order-sync migration must exist");
+assert.equal(exists(operationsMigration), true, "PB-3B operations migration must exist");
+assert.equal(exists(adapter), true, "Project Procurement adapter must exist");
+assert.equal(exists(component), true, "Project Procurement tab must exist");
 
 const permissionSource = read(permissions);
 assert.match(permissionSource, /project_procurement\.view/);
