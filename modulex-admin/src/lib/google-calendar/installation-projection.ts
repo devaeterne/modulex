@@ -140,6 +140,9 @@ export async function syncInstallationToGoogle(
     }
     binding = await ensureProjectCalendar(source.projectId, actorId, requestUrl);
   }
+  if (!binding) {
+    return { ok: false, status: "error", error_code: "project_binding_mismatch" };
+  }
   if (!binding.sync_enabled) return { ok: true, status: "skipped", error_code: "project_sync_disabled" };
 
   const existing = await getProjectCalendarEventLink({
