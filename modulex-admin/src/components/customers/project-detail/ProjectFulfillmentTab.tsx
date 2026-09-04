@@ -21,7 +21,7 @@ import {
   getCustomerProjectFulfillment,
   type ProjectFulfillmentOrder,
   type ProjectFulfillmentResult,
-} from "@/lib/customers/project-domain";
+} from "@/lib/customers/project-fulfillment-domain";
 
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
 
