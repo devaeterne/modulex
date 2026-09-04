@@ -45,6 +45,25 @@ assert.match(sync, /sync_customer_order_procurement/);
 assert.doesNotMatch(sync, /insert\s+into\s+public\.inventory_movements/i);
 
 assert.equal(exists(operationsMigration), true, "PB-3B operations migration must exist");
+const ops = read(operationsMigration);
+for (const token of [
+  "get_customer_project_procurement",
+  "get_customer_project_procurement_status",
+  "set_customer_project_procurement_vendor",
+  "create_customer_project_procurement_commitment",
+  "confirm_customer_project_procurement_commitment",
+  "cancel_customer_project_procurement_commitment",
+  "record_customer_project_procurement_delivery",
+  "correct_customer_project_procurement_delivery",
+  "record_customer_project_procurement_invoice",
+  "reverse_customer_project_procurement_invoice_allocation",
+  "42501",
+  "security definer",
+  "revoke",
+  "authenticated",
+]) assert.match(ops.toLowerCase(), new RegExp(token.toLowerCase()));
+assert.doesNotMatch(ops, /insert\s+into\s+public\.inventory_movements/i);
+
 assert.equal(exists(adapter), true, "Project Procurement adapter must exist");
 assert.equal(exists(component), true, "Project Procurement tab must exist");
 
