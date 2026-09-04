@@ -41,6 +41,7 @@ assert(catalog.includes('["Sink", "Brand", "Pricing", "Status", "Actions"]'), "S
 assert(!catalog.includes('priceGroups.map((group) => <TableCell key={group.id} isHeader'), "Sink table must not render one visible header per Price Group");
 assert(catalog.includes("setCurrentPage(1)"), "Catalog filter and tab changes must be able to reset pagination");
 
+// Keep Countertop thumbnails and lightbox behavior aligned with the canonical Product List media contract.
 assert(
   catalog.includes('.from("store_product_content")') &&
     catalog.includes('.in("base_product_code"') &&
