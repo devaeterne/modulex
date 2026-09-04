@@ -24,4 +24,17 @@ expect(/aria-|htmlFor=|role=/.test(sources), "Customers surfaces need accessible
 expect(/isLoading|loading|Loading/.test(sources) && /error|Error/.test(sources), "Customers surfaces need loading and error states");
 expect(!sources.includes('href="#"') && !sources.includes("TailAdmin") && !/lorem ipsum/i.test(sources), "Customers surfaces must not ship placeholder/template UI");
 expect(/orders\.view|customers\.view|shipments\.view|installations\.view/.test(sidebar), "Customers sidebar entries must remain permission-gated");
+
+const directory = read("src/components/customers/CustomersTable.tsx");
+expect(directory.includes('<TableHeader variant="admin">'), "Customer directory header must use the canonical admin table theme");
+expect(directory.includes('<TableBody variant="admin">'), "Customer directory body must use the canonical admin table theme");
+const tableStart = directory.indexOf("<TableHeader");
+const tableEnd = directory.indexOf("</Table>", tableStart);
+const tableMarkup = directory.slice(tableStart, tableEnd);
+const tableCellTags = [...tableMarkup.matchAll(/<TableCell\b[^>]*>/g)].map((match) => match[0]);
+expect(tableCellTags.length > 0 && tableCellTags.every((tag) => tag.includes('variant="admin"')), "Every customer directory table cell must use the admin variant so dark-mode text remains readable");
+expect(directory.includes('grid grid-cols-2 gap-3 md:grid-cols-4'), "Customer summary metrics must collapse into one row from tablet widths upward");
+expect(!directory.includes('<div className="p-5 sm:p-6">'), "Customer directory must not add a second padded shell inside ComponentCard");
+expect(directory.includes('className="w-full sm:w-36"'), "Customer pagination page-size control must stay compact on desktop");
+
 console.log("customers UI contract: ok");
