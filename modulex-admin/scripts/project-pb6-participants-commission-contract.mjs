@@ -19,6 +19,8 @@ const integrityMigrationPath = "../modulex-store/supabase/migrations/20260904151
 const integritySqlPath = "sql/project-pb6-participant-commission-integrity.sql";
 const eventProjectionMigrationPath = "../modulex-store/supabase/migrations/20260904152000_customer_project_commission_event_projection.sql";
 const eventProjectionSqlPath = "sql/project-pb6-commission-event-projection.sql";
+const roleClassificationMigrationPath = "../modulex-store/supabase/migrations/20260904152500_customer_project_participant_role_classification.sql";
+const roleClassificationSqlPath = "sql/project-pb6-participant-role-classification.sql";
 const domainPath = "src/lib/customers/project-participants-commission-domain.ts";
 const eventDomainPath = "src/lib/customers/project-commission-events.ts";
 const roleAdminDomainPath = "src/lib/customers/project-participant-role-admin.ts";
@@ -37,6 +39,8 @@ for (const [file, message] of [
   [integritySqlPath, "PB-6 participant/commission integrity SQL mirror must exist"],
   [eventProjectionMigrationPath, "PB-6 event projection migration must exist"],
   [eventProjectionSqlPath, "PB-6 event projection SQL mirror must exist"],
+  [roleClassificationMigrationPath, "PB-6 role classification migration must exist"],
+  [roleClassificationSqlPath, "PB-6 role classification SQL mirror must exist"],
   [domainPath, "PB-6 client domain must exist"],
   [eventDomainPath, "PB-6 commission event client domain must exist"],
   [roleAdminDomainPath, "PB-6 participant role Admin domain must exist"],
@@ -54,19 +58,22 @@ const integrity = read(integrityMigrationPath);
 const integritySql = read(integritySqlPath);
 const eventProjection = read(eventProjectionMigrationPath);
 const eventProjectionSql = read(eventProjectionSqlPath);
+const roleClassification = read(roleClassificationMigrationPath);
+const roleClassificationSql = read(roleClassificationSqlPath);
 const domain = read(domainPath);
 const eventDomain = read(eventDomainPath);
 const roleAdminDomain = read(roleAdminDomainPath);
 const component = read(componentPath);
 const roleManager = read(roleManagerPath);
 const page = read(pagePath);
-const dbSql = `${sql}\n${hardening}\n${systemRoleGuard}\n${integrity}\n${eventProjection}`;
+const dbSql = `${sql}\n${hardening}\n${systemRoleGuard}\n${integrity}\n${eventProjection}\n${roleClassification}`;
 
 assert.equal(migration, sql, "PB-6 Admin SQL mirror and Supabase migration must stay byte-identical");
 assert.equal(hardening, hardeningSql, "PB-6 hardening Admin SQL mirror and Supabase migration must stay byte-identical");
 assert.equal(systemRoleGuard, systemRoleGuardSql, "PB-6 system role guard Admin SQL mirror and migration must stay byte-identical");
 assert.equal(integrity, integritySql, "PB-6 participant/commission integrity Admin SQL mirror and migration must stay byte-identical");
 assert.equal(eventProjection, eventProjectionSql, "PB-6 event projection Admin SQL mirror and migration must stay byte-identical");
+assert.equal(roleClassification, roleClassificationSql, "PB-6 role classification Admin SQL mirror and migration must stay byte-identical");
 
 for (const token of [
   "project_participant_roles",
@@ -86,6 +93,7 @@ assert.match(dbSql, /customer_projects[\s\S]*sales_rep_id/i, "PB-6 must keep cus
 assert.match(dbSql, /designer[\s\S]*contractor[\s\S]*installer[\s\S]*referral_partner[\s\S]*project_manager/i, "Built-in participant roles must be seeded");
 assert.match(hardening, /upsert_customer_project_participant_role/i, "Participant role taxonomy must be configurable through an Admin-guarded RPC");
 assert.match(systemRoleGuard, /PROJECT_PARTICIPANT_SYSTEM_ROLE_REQUIRED/i, "Structural PB-6 roles must not be deactivatable");
+assert.match(roleClassification, /is_system\s*=\s*\(role_key\s*=\s*'sales_rep'\)/i, "Only canonical Sales Rep must remain a structural role; other defaults must stay configurable");
 assert.match(integrity, /PROJECT_PARTICIPANT_EMPLOYEE_INACTIVE_OR_MISSING[\s\S]*PROJECT_PARTICIPANT_CONTACT_CUSTOMER_MISMATCH_OR_INACTIVE[\s\S]*PROJECT_PARTICIPANT_PROFILE_INACTIVE_OR_MISSING/i, "Participant assignment must validate active canonical subjects at the DB boundary");
 
 assert.match(dbSql, /basis_type[\s\S]*fixed[\s\S]*percentage/i, "Commission obligations must support fixed and percentage basis");
