@@ -1,0 +1,41 @@
+name: Admin Project PB-5 Fulfillment
+
+on:
+  pull_request:
+    paths:
+      - "modulex-admin/sql/project-pb5-fulfillment-rollup.sql"
+      - "modulex-admin/scripts/project-pb5-fulfillment-contract.mjs"
+      - "modulex-admin/src/lib/customers/project-fulfillment-domain.ts"
+      - "modulex-admin/src/components/customers/project-detail/ProjectFulfillmentTab.tsx"
+      - "modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx"
+      - "docs/acceptance/pb-5-project-fulfillment.md"
+      - "docs/PROJECT_BASE_PLAN.md"
+      - "modulex-admin/ADMIN_ROADMAP.md"
+      - ".github/workflows/admin-project-pb5-fulfillment.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  project-pb5-fulfillment:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: PB-5 contract
+        run: node scripts/project-pb5-fulfillment-contract.mjs
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint PB-5 surfaces
+        run: npx eslint src/lib/customers/project-fulfillment-domain.ts src/components/customers/project-detail/ProjectFulfillmentTab.tsx src/components/customers/ProjectDetailWorkspace.tsx
+      - name: Production build
+        run: npm run build
