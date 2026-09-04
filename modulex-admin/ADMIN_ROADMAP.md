@@ -1,11 +1,12 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-04
-Main baseline: `8bf9babc15484e7c689f21462caa253efd34bd88`
+Main baseline: `190da5745fe2b6972deabff0d11c16263cd5c0f5`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
-Current parallel Admin package: **A6-F1 Finance Core + Cash/Bank is active in draft PR #287 on `feat/a6-f1-finance-core`; Finance is a first-class domain and the F1 production migrations remain intentionally unapplied before review/merge.**
-Current Admin next action: **Preserve the active Vendor Catalog rollout sequence. In parallel, finish fresh verification/review for Finance PR #287; do not apply the Finance Core migrations or deploy the Finance runtime before review/merge.**
+Current parallel Admin package: **A6-F1 Finance Core + Cash/Bank is tracked separately; Finance is a first-class domain and Project PB-5 does not modify Finance schema/runtime.**
+Current parallel Project package: **PB-5 Delivery & Installation Rollup is active in draft PR #296 on `feat/project-pb5-fulfillment-rollup`; current `main` is incorporated, production PB-5 DDL/RPC is intentionally unapplied, and Store/Portal projections remain unchanged.**
+Current Admin next action: **Preserve the active non-Project workstreams. In parallel, finish PB-5 final-head CI/review; do not apply the PB-5 Project fulfillment RPC or deploy its runtime before owner merge and the separate production DB acceptance gate.**
 
 ## Customer read performance cleanup
 
@@ -21,19 +22,26 @@ Current Admin next action: **Preserve the active Vendor Catalog rollout sequence
 - [x] Standardize the production Dashboard with shared TailAdmin cards, alerts, buttons, and admin table primitives without changing KPI/RPC, retry, or role-filtering behavior.
   - `smoke:dashboard-ui` is wired into the normal Admin smoke chain; Dashboard UI, Admin UI, production-surface, RBAC, TypeScript, lint, production build, and diff-check passed locally.
 
-## Project Base — PB-1 foundation closeout
+## Project Base — PB-5 Delivery & Installation Rollup
 
-- [x] Establish the additive Customer → Project → multiple Orders foundation without replacing the existing Order lifecycle, pricing, revision, reservation or fulfillment domains.
-  - Production Supabase contains `customer_projects`, `customer_project_status_history`, nullable `customer_orders.project_id`, the Project create/update/list/detail/assign/create-order RPC boundary, DB-authoritative Project numbering, lifecycle history, covering indexes, and authenticated-only Project RPC execution. Canonical production migration history records `20260902232013_project_base_core`, `20260902232311_project_base_order_assignment`, and `20260902234109_project_base_fk_covering_indexes`.
-  - Project Sales Rep is authoritative at Project level and may be prefilled from the Customer default without being rewritten by later Customer ownership changes. Project-context Order creation derives the Customer from the Project, and assigning an existing Order fails closed when Order Customer and Project Customer differ.
-  - `/projects` and `/projects/[id]` are protected by `projects.view` / `projects.manage`; Project list uses server-side search, Customer/Sales Rep/Status filters and pagination. Search covers Project #, Customer and Project name. Project Settings remains permission-gated.
-  - Existing standalone Orders remain valid with `project_id = null`. Cancelled Orders are hidden from the normal Order `All` view and excluded from Project active Order rows/count, Link Existing Order choices and Project Progress calculations while remaining reachable through the explicit `Cancelled` filter.
-  - AdminUICheck acceptance is complete for the changed Project/Order surfaces: shared Admin cards/forms/tables/alerts/badges/buttons, runtime locale formatting, readable Order revisions and Project lifecycle Activity, actor-aware Project status history, responsive tables/layouts, and light/dark contrast hardening are covered by the accepted runtime.
-  - Project Progress is locked as a **full-width compact overview**, not a sidebar/rail: horizontal `Draft → Quoted → Approved → Ordered → In Progress → Completed` badges with `Done / Current / Pending`, followed by responsive Orders / Delivery / Installation / Commercial blocks. Delivery/Installation remain read-only PB-1 summaries; Commercial is count/status only. The duplicate `Recent Activity` block is removed and the separate `Activity` card remains the official Project lifecycle/audit timeline.
-  - Accepted runtime SHA `e36126913a92acdf4d5c2783f12c29e87dff5030`: Admin Project Base #71, Admin UI Foundation #977, Admin A1 Core Operations #594 and Admin Customers UI #301 are green. Vercel Admin Preview `dpl_CfyHrv5kboYLAiPckd1HZg7Bz2dp` is `READY` on that exact runtime SHA and the final signed-in Project Detail / Project Progress presentation was accepted by the project owner.
-  - Fresh production Security + Performance Advisor review shows no Project-specific blocking finding. New Project covering/filter indexes may appear as unused-index `INFO` while traffic is still low; this is informational and not a PB-1 blocker.
-  - Store public/Customer Portal/Dealer Portal Project projection is unchanged. `modulex-store/STORE_ROADMAP.md` intentionally receives no PB-1 closeout mutation; portal Project navigation remains PB-8.
-  - PR #267 remains **draft/open** and must be merged by the project owner. PB-2 must not start until PB-1 is merged and the production Admin deployment is verified.
+- [x] **PB-1 — Project Core + Order Integration.** Customer → Project → multiple Orders is production-accepted without replacing Order lifecycle, pricing, revision, reservation or fulfillment truth. `customer_orders.project_id` remains nullable for legacy standalone Orders; Project Customer/Order Customer mismatch fails closed; Project Sales Rep is authoritative at Project level; cancelled Orders remain explicit history but are excluded from active Project calculations.
+- [x] **PB-2 — Project Financial Rollup.** Project Sales/Cost/Gross Profit/Margin/Markup/Invoiced/Paid/Balance derive from canonical Order/Invoice/cost truth. Missing cost and mixed-currency cases fail closed; detailed cost/margin remains Admin/Finance-gated and is not exposed to Store/Portal.
+- [x] **PB-3A — Customer Payment Ledger.** Payment requirements, actual customer payment transactions and explicit allocations are separate canonical concepts with partial payments, unallocated credit and append-safe reversal/void behavior. Sales receives sanitized collection status only; payment mutation remains Admin/Finance-only.
+- [x] **PB-3B — Procurement.** Confirmed Order requirements, vendor commitments, partial delivery events, shared Vendor Invoice allocations and sanitized Sales procurement status are production-accepted without fabricating Inventory movements. The approved role-aware `ProjectProcurementTab` is restored in PR #296; the pre-existing placeholder wiring found during PB-5 verification is no longer used.
+- [!] **PB-4 — Project Expenses / Outgoings.** Intentionally not a Project-owned ledger. Expenses, AP, payroll/commission payment and outgoing cash remain Finance-owned canonical truth; Project may consume stable Finance projections later.
+- [~] **PB-5 — Delivery & Installation Rollup.** Project-level fulfillment visibility is implemented as a narrow projection over canonical Orders, Shipments, Installations and PB-3B procurement quantities.
+  - Multiple Shipments and multiple Installations remain separate canonical records; Project only derives rollup state.
+  - `pickup` remains explicit Customer Pickup and is excluded from delivery-required counts.
+  - Canonical Installation records remain authoritative even when legacy Order `fulfillment_type` metadata is `delivery` rather than `delivery_installation`.
+  - Cancelled Orders are excluded from active rollup while remaining available as inactive history.
+  - Procurement blocker projection exposes only Sales-safe quantity/status states; vendor identity, vendor cost, margin, Finance transactions and internal notes are excluded.
+  - DB/client visibility does not broaden Finance into Shipment/Installation access. Store/Customer Portal/Dealer Portal behavior is unchanged.
+  - No Project fulfillment table/ledger is created. Repository source is `modulex-admin/sql/project-pb5-fulfillment-rollup.sql`; production DDL/RPC remains unapplied before owner merge.
+  - TDD RED was recorded before implementation. The PB-5 contract is wired into the consolidated `Admin Project Base` workflow rather than a new workflow wrapper.
+  - Fresh Project Base runs **#220 and #221 are GREEN** after the PB-3B workspace restoration; final-head Admin UI Foundation verification remains the last code/CI gate before owner review.
+  - Acceptance artifact: `docs/acceptance/pb-5-project-fulfillment.md`.
+  - Draft PR: **#296 — `feat(project): add PB-5 fulfillment rollup`**.
+- [ ] **PB-6 — Participants & Commission Ledger.** Next Project package after PB-5 merge/deploy/DB acceptance. Commission obligations belong to Project business truth; actual commission payment remains Finance-owned canonical money movement.
 
 ## Product Master UX v2
 
@@ -666,13 +674,12 @@ Finance ownership is now explicitly committed product scope. The authoritative a
   - HR remains source of employee/compensation/payroll calculation truth; Finance owns actual money movement, accounts, FX/base-currency snapshots, audit, AR/AP/cash-flow reporting.
   - Existing `company_expenses`, Customer Invoices, Project payment and HR payroll/advance surfaces are preserved for incremental integration rather than destructively rewritten.
 - [~] **A6-F1 — Finance Core + Cash/Bank.**
-  - Draft PR #287 / branch `feat/a6-f1-finance-core` contains `finance_accounts`, `finance_categories`, `finance_fx_rates`, `finance_transactions`, optional attribution/allocation links, audit and idempotency boundaries plus `/finance`, `/finance/transactions`, and `/finance/accounts`.
+  - Finance Core work is tracked in its own branch/acceptance flow and is intentionally not modified by PB-5.
   - Base currency reuses `general_settings.default_currency`; cross-currency posting stores the transaction-time FX snapshot and supports an audited manual negotiated rate.
   - Drafts may be edited/deleted before posting. Posted money history is immutable; corrections use controlled void/reversal. Historical correction remains possible after an account/category is deactivated, while new ordinary activity still rejects inactive dimensions.
   - Finance attribution is DB-reconciled: Order/Project/Customer combinations must match canonical source relationships, and transaction amount cannot be reduced below existing allocations.
   - Sensitive writes use authenticated public `SECURITY DEFINER` RPC wrappers with locked search paths backed by private role-checked cores; authenticated roles do not receive private-core execution or direct money-table mutation authority.
-  - Source implementation and hardening contracts are present; keep F1 `[~]` until a fresh current-head Finance workflow passes contract/RBAC/strict UI/typecheck/lint/build and the later post-merge production migration/advisor/deploy/signed-in acceptance gates are complete.
-  - Canonical F1 migration order: `20260904120000_a6_finance_core.sql` then `20260904121000_a6_finance_core_hardening.sql`. Both remain intentionally **unapplied before review/merge**.
+  - Source implementation and hardening contracts are present; keep F1 `[~]` until its own current-head Finance verification and post-merge production migration/advisor/deploy/signed-in acceptance gates are complete.
 - [ ] **A6-F2 — Expenses.** Bridge/migrate `company_expenses` into Finance Core without losing history; add controlled categories/payment account, audit and optional Project/Order/Employee/Vendor attribution.
 - [ ] **A6-F3 — Purchases & Accounts Payable.** Reuse/establish the canonical business Vendor/Supplier boundary, integrate purchase/vendor invoices and partial/full vendor payments, and add AP aging. Do not duplicate the existing procurement source-document model.
 - [ ] **A6-F4 — Payroll Finance integration.** Keep payroll calculation in HR and post approved/paid payroll obligations/payments into Finance without duplicating HR payroll tables.
@@ -723,6 +730,7 @@ The existing `/finance/payroll` and `/finance/compensation` surfaces remain HR-b
   - Configured Countertop Replace/Remove regression protects Draft-only dedicated actions, same-item replacement, dedicated authenticated removal, stable retained-line pricing/identity, and the generic revision fail-closed guards.
   - Vendor Catalog Review v3 contracts protect scoped adapter discovery, durable check snapshots, mapping-driven approval, family/variant identity, normalized availability and missing detection, safe canonical deactivate/reactivate behavior, AVAILABLE-only approval, server-only approval state, bounded bulk approval, migration mirrors, and scalable review UI behavior.
   - A6-F1 Finance contracts protect the neutral Finance ownership model, migration mirrors, account/transaction lifecycle, FX/base-currency snapshots, draft-only hard-delete, posted immutability, attribution/allocation reconciliation, RBAC and locked public-RPC/private-core mutation boundaries.
+  - PB-5 Project fulfillment contract protects canonical Order/Shipment/Installation/PB-3B procurement rollup semantics, Customer Pickup separation, cancelled-history treatment and no Store/Finance leakage; it runs inside the consolidated `Admin Project Base` workflow.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -857,26 +865,21 @@ Record material decisions here when they affect future phases.
 - [x] Vendor catalog discovery may stage vendor categories without creating Modulex master data; approval requires an explicit persistent Category + Product Type + allowed UOM mapping and fails closed when the mapping/master data is unavailable.
 - [x] Vendor SKU remains sellable identity; conservative family grouping sets `base_product_code` and variant/color identity without rewriting vendor SKU.
 - [x] Vendor availability is external supply eligibility only: it never becomes Modulex on-hand inventory. Only `AVAILABLE` rows may be approved; authoritative repeated absence can become `MISSING`; vendor-driven canonical reactivation never overrides a later manual Modulex status change.
+- [x] Project fulfillment remains a projection over canonical Order/Shipment/Installation/Procurement truth; PB-5 does not create a Project delivery/installation ledger, broaden Finance operational visibility, or widen Store/Portal data.
 
 ---
 
 # Next Action
 
-Vendor Catalog Review v3 availability/bulk approval remains the active Admin catalog package.
+Keep existing non-Project workstreams in their own acceptance flows. For the Project workstream, PB-5 is the active package.
 
-1. Keep migrations `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval` unapplied until this Vendor Catalog PR is merged; branch CI is not production acceptance.
-2. Review/merge the Vendor Catalog PR, then apply the canonical migrations in order and run Supabase Security + Performance Advisor checks before accepting the feature as production-ready.
-3. Deploy Admin and signed-in smoke **Karran → one category → Check Updates → Sync Changes**. Verify content counts and availability changes separately before broad/full scans.
-4. Verify availability behavior with one explicit review item: only `AVAILABLE` may approve; `OUT_OF_STOCK` / `UNAVAILABLE` / `UNKNOWN` / `MISSING` remain blocked. Confirm vendor-driven deactivation and safe reactivation do not override a manual Modulex status change.
-5. Verify mapping creation with an existing Category and with an explicitly created editable Category name; Product Type and UOM must come from valid active canonical masters.
-6. Verify one family such as `SQS200` retains separate vendor SKUs while sharing one base product family, then verify filtered Select All + bounded bulk approval and Product/Store draft edit links.
-7. Verify legacy `APPROVED + canonical_product_id=null` recovery through Complete Import and confirm direct browser `APPROVED` / canonical-link writes remain DB-blocked.
-8. Do not approve arbitrary production vendor data during acceptance; use an explicitly selected test/review item and keep Store content draft/unpublished.
+1. Require final-head `Admin Project Base` and `Admin UI Foundation` GREEN on draft PR #296; PB-5 contract must remain inside the consolidated Project Base workflow.
+2. Confirm the PR diff remains Project/Admin scoped: no Finance schema/runtime files and no Store/Portal projection changes.
+3. Project owner reviews/merges #296. Do **not** apply `modulex-admin/sql/project-pb5-fulfillment-rollup.sql` to production before that owner gate.
+4. After explicit owner approval, apply the PB-5 RPC through the normal production migration path, verify ownership/search-path/EXECUTE grants, run role acceptance and rollback-only fulfillment scenarios, then rerun Supabase Security + Performance Advisors.
+5. Deploy Admin only after the PB-5 DB acceptance passes and complete signed-in Project Fulfillment UI acceptance.
+6. After PB-5 closes, continue with **PB-6 — Participants & Commission Ledger** while keeping actual commission payment Finance-owned.
 
-**Parallel A6 Finance:** PR #287 implements A6-F1 Finance Core + Cash/Bank. Keep `20260904120000_a6_finance_core.sql` and `20260904121000_a6_finance_core_hardening.sql` unapplied until the PR has fresh current-head Finance contract/RBAC/strict-UI/typecheck/lint/build GREEN evidence and is reviewed/merged. After merge, apply both migrations in order, run Supabase Security + Performance Advisors, deploy Admin, and perform signed-in `/finance`, `/finance/transactions`, and `/finance/accounts` acceptance before changing F1 from `[~]` to `[x]`.
-
-**Parallel A1 rollout:** PR #248 is merged on `main`, but migration `20260902114500_countertop_replace_remove` remains intentionally unapplied. Apply that migration and complete its advisor/deploy/signed-in acceptance separately before marking the A1.2 row complete.
-
-**Cross-roadmap coordination:** Vendor Catalog Review v3 creates canonical Product variants and draft Store product/media through existing boundaries but does not widen public Store/Dealer projections; no functional `STORE_ROADMAP.md` status mutation is required before merge. Countertop Replace/Remove likewise changes no Store runtime/public projection. Finance F1 is an Admin/shared-Supabase operational package and adds no Customer/Dealer public Finance projection, so no functional `STORE_ROADMAP.md` status change is required before merge.
+**Cross-roadmap coordination:** PB-5 changes no Store public/Customer Portal/Dealer Portal projection, so `modulex-store/STORE_ROADMAP.md` requires no functional status mutation. PB-5 also changes no Finance schema/runtime; Finance remains an independent canonical money-movement workstream.
 
 **Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so newer merges are preserved rather than overwritten.
