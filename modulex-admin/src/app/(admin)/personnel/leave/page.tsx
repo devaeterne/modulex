@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import LeaveManager from "@/components/hr/LeaveManager";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function LeavePage() {
-  return <LeaveManager />;
+  return (
+    <div>
+      <PageBreadCrumb pageTitle="Leave & PTO" />
+      <LeaveManager />
+    </div>
+  );
 }
