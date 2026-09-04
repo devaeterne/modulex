@@ -150,7 +150,10 @@ assert.match(connectionRoute, /retireGoogleCredential/);
 assert.match(connectionRoute, /withApiTiming/);
 
 assert.match(authFetchSource, /supabase\.auth\.getSession/);
-assert.match(authFetchSource, /Authorization: `Bearer \$\{token\}`/);
+assert.match(
+  authFetchSource,
+  /(?:Authorization:\s*`Bearer \$\{token\}`|headers\.set\(["']Authorization["'],\s*`Bearer \$\{token\}`\))/
+);
 assert.match(settingsPage, /PageBreadcrumb/);
 assert.match(settingsPage, /GoogleCalendarSettings/);
 assert.match(settingsComponent, /ComponentCard/);
