@@ -4,38 +4,40 @@
 
 **Goal:** Build Project Procurement so confirmed Project Orders automatically create purchasable demand, Admin can place and receive vendor commitments, Admin/Finance can attach shared vendor invoices with Project-specific invoice cost, and Sales sees status only.
 
-**Architecture:** Keep Customer Orders as demand truth and create a separate append-safe procurement domain for vendor commitments, delivery events, and vendor invoice allocations. Derive configured Countertop Stone quantity from `countertop_configurations.slab_quantity` and configured Sink as a separate component. Synchronization is DB-authoritative and idempotent; no procurement action writes inventory, and vendor payment state remains Finance/PB-4 scope.
+**Architecture:** Customer Orders remain demand truth. PB-3B adds separate append-safe procurement requirements, vendor commitments, delivery events, canonical vendor invoices, and invoice allocations. Configured Countertop Stone demand comes from `countertop_configurations.slab_quantity`; configured Sink is a separate component. Synchronization is DB-authoritative and idempotent, vendor payment state remains PB-4/Finance scope, and no procurement operation writes inventory.
 
-**Tech Stack:** PostgreSQL/Supabase migrations + RPCs/RLS, Next.js 16 / React / TypeScript, Supabase JS client, Modulex shared Admin UI primitives, Node contract scripts, GitHub Actions.
+**Tech Stack:** PostgreSQL/Supabase migrations + RPCs/RLS, Next.js 16 / React / TypeScript, Supabase JS, Modulex shared Admin UI primitives, Node contract scripts, GitHub Actions.
 
 **Spec:** `docs/superpowers/specs/2026-09-04-pb-3b-project-procurement-design.md`
 
 ## Global Constraints
 
-- Work from execution-time current `main`; re-check open PRs immediately before implementation and preserve parallel Vendor Catalog/Stone work.
-- Use an isolated worktree/branch for execution; the current design branch is `feat/project-procurement-pb3b`.
-- `customer_orders` and `customer_order_items` remain canonical Order truth.
-- Draft Orders create no procurement demand; Project-linked confirmed Orders do.
-- Standalone Orders with `project_id = null` remain valid and create no Project Procurement.
-- Configured Countertop Stone quantity is `countertop_configurations.slab_quantity`, never sqft/commercial Order quantity.
-- Configured Countertop Sink is a separate procurement component with current canonical quantity `1` when present.
-- `SERVICE` lines do not create procurement requirements.
-- Existing vendor commitments are historical truth and must not be silently rewritten by later Order revisions.
-- Vendor resolution order is approved canonical Vendor Catalog link, then product metadata, then `Vendor Required`.
-- Missing vendor never fabricates a vendor; missing cost never becomes `0`; missing quantity never fabricates a quantity.
+- Re-check execution-time `main` and open PRs before implementation; preserve parallel Vendor Catalog/Stone work.
+- Execute in an isolated worktree/branch. Current design branch: `feat/project-procurement-pb3b`.
+- `customer_orders` / `customer_order_items` remain canonical Order truth.
+- Draft Orders create no procurement demand. Project-linked confirmed/non-Draft Orders do.
+- Standalone Orders with `project_id = null` create no Project Procurement.
+- Cancelled Orders have no current open procurement demand; existing commitments/delivery/invoice history remain readable.
+- Ordinary physical lines use `customer_order_items.quantity`.
+- `SERVICE` lines create no procurement requirement.
+- Configured Countertop Stone uses `countertop_configurations.slab_quantity`, never sqft/commercial Order quantity.
+- Configured Countertop Sink creates a separate requirement with canonical quantity `1` when present.
+- Existing vendor commitments are historical truth; later Order revisions never silently rewrite them.
+- Vendor resolution order: approved canonical Vendor Catalog link → product metadata → `Vendor Required`.
+- Missing vendor/cost/quantity never fabricates a value; missing cost never becomes `0`.
 - `Vendor Order / PO No` is required when placing a commitment.
-- Delivery is procurement receipt truth only and must create zero `inventory_movements`.
-- Vendor Invoice is vendor-scoped canonical truth and may span many Projects; Project shows only its allocated invoice cost.
-- No `Paid / Unpaid / Due / Payment Date / Payment Method` fields in Project Procurement.
+- Delivery is procurement receipt truth only and creates zero `inventory_movements`.
+- Vendor Invoice is vendor-scoped canonical truth and may span multiple Projects; a Project sees only its allocation cost.
+- Project Procurement contains no `Paid / Unpaid / Due / Payment Date / Payment Method` state.
 - No FX conversion is invented; currency mismatch fails closed.
 - PB-2 profitability remains unchanged in PB-3B.
-- Sales receives only sanitized operational status; vendor cost and invoice amounts remain denied.
+- Sales sees sanitized operational status only; vendor identity/cost and invoice numbers/amounts are internal.
 - No Store/Customer Portal/Dealer Portal procurement projection is added.
-- Public RPC wrappers stay `SECURITY INVOKER`; private mutation/read cores may use `SECURITY DEFINER` only with explicit role guards and pinned search paths.
-- Direct anon/authenticated table access is denied; RLS/grants are part of acceptance.
-- Use shared Admin primitives from `ADMIN_UI_GUIDE.md`; changed UI files must pass `npm run smoke:admin-ui-strict`.
-- Normalize text, currency, numeric and date inputs according to `ADMIN_VALIDATION_GUIDE.md`; browser validation is not authoritative.
-- Do not permanently apply the production migration before merge. Pre-merge production checks are read-only. After project-owner merge, apply migrations, run rollback-only mutation acceptance, Advisors, deploy acceptance, then close the package.
+- Public RPC wrappers remain `SECURITY INVOKER`; private privileged cores use explicit role guards + pinned search path.
+- Anon/authenticated direct table access is denied; RLS/grants and covering indexes are part of acceptance.
+- Changed Admin UI uses shared primitives and passes `npm run smoke:admin-ui-strict`.
+- Inputs follow `ADMIN_VALIDATION_GUIDE.md`; browser validation is only an early UX guard.
+- Do not permanently apply production DDL before project-owner merge. After merge: apply migrations, rollback-only business smoke, Advisors, deploy/UI acceptance, then close PB-3B.
 
 ---
 
@@ -48,12 +50,9 @@
 - Modify: `modulex-admin/ADMIN_ROADMAP.md`
 
 **Interfaces:**
-- Consumes: approved PB-3B spec.
-- Produces: one deterministic contract script used throughout the package and CI entry `Project Procurement contract`.
+- Produces CI step `Project Procurement contract` and the package-wide RED→GREEN contract script.
 
-- [ ] **Step 1: Re-check execution-time baseline and parallel work**
-
-Run:
+- [ ] **Step 1: Re-check baseline and parallel work**
 
 ```bash
 git fetch origin main
@@ -61,11 +60,11 @@ git rev-parse origin/main
 gh pr list --state open --limit 50
 ```
 
-Expected: record the current main SHA in the implementation notes. If main moved after the design baseline, rebase/merge current main into the isolated branch before touching implementation files. Do not overwrite unrelated vendor work.
+If `main` moved after the design baseline, bring current `main` into the isolated branch before implementation. Do not overwrite unrelated vendor files.
 
 - [ ] **Step 2: Write the initial failing contract**
 
-Create `modulex-admin/scripts/project-procurement-contract.mjs` with a minimal RED gate that requires the planned migration, adapter, component and permissions:
+Create `modulex-admin/scripts/project-procurement-contract.mjs`:
 
 ```js
 import assert from "node:assert/strict";
@@ -84,10 +83,10 @@ const component = "modulex-admin/src/components/customers/project-detail/Project
 const permissions = "modulex-admin/src/lib/auth/permissions.ts";
 
 assert.equal(exists(coreMigration), true, "PB-3B core migration must exist");
-assert.equal(exists(syncMigration), true, "PB-3B order sync migration must exist");
+assert.equal(exists(syncMigration), true, "PB-3B order-sync migration must exist");
 assert.equal(exists(operationsMigration), true, "PB-3B operations migration must exist");
-assert.equal(exists(adapter), true, "Project procurement adapter must exist");
-assert.equal(exists(component), true, "Project procurement tab must exist");
+assert.equal(exists(adapter), true, "Project Procurement adapter must exist");
+assert.equal(exists(component), true, "Project Procurement tab must exist");
 
 const permissionSource = read(permissions);
 assert.match(permissionSource, /project_procurement\.view/);
@@ -96,9 +95,7 @@ assert.match(permissionSource, /project_procurement\.manage/);
 console.log("Project Procurement contract passed.");
 ```
 
-- [ ] **Step 3: Run the contract and verify RED**
-
-Run:
+- [ ] **Step 3: Verify RED**
 
 ```bash
 cd modulex-admin
@@ -107,57 +104,51 @@ node scripts/project-procurement-contract.mjs
 
 Expected: FAIL on the first missing PB-3B migration.
 
-- [ ] **Step 4: Wire the contract into Project Base CI**
+- [ ] **Step 4: Wire Project Base CI**
 
-Add after the existing Finance simple-flow check in `.github/workflows/admin-project-base.yml`:
+Add after Project Finance simple flow:
 
 ```yaml
       - name: Project Procurement contract
         run: node scripts/project-procurement-contract.mjs
 ```
 
-- [ ] **Step 5: Mark PB-3B active in both trackers**
+- [ ] **Step 5: Mark PB-3B active**
 
-In `docs/PROJECT_BASE_PLAN.md`, change `PB-3B — Procurement [ ]` to `[~]` and record the approved boundaries: confirmed-order sync, no inventory movement, shared vendor invoice, Project-specific invoice cost, Finance owns payment.
+`docs/PROJECT_BASE_PLAN.md`: change PB-3B to `[~]` and record confirmed-order sync, no inventory movement, shared vendor invoice, Project-only allocation cost, and Finance-owned payment state.
 
-In `modulex-admin/ADMIN_ROADMAP.md`, add/update a Project Base PB-3B row as `[~]` and point to the design/plan paths. Do not mark complete.
+`modulex-admin/ADMIN_ROADMAP.md`: add/update PB-3B as `[~]` with spec/plan paths. Do not mark complete.
 
-- [ ] **Step 6: Commit the RED gate**
+- [ ] **Step 6: Commit RED**
 
 ```bash
-git add .github/workflows/admin-project-base.yml \
-  modulex-admin/scripts/project-procurement-contract.mjs \
-  docs/PROJECT_BASE_PLAN.md \
-  modulex-admin/ADMIN_ROADMAP.md
+git add .github/workflows/admin-project-base.yml modulex-admin/scripts/project-procurement-contract.mjs docs/PROJECT_BASE_PLAN.md modulex-admin/ADMIN_ROADMAP.md
 git commit -m "test: define PB-3B procurement contract"
 ```
 
 ---
 
-### Task 2: Add canonical procurement schema, component derivation, and idempotent demand sync
+### Task 2: Add canonical procurement schema, component derivation, vendor/cost resolution, and idempotent demand sync
 
 **Files:**
 - Create: `modulex-store/supabase/migrations/20260904102000_customer_project_procurement_core.sql`
 - Modify: `modulex-admin/scripts/project-procurement-contract.mjs`
 
 **Interfaces:**
-- Produces tables:
+- Tables:
   - `public.customer_project_procurement_requirements`
   - `public.customer_project_procurement_commitments`
   - `public.customer_project_procurement_delivery_events`
   - `public.vendor_invoices`
   - `public.customer_project_procurement_invoice_allocations`
   - `public.customer_project_procurement_events`
-- Produces private functions:
+- Private functions:
   - `private.get_customer_order_procurement_components(p_order_id uuid)`
   - `private.resolve_customer_project_procurement_vendor(p_product_id uuid)`
   - `private.get_customer_project_procurement_cost(p_product_id uuid)`
   - `private.sync_customer_order_procurement(p_order_id uuid)`
-- Later tasks consume these exact names.
 
-- [ ] **Step 1: Extend the contract with core-schema RED assertions**
-
-Add assertions for these exact tokens:
+- [ ] **Step 1: Add core-schema RED assertions**
 
 ```js
 const core = read(coreMigration);
@@ -175,24 +166,23 @@ for (const token of [
   "countertop_stone",
   "countertop_sink",
 ]) assert.match(core, new RegExp(token));
-
 assert.match(core, /slab_quantity/);
 assert.match(core, /source_kind/);
 assert.match(core, /is_current/);
 ```
 
-Run the contract; expected FAIL because the migration is not present.
+Run contract; expected FAIL because core migration is absent.
 
-- [ ] **Step 2: Create the requirement table with current-demand identity**
+- [ ] **Step 2: Create current-demand requirement table**
 
-Use `numeric(18,4)` for quantities/money and `varchar(3)` for currency codes. The requirement table must include:
+Use `numeric(18,4)` for quantities/money and `varchar(3)` for currencies:
 
 ```sql
 create table public.customer_project_procurement_requirements (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.customer_projects(id) on delete restrict,
   order_id uuid not null references public.customer_orders(id) on delete restrict,
-  order_item_id uuid not null references public.customer_order_items(id) on delete restrict,
+  order_item_id uuid not null,
   source_kind text not null check (source_kind in ('order_item','countertop_stone','countertop_sink')),
   configuration_id uuid null references public.countertop_configurations(id) on delete set null,
   product_id uuid not null references public.products(id) on delete restrict,
@@ -201,8 +191,7 @@ create table public.customer_project_procurement_requirements (
   required_quantity numeric(18,4) null check (required_quantity is null or required_quantity > 0),
   vendor_code text null,
   vendor_name_snapshot text null,
-  vendor_source text not null default 'unresolved'
-    check (vendor_source in ('catalog','metadata','manual','unresolved')),
+  vendor_source text not null default 'unresolved' check (vendor_source in ('catalog','metadata','manual','unresolved')),
   expected_unit_cost numeric(18,4) null check (expected_unit_cost is null or expected_unit_cost >= 0),
   expected_cost_currency varchar(3) null,
   is_current boolean not null default true,
@@ -218,50 +207,78 @@ create unique index customer_project_procurement_requirement_current_source_uidx
   where is_current;
 ```
 
-The `is_current` model is required so a committed historical product can be retained while a later source/product change creates a new current requirement.
+`order_item_id` deliberately has no FK: confirmed Order revision may physically replace/delete current `customer_order_items`, while Procurement must preserve the source UUID/history and let sync retire the old current requirement. Project/Order/Product references remain real FKs.
 
-- [ ] **Step 3: Create commitment, delivery, invoice, allocation, and event tables**
+- [ ] **Step 3: Create commitment, delivery, invoice, allocation, and immutable event tables**
 
-Use these business constraints:
+Required commitment fields/constraints:
 
 ```sql
--- commitment
 ordered_quantity numeric(18,4) not null check (ordered_quantity > 0)
 agreed_unit_cost numeric(18,4) not null check (agreed_unit_cost >= 0)
 currency_code varchar(3) not null
 vendor_order_no text not null check (btrim(vendor_order_no) <> '')
 status text not null check (status in ('ordered','confirmed','cancelled'))
+```
 
--- delivery event: append-safe signed delta
+Delivery event:
+
+```sql
 quantity_delta numeric(18,4) not null check (quantity_delta <> 0)
 event_type text not null check (event_type in ('delivery','correction'))
-correction_of_event_id uuid null
+correction_of_event_id uuid null references public.customer_project_procurement_delivery_events(id) on delete restrict
 reason text null
+```
 
--- vendor invoice
+Vendor invoice:
+
+```sql
 vendor_code text not null
+vendor_name_snapshot text not null
 invoice_number text not null
 invoice_number_key text not null
 invoice_date date not null
 total_amount numeric(18,4) not null check (total_amount > 0)
 currency_code varchar(3) not null
 unique(vendor_code, invoice_number_key)
+```
 
--- invoice allocation: append-safe signed delta
+Invoice allocation:
+
+```sql
 quantity_delta numeric(18,4) not null check (quantity_delta <> 0)
 amount_delta numeric(18,4) not null check (amount_delta <> 0)
-reversal_of_allocation_id uuid null
+check ((quantity_delta > 0 and amount_delta > 0) or (quantity_delta < 0 and amount_delta < 0))
+reversal_of_allocation_id uuid null references public.customer_project_procurement_invoice_allocations(id) on delete restrict
 reason text null
 ```
 
-`customer_project_procurement_events` is immutable append-only audit for vendor override, commitment confirm/cancel and other stateful corrections. Store `event_type`, relevant entity IDs, `before_snapshot`, `after_snapshot`, `reason`, `actor_id`, `created_at`.
+`customer_project_procurement_events` stores `project_id`, optional requirement/commitment/invoice/allocation IDs, `event_type`, `before_snapshot`, `after_snapshot`, `reason`, `actor_id`, `created_at`; it is append-only audit.
 
-- [ ] **Step 4: Implement purchasable-component derivation**
+- [ ] **Step 4: Add covering indexes before Advisor acceptance**
 
-`private.get_customer_order_procurement_components` must return ordinary physical lines plus configured Countertop components with no duplication:
+Create at least:
 
 ```sql
--- ordinary physical lines: exclude SERVICE and any configured countertop line
+create index customer_project_procurement_requirements_project_idx on public.customer_project_procurement_requirements(project_id, is_current);
+create index customer_project_procurement_requirements_order_idx on public.customer_project_procurement_requirements(order_id, is_current);
+create index customer_project_procurement_requirements_product_idx on public.customer_project_procurement_requirements(product_id);
+create index customer_project_procurement_requirements_created_by_idx on public.customer_project_procurement_requirements(created_by) where created_by is not null;
+create index customer_project_procurement_requirements_updated_by_idx on public.customer_project_procurement_requirements(updated_by) where updated_by is not null;
+create index customer_project_procurement_commitments_requirement_idx on public.customer_project_procurement_commitments(requirement_id, status);
+create index customer_project_procurement_delivery_commitment_idx on public.customer_project_procurement_delivery_events(commitment_id, created_at);
+create index customer_project_procurement_invoice_alloc_commitment_idx on public.customer_project_procurement_invoice_allocations(commitment_id, created_at);
+create index customer_project_procurement_invoice_alloc_invoice_idx on public.customer_project_procurement_invoice_allocations(invoice_id, created_at);
+create index customer_project_procurement_events_project_idx on public.customer_project_procurement_events(project_id, created_at desc);
+```
+
+Also index each actor/reference FK introduced by the final DDL so the package does not knowingly create unindexed-FK Advisor findings.
+
+- [ ] **Step 5: Implement purchasable-component derivation**
+
+`private.get_customer_order_procurement_components` returns ordinary physical items plus configured components without duplication:
+
+```sql
 select
   oi.id as order_item_id,
   'order_item'::text as source_kind,
@@ -300,177 +317,161 @@ where cc.order_id = p_order_id
   and cc.sink_product_id is not null;
 ```
 
-This is the contract that prevents 55 sqft from becoming 55 Stone units.
+This locks `55 sqft / 2 slabs` to Stone required quantity `2`, not `55`.
 
-- [ ] **Step 5: Implement deterministic vendor resolution**
+- [ ] **Step 6: Implement deterministic vendor resolution**
 
-Resolver rules:
+Rules:
 
-1. Collect distinct non-empty `vendor_catalog_items.vendor_code` rows where `canonical_product_id = p_product_id` and `review_status = 'APPROVED'`.
-2. If exactly one distinct code exists, return it with display name from product metadata `vendor_name`, Stone profile `vendor_name`, or humanized code.
-3. If catalog result is absent, use `products.metadata->>'vendor_code'` with the same display-name fallback.
-4. If catalog has conflicting vendor codes, fail safe to unresolved instead of picking one.
-5. Normalize stored code with `lower(btrim(...))`.
+1. Read distinct non-empty `vendor_catalog_items.vendor_code` where `canonical_product_id=p_product_id` and `review_status='APPROVED'`.
+2. Exactly one distinct catalog vendor → use it.
+3. No catalog vendor → fallback to `products.metadata->>'vendor_code'`.
+4. Conflicting approved catalog vendors → unresolved; do not choose arbitrarily.
+5. Normalize code with `lower(btrim(...))`.
+6. Display name order: `products.metadata->>'vendor_name'` → `countertop_stone_product_profiles.vendor_name` → humanized vendor code (`initcap(replace(code,'_',' '))`).
 
-Return columns `(vendor_code text, vendor_name text, vendor_source text)`.
+Return `(vendor_code text, vendor_name text, vendor_source text)`.
 
-- [ ] **Step 6: Implement current product-cost lookup**
+- [ ] **Step 7: Implement current cost lookup**
 
-Match PB-2 current-cost semantics: active cost, `valid_from <= now()`, `valid_to is null or valid_to > now()`, newest `valid_from/created_at` wins. Return `(amount numeric, currency_code varchar)` or no row. Never coalesce missing cost to zero.
+Match PB-2 semantics: `product_costs.is_active=true`, valid window contains `now()`, latest `valid_from`, then `created_at`. Return `(amount, currency_code)` or no row. Never `coalesce` missing cost to zero.
 
-- [ ] **Step 7: Implement idempotent sync**
+- [ ] **Step 8: Implement idempotent sync**
 
-`private.sync_customer_order_procurement(p_order_id uuid)` must:
+Use per-order `pg_advisory_xact_lock` and lock the Order row.
+
+Behavior:
 
 ```text
-lock Order
-if Order missing -> raise
-if project_id is null -> return 0
-if status = draft -> return 0
-if status = cancelled -> return 0
-derive desired components
-for each desired order_item/source_kind:
-  if current requirement exists and has no commitments:
-    refresh product, qty, vendor (preserve manual vendor only if product unchanged), expected cost
-  if current requirement exists and product unchanged with commitments:
-    refresh current required qty only; preserve commitment history
-  if current requirement exists and product changed with commitments:
-    mark old requirement is_current=false, retired_reason='source_product_changed'
-    create new current requirement for the new product
-  if no current requirement:
-    create it
-for each current requirement no longer present in desired components:
-  set is_current=false, retired_reason='source_removed'
-return count of current requirements
+missing Order -> raise
+project_id null -> return 0
+draft -> return 0
+cancelled -> retire all current requirements with retired_reason='order_cancelled'; preserve commitments; return 0
+otherwise derive desired components
 ```
 
-Use a per-order transaction advisory lock so repeated/parallel sync cannot duplicate current rows.
+For each desired `(order_item_id, source_kind)`:
 
-- [ ] **Step 8: Enable RLS immediately on new tables**
+```text
+current req + no commitments -> refresh product/qty/vendor/cost; preserve manual vendor only if product unchanged
+current req + commitments + same product -> update required qty only; preserve commitment/cost/vendor history
+current req + commitments + product changed -> retire old req, create new current req
+no current req -> create current req
+```
 
-Core migration must `enable row level security` on every new public table. Direct grants are added in Task 4; enabling RLS at creation prevents a permissive intermediate schema.
+For current requirements absent from desired components: set `is_current=false`, `retired_reason='source_removed'`. Never delete a requirement with historical procurement activity.
 
-- [ ] **Step 9: Run the contract**
+- [ ] **Step 9: Enable RLS at table creation**
+
+`alter table ... enable row level security` for all six new public tables. Task 4 adds explicit deny policies/grants.
+
+- [ ] **Step 10: Run contract**
 
 ```bash
 cd modulex-admin
 node scripts/project-procurement-contract.mjs
 ```
 
-Expected: core assertions pass; contract still fails on the not-yet-created sync/operations files.
+Expected: core assertions GREEN; later files remain RED.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
-git add modulex-store/supabase/migrations/20260904102000_customer_project_procurement_core.sql \
-  modulex-admin/scripts/project-procurement-contract.mjs
+git add modulex-store/supabase/migrations/20260904102000_customer_project_procurement_core.sql modulex-admin/scripts/project-procurement-contract.mjs
 git commit -m "feat: add Project procurement core model"
 ```
 
 ---
 
-### Task 3: Connect procurement sync to canonical Order lifecycle without browser coupling
+### Task 3: Connect sync to canonical Order lifecycle without browser coupling
 
 **Files:**
 - Create: `modulex-store/supabase/migrations/20260904102500_customer_project_procurement_order_sync.sql`
 - Modify: `modulex-admin/scripts/project-procurement-contract.mjs`
 
 **Interfaces:**
-- Consumes: `private.sync_customer_order_procurement(uuid)`.
-- Produces trigger functions that call sync after confirmed status/project assignment and after completed confirmed-order revision activity.
+- Consumes `private.sync_customer_order_procurement(uuid)`.
+- Produces Order/update hooks for confirmation, Project assignment, cancellation, and completed confirmed revisions.
 
-- [ ] **Step 1: Add RED assertions for DB-authoritative hooks**
-
-Add:
+- [ ] **Step 1: Add lifecycle-hook RED assertions**
 
 ```js
 const sync = read(syncMigration);
 assert.match(sync, /customer_orders/);
 assert.match(sync, /project_id/);
 assert.match(sync, /confirmed/);
+assert.match(sync, /cancelled/);
 assert.match(sync, /customer_activity/);
 assert.match(sync, /order_revised/);
 assert.match(sync, /sync_customer_order_procurement/);
 ```
 
-Run contract; expected FAIL because sync migration does not exist.
+Expected: RED until sync migration exists.
 
-- [ ] **Step 2: Add an AFTER UPDATE Order hook**
+- [ ] **Step 2: Add `customer_orders` AFTER UPDATE hook**
 
-Create a trigger function that calls sync only when the order is Project-linked and either:
-
-- status transitions to `confirmed`; or
-- `project_id` changes from null/another value to the current Project while status is already non-Draft/non-cancelled.
-
-Use logic equivalent to:
+Call sync when Project-linked truth can change:
 
 ```sql
 if new.project_id is not null and (
-  (new.status = 'confirmed' and old.status is distinct from new.status)
+  (new.status in ('confirmed','cancelled') and old.status is distinct from new.status)
   or
-  (new.project_id is distinct from old.project_id and new.status not in ('draft','cancelled'))
+  (new.project_id is distinct from old.project_id and new.status <> 'draft')
 ) then
   perform private.sync_customer_order_procurement(new.id);
 end if;
 ```
 
-This also covers `create_project_customer_order(... p_initial_status => 'confirmed')` because that function sets `project_id` only after the canonical Order/items are created.
+This covers normal confirmation/cancellation, assigning an already-confirmed Order to a Project, and `create_project_customer_order(... p_initial_status => 'confirmed')` because Project assignment occurs after canonical Order/items creation.
 
-- [ ] **Step 3: Add a confirmed-revision completion hook**
+- [ ] **Step 3: Add completed revision hook**
 
-The existing canonical Order update core inserts `customer_activity.activity_type = 'order_revised'` at the end of a successful revision. Add an AFTER INSERT trigger on `public.customer_activity` that:
+Existing `private.update_customer_order` inserts `customer_activity.activity_type='order_revised'` only after successful line/totals mutation. Add AFTER INSERT trigger on `public.customer_activity`:
 
 ```sql
 if new.activity_type = 'order_revised'
-   and nullif(new.metadata->>'order_id','') is not null then
+   and coalesce(new.metadata->>'order_id','') <> '' then
   v_order_id := (new.metadata->>'order_id')::uuid;
   if exists (
     select 1 from public.customer_orders o
     where o.id = v_order_id
       and o.project_id is not null
-      and o.status not in ('draft','cancelled')
+      and o.status <> 'draft'
   ) then
     perform private.sync_customer_order_procurement(v_order_id);
   end if;
 end if;
 ```
 
-Do not hook draft Countertop configurator functions: current production `attach_countertop_configuration`, `create_and_attach_countertop_order_item`, and `remove_countertop_order_item` explicitly reject non-Draft Orders, so confirmed procurement truth is created only after configuration is stable.
+Current production Countertop configurator mutations are Draft-only, so no confirmed Countertop edit hook is needed; confirmed procurement derives from stable configuration truth.
 
-- [ ] **Step 4: Keep sync side-effect free with respect to customer activity and inventory**
+- [ ] **Step 4: Prevent recursion/stock side effects**
 
-The sync function must not insert `customer_activity`, and neither lifecycle trigger may insert or call any `inventory_movements` function. This prevents recursive activity triggers and preserves the approved no-stock boundary.
+Sync must not insert `customer_activity` and neither hook may insert/call `inventory_movements`.
 
-- [ ] **Step 5: Run contract**
+- [ ] **Step 5: Run contract and commit**
 
 ```bash
 cd modulex-admin
 node scripts/project-procurement-contract.mjs
-```
-
-Expected: sync-hook assertions pass; operations/adapter/UI assertions remain RED.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add modulex-store/supabase/migrations/20260904102500_customer_project_procurement_order_sync.sql \
-  modulex-admin/scripts/project-procurement-contract.mjs
+cd ..
+git add modulex-store/supabase/migrations/20260904102500_customer_project_procurement_order_sync.sql modulex-admin/scripts/project-procurement-contract.mjs
 git commit -m "feat: sync procurement from confirmed Orders"
 ```
 
 ---
 
-### Task 4: Add procurement operations, shared vendor invoice behavior, append-safe corrections, and authorization
+### Task 4: Add operations, shared vendor invoices, append-safe corrections, and DB authorization
 
 **Files:**
 - Create: `modulex-store/supabase/migrations/20260904103000_customer_project_procurement_operations.sql`
 - Modify: `modulex-admin/scripts/project-procurement-contract.mjs`
 
 **Interfaces:**
-- Public reads:
+- Reads:
   - `get_customer_project_procurement(p_project_id uuid) returns jsonb`
   - `get_customer_project_procurement_status(p_project_id uuid) returns jsonb`
-- Public mutations:
+- Mutations:
   - `set_customer_project_procurement_vendor(p_requirement_id uuid, p_vendor_code text, p_vendor_name text) returns uuid`
   - `create_customer_project_procurement_commitment(p_requirement_id uuid, p_ordered_quantity numeric, p_agreed_unit_cost numeric, p_currency_code text, p_vendor_order_no text) returns uuid`
   - `confirm_customer_project_procurement_commitment(p_commitment_id uuid) returns uuid`
@@ -480,9 +481,7 @@ git commit -m "feat: sync procurement from confirmed Orders"
   - `record_customer_project_procurement_invoice(p_commitment_id uuid, p_invoice_number text, p_invoice_date date, p_invoice_total numeric, p_currency_code text, p_invoiced_quantity numeric, p_project_invoice_cost numeric) returns uuid`
   - `reverse_customer_project_procurement_invoice_allocation(p_allocation_id uuid, p_reason text) returns uuid`
 
-- [ ] **Step 1: Extend contract with operation/security RED assertions**
-
-Require all RPC names above plus these security tokens:
+- [ ] **Step 1: Add operation/security RED assertions**
 
 ```js
 const ops = read(operationsMigration);
@@ -502,11 +501,9 @@ for (const token of [
 assert.doesNotMatch(ops, /insert\s+into\s+public\.inventory_movements/i);
 ```
 
-Run contract; expected FAIL because operations migration does not exist.
+- [ ] **Step 2: Implement detailed Admin/Finance read**
 
-- [ ] **Step 2: Implement detailed and Sales-safe read cores**
-
-Detailed read is Admin/Finance only. It returns JSON shaped as:
+Return JSON:
 
 ```json
 {
@@ -519,8 +516,8 @@ Detailed read is Admin/Finance only. It returns JSON shaped as:
       "order_item_id": "uuid",
       "source_kind": "countertop_stone",
       "product_id": "uuid",
-      "sku": "...",
-      "product_name": "...",
+      "sku": "SKU",
+      "product_name": "Product",
       "required_quantity": 2,
       "vendor_code": "venezia",
       "vendor_name": "Venezia Surfaces",
@@ -536,9 +533,9 @@ Detailed read is Admin/Finance only. It returns JSON shaped as:
 }
 ```
 
-For each commitment include `ordered_quantity`, `agreed_unit_cost`, `currency_code`, `vendor_order_no`, `status`, effective `delivered_quantity`, derived `delivery_state`, effective `invoiced_quantity`, derived `invoice_state`, effective `invoice_cost`, and linked invoice rows `{allocation_id, invoice_id, invoice_number, invoice_date, project_invoice_cost}`.
+Each commitment includes ordered qty, agreed unit cost/currency, PO, status, effective delivered qty/state, effective invoiced qty/state, effective Project invoice cost, and linked invoices `{allocation_id, invoice_id, invoice_number, invoice_date, project_invoice_cost}`.
 
-Derived requirement attention priority:
+Attention priority:
 
 ```sql
 case
@@ -551,9 +548,11 @@ case
 end
 ```
 
-Sales-safe read returns only product/source identity, required quantity, ordered/open boolean/status, delivery state/quantity progress, and invoice state. It must omit `vendor_code`, `vendor_name`, all expected/agreed cost fields, invoice number, invoice total, allocation amount, and Project invoice cost.
+- [ ] **Step 3: Implement Sales-safe read**
 
-- [ ] **Step 3: Implement manual vendor resolution for Admin**
+Return only requirement/product identity, required quantity, ordered/open status, delivery progress/state, invoiced state. Omit vendor identity, expected/agreed cost, PO, invoice number/header/allocation amounts, and Project invoice cost.
+
+- [ ] **Step 4: Implement Admin manual vendor resolution**
 
 Normalize:
 
@@ -562,121 +561,100 @@ v_vendor_code := lower(nullif(btrim(p_vendor_code), ''));
 v_vendor_name := nullif(btrim(p_vendor_name), '');
 ```
 
-Reject either missing field. Admin/Super Admin only. Lock the current requirement. If the requirement product has already been committed, do not allow vendor identity rewrite; existing commitment vendor is historical truth. Otherwise update requirement vendor fields with `vendor_source='manual'` and append a procurement event with before/after snapshot.
+Require both. Admin/Super Admin only. Lock current requirement. If any commitment exists, reject vendor rewrite. Otherwise set `vendor_source='manual'` and append before/after procurement event.
 
-- [ ] **Step 4: Implement commitment creation with open-quantity guard**
+- [ ] **Step 5: Implement commitment creation**
 
-Admin/Super Admin only. Lock requirement and active commitments. Reject:
+Admin/Super Admin only. Lock requirement + active commitments. Reject non-current requirement, missing vendor, missing quantity, `ordered_quantity<=0`, amount above open quantity, blank PO, invalid agreed cost, invalid three-letter currency. Missing expected/canonical cost does not block ordering once explicit agreed cost is supplied.
 
-```text
-not current requirement
-Vendor Required
-Quantity Required
-ordered_quantity <= 0
-ordered_quantity > max(required_quantity - active_committed_quantity, 0)
-blank PO/vendor_order_no
-missing/non-finite agreed unit cost
-invalid three-letter currency
-```
+Snapshot vendor identity into commitment. Default UI quantity is open quantity; DB still validates.
 
-Snapshot requirement vendor identity into the commitment. Allow missing expected cost if the user supplies the required agreed unit cost; `Cost Required` means canonical expected cost is missing, not that the real vendor order must be blocked once an agreed cost is entered.
+- [ ] **Step 6: Implement confirmation/cancellation**
 
-- [ ] **Step 5: Implement confirmation/cancellation**
+`ordered -> confirmed` stores actor/time + event.
 
-Confirmation changes `ordered -> confirmed`, records actor/timestamp, and appends event history.
+Cancellation requires reason and is permitted only when effective delivered qty = 0 and effective invoiced qty = 0. Never delete commitment; set cancelled metadata and append event. Derived open quantity becomes available again.
 
-Cancellation requires non-empty reason and is allowed only when effective delivered quantity and effective invoiced quantity are both zero. Do not delete the commitment. Set `status='cancelled'`, `cancelled_at/by/reason`, append event history, and let open quantity become available again through derived reads.
+- [ ] **Step 7: Implement append-safe delivery and correction**
 
-- [ ] **Step 6: Implement append-safe delivery + correction**
+Admin/Super Admin only. Positive receipt inserts `quantity_delta>0`; reject resulting effective delivery above ordered qty.
 
-Admin/Super Admin only.
+Correction inserts negative delta referencing original positive event, requires reason, rejects double/excess correction and total effective delivery below zero.
 
-Positive delivery inserts one `quantity_delta > 0` event. Before insert, lock commitment and sum current delivery deltas. Reject if resulting effective delivery is `> ordered_quantity`.
+No function inserts `inventory_movements`.
 
-Correction inserts a new negative event referencing the original positive delivery event. Require a non-empty reason. Reject if correction quantity exceeds the remaining effective quantity attributable to the original event or would make total effective delivery negative.
+- [ ] **Step 8: Implement one-step shared invoice create/reuse + Project allocation**
 
-No delivery function may call inventory RPCs or insert `inventory_movements`.
+Admin/Finance/Super Admin.
 
-- [ ] **Step 7: Implement one-step canonical invoice create/reuse + Project allocation**
-
-Admin/Finance/Super Admin may call `record_customer_project_procurement_invoice`.
-
-Normalize invoice identity:
+Normalize:
 
 ```sql
 v_invoice_number := nullif(btrim(p_invoice_number), '');
-v_invoice_key := lower(regexp_replace(v_invoice_number, '\\s+', ' ', 'g'));
+v_invoice_key := lower(regexp_replace(v_invoice_number, '\s+', ' ', 'g'));
 v_currency := upper(btrim(p_currency_code));
 ```
 
-Use commitment vendor code as the invoice vendor; the caller never supplies a different vendor.
+Use commitment vendor as invoice vendor; caller cannot supply another vendor. Advisory-lock `(vendor_code, invoice_key)`.
 
-Lock by `(vendor_code, invoice_key)` using advisory lock. If invoice does not exist, create header using invoice date, total and currency. If it exists, require exact vendor/currency and the same invoice date and total (numeric tolerance `0.0001`); otherwise reject instead of silently changing canonical invoice truth.
+If invoice absent: create header. If present: require same vendor, currency, date, and total within `0.0001`; reject mismatch rather than rewriting canonical invoice.
 
-Then validate allocation:
+Allocation guards:
 
 ```text
 invoiced_quantity > 0
 project_invoice_cost > 0
 commitment not cancelled
 currency = commitment currency
-resulting commitment invoiced quantity <= ordered quantity
-resulting invoice allocated amount <= vendor invoice total
+resulting commitment invoiced qty <= ordered qty
+resulting total invoice allocated amount <= vendor invoice total
 ```
 
-Insert a positive allocation row and return its UUID. The same vendor invoice ID can therefore receive allocations from commitments in many Projects.
+Insert positive allocation row and return allocation UUID. Same canonical invoice may therefore have allocations from many Projects.
 
-- [ ] **Step 8: Implement append-safe invoice allocation reversal**
+- [ ] **Step 9: Implement append-safe allocation reversal**
 
-Admin/Finance/Super Admin. Require reason. Insert a negative allocation row referencing the original positive row; never delete the original. Reject double reversal and any reversal that would make effective commitment invoiced quantity or invoice allocated amount negative.
+Admin/Finance/Super Admin. Require reason. Insert negative row referencing original positive allocation. Reject double reversal and any result below zero.
 
-- [ ] **Step 9: Apply RLS/grants/security model**
+- [ ] **Step 10: Apply security model**
 
-For every new table:
+Every table:
 
 ```sql
-alter table ... enable row level security;
-revoke all on table ... from public, anon, authenticated;
+alter table public.<table_name> enable row level security;
+revoke all on table public.<table_name> from public, anon, authenticated;
 ```
 
-Use restrictive deny policies for `anon` and `authenticated` direct table access. Service-role access may remain explicit for maintenance/diagnostics.
+Create explicit restrictive deny policies for anon/authenticated to avoid RLS-no-policy Advisor findings. Public wrappers are `SECURITY INVOKER`, execute revoked from `public`/`anon`, granted to `authenticated`. Private cores are `SECURITY DEFINER` with pinned `search_path`.
 
-Private read/mutation functions are `SECURITY DEFINER` with pinned `search_path` and explicit role checks. Public wrappers are SQL/PLpgSQL `SECURITY INVOKER`; revoke execute from `public` and `anon`, grant only required public RPCs to `authenticated`.
+Role matrix:
 
-Detailed read guard: roles `super_admin`, `admin`, `finance`.
+```text
+Detailed read: super_admin, admin, finance
+Status read:   super_admin, admin, finance, sales
+Vendor/order/delivery mutations: super_admin, admin
+Invoice record/reversal:          super_admin, admin, finance
+```
 
-Sales-safe read guard: roles `super_admin`, `admin`, `finance`, `sales`.
+All business role denials use SQLSTATE `42501`.
 
-Order/vendor/delivery mutations: `super_admin`, `admin` only.
+- [ ] **Step 11: Make event audit immutable**
 
-Invoice record/reversal: `super_admin`, `admin`, `finance`.
+BEFORE UPDATE/DELETE on `customer_project_procurement_events` raises SQLSTATE `23514` with `Project procurement audit rows are immutable.`
 
-All role denials use SQLSTATE `42501`.
-
-- [ ] **Step 10: Make procurement event log immutable**
-
-Add a BEFORE UPDATE OR DELETE trigger on `customer_project_procurement_events` that raises SQLSTATE `23514` with a stable message such as `Project procurement audit rows are immutable.`
-
-- [ ] **Step 11: Run contract**
+- [ ] **Step 12: Run contract and commit**
 
 ```bash
 cd modulex-admin
 node scripts/project-procurement-contract.mjs
-```
-
-Expected: DB schema/sync/operations contract is GREEN; adapter/UI still RED.
-
-- [ ] **Step 12: Commit**
-
-```bash
-git add modulex-store/supabase/migrations/20260904103000_customer_project_procurement_operations.sql \
-  modulex-admin/scripts/project-procurement-contract.mjs
+cd ..
+git add modulex-store/supabase/migrations/20260904103000_customer_project_procurement_operations.sql modulex-admin/scripts/project-procurement-contract.mjs
 git commit -m "feat: add Project procurement operations"
 ```
 
 ---
 
-### Task 5: Add Admin permissions and typed procurement client adapter
+### Task 5: Add explicit Admin permissions and typed procurement adapter
 
 **Files:**
 - Create: `modulex-admin/src/lib/customers/project-procurement.ts`
@@ -684,30 +662,10 @@ git commit -m "feat: add Project procurement operations"
 - Modify: `modulex-admin/scripts/project-procurement-contract.mjs`
 
 **Interfaces:**
-- Produces TypeScript types:
-  - `ProjectProcurementAttentionState`
-  - `ProjectProcurementDeliveryState`
-  - `ProjectProcurementInvoiceState`
-  - `ProjectProcurementInvoiceLink`
-  - `ProjectProcurementCommitment`
-  - `ProjectProcurementRequirement`
-  - `ProjectProcurementLedger`
-  - `ProjectProcurementStatusRow`
-- Produces adapter functions:
-  - `loadProjectProcurement(projectId)`
-  - `loadProjectProcurementStatus(projectId)`
-  - `resolveProjectProcurementVendor(input)`
-  - `createProjectProcurementCommitment(input)`
-  - `confirmProjectProcurementCommitment(commitmentId)`
-  - `cancelProjectProcurementCommitment(input)`
-  - `recordProjectProcurementDelivery(input)`
-  - `correctProjectProcurementDelivery(input)`
-  - `recordProjectProcurementInvoice(input)`
-  - `reverseProjectProcurementInvoiceAllocation(input)`
+- Types: `ProjectProcurementAttentionState`, `ProjectProcurementDeliveryState`, `ProjectProcurementInvoiceState`, `ProjectProcurementInvoiceLink`, `ProjectProcurementCommitment`, `ProjectProcurementRequirement`, `ProjectProcurementLedger`, `ProjectProcurementStatusRow`.
+- Functions: `loadProjectProcurement`, `loadProjectProcurementStatus`, `resolveProjectProcurementVendor`, `createProjectProcurementCommitment`, `confirmProjectProcurementCommitment`, `cancelProjectProcurementCommitment`, `recordProjectProcurementDelivery`, `correctProjectProcurementDelivery`, `recordProjectProcurementInvoice`, `reverseProjectProcurementInvoiceAllocation`.
 
-- [ ] **Step 1: Extend contract with adapter/permission RED assertions**
-
-Require the exact exported function names above and role assignments:
+- [ ] **Step 1: Add adapter/permission RED assertions**
 
 ```js
 const adapterSource = read(adapter);
@@ -719,16 +677,11 @@ for (const token of [
   "recordProjectProcurementDelivery",
   "recordProjectProcurementInvoice",
 ]) assert.match(adapterSource, new RegExp(token));
-
-assert.match(permissionSource, /project_procurement\.view/);
-assert.match(permissionSource, /project_procurement\.manage/);
 ```
 
-Run; expected RED.
+- [ ] **Step 2: Add permissions**
 
-- [ ] **Step 2: Add explicit permissions**
-
-Add to `Permission` and labels:
+Add:
 
 ```ts
 | "project_procurement.view"
@@ -748,16 +701,14 @@ Role mapping:
 sales   -> project_procurement.view
 finance -> project_procurement.view
 admin/super_admin -> all permissions, therefore view + manage
-warehouse/shipping -> no new Procurement permission in PB-3B
+warehouse/shipping -> no PB-3B procurement permission
 ```
 
-Finance invoice actions are authorized by DB role plus existing `finance.manage`; do not give Finance broad vendor-order/delivery ownership through `project_procurement.manage`.
+Finance invoice mutation uses existing `finance.manage` plus DB role guard; do not grant broad `project_procurement.manage` to Finance.
 
-Update role descriptions so Sales says Procurement operational status only and Finance says vendor invoice allocation/cost visibility without order/delivery ownership.
+- [ ] **Step 3: Define typed models**
 
-- [ ] **Step 3: Define typed adapter models**
-
-Use camelCase client types. Example commitment:
+Example:
 
 ```ts
 export type ProjectProcurementCommitment = {
@@ -776,11 +727,9 @@ export type ProjectProcurementCommitment = {
 };
 ```
 
-Requirement includes order/source/product/vendor/expected cost, active committed/open/excess quantity and commitments.
+Keep nullable expected cost as `number | null`; parsing must not turn missing cost into zero.
 
-- [ ] **Step 4: Normalize mutation inputs before RPC**
-
-In the adapter, implement domain-local helpers:
+- [ ] **Step 4: Add exact normalization helpers**
 
 ```ts
 function requiredText(value: string, field: string) {
@@ -794,36 +743,58 @@ function positiveNumber(value: number, field: string) {
   return value;
 }
 
-function currencyCode(value: string) {
+function nonNegativeNumber(value: number, field: string) {
+  if (!Number.isFinite(value) || value < 0) throw new Error(`${field} cannot be negative.`);
+  return value;
+}
+
+function normalizeCurrency(value: string) {
   const normalized = value.trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(normalized)) throw new Error("Currency must be a three-letter code.");
   return normalized;
 }
 
-function isoDate(value: string, field: string) {
+function normalizeIsoDate(value: string, field: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`${field} is invalid.`);
   return value;
 }
 ```
 
-Do not convert blank numeric fields to zero.
-
-- [ ] **Step 5: Add local early permission guards without replacing DB authority**
-
-Implement:
+- [ ] **Step 5: Add actual early permission guards**
 
 ```ts
-async function requireProcurementManage() { /* project_procurement.manage */ }
-async function requireProcurementInvoiceManage() { /* project_procurement.manage OR finance.manage */ }
+async function currentProfileOrThrow() {
+  const { profile, error } = await getCurrentProfile();
+  if (error) throw error;
+  if (!profile) throw new Error("Profile could not be loaded.");
+  return profile;
+}
+
+async function requireProcurementManage() {
+  const profile = await currentProfileOrThrow();
+  if (!hasPermission(profile.roles, "project_procurement.manage")) {
+    throw new Error("You do not have permission to manage Project procurement.");
+  }
+  return profile;
+}
+
+async function requireProcurementInvoiceManage() {
+  const profile = await currentProfileOrThrow();
+  if (
+    !hasPermission(profile.roles, "project_procurement.manage") &&
+    !hasPermission(profile.roles, "finance.manage")
+  ) {
+    throw new Error("You do not have permission to manage Project vendor invoices.");
+  }
+  return profile;
+}
 ```
 
-Detailed reads may be requested only when `project_procurement.view` plus internal finance/cost visibility is present; Sales uses the status RPC.
+DB/RPC authorization remains authoritative.
 
 - [ ] **Step 6: Implement RPC adapters**
 
-Use exact RPC argument names from Task 4. Parse numeric strings with a helper that returns finite numbers but does not fabricate missing cost values; nullable costs stay `null`.
-
-`recordProjectProcurementInvoice` input:
+Use exact Task 4 RPC argument names. `recordProjectProcurementInvoice` input:
 
 ```ts
 {
@@ -837,28 +808,22 @@ Use exact RPC argument names from Task 4. Parse numeric strings with a helper th
 }
 ```
 
-- [ ] **Step 7: Run contract and TypeScript**
+`loadProjectProcurementStatus` is the only read called by Sales UI. Detailed adapter is for Admin/Finance only.
+
+- [ ] **Step 7: Verify and commit**
 
 ```bash
 cd modulex-admin
 node scripts/project-procurement-contract.mjs
 npm run typecheck
-```
-
-Expected: adapter/permission contract GREEN; typecheck passes; UI assertions still RED.
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add modulex-admin/src/lib/customers/project-procurement.ts \
-  modulex-admin/src/lib/auth/permissions.ts \
-  modulex-admin/scripts/project-procurement-contract.mjs
+cd ..
+git add modulex-admin/src/lib/customers/project-procurement.ts modulex-admin/src/lib/auth/permissions.ts modulex-admin/scripts/project-procurement-contract.mjs
 git commit -m "feat: add Project procurement client boundary"
 ```
 
 ---
 
-### Task 6: Replace Project Procurement placeholder with the real role-aware UI
+### Task 6: Replace Project Procurement placeholder with role-aware UI
 
 **Files:**
 - Create: `modulex-admin/src/components/customers/project-detail/ProjectProcurementTab.tsx`
@@ -868,50 +833,32 @@ git commit -m "feat: add Project procurement client boundary"
 - Modify: `modulex-admin/scripts/project-procurement-contract.mjs`
 
 **Interfaces:**
-- `ProjectProcurementTab` props:
 
 ```ts
 type ProjectProcurementTabProps = {
   projectId: string;
+  canViewProcurement: boolean;
   canViewDetails: boolean;
   canManageProcurement: boolean;
   canManageInvoices: boolean;
 };
 ```
 
-- `canViewDetails`: Admin/Finance internal detail; false for Sales.
-- `canManageProcurement`: Admin/Super Admin.
-- `canManageInvoices`: Admin/Super Admin or Finance.
-
-- [ ] **Step 1: Extend UI contract RED assertions**
-
-Require:
+- [ ] **Step 1: Add UI RED assertions**
 
 ```js
 const workspace = read("modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx");
 const procurementUi = read(component);
 assert.match(workspace, /ProjectProcurementTab/);
-assert.doesNotMatch(workspace, /title="Procurement"[\s\S]{0,300}ProjectPendingDomainTab/);
-for (const label of [
-  "Vendor",
-  "Product",
-  "Vendor Cost",
-  "Delivery",
-  "Invoiced",
-  "Invoice No",
-  "Invoice Cost",
-  "PO No",
-]) assert.match(procurementUi, new RegExp(label));
+for (const label of ["Vendor", "Product", "Vendor Cost", "Delivery", "Invoiced", "Invoice No", "Invoice Cost", "PO No"]) {
+  assert.match(procurementUi, new RegExp(label));
+}
 assert.match(procurementUi, /Vendor Required/);
 assert.match(procurementUi, /Open to Purchase/);
 assert.match(procurementUi, /Excess Ordered/);
 ```
 
-Run; expected RED.
-
-- [ ] **Step 2: Add role-aware Procurement permissions to workspace load**
-
-In `ProjectDetailWorkspace.tsx`, compute after profile load:
+- [ ] **Step 2: Compute workspace permissions from current profile**
 
 ```ts
 const nextCanViewProcurement = Boolean(profile && hasPermission(profile.roles, "project_procurement.view"));
@@ -929,13 +876,11 @@ const nextCanViewProcurementDetails = Boolean(
 );
 ```
 
-Sales therefore gets the status projection, Finance gets detailed cost/invoice view + invoice actions, Admin gets full actions.
+No permission → explicit permission-denied state and no RPC call.
 
-If the profile lacks `project_procurement.view`, the Procurement tab should render a permission-denied state rather than attempt the RPC.
+- [ ] **Step 3: Build Sales-safe branch first**
 
-- [ ] **Step 3: Build the Sales-safe status branch first**
-
-When `canViewDetails === false`, call only `loadProjectProcurementStatus`. Render no vendor identity or money columns. Use shared `ComponentCard`, `TableViewport`, `Table`, `Badge`, `Alert`, `Button`.
+When `canViewDetails=false`, call only `loadProjectProcurementStatus`.
 
 Columns:
 
@@ -943,11 +888,11 @@ Columns:
 Product | Required | Ordered | Delivery | Invoiced
 ```
 
-Explicit states: loading, empty (`No confirmed Project purchases yet.`), error + Retry, permission denied.
+Do not render vendor, PO, costs, invoice number, invoice amount. Implement loading, empty (`No confirmed Project purchases yet.`), error/retry, permission-denied states using shared primitives.
 
-- [ ] **Step 4: Build the detailed Admin/Finance table**
+- [ ] **Step 4: Build detailed Admin/Finance table**
 
-Call `loadProjectProcurement`. Render the approved compact table:
+Approved primary columns:
 
 ```text
 Vendor | Product | Qty | Vendor Cost | Delivery | Invoiced | Invoice No | Invoice Cost | PO No | Actions
@@ -955,54 +900,52 @@ Vendor | Product | Qty | Vendor Cost | Delivery | Invoiced | Invoice No | Invoic
 
 Rules:
 
-- Requirement row shows current required quantity.
-- Configured Countertop source label may show `Stone` / `Sink` secondary text.
-- Vendor Cost uses agreed commitment cost when commitment exists; otherwise expected cost; missing is `Cost Required` rather than `$0.00`.
-- Delivery shows `delivered / ordered` plus state badge.
-- Invoice Cost sums effective allocations for the visible commitment only.
-- Multiple invoice numbers render as a compact list, never as the vendor invoice full total.
-- Attention badges: `Vendor Required`, `Cost Required`, `Quantity Required`, `Open to Purchase`, `Excess Ordered`.
-- Historical cancelled commitments remain readable but visually marked cancelled.
+- Stone/Sink configured components show separate source labels.
+- Vendor Cost = agreed commitment cost when ordered; otherwise expected cost; missing displays `Cost Required`, never `$0.00`.
+- Delivery displays effective `delivered / ordered` and status.
+- Invoice Cost sums effective allocations for that commitment only.
+- Multiple invoice numbers render compactly.
+- Shared invoice header total never appears as the Project's cost.
+- Attention states: `Vendor Required`, `Cost Required`, `Quantity Required`, `Open to Purchase`, `Excess Ordered`.
+- Cancelled historical commitments remain readable.
 
-- [ ] **Step 5: Implement Admin order/vendor actions in `ProjectProcurementOrderActions.tsx`**
+- [ ] **Step 5: Implement Admin vendor/order actions**
 
-Use shared Modal/Input/Label/Button/Alert components only.
+`ProjectProcurementOrderActions.tsx` uses shared Modal/Input/Label/Button/Alert.
 
-Vendor resolution modal fields:
+Vendor modal:
 
 ```text
 Vendor Code
 Vendor Name
 ```
 
-Create Order modal fields:
+Create Order modal:
 
 ```text
 PO / Vendor Order No
-Quantity (default = open quantity)
+Quantity (default open quantity)
 Agreed Unit Cost
-Currency (default expected currency when available)
+Currency (default expected currency when present)
 ```
 
-Disable duplicate submits. Frontend rejects quantity `<= 0` or `> openQuantity`; DB remains authoritative.
+Hide from Finance/Sales. Add Confirm and Cancel actions; Cancel requires reason. Disable duplicate submit and reject obvious invalid quantity/currency before RPC.
 
-Add `Confirm Vendor Order` for ordered commitments and `Cancel Vendor Order` with mandatory reason. Hide all of these actions from Finance/Sales.
-
-- [ ] **Step 6: Implement delivery and invoice actions in `ProjectProcurementReceiptInvoiceActions.tsx`**
+- [ ] **Step 6: Implement delivery/invoice/correction actions**
 
 Admin delivery modal:
 
 ```text
-Received Quantity (default remaining)
-Delivery Date (default today YYYY-MM-DD)
-Notes (optional)
+Received Quantity
+Delivery Date (YYYY-MM-DD, default today)
+Notes
 ```
 
-Admin correction modal:
+Admin delivery correction:
 
 ```text
 Correction Quantity
-Reason (required)
+Reason
 ```
 
 Admin/Finance invoice modal:
@@ -1012,61 +955,42 @@ Invoice No
 Invoice Date
 Vendor Invoice Total
 Currency
-Invoiced Quantity (default remaining uninvoiced qty)
+Invoiced Quantity
 Invoice Cost for this Project/product
 ```
 
-Copy clarifies that `Vendor Invoice Total` is the whole vendor invoice header and `Invoice Cost` is only this Project/product allocation. Do not render payment status fields.
+Copy explains `Vendor Invoice Total` is the whole vendor invoice and `Invoice Cost` is this Project/product allocation. Add allocation reversal as secondary action requiring reason. No payment controls/fields.
 
-Provide reversal of a linked allocation behind a secondary action requiring a reason. Admin and Finance may use it.
+- [ ] **Step 7: Replace only Procurement placeholder**
 
-- [ ] **Step 7: Keep the primary screen simple**
+Import/render `ProjectProcurementTab` for `activeTab === "Procurement"`. Keep `ProjectPendingDomainTab` for Documents/other staged domains.
 
-Do not add a standalone PO module, inventory controls, payment controls, or PB-2 profitability changes. Correction/cancellation actions belong behind row actions/modals; the primary table remains the nine approved business columns plus Actions.
-
-- [ ] **Step 8: Replace only the Procurement placeholder in workspace**
-
-Import `ProjectProcurementTab` and render it for `activeTab === "Procurement"`. Keep `ProjectPendingDomainTab` for Documents or other still-staged domains.
-
-- [ ] **Step 9: Run focused contract and strict UI gate**
+- [ ] **Step 8: Verify and commit**
 
 ```bash
 cd modulex-admin
 node scripts/project-procurement-contract.mjs
 npm run smoke:admin-ui-strict
 npm run typecheck
-```
-
-Expected: all PB-3B source contract assertions GREEN; strict UI and typecheck pass.
-
-- [ ] **Step 10: Commit**
-
-```bash
-git add modulex-admin/src/components/customers/project-detail/ProjectProcurementTab.tsx \
-  modulex-admin/src/components/customers/project-detail/ProjectProcurementOrderActions.tsx \
-  modulex-admin/src/components/customers/project-detail/ProjectProcurementReceiptInvoiceActions.tsx \
-  modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx \
-  modulex-admin/scripts/project-procurement-contract.mjs
+cd ..
+git add modulex-admin/src/components/customers/project-detail/ProjectProcurementTab.tsx modulex-admin/src/components/customers/project-detail/ProjectProcurementOrderActions.tsx modulex-admin/src/components/customers/project-detail/ProjectProcurementReceiptInvoiceActions.tsx modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx modulex-admin/scripts/project-procurement-contract.mjs
 git commit -m "feat: add Project Procurement workspace"
 ```
 
 ---
 
-### Task 7: Lock behavioral/security acceptance and package documentation before PR handoff
+### Task 7: Final pre-merge verification, acceptance artifact, trackers, and PR
 
 **Files:**
 - Create: `docs/acceptance/pb-3b-project-procurement.md`
 - Modify: `modulex-admin/scripts/project-procurement-contract.mjs`
 - Modify: `docs/PROJECT_BASE_PLAN.md`
 - Modify: `modulex-admin/ADMIN_ROADMAP.md`
-- Modify: `.github/workflows/admin-project-base.yml` only if final contract naming/order needs correction
 
 **Interfaces:**
-- Produces pre-merge acceptance artifact and a final-head CI gate.
+- Produces final pre-merge evidence; PB-3B remains `[~]` until post-merge production acceptance.
 
-- [ ] **Step 1: Add final static invariants to the contract**
-
-Require the final contract to prove at source level:
+- [ ] **Step 1: Add final source invariants**
 
 ```js
 assert.doesNotMatch(core, /insert\s+into\s+public\.inventory_movements/i);
@@ -1076,36 +1000,58 @@ assert.match(core, /countertop_configurations/);
 assert.match(core, /slab_quantity/);
 assert.match(ops, /vendor_invoices/);
 assert.match(ops, /invoice_number_key/);
-assert.match(ops, /project_invoice_cost|allocated_amount|amount_delta/);
+assert.match(ops, /amount_delta/);
 ```
 
-Also assert Sales role receives `project_procurement.view` but not `project_procurement.manage`, and Finance receives view but not broad manage.
+Also assert Sales role contains `project_procurement.view` and not `project_procurement.manage`; Finance contains view and not broad manage.
 
-- [ ] **Step 2: Add a pre-merge read-only production reconnaissance section to acceptance doc**
-
-Record current production facts without writes:
+- [ ] **Step 2: Run exact read-only production preflight SQL**
 
 ```sql
--- current PB-3B tables should not exist before migration
-select to_regclass('public.customer_project_procurement_requirements');
-select to_regclass('public.vendor_invoices');
+select
+  to_regclass('public.customer_project_procurement_requirements') as requirements_table,
+  to_regclass('public.vendor_invoices') as vendor_invoices_table;
 
--- Stone/Sink source truth samples
-select ... from public.countertop_configurations ...;
-select ... from public.vendor_catalog_items where canonical_product_id is not null ...;
+select
+  cc.id,
+  cc.order_id,
+  cc.order_item_id,
+  cc.stone_product_id,
+  cc.sink_product_id,
+  cc.slab_quantity,
+  cc.sqft
+from public.countertop_configurations cc
+order by cc.created_at desc
+limit 10;
 
--- confirm no existing procurement ledger is being replaced
-select table_name from information_schema.tables
-where table_schema='public' and table_name ilike '%procurement%';
+select
+  vci.canonical_product_id,
+  vci.vendor_code,
+  vci.review_status,
+  p.sku,
+  pt.code as product_type_code
+from public.vendor_catalog_items vci
+join public.products p on p.id = vci.canonical_product_id
+join public.product_types pt on pt.id = p.product_type_id
+where vci.canonical_product_id is not null
+  and vci.review_status = 'APPROVED'
+  and pt.code in ('STONE','SINK')
+order by vci.updated_at desc
+limit 20;
+
+select table_name
+from information_schema.tables
+where table_schema='public'
+  and table_name ilike '%procurement%'
+order by table_name;
 ```
 
-Document that current Countertop config is Draft-only mutable, so confirmed procurement sync uses stable `slab_quantity`/`sink_product_id` truth.
+Expected before migration: no PB-3B tables; existing Stone/Sink sources prove current derivation inputs.
 
-- [ ] **Step 3: Run all relevant local verification**
-
-From `modulex-admin`:
+- [ ] **Step 3: Run full relevant Admin verification**
 
 ```bash
+cd modulex-admin
 node scripts/project-base-contract.mjs
 node scripts/project-progress-layout-contract.mjs
 node scripts/project-financial-rollup-contract.mjs
@@ -1116,89 +1062,78 @@ node scripts/project-procurement-contract.mjs
 node scripts/countertop-sink-fallback-contract.mjs
 npm run smoke:admin-ui-strict:self-test
 npm run smoke:admin-ui-strict
+npm run smoke:rbac
+npm run smoke:order-domain
+npm run smoke:order-lifecycle
 npm run typecheck
 npm run lint
 npm run build
 ```
 
-Expected: all pass.
+- [ ] **Step 4: Run shared Store/Portal regressions**
 
-- [ ] **Step 4: Verify Store/Portal remains unchanged**
+```bash
+cd modulex-store
+npm run smoke:store-portal
+npm run smoke:portal-experience
+npm run smoke:portal-auth-rpc-guard
+npm run smoke:gc6-cabinet-journey
+npm run lint
+npm run build
+```
 
-Run the existing Store/portal regressions that cover shared schema consumers. At minimum use the repository's current CI commands/workflows for Store Chrome/SEO, Dealer/Customer portal order surfaces, and Cabinet journey where available. The expected result is no new public procurement RPC/table projection and no Store source change required for PB-3B.
+Expected: no Store/Portal code/projection change required by PB-3B.
 
-- [ ] **Step 5: Review migration SQL against production before merge**
+- [ ] **Step 5: Write acceptance doc**
 
-Use read-only production queries to verify all referenced columns/FKs/functions still exist with compatible types. Compare current function/security metadata for the Order and Project domains. Do **not** run DDL or permanent mutation before merge.
-
-- [ ] **Step 6: Update acceptance doc with pre-merge evidence**
-
-Include:
+`docs/acceptance/pb-3b-project-procurement.md` records:
 
 ```text
-Design/spec path
-Migration filenames
+spec + plan paths
+migration filenames
 RBAC matrix
-Static/TDD RED -> GREEN evidence
-Local typecheck/lint/build
-No inventory writes
-No payment fields
-Production schema preflight
-Pending gates: owner merge -> production migration -> rollback smoke -> Advisors -> Admin deploy/UI review
+RED -> GREEN contract evidence
+Countertop 55 sqft / slab_quantity semantics
+no inventory writes
+no Project payment fields
+shared vendor invoice / Project allocation rule
+pre-merge production schema preflight
+local Admin + Store verification
+pending gates: owner merge -> production DDL -> rollback smoke -> Advisors -> Admin deploy/UI review
 ```
 
-- [ ] **Step 7: Keep trackers `[~]` before production acceptance**
+- [ ] **Step 6: Keep trackers active, commit, push, PR**
 
-Update current branch/PR/status in `docs/PROJECT_BASE_PLAN.md` and `modulex-admin/ADMIN_ROADMAP.md`, but do not change PB-3B to `[x]` before post-merge migration/deploy acceptance.
-
-- [ ] **Step 8: Commit**
+Update current branch/PR notes but keep PB-3B `[~]`.
 
 ```bash
-git add docs/acceptance/pb-3b-project-procurement.md \
-  modulex-admin/scripts/project-procurement-contract.mjs \
-  docs/PROJECT_BASE_PLAN.md \
-  modulex-admin/ADMIN_ROADMAP.md \
-  .github/workflows/admin-project-base.yml
+git add docs/acceptance/pb-3b-project-procurement.md modulex-admin/scripts/project-procurement-contract.mjs docs/PROJECT_BASE_PLAN.md modulex-admin/ADMIN_ROADMAP.md
 git commit -m "docs: add PB-3B procurement acceptance"
-```
-
-- [ ] **Step 9: Push and create a ready-for-review PR without merging**
-
-```bash
 git push -u origin feat/project-procurement-pb3b
-gh pr create \
-  --base main \
-  --head feat/project-procurement-pb3b \
-  --title "feat: add PB-3B Project procurement" \
-  --body-file /tmp/pb3b-pr-body.md
 ```
 
-PR body must summarize business behavior, security, TDD evidence, migration status `NOT YET APPLIED`, and owner-owned merge/deploy gate.
+Create ready-for-review PR titled `feat: add PB-3B Project procurement`; body must state migrations are **NOT YET APPLIED**, all security/role boundaries, RED/GREEN evidence, and owner-owned merge/deploy gate. Do not merge.
 
-- [ ] **Step 10: Wait for all PR CI on final head**
+- [ ] **Step 7: Wait for final-head CI**
 
-Expected required workflows: Admin Project Base, Admin UI Foundation, Admin Customers UI, Admin A1 Core Operations, and all Store/shared-schema regressions triggered by the diff. Fix only PB-3B regressions; do not sweep unrelated advisor/CI backlog.
+Require all workflows triggered by the diff to be green. Fix only PB-3B regressions; do not sweep unrelated backlog.
 
 ---
 
-### Task 8: Post-merge production migration, rollback-only business acceptance, Advisors, deploy, and closeout
+### Task 8: Post-merge production migration, rollback-only acceptance, Advisors, deploy, and closeout
 
 **Files:**
 - Modify after evidence: `docs/acceptance/pb-3b-project-procurement.md`
 - Modify after evidence: `docs/PROJECT_BASE_PLAN.md`
 - Modify after evidence: `modulex-admin/ADMIN_ROADMAP.md`
 
-**Interfaces:**
-- Gate: start only after the project owner explicitly confirms the PB-3B PR is merged.
-- Produces: production-accepted PB-3B and final tracker closeout.
+**Gate:** Start only after project owner explicitly confirms the PB-3B PR is merged.
 
-- [ ] **Step 1: Verify merge SHA and production migration absence**
+- [ ] **Step 1: Verify merged main + migration history**
 
-Confirm current `main` contains the PB-3B migrations and CI is green. Check Supabase migration history; none of the PB-3B migrations should have been applied before merge.
+Confirm current `main` contains the PB-3B migration files and PR CI is green. Confirm migrations were not applied pre-merge.
 
-- [ ] **Step 2: Apply the three migrations to production in order**
-
-Apply:
+- [ ] **Step 2: Apply production migrations in order**
 
 ```text
 20260904102000_customer_project_procurement_core.sql
@@ -1206,48 +1141,40 @@ Apply:
 20260904103000_customer_project_procurement_operations.sql
 ```
 
-If production schema drift makes any migration unsafe, stop and create a forward fix; do not edit an already-applied production migration in place.
+If production drift blocks safe application, stop and add a forward migration; never rewrite an already-applied migration.
 
-- [ ] **Step 3: Run rollback-only Admin happy-path smoke**
+- [ ] **Step 3: Rollback-only Admin happy-path smoke**
 
-Inside one explicit SQL transaction as an Admin/Super Admin identity/test harness:
+Inside one explicit transaction/test identity:
 
 ```text
-create or reuse a temporary Project + Draft Order only if safe test fixtures are available
+use/create safe Project + Draft Order fixture
 confirm Project-linked Order
-verify one requirement per ordinary physical component
-for configured Countertop fixture verify Stone qty = slab_quantity and Sink = 1
-place commitment with PO and agreed cost
+call sync twice and prove idempotency
+for ordinary physical item prove Order quantity is used
+for configured Countertop prove Stone qty = slab_quantity and Sink qty = 1
+place commitment with PO + agreed cost
 record partial delivery
 record vendor invoice allocation
-query detailed ledger
+read detailed ledger
 ROLLBACK
 ```
 
 Assertions:
 
 ```text
-confirmed sync idempotent
-55 sqft / 2 slabs -> Stone required qty 2, never 55
-Sink config -> separate qty 1 requirement
+55 sqft / 2 slabs => Stone required qty 2, never 55
 partial delivery state correct
 invoice state/cost correct
-no inventory_movements inserted
-rollback leaves zero PB-3B test residue
+inventory_movements count unchanged
+rollback leaves zero PB-3B business residue
 ```
 
-- [ ] **Step 4: Run rollback-only shared-invoice smoke across two Projects**
+- [ ] **Step 4: Rollback-only shared-invoice smoke across two Projects**
 
-Within one transaction:
+Use the same vendor + invoice number for Project A and Project B commitments. Assert one canonical `vendor_invoices` row, two effective allocations, each Project detailed read shows only its own invoice cost, aggregate allocation <= invoice header total. Roll back and prove zero residue.
 
-```text
-Project A commitment -> invoice INV-PB3B-SMOKE allocation A
-Project B commitment -> same vendor + same invoice number allocation B
-```
-
-Assert one canonical `vendor_invoices` row, two effective Project allocations, each Project detailed read shows only its own invoice cost, and summed allocations do not exceed invoice header total. Roll back and confirm zero residue.
-
-- [ ] **Step 5: Run failure/role smoke**
+- [ ] **Step 5: Rollback-only failure/role smoke**
 
 Verify:
 
@@ -1256,44 +1183,43 @@ Sales status RPC succeeds
 Sales detailed RPC -> 42501
 Sales mutation -> 42501
 Finance detailed RPC succeeds
-Finance invoice record/reversal succeeds in rollback
-Finance vendor-order/delivery mutation -> 42501
+Finance invoice record/reversal succeeds
+Finance vendor/order/delivery mutation -> 42501
 Vendor Required blocks commitment
 quantity above open amount rejected
-partial over-delivery rejected
-invoice vendor/currency/header mismatch rejected
+over-delivery rejected
+invoice currency/header mismatch rejected
 invoice over-allocation rejected
+cancelled Order retires current open demand while preserving historical commitment rows
 ```
 
 - [ ] **Step 6: Prove no inventory side effect**
 
-Capture `inventory_movements` count before and during rollback-only delivery smoke for the touched products. Count must not change because procurement delivery is not inventory receipt.
+Capture relevant `inventory_movements` count before and during procurement delivery smoke; count must remain unchanged.
 
-- [ ] **Step 7: Run fresh Supabase Security and Performance Advisors**
+- [ ] **Step 7: Run Security + Performance Advisors**
 
-Record PB-3B-specific findings. Fix blocking RLS/grant/search-path/FK/index findings with a new forward migration. New indexes may show `unused_index` INFO before traffic; document as informational rather than deleting useful covering indexes prematurely.
+Fix only PB-3B blocking RLS/grant/search-path/FK/index findings with a new forward migration. New low-traffic indexes may legitimately show `unused_index` INFO; document rather than delete prematurely.
 
 - [ ] **Step 8: Deploy merged Admin and perform signed-in UI acceptance**
 
-Verify Project -> Procurement for:
-
 ```text
 Admin: detailed table + vendor/order/delivery/invoice actions
-Finance: detailed cost/invoice view + invoice actions, no order/delivery ownership
-Sales: sanitized status-only table, no vendor cost/invoice amounts
+Finance: detailed cost/invoice view + invoice actions, no vendor-order/delivery ownership
+Sales: sanitized status-only table, no vendor/PO/cost/invoice numbers/amounts
 ```
 
-Check loading, empty, populated, error/retry, modal validation, partial delivery, shared invoice number display, mobile/table containment, light/dark readability.
+Also verify loading/empty/error/retry, modal validation, partial delivery, shared invoice number display, responsive table containment, light/dark readability.
 
-- [ ] **Step 9: Close trackers only after acceptance passes**
+- [ ] **Step 9: Close PB-3B only after all evidence passes**
 
-Change PB-3B to `[x]` in `docs/PROJECT_BASE_PLAN.md` and the Admin roadmap. Record production migration names, merge SHA, deployment ID, rollback smoke results, role boundaries, Advisor outcome, and zero test residue. Set next package to PB-4 outgoing Finance / Project Expenses.
+Set PB-3B `[x]` in both trackers. Record production migration names, merge SHA, Admin deployment ID, rollback smoke results, role boundaries, Advisor outcome, and zero residue. Next package becomes PB-4 outgoing Finance / Project Expenses.
 
-- [ ] **Step 10: Commit closeout documentation in a small follow-up PR if main is already protected by merge**
+- [ ] **Step 10: Commit closeout docs in a small follow-up PR when required**
 
 ```bash
 git add docs/acceptance/pb-3b-project-procurement.md docs/PROJECT_BASE_PLAN.md modulex-admin/ADMIN_ROADMAP.md
 git commit -m "docs: close PB-3B production acceptance"
 ```
 
-Do not mark deployment/acceptance complete without evidence.
+Do not claim package closure without production migration + deploy + acceptance evidence.
