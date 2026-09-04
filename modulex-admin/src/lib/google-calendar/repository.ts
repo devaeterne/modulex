@@ -88,11 +88,7 @@ export async function updateCalendarIntegrationSettings(
 ): Promise<GoogleCalendarIntegrationSettings> {
   const { data, error } = await supabaseAdmin
     .from("calendar_integration_settings")
-    .upsert({
-      id: 1,
-      ...input,
-      updated_by: actorUserId,
-    }, { onConflict: "id" })
+    .upsert({ id: 1, ...input, updated_by: actorUserId }, { onConflict: "id" })
     .select("enabled,auto_create_project_calendar,calendar_name_template,timezone_override,sync_installations,sync_deliveries,sync_measurements,sync_customer_appointments")
     .single();
   assertNoError(error, "Google Calendar settings could not be saved.");
@@ -100,21 +96,13 @@ export async function updateCalendarIntegrationSettings(
 }
 
 export async function getGeneralTimezone(): Promise<string> {
-  const { data, error } = await supabaseAdmin
-    .from("general_settings")
-    .select("timezone")
-    .eq("id", 1)
-    .single();
+  const { data, error } = await supabaseAdmin.from("general_settings").select("timezone").eq("id", 1).single();
   assertNoError(error, "General timezone could not be loaded.");
   return String(data?.timezone || "UTC");
 }
 
 export async function getGoogleCredential(): Promise<GoogleCredentialRow | null> {
-  const { data, error } = await supabaseAdmin
-    .from("calendar_integration_credentials")
-    .select("*")
-    .eq("id", 1)
-    .maybeSingle();
+  const { data, error } = await supabaseAdmin.from("calendar_integration_credentials").select("*").eq("id", 1).maybeSingle();
   assertNoError(error, "Google Calendar credential could not be loaded.");
   return data as GoogleCredentialRow | null;
 }
@@ -168,23 +156,22 @@ export async function retireGoogleCredential(errorCode: string | null = null): P
 export async function markGoogleCredentialSuccess(): Promise<void> {
   const { error } = await supabaseAdmin
     .from("calendar_integration_credentials")
-    .update({ last_success_at: new Date().toISOString(), last_error_at: null, last_error_code: null })
+    .update({ status: "connected", last_success_at: new Date().toISOString(), last_error_at: null, last_error_code: null })
     .eq("id", 1);
   assertNoError(error, "Google Calendar credential success state could not be recorded.");
 }
 
 export async function markGoogleCredentialError(errorCode: string, reconnectRequired = false): Promise<void> {
   const values: Record<string, unknown> = {
-    status: "error",
     last_error_at: new Date().toISOString(),
     last_error_code: errorCode,
   };
-  if (reconnectRequired) values.encrypted_refresh_token = null;
+  if (reconnectRequired) {
+    values.status = "error";
+    values.encrypted_refresh_token = null;
+  }
 
-  const { error } = await supabaseAdmin
-    .from("calendar_integration_credentials")
-    .update(values)
-    .eq("id", 1);
+  const { error } = await supabaseAdmin.from("calendar_integration_credentials").update(values).eq("id", 1);
   assertNoError(error, "Google Calendar credential error state could not be recorded.");
 }
 
@@ -202,30 +189,24 @@ export async function createCalendarOAuthState(input: {
 }
 
 export async function consumeCalendarOAuthState(input: {
-  userId: string;
   stateHash: string;
   now?: string;
-}): Promise<boolean> {
+}): Promise<{ userId: string } | null> {
   const now = input.now ?? new Date().toISOString();
   const { data, error } = await supabaseAdmin
     .from("calendar_oauth_states")
     .update({ consumed_at: now })
-    .eq("user_id", input.userId)
     .eq("state_hash", input.stateHash)
     .is("consumed_at", null)
     .gt("expires_at", now)
-    .select("id")
+    .select("user_id")
     .maybeSingle();
   assertNoError(error, "Google Calendar OAuth state could not be consumed.");
-  return Boolean(data?.id);
+  return data?.user_id ? { userId: String(data.user_id) } : null;
 }
 
 export async function getProjectCalendarBinding(projectId: string): Promise<ProjectCalendarBindingRow | null> {
-  const { data, error } = await supabaseAdmin
-    .from("project_calendar_bindings")
-    .select("*")
-    .eq("project_id", projectId)
-    .maybeSingle();
+  const { data, error } = await supabaseAdmin.from("project_calendar_bindings").select("*").eq("project_id", projectId).maybeSingle();
   assertNoError(error, "Project Calendar binding could not be loaded.");
   return data as ProjectCalendarBindingRow | null;
 }
