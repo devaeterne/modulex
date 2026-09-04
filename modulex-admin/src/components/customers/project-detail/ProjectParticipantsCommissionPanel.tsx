@@ -444,7 +444,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
               </TableHeader>
               <TableBody variant="admin">
                 {loading ? <TableStateRow colSpan={7}>Refreshing commission obligations…</TableStateRow> : null}
-                {!loading && commissions.length === 0 ? <TableStateRow colSpan={7}>"No commission obligations have been created."</TableStateRow> : null}
+                {!loading && commissions.length === 0 ? <TableStateRow colSpan={7}>No commission obligations have been created.</TableStateRow> : null}
                 {!loading ? commissions.map((commission) => (
                   <TableRow key={commission.obligationId}>
                     <TableCell variant="admin">

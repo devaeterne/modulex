@@ -143,7 +143,7 @@ async function requireParticipantManage() {
 
 async function requireCommissionView() {
   const profile = await currentProfileOrThrow();
-  if (!hasAnyRole(profile, ["super_admin", "admin", "finance", "sales"])) {
+  if (!hasAnyRole(profile, PB6_INTERNAL_ROLES)) {
     throw new Error("You do not have permission to view Project commissions.");
   }
   return profile;

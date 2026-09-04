@@ -13,6 +13,7 @@ const workspacePath = "src/components/customers/ProjectDetailWorkspace.tsx";
 const pagePath = "src/app/(admin)/projects/[id]/page.tsx";
 const domainPath = "src/lib/customers/project-participants-commission-domain.ts";
 const panelPath = "src/components/customers/project-detail/ProjectParticipantsCommissionPanel.tsx";
+const eventDomainPath = "src/lib/customers/project-commission-events.ts";
 const roleManagerPath = "src/components/customers/project-detail/ProjectParticipantRoleManager.tsx";
 const migrationPath = "../modulex-store/supabase/migrations/20260905004500_customer_project_commission_access_basis.sql";
 const mirrorPath = "sql/project-pb6-commission-access-basis.sql";
@@ -22,6 +23,7 @@ for (const [file, message] of [
   [pagePath, "Project detail page must exist"],
   [domainPath, "PB-6 client domain must exist"],
   [panelPath, "PB-6 panel must exist"],
+  [eventDomainPath, "PB-6 event domain must exist"],
   [roleManagerPath, "PB-6 role manager must exist"],
   [migrationPath, "PB-6 access/basis migration must exist"],
   [mirrorPath, "PB-6 access/basis Admin SQL mirror must exist"],
@@ -31,6 +33,7 @@ const workspace = read(workspacePath);
 const page = read(pagePath);
 const domain = read(domainPath);
 const panel = read(panelPath);
+const eventDomain = read(eventDomainPath);
 const migration = read(migrationPath);
 const mirror = read(mirrorPath);
 
@@ -44,6 +47,8 @@ assert.doesNotMatch(page, /ProjectParticipantsCommissionPanel|ProjectParticipant
 
 assert.match(domain, /const PB6_INTERNAL_ROLES = \["super_admin", "admin", "finance"\]/, "PB-6 client access must use one internal role boundary");
 assert.doesNotMatch(domain, /PB6_INTERNAL_ROLES[^\n]*sales/, "Sales must not be part of PB-6 internal detail access");
+assert.doesNotMatch(domain, /super_admin", "admin", "finance", "sales/, "Legacy Sales detail access must be removed from the PB-6 client domain");
+assert.doesNotMatch(eventDomain, /super_admin", "admin", "finance", "sales/, "Sales must not pass the commission-event client guard");
 assert.match(domain, /get_customer_project_commission_basis_preview/i, "Percentage creation must request the authoritative DB basis preview");
 assert.match(domain, /p_basis_amount:\s*null/, "Client must not send a user-entered percentage basis amount");
 
