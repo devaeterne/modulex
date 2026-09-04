@@ -17,12 +17,17 @@ import {
   deleteFinanceTransactionDraft,
   getFinanceAccounts,
   getFinanceCategories,
+  getFinanceEmployeeDirectory,
+  getFinanceEmployeePayrollItems,
   getFinanceTransactionsPage,
   postFinanceTransaction,
   reverseFinanceTransaction,
+  setFinanceTransactionLinks,
   voidFinanceTransaction,
   type FinanceAccount,
   type FinanceCategory,
+  type FinanceEmployeeOption,
+  type FinancePayrollItemOption,
   type FinanceTransaction,
   type FinanceTransactionKind,
   type FinanceTransactionStatus,
@@ -66,6 +71,8 @@ export default function FinanceTransactionsManager() {
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
   const [categories, setCategories] = useState<FinanceCategory[]>([]);
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
+  const [employees, setEmployees] = useState<FinanceEmployeeOption[]>([]);
+  const [payrollItems, setPayrollItems] = useState<FinancePayrollItemOption[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ variant: "success" | "error"; text: string } | null>(null);
@@ -74,6 +81,8 @@ export default function FinanceTransactionsManager() {
   const [sourceAccountId, setSourceAccountId] = useState("");
   const [destinationAccountId, setDestinationAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+  const [payrollItemId, setPayrollItemId] = useState("");
   const [amount, setAmount] = useState("");
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [transactionAt, setTransactionAt] = useState(localDateTimeValue());
@@ -90,7 +99,9 @@ export default function FinanceTransactionsManager() {
   const pageSize = 50;
 
   async function load(nextOffset = offset) {
-    const [nextAccounts, nextCategories, nextTransactions, profileResult] = await Promise.all([
+    const profileResult = await getCurrentProfile();
+    const nextCanManage = hasPermission(profileResult.profile?.roles, "finance.manage");
+    const [nextAccounts, nextCategories, nextTransactions, nextEmployees] = await Promise.all([
       getFinanceAccounts(),
       getFinanceCategories(),
       getFinanceTransactionsPage({
@@ -100,12 +111,13 @@ export default function FinanceTransactionsManager() {
         kind: (kindFilter || null) as FinanceTransactionKind | null,
         search: search || null,
       }),
-      getCurrentProfile(),
+      nextCanManage ? getFinanceEmployeeDirectory() : Promise.resolve([] as FinanceEmployeeOption[]),
     ]);
     setAccounts(nextAccounts);
     setCategories(nextCategories);
     setTransactions(nextTransactions);
-    setCanManage(hasPermission(profileResult.profile?.roles, "finance.manage"));
+    setEmployees(nextEmployees);
+    setCanManage(nextCanManage);
     setOffset(nextOffset);
   }
 
@@ -115,11 +127,40 @@ export default function FinanceTransactionsManager() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (kind !== "employee_payment" || !employeeId || !canManage) {
+      setPayrollItems([]);
+      setPayrollItemId("");
+      return;
+    }
+    void getFinanceEmployeePayrollItems(employeeId)
+      .then((items) => {
+        setPayrollItems(items);
+        if (payrollItemId && !items.some((item) => item.payroll_item_id === payrollItemId)) setPayrollItemId("");
+      })
+      .catch((error) => setMessage({ variant: "error", text: error instanceof Error ? error.message : "Payroll items could not be loaded." }));
+  }, [canManage, employeeId, kind, payrollItemId]);
+
   const activeAccounts = useMemo(() => accounts.filter((account) => account.is_active), [accounts]);
   const accountOptions = useMemo(() => activeAccounts.map((account) => ({ value: account.id, label: `${account.name} · ${account.currency_code}` })), [activeAccounts]);
   const destinationOptions = useMemo(() => activeAccounts.filter((account) => !sourceAccountId || account.currency_code === currencyCode).map((account) => ({ value: account.id, label: `${account.name} · ${account.currency_code}` })), [activeAccounts, sourceAccountId, currencyCode]);
   const categoryOptions = useMemo(() => categories.filter((category) => category.is_active && (kind !== "expense" || category.category_type === "expense")).map((category) => ({ value: category.id, label: `${category.code} · ${category.name}` })), [categories, kind]);
+  const employeeOptions = useMemo(() => employees.map((employee) => ({ value: employee.employee_id, label: `${employee.full_name} · ${employee.employee_number}${employee.employment_status === "active" ? "" : ` · ${employee.employment_status}`}` })), [employees]);
+  const payrollItemOptions = useMemo(() => payrollItems.map((item) => ({ value: item.payroll_item_id, label: `${item.period_code} · Pay ${item.pay_date} · ${money(item.remaining_amount, currencyCode)} remaining` })), [currencyCode, payrollItems]);
   const totalCount = Number(transactions[0]?.total_count ?? 0);
+
+  function chooseKind(value: string) {
+    const nextKind = value as FinanceTransactionKind;
+    setKind(nextKind);
+    if (nextKind !== "expense") setCategoryId("");
+    if (nextKind !== "employee_payment") {
+      setEmployeeId("");
+      setPayrollItemId("");
+      setPayrollItems([]);
+    } else {
+      setDestinationAccountId("");
+    }
+  }
 
   function chooseSource(value: string) {
     setSourceAccountId(value);
@@ -133,6 +174,18 @@ export default function FinanceTransactionsManager() {
     if (!sourceAccountId && account) setCurrencyCode(account.currency_code);
   }
 
+  function chooseEmployee(value: string) {
+    setEmployeeId(value);
+    setPayrollItemId("");
+    setPayrollItems([]);
+  }
+
+  function choosePayrollItem(value: string) {
+    setPayrollItemId(value);
+    const item = payrollItems.find((payrollItem) => payrollItem.payroll_item_id === value);
+    if (item) setAmount(String(item.remaining_amount));
+  }
+
   async function createDraft(event: FormEvent) {
     event.preventDefault();
     if (!canManage || busyId) return;
@@ -141,9 +194,20 @@ export default function FinanceTransactionsManager() {
       setMessage({ variant: "error", text: "Finance amount must be greater than zero." });
       return;
     }
+    if (kind === "employee_payment" && !employeeId) {
+      setMessage({ variant: "error", text: "Employee is required for an employee payment." });
+      return;
+    }
+    const selectedPayrollItem = payrollItems.find((item) => item.payroll_item_id === payrollItemId);
+    if (selectedPayrollItem && numericAmount > Number(selectedPayrollItem.remaining_amount)) {
+      setMessage({ variant: "error", text: "Finance amount cannot exceed the Payroll Item remaining amount." });
+      return;
+    }
+
     setBusyId("create");
+    let createdTransactionId: string | null = null;
     try {
-      await createFinanceTransactionDraft({
+      createdTransactionId = await createFinanceTransactionDraft({
         transactionKind: kind,
         sourceAccountId: sourceAccountId || null,
         destinationAccountId: destinationAccountId || null,
@@ -154,13 +218,27 @@ export default function FinanceTransactionsManager() {
         referenceNo,
         notes,
       });
+
+      if (kind === "employee_payment") {
+        await setFinanceTransactionLinks(createdTransactionId, [{
+          employee_id: employeeId,
+          source_document_type: payrollItemId ? "hr_payroll_item" : null,
+          source_document_id: payrollItemId || null,
+          allocated_amount: numericAmount,
+        }]);
+      }
+
       setAmount("");
       setReferenceNo("");
       setNotes("");
-      setMessage({ variant: "success", text: "Finance draft created. It does not affect balances until posted." });
+      setEmployeeId("");
+      setPayrollItemId("");
+      setPayrollItems([]);
+      setMessage({ variant: "success", text: kind === "employee_payment" ? "Employee Finance draft created and linked. It does not affect Payroll settlement until posted." : "Finance draft created. It does not affect balances until posted." });
       await load(0);
     } catch (error) {
-      setMessage({ variant: "error", text: error instanceof Error ? error.message : "Finance draft could not be created." });
+      const detail = error instanceof Error ? error.message : "Finance draft could not be created.";
+      setMessage({ variant: "error", text: createdTransactionId ? `Finance draft ${createdTransactionId} was created, but its Employee/Payroll link failed: ${detail}. Delete the draft before retrying.` : detail });
     } finally {
       setBusyId(null);
     }
@@ -189,7 +267,7 @@ export default function FinanceTransactionsManager() {
       if (numericFx !== null && (!Number.isFinite(numericFx) || numericFx <= 0)) throw new Error("Manual FX rate must be greater than zero.");
       if (numericFx !== null && !postFxSource.trim()) throw new Error("Manual FX source/reason is required when overriding the rate.");
       await postFinanceTransaction({ transactionId: transaction.id, manualFxRate: numericFx, manualFxRateSource: numericFx === null ? null : postFxSource });
-      setMessage({ variant: "success", text: "Finance transaction posted. Its base-currency snapshot is now immutable." });
+      setMessage({ variant: "success", text: transaction.transaction_kind === "employee_payment" ? "Employee payment posted. Personnel/Payroll settlement now reads this Finance movement." : "Finance transaction posted. Its base-currency snapshot is now immutable." });
       await load(offset);
     } catch (error) {
       setMessage({ variant: "error", text: error instanceof Error ? error.message : "Finance transaction could not be posted." });
@@ -243,7 +321,7 @@ export default function FinanceTransactionsManager() {
       {canManage ? (
         <ComponentCard title="New Finance Draft" desc="Drafts are editable working records and do not affect account balances until posted.">
           <form onSubmit={createDraft} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div><Label htmlFor="finance-kind">Transaction type</Label><Select id="finance-kind" options={kindOptions} value={kind} onChange={(value) => { setKind(value as FinanceTransactionKind); if (value !== "expense") setCategoryId(""); }} /></div>
+            <div><Label htmlFor="finance-kind">Transaction type</Label><Select id="finance-kind" options={kindOptions} value={kind} onChange={chooseKind} /></div>
             <div><Label htmlFor="finance-amount">Amount</Label><Input id="finance-amount" type="number" min="0.0001" step="0.0001" value={amount} onChange={(event) => setAmount(event.target.value)} required /></div>
             <div><Label htmlFor="finance-currency">Currency</Label><Input id="finance-currency" value={currencyCode} maxLength={3} onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())} required /></div>
             <div><Label htmlFor="finance-at">Transaction time</Label><Input id="finance-at" type="datetime-local" value={transactionAt} onChange={(event) => setTransactionAt(event.target.value)} required /></div>
@@ -251,6 +329,13 @@ export default function FinanceTransactionsManager() {
             <div><Label htmlFor="finance-destination">Destination account</Label><Select id="finance-destination" options={destinationOptions} value={destinationAccountId} allowEmpty placeholder="No destination account" onChange={chooseDestination} /></div>
             <div><Label htmlFor="finance-category">Category</Label><Select id="finance-category" options={categoryOptions} value={categoryId} allowEmpty placeholder={kind === "expense" ? "Select expense category" : "Optional category"} onChange={setCategoryId} /></div>
             <div><Label htmlFor="finance-reference">Reference</Label><Input id="finance-reference" value={referenceNo} onChange={(event) => setReferenceNo(event.target.value)} /></div>
+            {kind === "employee_payment" ? (
+              <>
+                <div><Label htmlFor="finance-employee">Employee</Label><Select id="finance-employee" options={employeeOptions} value={employeeId} placeholder="Select Employee" onChange={chooseEmployee} /></div>
+                <div className="md:col-span-2 xl:col-span-3"><Label htmlFor="finance-payroll-item">Payroll Item (optional salary allocation)</Label><Select id="finance-payroll-item" options={payrollItemOptions} value={payrollItemId} allowEmpty placeholder={employeeId ? "No Payroll Item / other employee payment" : "Select Employee first"} onChange={choosePayrollItem} /></div>
+                <div className="md:col-span-2 xl:col-span-4"><Alert variant="info" title="Single payment record" message="This creates only one Finance payment. If a Payroll Item is selected, Personnel/Payroll derives Finance Paid, Remaining and payment status from the posted Finance history." /></div>
+              </>
+            ) : null}
             <div className="md:col-span-2 xl:col-span-4"><Label htmlFor="finance-notes">Notes</Label><TextArea id="finance-notes" value={notes} onChange={setNotes} rows={2} /></div>
             <div><Button type="submit" disabled={Boolean(busyId)}>Save Draft</Button></div>
           </form>
