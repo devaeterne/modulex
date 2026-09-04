@@ -122,3 +122,59 @@ const uiSources = routes.map(read).join("\n");
 expect(uiSources.includes("PageBreadCrumb"), "Finance pages must use the shared breadcrumb convention");
 
 console.log("A6-F1 Finance Core + Cash/Bank contract: PASS");
+
+// A6-F2: bridge the existing company_expenses source model into Finance Core.
+// This deliberately extends the F1 workflow instead of creating a duplicate CI owner.
+const expenseSqlPath = "sql/a6-finance-expenses.sql";
+const expenseMigrationPath = "../modulex-store/supabase/migrations/20260905050000_a6_finance_expenses.sql";
+expect(exists(expenseSqlPath), "A6-F2 Finance Expenses SQL must exist");
+expect(exists(expenseMigrationPath), "A6-F2 shared Supabase migration mirror must exist");
+
+const expenseSql = read(expenseSqlPath);
+const expenseMigration = read(expenseMigrationPath);
+expect(expenseSql === expenseMigration, "A6-F2 Admin SQL and shared migration must stay byte-identical");
+expect(!/create\s+table(?:\s+if\s+not\s+exists)?\s+public\.(?:finance_)?expenses\b/i.test(expenseSql), "A6-F2 must not create a parallel expense source table");
+expect(/alter\s+table\s+public\.company_expenses/i.test(expenseSql), "A6-F2 must extend existing company_expenses");
+expect(/finance_category_id/i.test(expenseSql), "company_expenses must link the canonical Finance expense category");
+expect(/status[\s\S]{0,500}'draft'[\s\S]{0,500}'posted'[\s\S]{0,500}'void'/i.test(expenseSql), "company_expenses lifecycle must support draft, posted and void");
+expect(/source_document_type[\s\S]{0,300}'company_expense'|company_expense[\s\S]{0,300}source_document_type/i.test(expenseSql), "A6-F2 must link company_expenses through Finance transaction source-document links");
+expect(/transaction_kind[\s\S]{0,500}'expense'|'expense'[\s\S]{0,500}transaction_kind/i.test(expenseSql), "A6-F2 posting must reuse Finance expense transactions");
+expect(/revoke\s+(?:insert\s*,\s*update\s*,\s*delete\s*,\s*truncate|truncate\s*,\s*insert\s*,\s*update\s*,\s*delete)[\s\S]{0,300}company_expenses/i.test(expenseSql), "A6-F2 must close direct authenticated company_expenses mutations");
+expect(/company_expense_transaction_mutation/i.test(expenseSql), "A6-F2 must guard Finance expense drafts as company-expense source-managed records");
+expect(/finance_transaction_links[\s\S]{0,2200}company_expense/i.test(expenseSql), "A6-F2 must guard the company-expense source link from generic mutation/removal");
+expect(/Finance expense transaction must be linked to a company expense source/i.test(expenseSql), "A6-F2 must fail closed when a Finance expense attempts to post without its source document");
+
+for (const rpc of [
+  "get_company_expenses_page",
+  "create_company_expense_draft",
+  "update_company_expense_draft",
+  "delete_company_expense_draft",
+  "post_company_expense",
+  "void_company_expense",
+]) {
+  expect(expenseSql.includes(`private.${rpc}`), `A6-F2 private core ${rpc} is required`);
+  expect(expenseSql.includes(`public.${rpc}`), `A6-F2 public RPC ${rpc} is required`);
+}
+expect(/get_executive_report/i.test(expenseSql) && /get_executive_monthly_trend/i.test(expenseSql), "A6-F2 must preserve/update existing Executive expense reporting dependencies");
+expect(/security\s+definer/i.test(expenseSql) && /set\s+search_path\s*=\s*''/i.test(expenseSql), "A6-F2 mutation cores must use pinned SECURITY DEFINER boundaries");
+expect(/idempotency/i.test(expenseSql), "A6-F2 posting must reuse Finance idempotency semantics");
+
+const expenseRoute = "src/app/(admin)/finance/expenses/page.tsx";
+const expenseManager = "src/components/finance/FinanceExpensesManager.tsx";
+const expenseAdapter = "src/lib/finance/expenses.ts";
+for (const file of [expenseRoute, expenseManager, expenseAdapter]) {
+  expect(exists(file), `Missing A6-F2 Expense surface: ${file}`);
+}
+expect(read(expenseRoute).includes("PageBreadCrumb"), "Finance Expenses route must use shared PageBreadCrumb");
+const expenseUi = read(expenseManager);
+for (const primitive of ["ComponentCard", "Alert", "Button", "Label", "Input", "Select", "TextArea", "TableViewport"]) {
+  expect(expenseUi.includes(primitive), `Finance Expenses must reuse shared ${primitive}`);
+}
+expect(sidebar.includes('path: "/finance/expenses"'), "Finance sidebar must expose the Expenses route under finance.view");
+
+const transactionManager = read("src/components/finance/FinanceTransactionsManager.tsx");
+const createKindBlock = transactionManager.match(/const kindOptions = \[([\s\S]*?)\];/)?.[1] ?? "";
+expect(!createKindBlock.includes('value: "expense"'), "Generic Finance Transactions must not create source-less expenses after A6-F2");
+expect(transactionManager.includes('value: "expense"'), "Finance Transactions filters/history must still recognize expense transactions");
+
+console.log("A6-F2 Finance Expenses bridge contract: PASS");
