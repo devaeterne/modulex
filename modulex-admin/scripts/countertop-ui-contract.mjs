@@ -8,6 +8,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const catalog = read("src/components/countertop/CountertopCatalogManager.tsx");
 const setup = read("src/components/countertop/CountertopReferenceManager.tsx");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
+const thumbnail = read("src/components/common/ProductImageThumbnail.tsx");
 const catalogPage = read("src/app/(admin)/pricing/countertop/catalog/page.tsx");
 const setupPage = read("src/app/(admin)/pricing/countertop/settings/page.tsx");
 
@@ -51,13 +52,15 @@ assert(
 assert(
   catalog.includes("productImages") &&
     catalog.includes("previewImage") &&
-    catalog.includes('aria-label={`View ${product.name} image`}') &&
+    catalog.includes("ProductImageThumbnail") &&
+    catalog.includes('actionLabel={`View ${product.name} image`}') &&
     catalog.includes('ariaLabel="Countertop product image preview"'),
-  "Countertop Catalog must render clickable product thumbnails with an accessible lightbox preview"
+  "Countertop Catalog must render shared clickable product thumbnails with an accessible lightbox preview"
 );
 assert(
-  catalog.includes("h-12 w-12") && catalog.includes("object-contain"),
-  "Countertop Catalog thumbnails must use the same compact 48px scan pattern as Product List"
+  thumbnail.includes('className="h-12 w-12 shrink-0 p-0"') &&
+    thumbnail.includes('className="h-12 w-12 object-contain"'),
+  "Shared product thumbnail must own the compact 48px Product List scan pattern"
 );
 
 assert(configurator.includes('import SectionTitle from "@/components/common/SectionTitle"'), "Countertop configurator section headings must use the shared SectionTitle tone");
