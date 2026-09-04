@@ -20,6 +20,10 @@ on:
       - "modulex-admin/scripts/requests-admin-contract.mjs"
       - ".github/workflows/admin-request-center-ui.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

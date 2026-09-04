@@ -22,6 +22,10 @@ on:
       - "modulex-admin/scripts/admin-production-surface-contract.mjs"
       - ".github/workflows/admin-dashboard-shell-ui.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

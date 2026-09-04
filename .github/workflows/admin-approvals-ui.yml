@@ -14,6 +14,10 @@ on:
       - "modulex-admin/scripts/approvals-ui-contract.mjs"
       - ".github/workflows/admin-approvals-ui.yml"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
