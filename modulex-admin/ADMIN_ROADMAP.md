@@ -1,10 +1,11 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-09-03
-Main baseline: `2789ffebf147e701682ea97f4f1a09481fa29e45`
+Last reviewed: 2026-09-04
+Main baseline: `8bf9babc15484e7c689f21462caa253efd34bd88`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
-Current Admin next action: **Review/merge Vendor Catalog availability/bulk approval, then apply `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval`, run post-DDL advisors, deploy Admin, and perform signed-in sync/mapping/availability/bulk-approval acceptance.**
+Current parallel Admin package: **A6-F1 Finance Core + Cash/Bank is active in draft PR #287 on `feat/a6-f1-finance-core`; Finance is a first-class domain and the F1 production migrations remain intentionally unapplied before review/merge.**
+Current Admin next action: **Preserve the active Vendor Catalog rollout sequence. In parallel, finish fresh verification/review for Finance PR #287; do not apply the Finance Core migrations or deploy the Finance runtime before review/merge.**
 
 ## Customer read performance cleanup
 
@@ -211,7 +212,7 @@ These rules are mandatory for all future Modulex Admin work:
   - TDD evidence: Actions run `33255658800` failed on the legacy package identity before implementation; targeted GREEN run `33255818899` passed the runtime-config contract with the minimized lockfile identity delta.
   - Full deterministic verification: Actions run `33255912909` passed runtime-config, production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check. Credential-bound API/DB live smoke was not rerun because this package changes no schema, RLS, RPC, API, or production data behavior.
 - [x] Close post-merge Codex runtime/config findings before Phase A0 exit.
-  - PR #113 merged as `f6d7f9673dc874b5c254e47c750ff1bd4793c7c3`; Vercel deployment `dpl_5jbrwJDsdJv3FtXuMhfsstX7DY6k` is production `READY` from that exact merge SHA.
+  - PR #113 merged as `f6d7f9673dc874b5c254e47c750ff1bd4793c7c3`; Vercel deployment `dpl_5jbrwJDsdJv3FtXuMhfsstX7DY6k` is production `READY` from that exact SHA.
   - Post-merge Codex review found a P1 gap in source-wide privileged `NEXT_PUBLIC_*` detection and a P2 gap in Store activation-origin configuration/fallback handling.
   - Follow-up scope: strict source-wide browser-safe env allowlist, configuration-owned `STORE_SITE_URL` / `NEXT_PUBLIC_STORE_URL`, removal of the legacy `oakwell-phi.vercel.app` fallback, and fresh deterministic verification.
   - TDD RED: Actions run `33256670583` proved the previous runtime contract did not reject an injected `NEXT_PUBLIC_DATABASE_URL` source reference.
@@ -658,8 +659,28 @@ Current routes include employees, departments, positions, attendance, leave, lif
 
 ## A6.2 Finance
 
-- [ ] Classify finance payroll/compensation surfaces as production / planned / remove.
-- [ ] Avoid duplicating Personnel compensation/payroll without an explicit domain distinction.
+Finance ownership is now explicitly committed product scope. The authoritative architecture and baseline are `docs/FINANCE_DOMAIN_PLAN.md` and `docs/FINANCE_F0_BASELINE.md`.
+
+- [x] **A6-F0 — Finance baseline & contract lock.**
+  - Approved 2026-09-04. Finance is a first-class domain; Project/Order/Customer/Vendor/Employee are optional Finance Core attribution/source links rather than universal ownership parents.
+  - HR remains source of employee/compensation/payroll calculation truth; Finance owns actual money movement, accounts, FX/base-currency snapshots, audit, AR/AP/cash-flow reporting.
+  - Existing `company_expenses`, Customer Invoices, Project payment and HR payroll/advance surfaces are preserved for incremental integration rather than destructively rewritten.
+- [~] **A6-F1 — Finance Core + Cash/Bank.**
+  - Draft PR #287 / branch `feat/a6-f1-finance-core` contains `finance_accounts`, `finance_categories`, `finance_fx_rates`, `finance_transactions`, optional attribution/allocation links, audit and idempotency boundaries plus `/finance`, `/finance/transactions`, and `/finance/accounts`.
+  - Base currency reuses `general_settings.default_currency`; cross-currency posting stores the transaction-time FX snapshot and supports an audited manual negotiated rate.
+  - Drafts may be edited/deleted before posting. Posted money history is immutable; corrections use controlled void/reversal. Historical correction remains possible after an account/category is deactivated, while new ordinary activity still rejects inactive dimensions.
+  - Finance attribution is DB-reconciled: Order/Project/Customer combinations must match canonical source relationships, and transaction amount cannot be reduced below existing allocations.
+  - Sensitive writes use authenticated public `SECURITY DEFINER` RPC wrappers with locked search paths backed by private role-checked cores; authenticated roles do not receive private-core execution or direct money-table mutation authority.
+  - Source implementation and hardening contracts are present; keep F1 `[~]` until a fresh current-head Finance workflow passes contract/RBAC/strict UI/typecheck/lint/build and the later post-merge production migration/advisor/deploy/signed-in acceptance gates are complete.
+  - Canonical F1 migration order: `20260904120000_a6_finance_core.sql` then `20260904121000_a6_finance_core_hardening.sql`. Both remain intentionally **unapplied before review/merge**.
+- [ ] **A6-F2 — Expenses.** Bridge/migrate `company_expenses` into Finance Core without losing history; add controlled categories/payment account, audit and optional Project/Order/Employee/Vendor attribution.
+- [ ] **A6-F3 — Purchases & Accounts Payable.** Reuse/establish the canonical business Vendor/Supplier boundary, integrate purchase/vendor invoices and partial/full vendor payments, and add AP aging. Do not duplicate the existing procurement source-document model.
+- [ ] **A6-F4 — Payroll Finance integration.** Keep payroll calculation in HR and post approved/paid payroll obligations/payments into Finance without duplicating HR payroll tables.
+- [ ] **A6-F5 — Sales / Accounts Receivable integration.** Preserve Customer Invoices and Project payment source behavior while adding the standalone Finance payment ledger, authoritative allocation reconciliation, AR aging and customer balances.
+- [ ] **A6-F6 — Finance reporting & Project projection.** Add account movement/balance, cash-flow, operational income/expense, AR/AP and Project financial views sourced from Finance links/allocations rather than Project-owned money records.
+- [ ] **A6-F7 — Finance hardening & production acceptance.** Complete RLS/RPC/RBAC, idempotency/concurrency, append-safe correction, FX/allocation reconciliation, migration backfill, Advisors and signed-in production acceptance.
+
+The existing `/finance/payroll` and `/finance/compensation` surfaces remain HR-backed source views. They do not define a second Finance payroll/compensation data model.
 
 ## A6.3 Approvals and training
 
@@ -671,7 +692,9 @@ Current routes include employees, departments, positions, attendance, leave, lif
 
 - [ ] Every visible business module has an explicit product purpose.
 - [ ] Placeholder modules are removed from production navigation/routes.
-- [ ] Overlapping domains have one documented source of truth.
+- [~] Finance has one documented ownership model and staged F0→F7 delivery contract; F0 is complete and F1 is active.
+- [ ] Personnel/Finance overlap is explicit: HR owns payroll calculation/source records; Finance owns actual payment/money movement and financial reporting.
+- [ ] Finance Core production migration/advisor/deploy/signed-in acceptance is complete for the implemented Finance phase.
 
 ---
 
@@ -699,6 +722,7 @@ Current routes include employees, departments, positions, attendance, leave, lif
   - Countertop catalog/context regression protects visible Catalog/Setup navigation, Stone/Sink catalog ownership, active-product Order dropdown filtering, order-eligible commercial price-group scope, and canonical Product Master/Product Prices write reuse.
   - Configured Countertop Replace/Remove regression protects Draft-only dedicated actions, same-item replacement, dedicated authenticated removal, stable retained-line pricing/identity, and the generic revision fail-closed guards.
   - Vendor Catalog Review v3 contracts protect scoped adapter discovery, durable check snapshots, mapping-driven approval, family/variant identity, normalized availability and missing detection, safe canonical deactivate/reactivate behavior, AVAILABLE-only approval, server-only approval state, bounded bulk approval, migration mirrors, and scalable review UI behavior.
+  - A6-F1 Finance contracts protect the neutral Finance ownership model, migration mirrors, account/transaction lifecycle, FX/base-currency snapshots, draft-only hard-delete, posted immutability, attribution/allocation reconciliation, RBAC and locked public-RPC/private-core mutation boundaries.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -816,7 +840,8 @@ Keep this section current so future planning does not rediscover completed work.
 
 Record material decisions here when they affect future phases.
 
-- [ ] Which Personnel/Finance/Training/Approvals modules are committed production scope versus template/planned surface?
+- [ ] Which Personnel/Training/Approvals modules are committed production scope versus template/planned surface?
+- [x] Finance is committed production scope with the ownership and F0→F7 delivery contract in `docs/FINANCE_DOMAIN_PLAN.md`; Project is not the universal parent of Finance transactions, and payroll calculation stays HR-owned while actual payment/money movement is Finance-owned.
 - [ ] What exact roles beyond the current core Admin roles need operational permission matrices?
 - [ ] Which customer financial capabilities, if any, should ever be exposed to the Customer/Dealer portals?
 - [x] Phase 2.1 first secondary CMS scope is **About + Gallery/Projects**; Blog remains disabled until a real editorial workflow is required. Ordinary Navbar/Footer links become configurable in Package D while route/security behavior remains code-owned.
@@ -837,7 +862,7 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Vendor Catalog Review v3 availability/bulk approval is the active Admin catalog package.
+Vendor Catalog Review v3 availability/bulk approval remains the active Admin catalog package.
 
 1. Keep migrations `20260902093000_vendor_catalog_sync_family_v3` and `20260902113500_vendor_catalog_availability_bulk_approval` unapplied until this Vendor Catalog PR is merged; branch CI is not production acceptance.
 2. Review/merge the Vendor Catalog PR, then apply the canonical migrations in order and run Supabase Security + Performance Advisor checks before accepting the feature as production-ready.
@@ -848,8 +873,10 @@ Vendor Catalog Review v3 availability/bulk approval is the active Admin catalog 
 7. Verify legacy `APPROVED + canonical_product_id=null` recovery through Complete Import and confirm direct browser `APPROVED` / canonical-link writes remain DB-blocked.
 8. Do not approve arbitrary production vendor data during acceptance; use an explicitly selected test/review item and keep Store content draft/unpublished.
 
+**Parallel A6 Finance:** PR #287 implements A6-F1 Finance Core + Cash/Bank. Keep `20260904120000_a6_finance_core.sql` and `20260904121000_a6_finance_core_hardening.sql` unapplied until the PR has fresh current-head Finance contract/RBAC/strict-UI/typecheck/lint/build GREEN evidence and is reviewed/merged. After merge, apply both migrations in order, run Supabase Security + Performance Advisors, deploy Admin, and perform signed-in `/finance`, `/finance/transactions`, and `/finance/accounts` acceptance before changing F1 from `[~]` to `[x]`.
+
 **Parallel A1 rollout:** PR #248 is merged on `main`, but migration `20260902114500_countertop_replace_remove` remains intentionally unapplied. Apply that migration and complete its advisor/deploy/signed-in acceptance separately before marking the A1.2 row complete.
 
-**Cross-roadmap coordination:** Vendor Catalog Review v3 creates canonical Product variants and draft Store product/media through existing boundaries but does not widen public Store/Dealer projections; no functional `STORE_ROADMAP.md` status mutation is required before merge. Countertop Replace/Remove likewise changes no Store runtime/public projection.
+**Cross-roadmap coordination:** Vendor Catalog Review v3 creates canonical Product variants and draft Store product/media through existing boundaries but does not widen public Store/Dealer projections; no functional `STORE_ROADMAP.md` status mutation is required before merge. Countertop Replace/Remove likewise changes no Store runtime/public projection. Finance F1 is an Admin/shared-Supabase operational package and adds no Customer/Dealer public Finance projection, so no functional `STORE_ROADMAP.md` status change is required before merge.
 
 **Parallel-work rule:** re-read execution-time `main`, open PRs, and this roadmap before every new package so newer merges are preserved rather than overwritten.

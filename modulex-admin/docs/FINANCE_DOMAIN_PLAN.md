@@ -1,6 +1,6 @@
 # Modulex Finance Domain — Locked Architecture & Delivery Plan
 
-Status: **LOCKED FOR A6 IMPLEMENTATION — A6-F0 ACTIVE / REVIEW PENDING**
+Status: **LOCKED FOR A6 IMPLEMENTATION — A6-F0 COMPLETE / A6-F1 ACTIVE**
 Date: 2026-09-04
 Scope: `modulex-admin` operational finance
 
@@ -171,7 +171,7 @@ A document is not automatically a cash movement. Posting/receiving/paying a docu
 
 ## 6. Allocation rule
 
-One financial event may relate to zero, one, or multiple Projects/Orders. Do not make a single mandatory `project_id` the universal allocation model.
+One financial event may relate to zero, one or multiple Projects/Orders. Do not make a single mandatory `project_id` the universal allocation model.
 
 For multi-project costs/revenue, use an allocation/link layer with an amount (or an equivalent deterministic allocation model). The source transaction total remains authoritative; allocation totals must be validated and must not exceed the source transaction amount.
 
@@ -186,6 +186,11 @@ Finance Core financial history is append-safe:
 - posted amount/currency/account changes are never silent in-place edits;
 - actor, timestamp, reason, source reference and reversal relationship must be auditable;
 - idempotency is required for payment/posting mutations that may be retried.
+
+F1 hardening preserves two additional implications of this rule:
+
+- deactivating an account/category must not make historical posted→void or compensating reversal impossible;
+- draft hard-delete is allowed only through the guarded Finance mutation boundary and must never widen into posted/voided history deletion.
 
 ### Existing Project-payment compatibility exception
 
@@ -205,13 +210,15 @@ Production already demonstrates this distinction: the Finance role has `invoices
 
 Project-payment tables deny direct authenticated table access and use RPC/private-core mutations. This is the preferred precedent for sensitive Finance Core money mutations.
 
+F1 public mutation RPCs are `SECURITY DEFINER` with pinned empty `search_path` so authenticated callers can reach private cores without receiving private-core execution grants. The private cores remain responsible for canonical authenticated-role checks.
+
 Current Payroll UI still performs some direct browser table writes to HR payroll tables. That is a legacy HR boundary and must not be copied into Finance Core.
 
 Source-domain permissions remain source-specific. Adding `finance.manage` must not silently widen HR employee-master, Project, Customer or other protected domain authority.
 
 ## 9. Delivery plan
 
-### A6-F0 — Baseline & contract lock — **ACTIVE / REVIEW PENDING**
+### A6-F0 — Baseline & contract lock — **COMPLETE / APPROVED 2026-09-04**
 
 Completed evidence collection:
 
@@ -228,17 +235,19 @@ Completed evidence collection:
 
 Detailed evidence is in `docs/FINANCE_F0_BASELINE.md`.
 
-**Exit:** project owner accepts the F0 baseline/compatibility contract; only then does F1 migration design begin. No destructive rewrite.
+**Exit:** accepted by the project owner on 2026-09-04. F1 may proceed; no destructive rewrite was approved.
 
-### A6-F1 — Finance Core + Cash/Bank
+### A6-F1 — Finance Core + Cash/Bank — **ACTIVE / SOURCE IMPLEMENTATION COMPLETE / FRESH CI PENDING**
 
 - Add financial accounts (bank/cash/clearing).
 - Add Finance transaction ledger and optional attribution/link model.
 - Add transaction create/post/void/reverse boundaries with validation, idempotency and audit.
+- Add guarded draft deletion without permitting posted-history deletion.
 - Add main-currency + FX snapshot fields/logic.
 - Admin: Finance Overview, Transactions, Cash & Bank.
+- Harden public RPC/private-core execution, inactive historical dimension correction, and Finance regression contracts.
 
-**Exit:** a generic expense, deposit/withdrawal and account transfer can be recorded without Project/Order ownership.
+**Exit:** a generic expense, deposit/withdrawal and account transfer can be recorded without Project/Order ownership, with fresh Finance contract/RBAC/UI/typecheck/lint/build verification. Production rollout remains a separate post-merge gate.
 
 ### A6-F2 — Expenses
 
