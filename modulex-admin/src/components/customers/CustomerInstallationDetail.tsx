@@ -1,8 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import ComponentCard from "@/components/common/ComponentCard";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
+import { authenticatedFetch } from "@/lib/auth/authenticated-fetch";
 import { supabase } from "@/lib/supabase/client";
 import type { CustomerInstallation, CustomerInstallationStatus } from "@/lib/customers/installation-types";
 
@@ -27,18 +33,17 @@ function dateTime(value: string | null | undefined) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-function actionClass(status: CustomerInstallationStatus) {
-  if (status === "cancelled") {
-    return "h-10 rounded-lg border border-error-300 px-4 text-sm font-medium text-error-600 transition hover:bg-error-50 disabled:opacity-40 dark:border-error-500/40 dark:text-error-400 dark:hover:bg-error-500/10";
-  }
-  if (status === "completed") {
-    return "h-10 rounded-lg bg-success-600 px-4 text-sm font-medium text-white transition hover:bg-success-700 disabled:opacity-40";
-  }
-  return "h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-40";
+function statusColor(status: CustomerInstallationStatus) {
+  if (status === "completed") return "success" as const;
+  if (status === "cancelled") return "error" as const;
+  if (status === "in_progress") return "info" as const;
+  if (status === "confirmed") return "primary" as const;
+  return "warning" as const;
 }
 
 export default function CustomerInstallationDetail() {
   const params = useParams<{ id: string; installationId: string }>();
+  const router = useRouter();
   const [item, setItem] = useState<CustomerInstallation | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -90,17 +95,20 @@ export default function CustomerInstallationDetail() {
       return;
     }
 
+    void authenticatedFetch(`/api/admin/google-calendar/installations/${item.id}/sync`, { method: "POST" })
+      .catch(() => undefined);
+
     await load();
     setSuccessMessage(`Installation moved to ${titleCase(status)}.`);
     setIsSaving(false);
   }
 
   if (isLoading) {
-    return <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-400">Loading installation...</div>;
+    return <ComponentCard title="Installation" desc="Loading appointment details."><p className="text-sm" role="status">Loading installation…</p></ComponentCard>;
   }
 
   if (!item) {
-    return <div className="rounded-xl border border-error-200 bg-error-50 p-5 text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage || "Installation not found."}</div>;
+    return <Alert variant="error" title="Installation unavailable" message={errorMessage || "Installation not found."} />;
   }
 
   const address = item.address_snapshot as Record<string, string | null> | null;
@@ -109,89 +117,88 @@ export default function CustomerInstallationDetail() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">{item.installation_number}</h1>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{dateTime(item.scheduled_start_at)}{item.scheduled_end_at ? ` → ${dateTime(item.scheduled_end_at)}` : ""}</p>
-          </div>
-          <div className="flex gap-2">
-            <Link href={`/customers/${item.customer_id}/orders/${item.order_id}`} className="h-10 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.05]">Open Order</Link>
-            <Link href="/customers/installations" className="h-10 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.05]">All Installations</Link>
-          </div>
+      <ComponentCard
+        title={item.installation_number}
+        desc={`${dateTime(item.scheduled_start_at)}${item.scheduled_end_at ? ` → ${dateTime(item.scheduled_end_at)}` : ""}`}
+        headerAction={<Badge color={statusColor(item.status)}>{titleCase(item.status)}</Badge>}
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => router.push(`/customers/${item.customer_id}/orders/${item.order_id}`)}>Open Order</Button>
+          <Button size="sm" variant="outline" onClick={() => router.push("/customers/installations")}>All Installations</Button>
         </div>
-      </div>
+      </ComponentCard>
 
-      {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">{errorMessage}</div>}
-      {successMessage && <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">{successMessage}</div>}
+      {errorMessage ? <Alert variant="error" title="Installation action failed" message={errorMessage} /> : null}
+      {successMessage ? <Alert variant="success" title="Installation updated" message={successMessage} /> : null}
 
       <div className="grid gap-5 xl:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] xl:col-span-2">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Appointment</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <Info label="Status" value={titleCase(item.status)} />
-            <Info label="Team" value={item.team_name} />
-            <Info label="Contact" value={item.contact_name} />
-            <Info label="Phone" value={item.contact_phone} />
-            <Info label="Assigned User ID" value={item.assigned_to} />
-            <Info label="Shipment ID" value={item.shipment_id} />
-          </div>
-          <div className="mt-5">
-            <p className="text-xs font-medium uppercase text-gray-400">Address</p>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{address ? [address.address_line_1, address.address_line_2, address.postal_code, address.city, address.state_region, address.country_code].filter(Boolean).join(", ") : "—"}</p>
-          </div>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <Info label="Notes" value={item.notes} />
-            <Info label="Internal Notes" value={item.internal_notes} />
-          </div>
+        <div className="xl:col-span-2">
+          <ComponentCard title="Appointment" desc="Canonical Modulex installation schedule and assignment details.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Info label="Status" value={titleCase(item.status)} />
+              <Info label="Team" value={item.team_name} />
+              <Info label="Contact" value={item.contact_name} />
+              <Info label="Phone" value={item.contact_phone} />
+              <Info label="Assigned User ID" value={item.assigned_to} />
+              <Info label="Shipment ID" value={item.shipment_id} />
+            </div>
+            <div className="mt-5">
+              <Info label="Address" value={address ? [address.address_line_1, address.address_line_2, address.postal_code, address.city, address.state_region, address.country_code].filter(Boolean).join(", ") : null} />
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <Info label="Notes" value={item.notes} />
+              <Info label="Internal Notes" value={item.internal_notes} />
+            </div>
+          </ComponentCard>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Workflow</h2>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Only valid next lifecycle actions are available. The database enforces the same transition policy.</p>
-
-          <div className="mt-4 space-y-3">
-            {canComplete && (
-              <textarea
+        <ComponentCard title="Workflow" desc="Only valid next lifecycle actions are available; the database enforces the same transition policy.">
+          <div className="space-y-4">
+            {canComplete ? (
+              <TextArea
                 value={completionNotes}
-                onChange={(event) => setCompletionNotes(event.target.value)}
+                onChange={setCompletionNotes}
                 rows={4}
                 placeholder="Completion notes"
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
               />
-            )}
+            ) : null}
 
             {nextStatuses.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {nextStatuses.map((status) => (
-                  <button
+                  <Button
                     key={status}
-                    type="button"
+                    size="sm"
+                    variant={status === "cancelled" ? "danger" : "primary"}
                     onClick={() => void updateStatus(status)}
                     disabled={isSaving}
-                    className={actionClass(status)}
                   >
                     {isSaving ? "Saving..." : status === "cancelled" ? "Cancel Installation" : `Mark ${titleCase(status)}`}
-                  </button>
+                  </Button>
                 ))}
               </div>
             ) : (
-              <p className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:bg-white/[0.03] dark:text-gray-400">This installation is closed.</p>
+              <Alert variant="info" title="Installation closed" message="No further lifecycle transitions are available." />
             )}
-          </div>
 
-          <div className="mt-5 space-y-2 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
-            <div>Confirmed: {dateTime(item.confirmed_at)}</div>
-            <div>Started: {dateTime(item.started_at)}</div>
-            <div>Completed: {dateTime(item.completed_at)}</div>
-            <div>Cancelled: {dateTime(item.cancelled_at)}</div>
+            <div className={`space-y-2 text-xs ${ADMIN_TEXT_STYLES.body}`}>
+              <div>Confirmed: {dateTime(item.confirmed_at)}</div>
+              <div>Started: {dateTime(item.started_at)}</div>
+              <div>Completed: {dateTime(item.completed_at)}</div>
+              <div>Cancelled: {dateTime(item.cancelled_at)}</div>
+            </div>
           </div>
-        </div>
+        </ComponentCard>
       </div>
     </div>
   );
 }
 
 function Info({ label, value }: { label: string; value: string | null }) {
-  return <div><p className="text-xs font-medium uppercase text-gray-400">{label}</p><p className="mt-2 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">{value || "—"}</p></div>;
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase">{label}</p>
+      <p className={`mt-2 whitespace-pre-wrap text-sm ${ADMIN_TEXT_STYLES.body}`}>{value || "—"}</p>
+    </div>
+  );
 }

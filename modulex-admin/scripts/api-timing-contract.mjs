@@ -30,22 +30,13 @@ try {
 
   assert.equal(success.status, 201);
   assert.equal(success.headers.get("x-existing"), "keep");
-  assert.match(
-    success.headers.get("server-timing") ?? "",
-    /^modulex_api;dur=\d+(?:\.\d+)?$/
-  );
+  assert.match(success.headers.get("server-timing") ?? "", /^modulex_api;dur=\d+(?:\.\d+)?$/);
   assert.equal(events[0].event, "modulex_api_timing");
   assert.equal(events[0].route, "/api/test");
   assert.equal(events[0].method, "GET");
   assert.equal(events[0].status, 201);
   assert.equal(typeof events[0].duration_ms, "number");
-  assert.deepEqual(Object.keys(events[0]).sort(), [
-    "duration_ms",
-    "event",
-    "method",
-    "route",
-    "status",
-  ]);
+  assert.deepEqual(Object.keys(events[0]).sort(), ["duration_ms", "event", "method", "route", "status"]);
 
   const notFound = await withApiTiming(
     { route: "/api/missing", method: "GET" },
@@ -56,13 +47,7 @@ try {
 
   const boom = new Error("boom");
   await assert.rejects(
-    () =>
-      withApiTiming(
-        { route: "/api/fail", method: "POST" },
-        () => {
-          throw boom;
-        }
-      ),
+    () => withApiTiming({ route: "/api/fail", method: "POST" }, () => { throw boom; }),
     (error) => error === boom
   );
   assert.equal(events[2].status, 500);
@@ -79,25 +64,28 @@ const apiRoot = join(adminRoot, "src", "app", "api");
 async function findRouteFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
-
   for (const entry of entries) {
     const fullPath = join(directory, entry.name);
     if (entry.isDirectory()) files.push(...(await findRouteFiles(fullPath)));
     if (entry.isFile() && entry.name === "route.ts") files.push(fullPath);
   }
-
   return files;
 }
 
 const routeFiles = await findRouteFiles(apiRoot);
-const routeInventory = routeFiles
-  .map((file) => relative(adminRoot, file).replaceAll("\\", "/"))
-  .sort();
+const routeInventory = routeFiles.map((file) => relative(adminRoot, file).replaceAll("\\", "/")).sort();
 
 const expectedInventory = [
   "src/app/api/admin/dealer-portal/route.ts",
   "src/app/api/admin/email-notifications/process/route.ts",
   "src/app/api/admin/email-notifications/route.ts",
+  "src/app/api/admin/google-calendar/connection/route.ts",
+  "src/app/api/admin/google-calendar/installations/[installationId]/sync/route.ts",
+  "src/app/api/admin/google-calendar/oauth/callback/route.ts",
+  "src/app/api/admin/google-calendar/oauth/start/route.ts",
+  "src/app/api/admin/google-calendar/projects/[projectId]/resync/route.ts",
+  "src/app/api/admin/google-calendar/projects/[projectId]/route.ts",
+  "src/app/api/admin/google-calendar/status/route.ts",
   "src/app/api/admin/products/qr/route.ts",
   "src/app/api/admin/store-media/import/route.ts",
   "src/app/api/admin/store-media/route.ts",
@@ -115,7 +103,7 @@ const expectedInventory = [
   "src/app/api/vendor-catalog/vendors/route.ts",
 ].sort();
 
-assert.equal(routeInventory.length, 18, `Expected 18 API route files, found ${routeInventory.length}`);
+assert.equal(routeInventory.length, 25, `Expected 25 API route files, found ${routeInventory.length}`);
 assert.deepEqual(routeInventory, expectedInventory, "API route inventory changed; review timing coverage");
 
 const uninstrumented = [];
@@ -123,25 +111,13 @@ for (const file of routeFiles) {
   const routeSource = await readFile(file, "utf8");
   const hasImport = /from\s+["']@\/lib\/observability\/apiTiming["']/.test(routeSource);
   const hasCall = routeSource.includes("withApiTiming(");
-  if (!hasImport || !hasCall) {
-    uninstrumented.push(relative(adminRoot, file).replaceAll("\\", "/"));
-  }
+  if (!hasImport || !hasCall) uninstrumented.push(relative(adminRoot, file).replaceAll("\\", "/"));
 }
 
-assert.deepEqual(
-  uninstrumented,
-  [],
-  `Uninstrumented API routes:\n${uninstrumented.map((file) => `- ${file}`).join("\n")}`
-);
+assert.deepEqual(uninstrumented, [], `Uninstrumented API routes:\n${uninstrumented.map((file) => `- ${file}`).join("\n")}`);
 
-const dynamicApprovalSource = await readFile(
-  join(apiRoot, "vendor-catalog", "items", "[itemId]", "approve", "route.ts"),
-  "utf8"
-);
-assert.match(
-  dynamicApprovalSource,
-  /["']\/api\/vendor-catalog\/items\/\[itemId\]\/approve["']/,
-  "Dynamic approval timing must use the route template, not a concrete item ID"
-);
+const dynamicApprovalSource = await readFile(join(apiRoot, "vendor-catalog", "items", "[itemId]", "approve", "route.ts"), "utf8");
+assert.match(dynamicApprovalSource, /["']\/api\/vendor-catalog\/items\/\[itemId\]\/approve["']/,
+  "Dynamic approval timing must use the route template, not a concrete item ID");
 
 console.log("api-timing contract passed");

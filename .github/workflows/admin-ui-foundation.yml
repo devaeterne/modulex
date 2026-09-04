@@ -10,6 +10,7 @@ on:
       - "modulex-admin/**"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
+      - "modulex-store/supabase/migrations/*calendar*.sql"
       - ".github/workflows/**"
   push:
     paths:
@@ -20,6 +21,7 @@ on:
       - "modulex-admin/**"
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
+      - "modulex-store/supabase/migrations/*calendar*.sql"
       - ".github/workflows/**"
 
 concurrency:
@@ -49,6 +51,8 @@ jobs:
         run: npm run smoke:ci-workflow-architecture
       - name: API timing contract
         run: npm run smoke:api-timing
+      - name: Google Calendar integration contract
+        run: node scripts/google-calendar-integration-contract.mjs
       - name: Admin UI strict self-test
         run: npm run smoke:admin-ui-strict:self-test
       - name: Admin UI strict changed-file gate
