@@ -43,6 +43,20 @@ type EmployeeForm = {
   notes: string;
 };
 
+type EmployeeFinancePayment = {
+  transaction_id: string;
+  transaction_kind: string;
+  transaction_at: string;
+  posted_at: string | null;
+  amount: number;
+  currency_code: string;
+  reference_no: string | null;
+  source_account_name: string | null;
+  payroll_item_id: string | null;
+  period_code: string | null;
+  payment_status: string;
+};
+
 const emptyForm: EmployeeForm = {
   first_name: "",
   last_name: "",
@@ -102,6 +116,10 @@ function optional(value: string) {
   return normalized || null;
 }
 
+function paymentMoney(value: number, currency: string) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(value || 0));
+}
+
 export default function EmployeeDirectory() {
   const [employees, setEmployees] = useState<HrEmployee[]>([]);
   const [departments, setDepartments] = useState<HrDepartment[]>([]);
@@ -116,6 +134,10 @@ export default function EmployeeDirectory() {
   const [editing, setEditing] = useState<HrEmployee | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
+  const [paymentEmployee, setPaymentEmployee] = useState<HrEmployee | null>(null);
+  const [payments, setPayments] = useState<EmployeeFinancePayment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -175,6 +197,23 @@ export default function EmployeeDirectory() {
     setModalOpen(false);
     setEditing(null);
     setForm(emptyForm);
+  }
+
+  async function openPayments(employee: HrEmployee) {
+    setPaymentEmployee(employee);
+    setPayments([]);
+    setPaymentError(null);
+    setPaymentsLoading(true);
+    const { data, error: paymentsError } = await supabase.rpc("get_hr_employee_finance_payments", { p_employee_id: employee.id });
+    if (paymentsError) setPaymentError(paymentsError.message);
+    else setPayments((data ?? []) as EmployeeFinancePayment[]);
+    setPaymentsLoading(false);
+  }
+
+  function closePayments() {
+    setPaymentEmployee(null);
+    setPayments([]);
+    setPaymentError(null);
   }
 
   async function save(event: FormEvent) {
@@ -252,7 +291,7 @@ export default function EmployeeDirectory() {
       {success && <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">{success}</div>}
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-        <div className="overflow-x-auto"><table className="min-w-[1050px] w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Employee","Status","Employment","Department","Position","Manager","Hire Date","Actions"].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{heading}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+        <div className="overflow-x-auto"><table className="min-w-[1120px] w-full divide-y divide-gray-100 dark:divide-gray-800"><thead className="bg-gray-50 dark:bg-white/[0.02]"><tr>{["Employee","Status","Employment","Department","Position","Manager","Hire Date","Actions"].map((heading) => <th key={heading} className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">{heading}</th>)}</tr></thead><tbody className="divide-y divide-gray-100 dark:divide-gray-800">
           {loading ? <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-500">Loading employees...</td></tr> : filtered.length === 0 ? <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-500">No employees found.</td></tr> : filtered.map((employee) => <tr key={employee.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
             <td className="px-4 py-4"><p className="text-sm font-medium text-gray-800 dark:text-white/90">{employee.preferred_name || `${employee.first_name} ${employee.last_name}`}</p><p className="mt-0.5 text-xs text-gray-500">{employee.employee_number}{employee.work_email ? ` · ${employee.work_email}` : ""}</p></td>
             <td className="px-4 py-4"><span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-white/[0.06] dark:text-gray-300">{EMPLOYMENT_STATUS_LABELS[employee.employment_status]}</span></td>
@@ -261,7 +300,7 @@ export default function EmployeeDirectory() {
             <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{positionName(employee.position_id)}</td>
             <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{managerName(employee.manager_id)}</td>
             <td className="px-4 py-4 text-sm text-gray-500">{employee.hire_date || "—"}</td>
-            <td className="px-4 py-4"><button className={secondaryButton} onClick={() => openEdit(employee)}>Edit</button></td>
+            <td className="px-4 py-4"><div className="flex gap-2"><button className={secondaryButton} onClick={() => void openPayments(employee)}>Payments</button><button className={secondaryButton} onClick={() => openEdit(employee)}>Edit</button></div></td>
           </tr>)}</tbody></table></div>
       </div>
 
@@ -308,6 +347,36 @@ export default function EmployeeDirectory() {
 
               <div className="flex justify-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800"><button type="button" className={secondaryButton} onClick={closeModal}>Cancel</button><button type="submit" disabled={saving} className={primaryButton}>{saving ? "Saving..." : editing ? "Save Changes" : "Create Employee"}</button></div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {paymentEmployee && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4">
+          <div className="max-h-[calc(100vh-32px)] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-xl dark:bg-gray-900">
+            <div className="sticky top-0 z-10 flex items-start justify-between border-b border-gray-200 bg-white px-6 py-5 dark:border-gray-800 dark:bg-gray-900">
+              <div><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Payments · {paymentEmployee.preferred_name || `${paymentEmployee.first_name} ${paymentEmployee.last_name}`}</h2><p className="mt-1 text-sm text-gray-500">Finance payment history — read-only projection of posted Finance employee payments and reversals.</p></div>
+              <button className="text-gray-400 hover:text-gray-700" onClick={closePayments}>✕</button>
+            </div>
+            <div className="p-6">
+              {paymentError ? <div className="mb-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{paymentError}</div> : null}
+              <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
+                <table className="min-w-[850px] w-full divide-y divide-gray-100 text-sm dark:divide-gray-800">
+                  <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-white/[0.02]"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Reference</th><th className="px-4 py-3">Payroll</th><th className="px-4 py-3">Account</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Amount</th></tr></thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    {paymentsLoading ? <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-500">Loading Finance payment history...</td></tr> : payments.length === 0 ? <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-500">No posted Finance payments are linked to this employee.</td></tr> : payments.map((payment) => <tr key={`${payment.transaction_id}-${payment.payroll_item_id ?? "employee"}`}>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{new Date(payment.transaction_at).toLocaleString()}</td>
+                      <td className="px-4 py-3"><p className="font-medium text-gray-800 dark:text-white/90">{payment.reference_no || payment.transaction_kind.replaceAll("_", " ")}</p><p className="text-xs text-gray-500">{payment.transaction_id}</p></td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{payment.period_code || "—"}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{payment.source_account_name || "—"}</td>
+                      <td className="px-4 py-3"><span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-white/[0.06] dark:text-gray-300">{payment.payment_status}</span></td>
+                      <td className={`px-4 py-3 text-right font-semibold ${Number(payment.amount) < 0 ? "text-error-600" : "text-success-700 dark:text-success-300"}`}>{paymentMoney(payment.amount, payment.currency_code)}</td>
+                    </tr>)}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-5 flex justify-end"><button className={secondaryButton} onClick={closePayments}>Close</button></div>
+            </div>
           </div>
         </div>
       )}
