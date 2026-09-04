@@ -2,7 +2,9 @@
 
 Date: 2026-09-04
 Branch: `feat/project-pb5-fulfillment-rollup`
-Base main SHA: `2438c8aa735bd9d97f64a677935e370bd42a1082`
+Current main incorporated: `190da5745fe2b6972deabff0d11c16263cd5c0f5`
+Final verified implementation head before this documentation-only closeout: `0d77c2c60acdbe53bc26b6613c0b886e66875d65`
+Draft PR: #296
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
 ## Scope
@@ -90,7 +92,20 @@ The Admin client also requires existing `projects.view`, `shipments.view` and `i
 
 Finance continues to retain Project/Finance visibility through its existing permissions without gaining Shipment/Installation access from PB-5.
 
-## TDD / verification
+## PB-3B workspace integration found during verification
+
+PB-5 verification surfaced a pre-existing Project Detail integration gap: the approved PB-3B `ProjectProcurementTab` component and permission model were present, while `ProjectDetailWorkspace` still rendered the earlier Procurement placeholder.
+
+The PB-5 PR restores the already-approved PB-3B workspace wiring without changing procurement business rules:
+
+- `project_procurement.view` controls sanitized procurement visibility;
+- `project_procurement.manage` controls procurement mutation UI;
+- detailed vendor/cost visibility additionally requires `pricing.cost.view`;
+- Vendor Invoice mutation UI remains allowed to Procurement managers or Finance managers under the existing PB-3B contract.
+
+The permanent Project Procurement contract passes after this restoration.
+
+## TDD / CI verification
 
 RED contract:
 
@@ -98,17 +113,31 @@ RED contract:
 
 Initial expected failure occurred before implementation because `sql/project-pb5-fulfillment-rollup.sql` did not exist.
 
-GREEN gates:
+PB-5 intentionally does not own a separate GitHub Actions workflow. After CI consolidation, the PB-5 contract is executed inside the existing `.github/workflows/admin-project-base.yml` workflow.
 
-- PB-5 static contract;
-- TypeScript typecheck;
-- focused ESLint on PB-5 surfaces;
-- production build;
-- read-only production schema/truth verification;
-- Supabase Security Advisor;
-- Supabase Performance Advisor.
+Fresh implementation-head verification on `0d77c2c60acdbe53bc26b6613c0b886e66875d65`:
 
-PB-5 intentionally does not add a new GitHub Actions workflow. During implementation, parallel PR #294 introduced a consolidated CI ownership policy; the temporary PB-5-specific wrapper was removed before PR closeout to avoid creating competing workflow ownership. PB-5 verification uses the repository's existing Project/Admin CI surfaces plus direct package-contract evidence.
+- **Admin Project Base #223 — GREEN**
+  - Project Base contract
+  - Project Progress contract
+  - Project Financial/Payment contracts
+  - Project Procurement contract
+  - PB-5 Fulfillment contract
+  - Countertop fallback regression
+- **Admin UI Foundation #1244 — GREEN**
+  - Admin UI checks
+  - production-surface contract
+  - RBAC contract
+  - TypeScript typecheck
+  - Mobile Shell UI contract
+  - ESLint
+  - Admin consistency checks
+  - production build
+  - final diff check
+
+The CI consolidation had removed the old `admin-mobile-shell-ui.yml` wrapper while the Mobile Shell contract still referenced it. That current-main CI regression was repaired by aligning the contract with the consolidated `admin-ui-foundation.yml` owner; no application runtime behavior changed.
+
+Any documentation-only commit after the implementation-head evidence must still receive the normal PR workflow run before merge.
 
 ## Production read-only validation
 
@@ -123,6 +152,14 @@ Production schema inspection confirmed:
 - PB-3B Sales-safe procurement status already uses requirement / commitment / delivery-event quantities and PB-5 follows that quantity model without exposing detailed procurement fields.
 
 All production queries used for this validation were read-only.
+
+## Supabase Advisor review
+
+Fresh Security and Performance Advisor scans were run on 2026-09-04 after final implementation verification.
+
+Because the PB-5 SQL/RPC has intentionally **not** been installed in production, there is no PB-5 production function for the Advisors to flag and no PB-5-specific Advisor finding was observed.
+
+Existing unrelated project-wide findings remain, including Store/Finance/support/auth SECURITY DEFINER or policy warnings and existing unindexed-FK / unused-index / permissive-policy performance backlog. PB-5 does not broaden scope to remediate those findings.
 
 ## Production mutation status
 
@@ -139,10 +176,11 @@ After explicit owner approval:
 3. run role acceptance for Admin, Sales and a denied non-fulfillment Project viewer;
 4. run rollback-only scenario coverage for multiple Shipments, partial delivery, Customer Pickup, multiple Installations and cancelled Order exclusion;
 5. rerun Security and Performance Advisors;
-6. deploy Admin only after DB acceptance passes.
+6. deploy Admin only after DB acceptance passes;
+7. complete signed-in Project Fulfillment UI acceptance against the installed RPC.
 
 ## Package boundary
 
-PB-5 does not modify Store/Portal and does not touch Finance tables, migrations or runtime behavior.
+PB-5 does not modify Store/Portal projections and does not introduce Project-owned Finance tables, migrations or money-movement behavior.
 
-Next Project package after owner merge/deploy acceptance: **PB-6 — Participants & Commission Ledger**.
+Next Project package after owner merge, DB acceptance and Admin deployment: **PB-6 — Participants & Commission Ledger**.
