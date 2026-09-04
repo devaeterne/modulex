@@ -64,7 +64,7 @@ export function getOrderStatusGuidance(error: unknown): OrderStatusGuidance {
     const shortage = message.match(/SKU\s+([^\s]+)\s+requires\s+([0-9.]+)\s+more unit\(s\)/i);
     const sku = shortage?.[1] ?? "an Order item";
     const quantity = shortage?.[2] ? Number(shortage[2]) : null;
-    const quantityText = quantity !== null && Number.isFinite(quantity) ? ` ${quantity:g}` : "";
+    const quantityText = quantity !== null && Number.isFinite(quantity) ? ` ${quantity}` : "";
     return {
       reason: `Sellable inventory is insufficient for ${sku}.${quantityText ? `${quantityText} additional unit(s) are required.` : ""}`,
       requiredAction: "Receive or transfer stock into a sellable warehouse, or correct the Order quantity, then retry. Project-linked shortages should flow to Procurement instead of blocking confirmation.",
