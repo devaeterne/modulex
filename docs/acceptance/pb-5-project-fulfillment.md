@@ -108,9 +108,7 @@ GREEN gates:
 - Supabase Security Advisor;
 - Supabase Performance Advisor.
 
-Dedicated CI:
-
-`.github/workflows/admin-project-pb5-fulfillment.yml`
+PB-5 intentionally does not add a new GitHub Actions workflow. During implementation, parallel PR #294 introduced a consolidated CI ownership policy; the temporary PB-5-specific wrapper was removed before PR closeout to avoid creating competing workflow ownership. PB-5 verification uses the repository's existing Project/Admin CI surfaces plus direct package-contract evidence.
 
 ## Production read-only validation
 
