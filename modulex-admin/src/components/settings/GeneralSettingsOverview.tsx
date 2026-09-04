@@ -6,6 +6,7 @@ const sections = [
   { title: "Localization", description: "Default currency, locale and timezone used across the application.", href: "/settings/general/localization", icon: "LO" },
   { title: "Documents", description: "Order and invoice document titles, footer notes and customer-facing wording.", href: "/settings/general/documents", icon: "DO" },
   { title: "Tax Rules", description: "Expected tax rates for Customer Pickup, Delivery and Delivery + Installation workflows.", href: "/settings/general/tax-rules", icon: "TX" },
+  { title: "Project Participant Roles", description: "Configure reusable Project roles such as Designer, Contractor, Installer and Referral Partner.", href: "/settings/general/project-participant-roles", icon: "PR" },
   { title: "Email", description: "Sender identity, reply-to address, internal recipients and email delivery switches.", href: "/settings/general/email", icon: "EM" },
   { title: "Notifications", description: "Choose whether each operational event uses email, panel notification and sound.", href: "/settings/general/notifications", icon: "NT" },
   { title: "Email Delivery Log", description: "Review pending, sent, failed and skipped transactional emails and retry failures.", href: "/settings/general/email-notifications", icon: "LG" },
@@ -17,7 +18,7 @@ export default function GeneralSettingsOverview() {
     <div className="space-y-5">
       <ComponentCard
         title="General Settings"
-        desc="Settings are grouped by purpose so company data, documents, tax rules, email and operational notifications can be managed without searching through one long page."
+        desc="Settings are grouped by purpose so company data, documents, tax rules, Project configuration, email and operational notifications can be managed without searching through one long page."
       >
         <p className="text-sm text-gray-500 dark:text-gray-400">
           Choose a settings area below to review or update its configuration.
