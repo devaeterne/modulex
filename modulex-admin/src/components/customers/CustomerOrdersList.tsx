@@ -18,6 +18,7 @@ import {
   TableStateRow,
   TableViewport,
 } from "@/components/ui/table";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -377,7 +378,7 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
   }, [currentPage, totalPages]);
 
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 ${ADMIN_TEXT_STYLES.body}`}>
       {errorMessage ? (
         <div className="space-y-3" role="alert">
           <Alert variant="error" title="Orders could not be loaded" message={errorMessage} />
@@ -392,22 +393,20 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
         </div>
       ) : null}
 
-      <ComponentCard
-        title={selectedCustomer ? `${selectedCustomer.name} Orders` : "Customer Orders"}
-        desc={
-          selectedCustomer
-            ? `${selectedCustomer.customer_code} • order history`
-            : "Review customer orders and fulfillment status."
-        }
-        headerAction={headerActions}
-      >
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <ComponentCard title="Orders"><p className="text-xl font-semibold">{summary.total}</p></ComponentCard>
-          <ComponentCard title="Open"><p className="text-xl font-semibold">{summary.open}</p></ComponentCard>
-          <ComponentCard title="Completed"><p className="text-xl font-semibold">{summary.completed}</p></ComponentCard>
-          <ComponentCard title="Total Value"><p className="text-xl font-semibold">{totalValueLabel}</p></ComponentCard>
-        </div>
-      </ComponentCard>
+      {selectedCustomer ? (
+        <ComponentCard
+          title={`${selectedCustomer.name} Orders`}
+          desc={`${selectedCustomer.customer_code} • order history`}
+          headerAction={headerActions}
+        />
+      ) : null}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <SummaryCard title="Orders" value={summary.total} />
+        <SummaryCard title="Open" value={summary.open} />
+        <SummaryCard title="Completed" value={summary.completed} />
+        <SummaryCard title="Total Value" value={totalValueLabel} />
+      </div>
 
       <ComponentCard
         title="Order Directory"
@@ -503,7 +502,7 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
           </Table>
         </TableViewport>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm" aria-live="polite">
             {filteredCount === 0 ? "0 orders" : `${startRow}–${endRow} of ${filteredCount} orders`}
           </p>
@@ -529,5 +528,13 @@ export default function CustomerOrdersList({ customerId }: { customerId?: string
         </div>
       </ComponentCard>
     </div>
+  );
+}
+
+function SummaryCard({ title, value }: { title: string; value: React.ReactNode }) {
+  return (
+    <ComponentCard title={title}>
+      <p className={`text-2xl font-semibold ${ADMIN_TEXT_STYLES.strong}`}>{value}</p>
+    </ComponentCard>
   );
 }
