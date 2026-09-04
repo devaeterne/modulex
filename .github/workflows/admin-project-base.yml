@@ -35,5 +35,7 @@ jobs:
         run: node scripts/project-payment-edit-delete-contract.mjs
       - name: Project Finance simple flow contract
         run: node scripts/project-finance-simple-flow-contract.mjs
+      - name: Project Procurement contract
+        run: node scripts/project-procurement-contract.mjs
       - name: Countertop Sink fallback contract
         run: node scripts/countertop-sink-fallback-contract.mjs
