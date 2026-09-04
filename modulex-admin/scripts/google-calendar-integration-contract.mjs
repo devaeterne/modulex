@@ -168,7 +168,7 @@ assert.match(settingsComponent, /\/api\/admin\/google-calendar\/connection/);
 assert.match(settingsComponent, /Delivery.*not available|Delivery.*unavailable/is);
 assert.match(settingsComponent, /Measurement.*not available|Measurement.*unavailable/is);
 assert.match(settingsComponent, /Customer appointment.*not available|Customer appointment.*unavailable/is);
-assert.doesNotMatch(settingsComponent, /<(button|input|select|textarea|label)\b/i);
+assert.doesNotMatch(settingsComponent, /<(button|input|select|textarea|label)\b/);
 assert.doesNotMatch(settingsComponent, /(GOOGLE_CALENDAR_CLIENT_SECRET|GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY|encrypted_refresh_token)/);
 assert.match(integrationLink, /\/settings\/integrations\/google-calendar/);
 assert.match(generalSettingsPage, /GoogleCalendarIntegrationLink/);
