@@ -36,27 +36,139 @@ Do not mark a package `COMPLETE` from source changes alone. Its stated exit crit
 
 ---
 
+## 0A. Mandatory existing-system-first / no-duplication gate
+
+This gate applies **before every A6 package and sub-package**. A roadmap item is a business requirement, not permission to create a new table, RPC, route, component, service, or source of truth.
+
+### Core rule
+
+**Never implement `NEW` first. Inspect the current system first.**
+
+Before changing code or schema, inventory the current execution-time state across:
+
+- current `main` and relevant open PRs;
+- production tables, views, columns, constraints, indexes and triggers;
+- public RPCs and private authorization/validation cores;
+- RLS policies, grants and role/permission mappings;
+- existing Admin routes, managers/components, actions and navigation;
+- source-domain models such as Customer, Project, Order, HR, Vendor/Purchasing and Inventory;
+- existing tests, regression contracts and CI workflows;
+- production row counts/history when migration, backfill or constraint work is involved.
+
+For every planned requirement, record a delta decision before implementation:
+
+| Decision | Meaning | Required behavior |
+| --- | --- | --- |
+| `REUSE` | Existing canonical capability already satisfies the requirement | Use it as-is; do not duplicate it |
+| `EXTEND` | Existing canonical capability is correct but incomplete | Add only the missing behavior/schema/UI/tests to that capability |
+| `BRIDGE` | Another domain already owns the source truth | Link/project it into Finance without copying ownership |
+| `MIGRATE` | Existing shape must evolve | Use additive/controlled migration, preserve history/IDs and reconcile |
+| `DEPRECATE` | A legacy compatibility path can eventually be retired | Only through explicit reviewed migration with compatibility evidence |
+| `NEW` | No canonical primitive currently satisfies the requirement | Create only after absence is demonstrated from current repo + DB evidence |
+
+### Mandatory delta matrix per package
+
+Before implementation starts, add a package-specific matrix to the work log or implementation notes:
+
+| Requirement | Existing asset | Decision | Required delta | Compatibility/migration |
+| --- | --- | --- | --- | --- |
+| Example | existing RPC/table/UI | `REUSE` / `EXTEND` / `BRIDGE` / `MIGRATE` / `DEPRECATE` / `NEW` | exact missing behavior | how live behavior/history is preserved |
+
+No package may move from planning to implementation until this matrix is grounded in current-state evidence.
+
+### Hard rules
+
+- `NEW` requires positive evidence that no canonical existing primitive satisfies the requirement.
+- If an existing system partially satisfies the requirement, default to `EXTEND`, not a parallel replacement.
+- If another domain owns the business truth, default to `BRIDGE`, not copied rows/manual totals.
+- Do not create duplicate tables because the roadmap uses a different conceptual name.
+- Do not create duplicate RPCs when an existing canonical mutation can be safely extended.
+- Do not create a second page/manager when an existing route can be extended without breaking domain boundaries.
+- Do not create a second permission vocabulary when existing Finance/source-domain permissions already model the authority.
+- Preserve existing production IDs, source references, posted history and audit history unless an explicit reviewed migration proves replacement is required.
+- Preserve supported public behavior/API compatibility until a deliberate deprecation/migration package retires it.
+- Never turn a migration convenience field into a second manually editable source of financial truth.
+- Historical/inactive dimension rows must remain resolvable for audit and reversal.
+- A previous baseline finding of “not found” is not permanent evidence. Re-check current `main` and production immediately before creating a new primitive.
+
+### Implementation sequence enforced for every package
+
+`inventory current system → produce delta matrix → choose REUSE/EXTEND/BRIDGE/MIGRATE/DEPRECATE/NEW → lock compatibility plan → tests/implementation → fresh verification → rollout/reconciliation → update financefinal.md`
+
+---
+
+## 0B. Current existing-system map — verified direction as of 2026-09-05
+
+This map prevents already-built Finance work from being accidentally rebuilt. It is a starting point, not a substitute for execution-time re-verification.
+
+| Capability/domain | Existing state | Default decision for later work |
+| --- | --- | --- |
+| Finance Overview `/finance` | Existing route + Finance Overview component | `REUSE / EXTEND` |
+| Financial Accounts `/finance/accounts` | Existing F1 UI and canonical Finance account RPC client | `REUSE / EXTEND / CLOSEOUT` |
+| Transactions `/finance/transactions` | Existing F1 transaction UI and lifecycle RPC client | `REUSE / EXTEND / CLOSEOUT` |
+| Finance Core transaction vocabulary | Existing draft/post/void/reverse model | `REUSE`; extend only for real missing semantics |
+| Finance accounts/categories/FX | Existing client/RPC surface for accounts, categories, FX observations | `REUSE / EXTEND` |
+| Finance transaction links | Existing link/allocation client surface including Employee/source-document context | `REUSE / EXTEND` |
+| Employee payment linkage | Already supported in current Finance Transactions flow | `REUSE / EXTEND`; F4 must not rebuild basic employee-payment posting |
+| `/finance/payroll` | Existing route renders HR `PayrollManager` | `BRIDGE`; do not create a second payroll calculation engine |
+| `/finance/compensation` | Existing route renders HR `CompensationManager` | `BRIDGE`; HR remains compensation owner |
+| `company_expenses` | Existing source table/domain from pre-F1 baseline | `BRIDGE / MIGRATE`; do not create parallel expense truth by default |
+| `customer_invoices` | Existing live customer document model | `BRIDGE / EXTEND`; preserve IDs/history |
+| Project payment requirements/transactions/allocations | Existing live specialized payment ledger/history | `BRIDGE / EXTEND`; preserve compatibility until explicit F5 migration |
+| HR payroll periods/runs/items | Existing HR source model | `BRIDGE`; Finance records resulting money movement only |
+| `hr_advances` | Existing HR source model | `BRIDGE`; no duplicate Finance advance master |
+| `payment_methods` | Existing shared canonical configuration | `REUSE`; no free-text AP/Finance method duplicate |
+| `payment_terms` | Existing commercial configuration | `REUSE` where applicable; do not confuse with payment movement |
+| Canonical Vendor/Supplier master | F0 did not identify one | **RE-CHECK at F3A**; `NEW` only if still absent |
+| General Vendor Bill/AP model | F0 did not identify one | **RE-CHECK at F3B**; `NEW` only if still absent |
+| Cash/bank Finance Core | Implemented by F1 source work | `REUSE / EXTEND / CLOSEOUT`; never rebuild |
+
+### Current F1 evidence that must be preserved
+
+The current Finance client already exposes canonical operations including:
+
+- `get_finance_overview`;
+- `get_finance_accounts`;
+- `get_finance_categories`;
+- `get_finance_fx_rates`;
+- `get_finance_transactions_page`;
+- `create_finance_account` / `update_finance_account`;
+- `create_finance_category`;
+- `upsert_finance_fx_rate`;
+- `create_finance_transaction_draft` / `update_finance_transaction_draft` / `delete_finance_transaction_draft`;
+- `set_finance_transaction_links`;
+- `post_finance_transaction`;
+- `void_finance_transaction`;
+- `reverse_finance_transaction`;
+- Finance Employee/Payroll lookup helpers used for Employee payment linkage.
+
+F1 closeout is therefore **verification and gap correction**, not Finance Core reimplementation.
+
+---
+
 ## 1. Current progress board
 
-| Package | Scope | Status | Exit dependency |
-| --- | --- | --- | --- |
-| A6-F0 | Baseline & architecture contract | **COMPLETE / APPROVED 2026-09-04** | — |
-| A6-F1 | Finance Core + Cash/Bank | **ACTIVE / SOURCE IMPLEMENTATION COMPLETE / FRESH CI PENDING** | Fresh CI + required verification + rollout gate |
-| A6-F2 | Expenses | **NOT STARTED** | F1 closure |
-| A6-F3A | Vendor/Supplier Master + Compliance | **NOT STARTED** | F2 + canonical counterparty decision |
-| A6-F3B | Vendor Bills / AP Core | **NOT STARTED** | F3A |
-| A6-F3C | Vendor Payments + Check Lifecycle | **NOT STARTED** | F3B |
-| A6-F3D | Payment Schedule | **NOT STARTED** | F3B/F3C primitives |
-| A6-F3E | Purchasing / AP Integration | **NOT STARTED** | F3B/F3C |
-| A6-F3F | AP Aging & Vendor Financial Projection | **NOT STARTED** | F3B–F3E |
-| A6-F4 | Payroll / Contractor Finance Integration | **NOT STARTED** | F3 stable |
-| A6-F5 | Sales / AR Integration | **NOT STARTED** | F4 stable |
-| A6-F6 | Reporting & Profitability Projection | **NOT STARTED** | F2–F5 integrated |
-| A6-F7 | Hardening & Production Acceptance | **NOT STARTED** | F1–F6 complete |
+| Package | Scope | Status | Existing-system posture | Exit dependency |
+| --- | --- | --- | --- | --- |
+| A6-F0 | Baseline & architecture contract | **COMPLETE / APPROVED 2026-09-04** | Baseline/source inventory | — |
+| A6-F1 | Finance Core + Cash/Bank | **ACTIVE / SOURCE IMPLEMENTATION COMPLETE / FRESH CI PENDING** | **REUSE / EXTEND / CLOSEOUT ONLY** | Fresh CI + required verification + rollout gate |
+| A6-F2 | Expenses | **NOT STARTED** | `company_expenses` → **BRIDGE/MIGRATE first** | F1 closure |
+| A6-F3A | Vendor/Supplier Master + Compliance | **NOT STARTED** | Re-check canonical entity before `NEW` | F2 + current-state audit |
+| A6-F3B | Vendor Bills / AP Core | **NOT STARTED** | Re-check current AP primitives before `NEW` | F3A |
+| A6-F3C | Vendor Payments + Check Lifecycle | **NOT STARTED** | Finance Core + `payment_methods` → **REUSE/EXTEND** | F3B |
+| A6-F3D | Payment Schedule | **NOT STARTED** | Reuse bill/payment primitives | F3B/F3C primitives |
+| A6-F3E | Purchasing / AP Integration | **NOT STARTED** | **BRIDGE** Purchasing ↔ AP | F3B/F3C |
+| A6-F3F | AP Aging & Vendor Financial Projection | **NOT STARTED** | Projection over canonical AP/Finance truth | F3B–F3E |
+| A6-F4 | Payroll / Contractor Finance Integration | **NOT STARTED** | HR + existing Employee Finance flow → **BRIDGE/EXTEND** | F3 stable |
+| A6-F5 | Sales / AR Integration | **NOT STARTED** | Existing invoices/Project payments → **BRIDGE/EXTEND/MIGRATE** | F4 stable |
+| A6-F6 | Reporting & Profitability Projection | **NOT STARTED** | Read models over existing canonical truth | F2–F5 integrated |
+| A6-F7 | Hardening & Production Acceptance | **NOT STARTED** | Verify integrated system; no feature rewrite | F1–F6 complete |
 
 ### Next executable package
 
-**A6-F1 closeout.** Do not begin F2 until fresh Finance contract/RBAC/UI/typecheck/lint/build verification is recorded and the F1 production rollout state is explicitly known.
+**A6-F1 closeout only.** Inventory the current F1 migrations/RPCs/UI/tests, run fresh Finance contract/RBAC/UI/typecheck/lint/build verification, patch only proven gaps, and record the production rollout state. **Do not reimplement Finance Core.**
+
+Do not begin F2 until that closeout is recorded.
 
 ---
 
@@ -152,10 +264,10 @@ Required concepts:
 
 Target lifecycle vocabulary for checks:
 
-- `issued`
-- `cleared`
-- `voided`
-- `returned`
+- `issued`;
+- `cleared`;
+- `voided`;
+- `returned`.
 
 Preferred model direction: a Finance transaction child such as `finance_payment_instruments` (final physical name decided during migration design), rather than adding check-specific columns to every Finance transaction.
 
@@ -214,7 +326,7 @@ Do not create duplicate monetary truth just to simplify a report.
 
 ### 3.6 One ledger, not annual tables — REQUIRED
 
-Do not reproduce separate `CHECKS 2024`, `CHECK 2025`, `CHECK 2026` structures. Use one canonical ledger/instrument model and filter/report by date/year.
+Do not reproduce separate annual check structures. Use one canonical ledger/instrument model and filter/report by date/year.
 
 ### 3.7 Counterparty normalization — REQUIRED
 
@@ -241,44 +353,44 @@ Legacy payee/vendor spelling variants must not become duplicate AP counterpartie
 
 ## 5. Target Admin information architecture
 
-Final sidebar naming may follow existing navigation conventions, but the functional surfaces below must exist by completion.
+This is a functional target map, not a command to create duplicate routes. **Before adding any route, apply section 0A and extend an existing surface when that is the canonical home.**
 
 ### Finance
 
-- `/finance` — Overview
-- `/finance/transactions` — Transactions
-- `/finance/accounts` — Cash & Bank / Financial Accounts
-- `/finance/expenses` — Expenses
-- Accounts Payable
-  - Vendor Bills
-  - Vendor Payments
-  - Payment Schedule
-  - AP Aging
-- Accounts Receivable
-  - Customer Invoices
-  - Customer Payments
-  - AR Aging
-- Finance-linked Payroll/Compensation entry points remain integration views, not duplicate HR data models.
-- Settings/configuration entry points where appropriate:
-  - Financial Accounts
-  - Finance Categories
-  - Payment Methods
+- `/finance` — Overview — **already exists; reuse/extend**.
+- `/finance/transactions` — Transactions — **already exists; reuse/extend**.
+- `/finance/accounts` — Cash & Bank / Financial Accounts — **already exists; reuse/extend**.
+- `/finance/expenses` — Expenses — create only if current route inventory still lacks a canonical Expenses surface at F2.
+- Accounts Payable functional surfaces:
+  - Vendor Bills;
+  - Vendor Payments;
+  - Payment Schedule;
+  - AP Aging.
+- Accounts Receivable functional surfaces:
+  - Customer Invoices — **existing customer invoice surface must be reused/extended**;
+  - Customer Payments — integrate existing Project/customer payment surfaces where appropriate;
+  - AR Aging.
+- `/finance/payroll` and `/finance/compensation` — **existing HR-backed integration views; do not duplicate HR models**.
+- Settings/configuration:
+  - Financial Accounts — existing Finance surface;
+  - Finance Categories — existing Finance surface;
+  - Payment Methods — existing shared configuration.
 
 ### Vendor/Supplier detail target surfaces
 
-The canonical Vendor/Supplier entity should be able to expose, either as tabs or equivalent sections:
+After F3A current-state audit, extend the canonical Vendor/Supplier entity rather than building a parallel AP-only vendor unless no canonical entity exists:
 
-- Overview
-- Contacts
-- Documents / Compliance
-- Purchases
-- Bills / Invoices
-- Payments
-- Balance / open AP summary
+- Overview;
+- Contacts;
+- Documents / Compliance;
+- Purchases;
+- Bills / Invoices;
+- Payments;
+- Balance / open AP summary.
 
 ### Project / Order projections
 
-Do not create a second Finance ledger inside Projects or Orders. Their detail pages may display:
+Do not create a second Finance ledger inside Projects or Orders. Their existing detail pages may be extended to display:
 
 - linked Finance transactions;
 - allocated expenses/payables/receipts;
@@ -305,20 +417,18 @@ At minimum, each package must cover:
 
 ### Resolution/UI-system requirements inherited from Admin UI Audit v2
 
-Finance tables/forms/modals must respect the shared Admin shell and components rather than adding one-off layout fixes.
-
 Required responsive verification matrix where applicable:
 
-- 360
-- 390
-- 768
-- 1024
-- 1280
-- 1366
-- 1440
-- 1536
-- 1920
-- 2560
+- 360;
+- 390;
+- 768;
+- 1024;
+- 1280;
+- 1366;
+- 1440;
+- 1536;
+- 1920;
+- 2560.
 
 Additional expectations:
 
@@ -327,6 +437,7 @@ Additional expectations:
 - Loading/empty/populated states preserve table structure.
 - Shared design tokens/components are used for buttons, inputs, dropdowns, modal, checkbox/switch, cards, focus and semantic status UI.
 - Desktop expanded/collapsed sidebar and mobile open/closed navigation states must not break Finance pages.
+- Existing shared components are reused before adding Finance-only equivalents.
 
 A Finance package is not UI-complete until its relevant `AdminUICheck.md` acceptance items have fresh evidence.
 
@@ -338,17 +449,30 @@ A Finance package is not UI-complete until its relevant `AdminUICheck.md` accept
 
 Current state: **ACTIVE / SOURCE IMPLEMENTATION COMPLETE / FRESH CI PENDING**.
 
-Existing route surface on current `main` includes:
+Existing current route surface:
 
-- `/finance`
-- `/finance/accounts`
-- `/finance/transactions`
-- `/finance/payroll`
-- `/finance/compensation`
+- `/finance`;
+- `/finance/accounts`;
+- `/finance/transactions`;
+- `/finance/payroll`;
+- `/finance/compensation`.
+
+Existing F1 client/UI already covers Finance accounts, categories, FX observations, transaction drafts, links, posting, draft deletion, void and reversal. Therefore F1 is not an implementation-from-zero package.
+
+### F1 existing-system delta audit — REQUIRED FIRST
+
+- [ ] Inventory F1 migrations/tables/views/constraints/indexes/triggers on current `main` and production.
+- [ ] Inventory Finance RPC/private-core/RLS/grant surface.
+- [ ] Inventory current Finance Overview/Accounts/Transactions components and route RBAC.
+- [ ] Inventory F1 contract/regression/workflow tests.
+- [ ] Produce F1 delta matrix using section 0A.
+- [ ] Classify every finding as `REUSE`, `EXTEND`, `MIGRATE`, `DEPRECATE` or proven `NEW`.
+- [ ] Do **not** recreate accounts, categories, FX, transactions, links, posting, void/reversal, or Employee payment linkage already present.
 
 ### F1 closeout tasks
 
 - [ ] Re-read current `main` and open PRs before any follow-up implementation.
+- [ ] Patch only gaps proven by the delta audit.
 - [ ] Run fresh Finance contract tests.
 - [ ] Run fresh Finance RBAC/production-surface tests.
 - [ ] Run typecheck.
@@ -359,43 +483,50 @@ Existing route surface on current `main` includes:
 - [ ] Verify idempotency behavior for retryable mutations.
 - [ ] Verify inactive historical account/category records do not prevent audit/void/reversal history.
 - [ ] Verify FX snapshot behavior for same-currency, market-FX and manual/agreed-FX scenarios.
+- [ ] Verify current Employee/Payroll linkage behavior is preserved.
 - [ ] Record migration/production rollout state explicitly.
 - [ ] Update this file with CI/PR/deploy evidence.
 
 ### F1 exit
 
-A generic expense-like transaction, deposit/withdrawal and account transfer can exist without Project/Order ownership, preserve Finance audit/lifecycle rules, pass fresh CI/UI verification, and have an explicitly recorded production rollout state.
+The **existing** F1 Finance Core is verified, any proven gaps are extended in-place, generic money movement works without Project/Order ownership, lifecycle/FX/idempotency rules pass fresh verification, and production rollout state is explicit.
 
 ---
 
 ## A6-F2 — Expenses
 
-Goal: make operational company/project-attributable expenses use Finance Core without losing the existing `company_expenses` compatibility/history.
+Goal: make operational company/project-attributable expenses use Finance Core without losing or duplicating the existing `company_expenses` model/history.
+
+### F2 existing-system delta audit — REQUIRED FIRST
+
+- [ ] Re-audit current `company_expenses` schema, data, RLS, UI and mutation paths.
+- [ ] Re-audit current Finance categories/accounts/transactions/links/payment methods for reusable primitives.
+- [ ] Check whether an Expenses Admin route or component has been added since F0.
+- [ ] Produce F2 delta matrix.
+- [ ] Default `company_expenses` to `BRIDGE/MIGRATE`; a parallel expense source table requires explicit proof.
 
 ### F2 data/domain work
 
-- [ ] Re-audit current production `company_expenses` immediately before migration design.
 - [ ] Define bridge/backfill strategy; do not destructively replace historical rows.
-- [ ] Finalize controlled expense category relationship.
-- [ ] Require/resolve financial account at posting time.
-- [ ] Use canonical `payment_methods` relationship where a payment method applies.
-- [ ] Add document/reference/attachment relationship without mixing binary/document state into the ledger.
-- [ ] Define expense statuses and their mapping to Finance draft/posted/void/reversal behavior.
+- [ ] Reuse/extend controlled Finance category relationship.
+- [ ] Reuse existing financial accounts at posting time.
+- [ ] Reuse canonical `payment_methods` where applicable.
+- [ ] Add/reuse document/reference/attachment relationship without mixing binary state into the ledger.
+- [ ] Map expense status to Finance draft/posted/void/reversal without parallel money truth.
 - [ ] Support optional Vendor, Employee, Project, Order and Customer context only when relevant.
-- [ ] Support multi-project/order allocation through the Finance link/allocation model.
-- [ ] Preserve transaction currency and FX snapshot semantics.
-- [ ] Add/extend audit and idempotent mutation contracts.
+- [ ] Reuse/extend Finance link/allocation model for multi-project/order attribution.
+- [ ] Preserve existing currency/FX semantics.
+- [ ] Extend existing audit/idempotent mutation boundaries where possible.
 
 ### F2 UI
 
-- [ ] `/finance/expenses` list.
-- [ ] Expense create flow.
-- [ ] Expense detail.
+- [ ] Extend an existing canonical Expenses surface if one exists; otherwise add `/finance/expenses`.
+- [ ] Expense list/create/detail.
 - [ ] Draft edit/delete.
 - [ ] Post/pay action as appropriate.
 - [ ] Void/reversal flow.
 - [ ] Filters: status, date, category, account, vendor, project/order, employee, currency as supported.
-- [ ] Clear allocation UI when one expense is split across projects/orders.
+- [ ] Allocation UI when one expense is split across projects/orders.
 - [ ] Attachment/reference presentation.
 - [ ] Admin UI audit per section 6.
 
@@ -410,38 +541,45 @@ Goal: make operational company/project-attributable expenses use Finance Core wi
 - [ ] Retry/idempotency regression.
 - [ ] Posted mutation immutability regression.
 - [ ] Legacy `company_expenses` bridge/backfill reconciliation.
+- [ ] No duplicate expense source-of-truth regression.
 
 ### F2 exit
 
-Office rent, utilities, fuel, employee reimbursement and project-attributable expenses use one audited Finance money-movement boundary with no required Project ownership and no lost legacy history.
+Existing expense history is preserved; operational expenses use the canonical Finance money-movement boundary; no duplicate expense ledger/source has been introduced.
 
 ---
 
 ## A6-F3A — Canonical Vendor/Supplier Master + Compliance
 
-Goal: establish the AP counterparty identity before building bills/payments on top of ambiguous free-text vendors.
+Goal: establish/reuse the AP counterparty identity before building bills/payments on ambiguous free-text vendors.
+
+### F3A existing-system delta audit — REQUIRED FIRST
+
+- [ ] Re-audit current Vendor Catalog/integration identities.
+- [ ] Re-audit any Vendor/Supplier/Contractor master added since F0.
+- [ ] Re-audit shared document/media/compliance frameworks before adding vendor-specific document storage.
+- [ ] Produce F3A delta matrix.
+- [ ] `NEW` Vendor/Supplier master is allowed only if a canonical business counterparty still does not exist.
 
 ### F3A domain/data
 
-- [ ] Re-audit existing Vendor Catalog/integration identities and any business counterparty candidates.
-- [ ] Select/reuse the canonical Vendor/Supplier master; do not accidentally treat Vendor Catalog codes as AP identity.
-- [ ] Define vendor status/activation rules without breaking historical AP references.
-- [ ] Define duplicate detection/mapping strategy for imported legacy payee/vendor names.
+- [ ] Select/reuse/extend the canonical Vendor/Supplier master.
+- [ ] Do not treat Vendor Catalog integration codes as AP identity by accident.
+- [ ] Define vendor status/activation rules while preserving historical references.
+- [ ] Define duplicate detection/mapping strategy for legacy names.
 - [ ] Define contacts/remittance/business details required by AP.
-- [ ] Add vendor compliance document model or reuse an existing canonical document framework.
-- [ ] Supported compliance types initially: W9, COI, LICENSE, OTHER unless current domain conventions dictate different canonical values.
-- [ ] Compliance metadata supports issued/expiry/status/verification information as applicable.
-- [ ] Compliance warning behavior defined.
-- [ ] Do **not** create a hard payment block for expired/missing compliance without explicit approved policy.
+- [ ] Reuse an existing canonical document framework where appropriate; otherwise add vendor compliance records.
+- [ ] Initial compliance concepts: W9, COI, LICENSE, OTHER unless existing conventions provide canonical values.
+- [ ] Support issued/expiry/status/verification metadata.
+- [ ] Define warning behavior.
+- [ ] Do **not** invent a hard payment block for expired/missing compliance without approved policy.
 
 ### F3A UI
 
-- [ ] Vendor list supports canonical identity/status/search.
-- [ ] Vendor detail Overview.
-- [ ] Vendor Contacts.
-- [ ] Vendor Documents / Compliance.
-- [ ] Compliance missing/expired warning states.
-- [ ] Finance/AP summary placeholders only when backed by real data; no dead tabs/actions.
+- [ ] Extend the canonical Vendor list/detail rather than create a duplicate AP vendor UI.
+- [ ] Vendor Overview, Contacts, Documents/Compliance.
+- [ ] Missing/expired compliance warning states.
+- [ ] Finance/AP summaries only when backed by real data; no dead tabs/actions.
 - [ ] Admin UI audit per section 6.
 
 ### F3A tests
@@ -450,457 +588,381 @@ Goal: establish the AP counterparty identity before building bills/payments on t
 - [ ] Duplicate/import mapping tests.
 - [ ] Historical inactive vendor references remain readable.
 - [ ] Document expiry/status/permission tests.
-- [ ] Finance permission does not silently grant unrelated vendor-master mutation authority unless explicitly intended.
+- [ ] Finance permission does not silently grant unrelated vendor-master mutation authority.
 
 ### F3A exit
 
-There is one deliberate canonical AP Vendor/Supplier identity usable by future bills/payments, with compliance documents modeled outside Finance transactions.
+One canonical AP Vendor/Supplier identity exists or is deliberately extended, with compliance modeled outside Finance transactions and no duplicate vendor master.
 
 ---
 
 ## A6-F3B — Vendor Bills / AP Core
 
-Goal: create the payable source-document layer while keeping actual money movement in Finance Core.
+Goal: create or extend the payable source-document layer while keeping actual money movement in the existing Finance Core.
+
+### F3B existing-system delta audit — REQUIRED FIRST
+
+- [ ] Re-audit production/current-main for purchase/vendor invoice, payable, receiving or bill primitives added after F0.
+- [ ] Re-audit Purchasing PO/receiving/cost models for reusable source-document relations.
+- [ ] Re-audit Finance transactions/links/payment methods/FX for reusable settlement primitives.
+- [ ] Produce F3B delta matrix.
+- [ ] Build new bill/AP tables only for capabilities still absent after this audit.
 
 ### F3B schema/domain
 
-- [ ] Vendor bill header model.
-- [ ] Vendor bill line model where line-level detail is required.
+- [ ] Reuse/extend existing payable document if present; otherwise add vendor bill header.
+- [ ] Add/extend bill lines only where line-level detail is needed.
 - [ ] Canonical vendor FK.
-- [ ] Bill number/reference and duplicate protection rules.
-- [ ] Bill date.
-- [ ] `due_date`.
-- [ ] Transaction/document currency.
-- [ ] Main-currency projection/snapshot rules consistent with Finance architecture.
-- [ ] Status model: draft/open/partially paid/paid/void or equivalent canonical vocabulary.
+- [ ] Bill number/reference + duplicate protection.
+- [ ] Bill date and `due_date`.
+- [ ] Document currency + main-currency projection/snapshot consistent with Finance architecture.
+- [ ] Status model: draft/open/partially paid/paid/void or canonical equivalent.
 - [ ] Optional Project/Order/PO attribution without universal ownership.
 - [ ] Payment allocation model: one bill can receive N payments.
-- [ ] Outstanding balance derived from authoritative bill total minus valid payment allocations; no independent manually editable running balance.
-- [ ] Overpayment rules fail closed unless an explicit supported use case exists.
-- [ ] Bill attachment/source-document relationship.
-- [ ] Audit and idempotency rules.
+- [ ] Outstanding balance derived from authoritative bill total minus valid allocations.
+- [ ] No independent manually editable running balance.
+- [ ] Overpayment fails closed unless explicitly supported.
+- [ ] Reuse/extend attachment/source-document framework.
+- [ ] Audit/idempotency rules.
 
-### F3B UI
+### F3B UI/tests/exit
 
-- [ ] Vendor Bills list.
-- [ ] Bill create/edit draft flow.
-- [ ] Bill detail.
-- [ ] Bill lines.
-- [ ] Due/status/outstanding presentation.
-- [ ] Linked Vendor, PO, Project/Order context.
-- [ ] Payment allocation history section.
-- [ ] Filters: vendor, status, due range, project/order, PO, currency.
-- [ ] Admin UI audit per section 6.
+- [ ] Extend an existing AP/purchasing document surface if canonical; otherwise add Vendor Bills UI.
+- [ ] List/create/edit/detail/lines/due/status/outstanding/links/allocation history.
+- [ ] Filters: vendor/status/due/project/order/PO/currency.
+- [ ] Admin UI audit.
+- [ ] Bill without Project/Order.
+- [ ] Project/Order/PO-linked bill.
+- [ ] Partial/full payment reconciliation.
+- [ ] Duplicate bill protection.
+- [ ] Unauthorized mutation denial.
+- [ ] FX/history semantics.
 
-### F3B tests
-
-- [ ] Bill can exist without Project/Order.
-- [ ] Bill can link to one Project/Order.
-- [ ] Bill can support allocation across Projects/Orders where business allocation is required.
-- [ ] Partial payment leaves correct outstanding.
-- [ ] Full payment closes bill.
-- [ ] Duplicate bill protection works according to canonical rules.
-- [ ] Unauthorized AP mutations denied.
-- [ ] FX/history semantics preserved.
-
-### F3B exit
-
-A vendor bill can exist independently of a Project, optionally carry Project/Order/PO attribution, accept partial payments through allocations, and derive a reconciled outstanding balance.
+**Exit:** vendor bills/payables use one canonical source model, optionally link Project/Order/PO, reconcile partial payments, and do not duplicate Finance money movement.
 
 ---
 
 ## A6-F3C — Vendor Payments + Check / Payment Instrument Lifecycle
 
-Goal: connect AP settlement to real Finance money movement and explicitly support checks.
+Goal: settle AP through the **existing** Finance transaction engine and explicitly add only the missing payment/check semantics.
+
+### F3C existing-system delta audit — REQUIRED FIRST
+
+- [ ] Re-audit existing `vendor_payment` Finance transaction behavior.
+- [ ] Re-audit `payment_methods` fields/relations and current payment UI.
+- [ ] Re-audit whether any check/payment-instrument model was added after this plan.
+- [ ] Produce F3C delta matrix.
+- [ ] Default Finance transaction posting/FX/idempotency/account behavior to `REUSE/EXTEND`, not replacement.
 
 ### F3C payment model
 
-- [ ] Vendor payment creates or links the canonical `vendor_payment` Finance transaction.
-- [ ] Payment links to canonical Vendor/Supplier.
-- [ ] Payment uses canonical `payment_methods` FK; no new free-text method field.
-- [ ] One payment may allocate across one or more vendor bills when supported.
-- [ ] One bill may receive multiple payments.
-- [ ] Unapplied vendor payment behavior must be explicitly supported or fail closed; do not invent silent balance behavior.
-- [ ] Account/source of funds is explicit.
-- [ ] Currency/FX handling follows Finance Core.
-- [ ] Posting and idempotency follow Finance Core.
+- [ ] Vendor payment creates/links canonical `vendor_payment` Finance transaction.
+- [ ] Canonical Vendor/Supplier link.
+- [ ] Canonical `payment_methods` FK; no duplicate free-text method.
+- [ ] One payment may allocate across bills when supported; one bill may receive multiple payments.
+- [ ] Unapplied payment explicitly supported or fails closed.
+- [ ] Existing Finance account/source-of-funds, currency/FX, posting and idempotency reused.
 
 ### F3C payment instrument model
 
-Preferred child model direction: `finance_payment_instruments` or equivalent.
+Only add a child such as `finance_payment_instruments` if current-state audit confirms no canonical instrument model exists.
 
 Required semantics:
 
-- [ ] `transaction_id` / canonical Finance transaction link.
-- [ ] `payment_method_id` where required by model.
-- [ ] instrument type.
-- [ ] check/instrument number.
-- [ ] `issued_at`.
-- [ ] `cleared_at`.
-- [ ] `voided_at` when applicable.
-- [ ] bank/financial account reference.
-- [ ] status (`issued`, `cleared`, `voided`, `returned` initially).
-- [ ] reference/notes.
-- [ ] check number uniqueness rule scoped appropriately to financial account/instrument type.
-- [ ] state-transition validation and audit.
+- [ ] Finance transaction link;
+- [ ] payment method link where required;
+- [ ] instrument type;
+- [ ] check/instrument number;
+- [ ] `issued_at`;
+- [ ] `cleared_at`;
+- [ ] `voided_at` when applicable;
+- [ ] bank/financial account reference;
+- [ ] status `issued` / `cleared` / `voided` / `returned` initially;
+- [ ] reference/notes;
+- [ ] scoped check-number uniqueness;
+- [ ] validated/audited transitions.
 
-### F3C lifecycle rules
+### F3C lifecycle/UI/tests
 
-- [ ] Posting a check payment does not falsely mark the bank instrument `cleared`.
-- [ ] Clearing is a separate auditable action/state transition.
+- [ ] Posting a check payment does not mark it cleared automatically.
+- [ ] Clearing is a separate audited action.
 - [ ] Void before clearing follows safe lifecycle rules.
-- [ ] Returned check behavior restores/reverses financial/AP effect according to approved transaction semantics; no silent status-only correction.
-- [ ] Already-cleared instruments cannot be casually edited/renumbered.
-- [ ] Historical check data remains queryable by year/account/vendor without annual tables.
-
-### F3C UI
-
-- [ ] Vendor Payments list.
-- [ ] Record/pay vendor bill flow.
-- [ ] Allocate payment across bills.
-- [ ] Payment detail.
-- [ ] Check/instrument fields appear conditionally for relevant payment methods.
-- [ ] Mark/record cleared action.
-- [ ] Void/returned workflow with reason.
-- [ ] Outstanding Checks filter/view.
-- [ ] Cleared Checks filter/view.
-- [ ] Search by check number/vendor/reference.
-- [ ] Admin UI audit per section 6.
-
-### F3C tests
-
-- [ ] Cash/wire/non-check payment does not require check fields.
-- [ ] Check payment requires relevant instrument fields.
-- [ ] Issued → cleared valid transition.
-- [ ] Issued → voided valid transition when safe.
-- [ ] Invalid cleared/voided/returned transitions fail closed.
-- [ ] Partial payment allocation reconciliation.
-- [ ] Multi-bill payment allocation reconciliation if supported.
-- [ ] Duplicate/retried posting does not double-pay.
+- [ ] Returned check causes approved Finance/AP reversal behavior, not status-only correction.
+- [ ] Cleared instruments cannot be casually edited/renumbered.
+- [ ] Vendor Payments list/detail/allocate flow.
+- [ ] Conditional check fields by payment method.
+- [ ] Outstanding/Cleared Checks filters and check-number search.
+- [ ] Cash/wire does not require check fields.
+- [ ] Issued→cleared and safe issued→voided transitions.
+- [ ] Invalid transitions fail closed.
+- [ ] Retry does not double-pay.
 - [ ] Unauthorized clearing/void/reversal denied.
+- [ ] Admin UI audit.
 
-### F3C exit
-
-Vendor payments settle AP through canonical Finance transactions, use canonical payment methods, and checks have a real issued/cleared/voided/returned lifecycle distinct from posting status.
+**Exit:** AP payments reuse Finance Core and `payment_methods`; only missing instrument lifecycle is added/extended, with posting distinct from clearing.
 
 ---
 
 ## A6-F3D — Payment Schedule
 
-Goal: model the operational intent to pay without pretending a scheduled payment is already money movement.
+Goal: model intent to pay without pretending scheduled payment is money movement.
 
-### F3D domain
+### Existing-system gate
 
-- [ ] `scheduled_payment_date` is separate from bill `due_date`, Finance `paid_at`/posting time and instrument `cleared_at`.
-- [ ] Schedule can reference a vendor bill/payable.
-- [ ] Support one or multiple planned installments without fixed numbered columns.
-- [ ] Scheduled total/outstanding validation prevents impossible plans when applicable.
-- [ ] A schedule entry does not affect cash/account balance before actual posting.
-- [ ] Actual payment can satisfy/link a scheduled entry deterministically.
-- [ ] Reschedule/cancel actions are auditable.
+- [ ] Re-audit payment terms, bill due-date fields, reminder/schedule primitives and existing calendars/approvals.
+- [ ] Produce F3D delta matrix and reuse/extend available scheduling primitives where their semantics match.
 
-### F3D UI
+### Domain/UI/tests
 
-- [ ] Payment Schedule list/calendar/table presentation as appropriate.
-- [ ] Due soon.
-- [ ] Overdue.
-- [ ] Scheduled.
-- [ ] Paid/completed.
-- [ ] Vendor, bill, amount, due date, scheduled date and status visible without conflating meanings.
-- [ ] Create/edit/cancel schedule action permissions.
-- [ ] `Pay now`/record payment handoff uses F3C canonical payment flow.
-- [ ] Admin UI audit per section 6.
+- [ ] `scheduled_payment_date` distinct from `due_date`, posting/paid time and `cleared_at`.
+- [ ] Schedule references bill/payable.
+- [ ] Multiple planned installments without fixed numbered columns.
+- [ ] Validation prevents impossible plans where applicable.
+- [ ] Schedule has no account-balance effect.
+- [ ] Actual payment can satisfy/link a schedule deterministically.
+- [ ] Reschedule/cancel audited.
+- [ ] List/calendar/table with due soon, overdue, scheduled, paid/completed.
+- [ ] `Pay now` hands off to canonical F3C payment flow.
+- [ ] Scheduling/rescheduling/cancel and actual-payment reconciliation tests.
+- [ ] Admin UI audit.
 
-### F3D tests
-
-- [ ] Scheduling does not change financial account balance.
-- [ ] Schedule can be moved/cancelled without altering posted history.
-- [ ] Actual payment links/reconciles correctly.
-- [ ] Multiple planned installments reconcile to bill outstanding according to policy.
-- [ ] Past due vs scheduled-later semantics are represented correctly.
-
-### F3D exit
-
-Modulex can answer “what is due?”, “what do we plan to pay?”, “what did we actually pay?” and “what cleared the bank?” as four distinct questions.
+**Exit:** Modulex distinguishes due, planned-to-pay, actually paid and bank-cleared dates/states.
 
 ---
 
 ## A6-F3E — Purchasing / AP Integration
 
-Goal: connect procurement source documents to AP without merging domain ownership.
+Goal: bridge existing procurement source documents to AP without merging or copying ownership.
 
-### F3E integration contract
+### Existing-system gate
 
-- [ ] PO can link to its Vendor/Supplier.
-- [ ] Vendor bill can reference one/more purchasing source records according to canonical PO model.
+- [ ] Inventory current PO, receiving, vendor-catalog, freight/additional-cost and landed-cost models.
+- [ ] Inventory existing links from orders/projects/products to procurement.
+- [ ] Produce F3E delta matrix.
+- [ ] Prefer `BRIDGE/EXTEND`; do not rebuild purchasing inside Finance.
+
+### Integration/UI/tests
+
+- [ ] PO links canonical Vendor/Supplier.
+- [ ] Vendor bill references purchasing source records according to existing PO model.
 - [ ] PO/SKU/quantity remain Purchasing truth.
-- [ ] Procurement freight/additional cost inputs remain in the appropriate purchasing/costing model.
-- [ ] Vendor payable/bill remains AP truth.
-- [ ] Actual payment remains Finance transaction truth.
-- [ ] Selling price/margin remains Sales/Pricing/Reporting truth.
-- [ ] No report depends on duplicating payable/payment totals into PO rows as manually editable truth.
-- [ ] Define behavior for bill amount vs PO/receipt mismatch: warning/approval/fail-closed according to explicit business rule; do not silently accept unexplained mismatch.
+- [ ] Freight/additional cost stays in correct procurement/cost model.
+- [ ] Vendor payable stays AP truth.
+- [ ] Actual payment stays Finance transaction truth.
+- [ ] Selling price/margin stays Sales/Pricing/Reporting truth.
+- [ ] No manually duplicated payable/payment totals on PO rows.
+- [ ] Define bill vs PO/receipt variance behavior explicitly.
+- [ ] Extend existing PO detail with AP state where useful; extend bill detail with PO context.
+- [ ] Permission-safe cross-domain navigation.
+- [ ] PO remains optional for general vendor bill.
+- [ ] PO edits/deletes cannot corrupt posted AP/Finance history.
+- [ ] Cross-domain RBAC tests + Admin UI audit.
 
-### F3E UI
-
-- [ ] PO detail shows linked vendor bill/payment state where useful.
-- [ ] Vendor bill detail shows linked PO/purchasing context.
-- [ ] Navigation between purchasing source and AP document is permission-safe.
-- [ ] Procurement cost vs Finance payable labels are unambiguous.
-- [ ] Admin UI audit per section 6 for changed Purchasing surfaces.
-
-### F3E tests
-
-- [ ] PO link does not become mandatory for general vendor bill.
-- [ ] Deleting/editing source PO cannot silently corrupt posted AP/Finance history.
-- [ ] Linked values reconcile according to defined relationship.
-- [ ] Cross-domain RBAC is preserved.
-
-### F3E exit
-
-A purchase can flow `PO → Vendor Bill → Payment Allocation → Finance Transaction` while each domain keeps one authoritative truth.
+**Exit:** `PO → Vendor Bill → Payment Allocation → Finance Transaction` is linked, while each existing domain retains one authoritative truth.
 
 ---
 
 ## A6-F3F — AP Aging & Vendor Financial Projection
 
-Goal: make AP operationally usable after bills/payments exist.
+Goal: project AP from canonical bills/payments/schedules rather than create a separate balance ledger.
 
-### F3F read models/reports
+### Existing-system gate
+
+- [ ] Re-audit current reporting/read-model infrastructure and Vendor detail surfaces.
+- [ ] Produce F3F delta matrix.
+- [ ] Reuse existing pagination/filter/report patterns.
+
+### Read models/UI/exit
 
 - [ ] Open AP total.
 - [ ] Vendor outstanding balance.
 - [ ] Bill status/outstanding.
-- [ ] Due soon/overdue.
-- [ ] AP aging buckets based on agreed due-date semantics.
+- [ ] Due soon/overdue/AP aging buckets.
 - [ ] Vendor payment history.
 - [ ] Scheduled payments projection.
-- [ ] Outstanding/cleared check views where relevant.
-- [ ] Main-currency normalized totals use stored historical FX snapshots where applicable.
+- [ ] Outstanding/cleared check views.
+- [ ] Main-currency totals use stored Finance FX snapshots.
+- [ ] AP Aging page/view and Vendor detail summary.
+- [ ] Drill-down to canonical source documents/transactions.
+- [ ] Admin UI audit.
 
-### F3F UI
-
-- [ ] AP Aging page/view.
-- [ ] Vendor detail open AP summary.
-- [ ] Vendor Bills/Payments links.
-- [ ] Clear drill-down from aggregate totals to source documents/transactions.
-- [ ] Admin UI audit per section 6.
-
-### F3F exit
-
-AP totals, aging, vendor balance, payments and schedules reconcile back to canonical bills/payment allocations/Finance transactions.
+**Exit:** AP totals reconcile directly to canonical bills, allocations, schedules and Finance transactions with no manually maintained duplicate balance.
 
 ---
 
 ## A6-F4 — Payroll & Contractor Finance Integration
 
-Goal: Finance records actual employee/contractor money movement while HR remains payroll/compensation source of truth.
+Goal: extend the **existing HR-backed Finance integration** so actual employee/contractor money movement is complete while HR remains payroll/compensation truth.
 
-### F4 tasks
+### F4 existing-system delta audit — REQUIRED FIRST
 
-- [ ] Re-audit current HR payroll/advance flows at execution time.
+- [ ] Re-audit current HR payroll/advance flows and current Finance Employee payment flow.
+- [ ] Re-audit `/finance/payroll` → HR `PayrollManager` and `/finance/compensation` → HR `CompensationManager` behavior.
+- [ ] Re-audit current Finance Employee/Payroll lookup/link/posting behavior.
+- [ ] Produce F4 delta matrix.
+- [ ] Do not rebuild payroll period/run/item calculation or basic Employee Finance payment linkage already present.
+
+### F4 tasks/UI/tests
+
 - [ ] Keep payroll period/run/item calculations in HR.
-- [ ] Define approved/paid transition that creates/links Finance obligations/payments.
-- [ ] Post salary payments to canonical Finance accounts/transactions.
-- [ ] Integrate advances.
-- [ ] Integrate deductions/reimbursements where they cause Finance movement.
-- [ ] Handle employer costs only from explicit HR source truth.
-- [ ] Employee is required for employee-level payment records.
-- [ ] Project/Order attribution remains optional unless an explicit allocation is made.
-- [ ] Contractor payment identity must use the correct canonical business entity; do not duplicate a contractor as vendor/employee without an explicit mapping rule.
-- [ ] Contractor W9/COI compliance stays in the canonical contractor/vendor document domain, not Finance transaction rows.
+- [ ] Extend approved/paid transitions to create/link Finance obligations/payments where not already complete.
+- [ ] Reuse canonical Finance accounts/transactions for salary payments.
+- [ ] Bridge advances, deductions/reimbursements where they cause money movement.
+- [ ] Employer costs only from explicit HR truth.
+- [ ] Employee required for employee-level payments; Project/Order attribution optional.
+- [ ] Contractor identity uses canonical entity/mapping; no duplicate vendor/employee identities.
+- [ ] Contractor W9/COI remains vendor/contractor compliance, not Finance transaction data.
+- [ ] Extend existing Finance/HR screens instead of cloning calculation UI.
+- [ ] HR screens expose resulting Finance references where useful.
+- [ ] Retry cannot double-post payroll payment.
+- [ ] Finance permission cannot mutate unrelated HR master data.
+- [ ] Reversal preserves append-safe Finance history.
+- [ ] Optional allocations reconcile.
+- [ ] Admin UI audit on modified surfaces.
 
-### F4 UI
-
-- [ ] Finance payroll/payment projection shows financial state without copying HR calculation screens.
-- [ ] From HR payroll, authorized users can inspect resulting Finance posting/payment reference.
-- [ ] Advances/reimbursements show financial status and linked account/transaction where applicable.
-- [ ] Admin UI audit on every modified Finance and Personnel surface.
-
-### F4 tests
-
-- [ ] Payroll calculation does not duplicate into a second Finance calculation truth.
-- [ ] Retry does not double-post payroll payment.
-- [ ] Finance role cannot mutate unrelated HR employee master by implication.
-- [ ] Payroll reversal/correction preserves append-safe Finance history.
-- [ ] Optional Project/Order allocation reconciles.
-
-### F4 exit
-
-Paid payroll/employee financial events appear in Finance/cash flow while HR remains the source of payroll calculation truth.
+**Exit:** paid payroll/employee/contractor money events reconcile to Finance while existing HR models remain the sole calculation source.
 
 ---
 
 ## A6-F5 — Sales / Accounts Receivable Integration
 
-Goal: reconcile customer invoices and receipts into Finance Core without breaking existing Project payment history.
+Goal: bridge and extend **existing** customer invoices and Project payment history into Finance Core without destructive rewrite.
 
-### F5 tasks
+### F5 existing-system delta audit — REQUIRED FIRST
 
-- [ ] Re-audit production customer invoices/project payment tables and compatibility behavior immediately before migration work.
-- [ ] Preserve current customer invoice IDs/history.
-- [ ] Preserve Project payment requirements/allocations during transition.
-- [ ] Introduce/complete canonical customer receipt through Finance Core.
-- [ ] Customer required for customer receipt.
-- [ ] Invoice/Order/Project links optional according to actual business context.
-- [ ] Customer payment allocation supports partial/full payment.
-- [ ] Derive invoice paid/outstanding/status from authoritative allocations/postings; no parallel manual truth.
-- [ ] Add Finance linkage/reconciliation to existing Project payment records without duplicating money movement.
-- [ ] Retire/narrow the legacy Project-payment posted-edit/hard-delete exception only through a separate reviewed migration after compatibility evidence.
+- [ ] Re-audit production `customer_invoices` and current invoice UI/RPCs.
+- [ ] Re-audit Project payment requirements/transactions/allocations/RPCs and current compatibility exception.
+- [ ] Re-audit whether customer receipt Finance linking already exists.
+- [ ] Produce F5 delta matrix.
+- [ ] Existing IDs/history are preservation constraints, not migration conveniences.
+
+### F5 tasks/UI/tests
+
+- [ ] Preserve customer invoice IDs/history.
+- [ ] Preserve Project payment requirements/transactions/allocations during transition.
+- [ ] Reuse/extend canonical `customer_receipt` Finance transactions.
+- [ ] Customer required; Invoice/Order/Project links according to business context.
+- [ ] Partial/full payment allocation.
+- [ ] Derive paid/outstanding/status from authoritative allocations/postings; no parallel manual truth.
+- [ ] Link/reconcile existing Project payment records to Finance without double-posting money.
+- [ ] Retire/narrow legacy Project-payment posted-edit/hard-delete only through separate reviewed migration.
 - [ ] Preserve currency/FX snapshots.
-- [ ] Ensure refund/reversal behavior reconciles AR.
+- [ ] Refund/reversal reconciles AR.
+- [ ] Extend existing invoice/Project payment pages before creating duplicate screens.
+- [ ] Customer payment history/balance and AR Aging.
+- [ ] Standalone and Project-linked receipt tests.
+- [ ] Partial/full/refund/reversal reconciliation.
+- [ ] Legacy IDs/history preservation.
+- [ ] Retry cannot double-receive payment.
+- [ ] Cross-domain RBAC + Admin UI audit.
 
-### F5 UI
-
-- [ ] Customer Payments/Receipts list.
-- [ ] Invoice detail payment history/outstanding.
-- [ ] Record/allocate payment flow.
-- [ ] Customer balance/payment history.
-- [ ] Project payment screens show reconciled Finance linkage without becoming Finance ownership screens.
-- [ ] AR Aging surface.
-- [ ] Admin UI audit per section 6.
-
-### F5 tests
-
-- [ ] Standalone customer receipt not tied to Project when not required.
-- [ ] Project-linked customer payment still works.
-- [ ] Partial/full allocation reconciliation.
-- [ ] Refund/reversal reconciliation.
-- [ ] Legacy Project payment IDs/history preserved.
-- [ ] Retry does not double-receive payment.
-- [ ] Cross-domain RBAC preserved.
-
-### F5 exit
-
-Customer receipt can reference invoice/order/project when applicable, AR derives from authoritative allocations/postings, and existing Project payment workflows reconcile to Finance without losing live history.
+**Exit:** existing customer/Project payment systems reconcile to Finance, AR derives from authoritative allocations/postings, and live history is preserved.
 
 ---
 
 ## A6-F6 — Reporting & Profitability Projection
 
-Goal: build reports from canonical Finance/source-domain truth after operational posting flows are stable.
+Goal: extend existing reporting infrastructure to project canonical Finance/source-domain truth; do not create report-only editable totals.
 
-### F6 required Finance reports
+### F6 existing-system delta audit — REQUIRED FIRST
+
+- [ ] Inventory current `/reports`, Finance Overview, Project financial rollups, pricing/cost-margin and vendor/customer summary read models.
+- [ ] Inventory existing query/pagination/export patterns.
+- [ ] Produce F6 delta matrix.
+- [ ] Reuse/extend existing reports where semantics match instead of creating duplicate reports with new names.
+
+### F6 required Finance reporting coverage
 
 - [ ] Finance Overview KPIs.
 - [ ] Cash Flow.
-- [ ] Income vs Expense operational report.
-- [ ] Financial Account Balances.
-- [ ] Account Movements.
-- [ ] Expense by Category.
-- [ ] Expense by Vendor.
-- [ ] Expense by Project/Order.
-- [ ] AP Aging.
-- [ ] Vendor Balance.
-- [ ] Vendor Payment History.
+- [ ] Income vs Expense.
+- [ ] Financial Account Balances/Movements.
+- [ ] Expense by Category/Vendor/Project/Order.
+- [ ] AP Aging, Vendor Balance, Vendor Payment History.
 - [ ] Scheduled Payments.
-- [ ] Outstanding Checks.
-- [ ] Cleared Checks.
-- [ ] AR Aging.
-- [ ] Customer Balance.
-- [ ] Customer Payment History.
-- [ ] Project Financial Summary.
-- [ ] Project profitability inputs/projection.
-- [ ] Order profitability inputs/projection where source data supports it.
+- [ ] Outstanding/Cleared Checks.
+- [ ] AR Aging, Customer Balance, Customer Payment History.
+- [ ] Project Financial Summary and profitability inputs/projection.
+- [ ] Order profitability inputs/projection where supported.
 
-### F6 reporting rules
+### F6 reporting/UI rules
 
-- [ ] Posted authoritative Finance state drives actual money movement reporting.
-- [ ] Scheduled entries are forecasts, never silently included as actual cash.
-- [ ] Outstanding checks are distinguishable from cleared bank movement.
-- [ ] Historical cross-currency totals use stored transaction FX snapshots.
-- [ ] Report totals drill down to source transactions/documents.
-- [ ] Project/Order reports consume Finance allocations; they do not own duplicate transaction rows.
-- [ ] Procurement landed-cost inputs and Sales/Pricing values are joined/projected from their source domains rather than manually copied into Finance.
-- [ ] Date/timezone/main-currency rules are deterministic and tested.
+- [ ] Posted Finance state drives actual money movement reporting.
+- [ ] Scheduled entries are forecasts, not actual cash.
+- [ ] Outstanding checks remain distinguishable from cleared bank movement.
+- [ ] Historical cross-currency totals use stored snapshots.
+- [ ] Totals drill down to canonical records.
+- [ ] Project/Order reports consume allocations rather than own duplicate transactions.
+- [ ] Procurement landed cost and Sales/Pricing values join from source domains.
+- [ ] Date/timezone/main-currency rules deterministic/tested.
+- [ ] Shared filters, server-side pagination/aggregation and permission-safe drilldowns.
+- [ ] Export, if present, uses same authoritative semantics.
+- [ ] Admin UI audit.
 
-### F6 UI
-
-- [ ] Shared filters/date range patterns.
-- [ ] Main-currency vs transaction-currency display is explicit.
-- [ ] Drill-down links respect RBAC.
-- [ ] Large tables are paginated/virtualized/aggregated as appropriate rather than unbounded client loads.
-- [ ] Export, if implemented, must use the same authoritative filter/report semantics as the UI.
-- [ ] Admin UI audit per section 6.
-
-### F6 exit
-
-Operational Finance/AP/AR/account/Project reports reconcile to their canonical source records with no duplicate manually maintained totals.
+**Exit:** Finance/AP/AR/account/Project/Order reports reconcile to existing canonical records with no report-only source of truth.
 
 ---
 
 ## A6-F7 — Hardening & Production Acceptance
 
-Goal: prove the integrated Finance domain is safe, reconcilable and operable in production.
+Goal: prove the integrated Finance domain is safe, reconcilable and operable. F7 is not a rewrite package.
+
+### F7 existing-system completeness audit — REQUIRED FIRST
+
+- [ ] Re-run section 0A across F1–F6 and flag any accidental duplicate sources/routes/RPCs.
+- [ ] Confirm every `NEW` primitive has documented absence evidence and ownership.
+- [ ] Confirm every legacy path has an explicit keep/bridge/deprecate disposition.
+- [ ] Remove/deprecate redundant paths only when migration evidence proves safety.
 
 ### F7 security / authorization
 
 - [ ] Full Finance RLS/RPC/grants review.
 - [ ] Public mutation RPC/private-core authorization review.
-- [ ] No unexpected authenticated direct table write path to protected Finance history.
-- [ ] RBAC matrix for `finance.view`, `finance.manage` and source-domain permissions.
+- [ ] No unexpected authenticated direct-table write path to protected Finance history.
+- [ ] RBAC matrix for Finance and source-domain permissions.
 - [ ] Cross-domain escalation tests.
-- [ ] Security Advisor review and disposition.
+- [ ] Security Advisor review/disposition.
 
 ### F7 data integrity
 
 - [ ] Idempotency/concurrency tests.
-- [ ] Draft/post/void/reversal lifecycle tests.
-- [ ] Check lifecycle transition tests.
-- [ ] Payment allocation reconciliation tests.
-- [ ] AP/AR outstanding reconciliation.
+- [ ] Draft/post/void/reversal tests.
+- [ ] Check transition tests.
+- [ ] AP/AR payment allocation reconciliation.
 - [ ] Multi-project allocation reconciliation.
 - [ ] FX snapshot/manual-rate tests.
-- [ ] Historical inactive dimension reference tests.
-- [ ] Duplicate vendor/counterparty mapping review.
-- [ ] Migration/backfill counts and sums reconciled before/after.
+- [ ] Inactive historical dimension references.
+- [ ] Vendor mapping review.
+- [ ] Migration/backfill counts/sums reconciled before/after.
 
-### F7 performance
+### F7 performance/UI/release
 
-- [ ] Query/index review for transactions, bills, allocations, schedules, instruments, reports.
-- [ ] Pagination/filter query contracts.
-- [ ] Performance Advisor review and disposition.
-- [ ] No obvious N+1 or unbounded report/table fetches on production data paths.
-
-### F7 UI / browser acceptance
-
+- [ ] Query/index review for transactions, bills, allocations, schedules, instruments and reports.
+- [ ] Pagination/filter contracts; no obvious N+1/unbounded fetches.
+- [ ] Performance Advisor review/disposition.
 - [ ] Full Finance route audit against `AdminUICheck.md`.
-- [ ] Relevant Vendor/Purchasing/Personnel/Customer/Project/Order modified surfaces re-audited.
-- [ ] Resolution matrix verified where applicable.
-- [ ] Light/dark themes.
-- [ ] Loading/empty/error/retry/action states.
-- [ ] Keyboard/accessibility basics.
-- [ ] Signed-in production acceptance with correct roles.
-- [ ] No dead navigation/actions/placeholders.
+- [ ] Modified Vendor/Purchasing/Personnel/Customer/Project/Order surfaces re-audited.
+- [ ] Resolution matrix/light-dark/loading-empty-error-retry/accessibility/RBAC.
+- [ ] Signed-in production acceptance.
+- [ ] Unit/contract/integration/E2E tests as applicable.
+- [ ] Typecheck, lint, production build.
+- [ ] Migration order and production rollout verified.
+- [ ] Production smoke + reporting reconciliation.
+- [ ] Recovery notes for risky rollout steps.
+- [ ] Final docs updated.
 
-### F7 CI / release
-
-- [ ] Unit tests.
-- [ ] Contract tests.
-- [ ] Integration tests.
-- [ ] Relevant E2E/browser tests.
-- [ ] Typecheck.
-- [ ] Lint.
-- [ ] Production build.
-- [ ] Migration order verified.
-- [ ] Production migrations applied deliberately.
-- [ ] Production smoke tests.
-- [ ] Report/reconciliation spot checks.
-- [ ] Rollback/operational recovery notes documented for risky rollout steps.
-- [ ] Final Finance docs updated.
-
-### F7 exit
-
-Finance is production-accepted only after the integrated ledger/AP/AR/payroll/reporting surfaces pass security, integrity, UI, CI, migration and production smoke/reconciliation gates.
+**Exit:** integrated Finance passes no-duplication, security, integrity, UI, CI, migration, production smoke and reconciliation gates.
 
 ---
 
 ## 8. Cross-package test matrix
 
-Every package should select and extend the applicable cases below rather than creating isolated happy-path tests only.
+Every package extends the applicable existing tests before adding isolated parallel suites.
 
 | Concern | Required evidence |
 | --- | --- |
+| Existing-system delta | current asset inventory + REUSE/EXTEND/BRIDGE/MIGRATE/DEPRECATE/NEW decision |
+| No duplication | no parallel source of truth/RPC/route/component for equivalent canonical behavior |
 | Authentication | anonymous/non-authenticated mutation rejected |
 | Authorization | view/manage/source-domain permission boundaries |
 | Lifecycle | draft/post/void/reverse allowed/denied transitions |
@@ -923,25 +985,24 @@ Every package should select and extend the applicable cases below rather than cr
 ## 9. Data migration and backfill rules
 
 - Re-read production immediately before each migration/backfill; F0 row counts are historical evidence, not permanent assumptions.
+- Inventory current schema before creating a new table/column/RPC; previous absence is not permanent proof.
+- Prefer extending canonical structures over parallel replacements.
 - Prefer additive schema + deterministic backfill + verification + later cleanup over destructive replacement.
-- Never map free-text vendor names automatically when identity is ambiguous; create an explicit mapping/review path.
+- Never map free-text vendor names automatically when identity is ambiguous; create explicit mapping/review.
 - Preserve legacy source IDs/references where needed for traceability and rollback.
 - Backfills must be idempotent or safely rerunnable.
 - Record pre/post counts, sums and unresolved rows.
-- Do not convert historical document rows into posted Finance money movement unless the historical event can be proven and reconciled.
-- Do not create artificial Project/Order links for general Finance records.
+- Do not convert historical document rows into posted Finance money movement unless the event can be proven/reconciled.
+- Do not create artificial Project/Order links.
 - Historical currency values must not be recomputed from a current FX rate.
-- Production constraint tightening happens only after data verification proves compatibility.
+- Constraint tightening occurs only after data verification proves compatibility.
+- Do not delete a legacy source immediately after bridging; deprecation/removal requires explicit migration acceptance.
 
 ---
 
 ## 10. Reconciliation rules
 
-Use reconciliation as an explicit acceptance step, not an afterthought.
-
 ### Finance account reconciliation
-
-For a defined date range/account:
 
 `opening balance + posted inflows - posted outflows ± valid reversals = closing operational balance`
 
@@ -949,22 +1010,29 @@ Instrument clearing is tracked separately where an issued check has not yet clea
 
 ### AP reconciliation
 
-For each vendor bill:
-
 `bill authoritative total - valid payment allocations ± valid reversals/refunds = outstanding balance`
 
-Aggregate vendor open balance must equal the sum of its open bill balances, subject only to explicitly supported unapplied credits/payments.
+Aggregate vendor open balance equals open bill balances subject only to explicitly supported unapplied credits/payments.
 
 ### AR reconciliation
-
-For each customer invoice:
 
 `invoice authoritative total - valid receipt allocations ± refunds/reversals = outstanding balance`
 
 ### Project/Order allocation reconciliation
 
-- Allocation totals cannot exceed their authoritative Finance transaction/document amount.
-- Project/Order financial summaries are projections of links/allocations, not manually editable totals.
+- Allocation totals cannot exceed authoritative Finance transaction/document amount.
+- Project/Order summaries are projections of links/allocations, not manually editable totals.
+
+### Existing-source reconciliation
+
+For every bridge/migration:
+
+- [ ] source IDs/counts identified;
+- [ ] canonical destination/link counts identified;
+- [ ] monetary totals reconcile;
+- [ ] unresolved/ambiguous records explicitly listed;
+- [ ] no duplicate posting caused by bridge/backfill;
+- [ ] old supported read path remains correct until deliberate deprecation.
 
 ---
 
@@ -972,19 +1040,24 @@ For each customer invoice:
 
 A package is `COMPLETE` only when all applicable items are true:
 
+- [ ] Existing-system inventory completed immediately before implementation.
+- [ ] Package delta matrix recorded.
+- [ ] Every new primitive justified; reusable canonical assets reused/extended/bridged instead.
 - [ ] Scope implemented without violating `FINANCE_DOMAIN_PLAN.md`.
+- [ ] No parallel source of truth introduced.
+- [ ] Existing production IDs/history/behavior preserved or explicitly migrated with reconciliation.
 - [ ] Schema/migration reviewed against current production state.
 - [ ] RLS/RPC/RBAC boundary verified.
 - [ ] Audit/lifecycle/idempotency behavior verified.
 - [ ] Domain reconciliation tests pass.
 - [ ] Existing compatibility/regression tests pass.
 - [ ] UI meets `AdminUICheck.md` for changed surfaces.
-- [ ] Fresh typecheck/lint/build gates required by the repo pass.
+- [ ] Fresh typecheck/lint/build gates required by repo pass.
 - [ ] PR/merge state recorded if a PR is used.
 - [ ] Production migration/deployment state recorded if applicable.
 - [ ] Production smoke/reconciliation recorded when production changed.
-- [ ] This `financefinal.md` progress board and package checklist are updated.
-- [ ] Next executable package is named.
+- [ ] This `financefinal.md` progress board/package checklist/work log updated.
+- [ ] Next executable package named.
 
 ---
 
@@ -992,24 +1065,24 @@ A package is `COMPLETE` only when all applicable items are true:
 
 Use small vertical packages instead of one Finance mega-PR.
 
-Recommended delivery sequence:
+Recommended sequence:
 
-1. Close A6-F1 with fresh verification.
-2. A6-F2 Expenses.
-3. A6-F3A Vendor/Supplier + Compliance.
-4. A6-F3B Vendor Bills.
-5. A6-F3C Vendor Payments + Check Lifecycle.
+1. Close A6-F1 by auditing/verifying/extending existing F1 only.
+2. A6-F2 Expenses — bridge existing `company_expenses`.
+3. A6-F3A Vendor/Supplier + Compliance — re-check canonical entity first.
+4. A6-F3B Vendor Bills — re-check AP primitives first.
+5. A6-F3C Vendor Payments + Check Lifecycle — reuse Finance Core + `payment_methods`.
 6. A6-F3D Payment Schedule.
-7. A6-F3E Purchasing/AP linkage.
-8. A6-F3F AP Aging/Vendor financial projection.
-9. A6-F4 Payroll/Contractor Finance integration.
-10. A6-F5 Customer AR integration.
-11. A6-F6 Reporting/profitability projections.
-12. A6-F7 hardening/production acceptance.
+7. A6-F3E Purchasing/AP linkage — bridge existing Purchasing.
+8. A6-F3F AP Aging/Vendor projection.
+9. A6-F4 Payroll/Contractor — extend existing HR/Finance integration.
+10. A6-F5 Customer AR — bridge existing invoices/Project payments.
+11. A6-F6 Reporting/profitability — extend existing report/read models.
+12. A6-F7 hardening/no-duplication/production acceptance.
 
 For each package:
 
-`read current main + production → lock package contract → tests/implementation → fresh CI → review/PR → merge → production rollout if needed → smoke/reconcile → update financefinal.md`
+`read current main + production → inventory existing assets → delta matrix → lock compatibility plan → tests/implementation → fresh CI → review/PR → merge → production rollout if needed → smoke/reconcile → update financefinal.md`
 
 Do not start the next package merely because code exists; use the prior package exit gate.
 
@@ -1019,19 +1092,24 @@ Do not start the next package merely because code exists; use the prior package 
 
 | Decision | Status | Reason |
 | --- | --- | --- |
-| Keep current F1 Finance Core architecture | **LOCKED** | Spreadsheet requirements extend operations; they do not require redesigning the neutral ledger |
+| Existing-system-first before every package | **LOCKED** | Prevent duplicate tables/RPCs/routes/sources and repeated work |
+| `NEW` only after current-state absence evidence | **LOCKED** | Prior plans/baselines can become stale |
+| Preserve/extend existing F1 Finance Core | **LOCKED** | F1 source implementation already exists |
+| Existing HR payroll/compensation remains canonical | **LOCKED** | Finance routes already project HR managers; no second payroll model |
+| Existing `company_expenses` is bridged/migrated, not casually replaced | **LOCKED** | Existing source model must not become duplicate history |
+| Existing customer invoices/Project payments are preserved and integrated | **LOCKED** | Live IDs/history and compatibility exist |
+| Existing `payment_methods` is canonical | **LOCKED** | No AP/Finance free-text duplicate |
 | Finance remains first-class; Project is attribution | **LOCKED** | Required by Finance domain contract |
-| Source documents stay separate from money movement | **LOCKED** | Prevent invoice/PO/check/payment truth from collapsing into one table |
-| Check lifecycle uses a child/instrument model direction | **ACCEPTED** | Check issued vs cleared is operationally distinct from Finance posting |
-| `scheduled_payment_date` remains distinct from due/paid/cleared | **ACCEPTED** | Required for payment planning and cash forecast semantics |
-| W9/COI belongs to Vendor/Contractor compliance, not Finance transaction | **ACCEPTED** | Compliance is counterparty/document state, not money movement |
-| Canonical `payment_methods` relationship; no AP free text | **ACCEPTED** | Prevent spelling variants and reporting fragmentation |
-| Vendor bills support partial payments through allocations | **ACCEPTED** | Real operational installment requirement |
-| PO → Bill → Payment → Finance relationship without domain collapse | **ACCEPTED** | Preserves procurement/AP/ledger ownership |
-| One ledger/instrument model across years | **ACCEPTED** | Annual spreadsheet tabs are a presentation artifact, not a data model |
-| No compliance hard-block without approved policy | **LOCKED SAFE DEFAULT** | Do not invent a business rule that can stop payments |
-| No full statutory GL in this roadmap | **DEFERRED / NON-GOAL** | Existing Finance plan intentionally targets operational Finance first |
-| Bank-feed reconciliation/tax filing/external accounting integrations | **DEFERRED** | Require explicit future requirements after operational Finance stabilizes |
+| Source documents stay separate from money movement | **LOCKED** | Prevent invoice/PO/check/payment truth collapse |
+| Check lifecycle child/instrument direction | **ACCEPTED, SUBJECT TO CURRENT-STATE RECHECK** | Add only if no canonical instrument model exists at F3C |
+| `scheduled_payment_date` distinct from due/paid/cleared | **ACCEPTED** | Required for payment planning/cash forecast semantics |
+| W9/COI belongs to Vendor/Contractor compliance | **ACCEPTED** | Compliance is counterparty/document state |
+| Vendor bills support partial payments via allocations | **ACCEPTED** | Real operational installment requirement |
+| PO → Bill → Payment → Finance without domain collapse | **ACCEPTED** | Preserves procurement/AP/ledger ownership |
+| One ledger/instrument model across years | **ACCEPTED** | Annual spreadsheet tabs are presentation only |
+| No compliance hard-block without approved policy | **LOCKED SAFE DEFAULT** | Do not invent payment-stopping business rules |
+| No full statutory GL in this roadmap | **DEFERRED / NON-GOAL** | Operational Finance first |
+| Bank feeds/tax filing/external accounting integrations | **DEFERRED** | Require explicit future requirements |
 
 ---
 
@@ -1039,38 +1117,55 @@ Do not start the next package merely because code exists; use the prior package 
 
 | Risk | Control |
 | --- | --- |
-| Duplicate Vendor/Supplier identities from legacy names | Canonical master + explicit import mapping/dedupe review |
-| Double-posting from legacy Project/customer payment flows | Reconciliation links + idempotency + staged F5 integration |
+| Rebuilding an existing Finance feature | Mandatory section 0A inventory + delta matrix |
+| Parallel source of truth | `NEW` evidence gate + Definition of Done no-duplication check |
+| Stale baseline causes duplicate schema | Re-read current `main` + production before every package |
+| Duplicate Vendor/Supplier identities | Canonical master + explicit mapping/dedupe review |
+| Double-posting from legacy Project/customer payment flows | Bridge/reconciliation + idempotency + staged F5 integration |
+| Payroll duplicated into Finance | HR remains source; existing HR-backed Finance routes are extended only |
 | Posted history silently edited | Private mutation core + lifecycle constraints + reversal model |
-| Outstanding checks mistaken for cleared cash | Separate payment instrument lifecycle and cleared timestamp/status |
-| Payment schedule mistaken for actual cash | Schedule has no ledger effect until canonical payment posting |
-| Incorrect historical FX | Stored transaction-time snapshot; no later-rate recomputation |
-| Multi-project allocation drift | Authoritative source total + deterministic allocation validation |
-| Procurement and AP duplicate truth | Explicit domain ownership and links, no copied editable totals |
-| Expired W9/COI unexpectedly blocking operations | Warning by default; hard block requires approved policy |
-| Permission regression across Finance/HR/Project/Vendor | Cross-domain RBAC tests + RPC/RLS review |
-| Large reporting queries degrade Admin | Indexed server-side filtering/pagination + F7 performance review |
-| Backfill changes live historical meaning | Additive migrations + before/after reconciliation + fail closed on ambiguity |
+| Outstanding checks mistaken for cleared cash | Separate instrument lifecycle and clearing state |
+| Payment schedule mistaken for actual cash | Schedule has no ledger effect until payment posts |
+| Incorrect historical FX | Stored transaction-time snapshot |
+| Multi-project allocation drift | Authoritative source total + deterministic validation |
+| Procurement and AP duplicate truth | Explicit domain ownership + links, no copied editable totals |
+| Expired W9/COI unexpectedly blocks operations | Warning default; hard block requires approved policy |
+| Permission regression | Cross-domain RBAC tests + RPC/RLS review |
+| Large reporting queries degrade Admin | Indexed server-side filtering/pagination + performance review |
+| Backfill changes historical meaning | Additive migrations + before/after reconciliation + fail closed on ambiguity |
 
 ---
 
 ## 15. Deferred decisions — resolve only when their package starts
 
-These are intentionally not blockers for the current plan. Resolve them from current repo/business evidence when their package begins; do not invent them early.
+Resolve these from **current execution-time evidence**, not from assumptions in this document:
 
-- Final physical table names for Vendor/Supplier and payment instruments.
-- Exact Vendor entity reuse vs extension after current domain inventory.
+- Final physical Vendor/Supplier table choice/name.
+- Exact Vendor entity reuse vs extension.
+- Final payment-instrument table/model name or whether a suitable current model already exists.
 - Whether one vendor payment may be intentionally unapplied/on-account.
 - Exact AP aging bucket ranges.
-- Exact bill approval workflow, if one is required beyond draft/open/posting semantics.
+- Exact bill approval workflow beyond canonical lifecycle.
 - Exact PO-vs-bill variance approval thresholds.
-- Whether missing/expired compliance ever hard-blocks a payment.
-- Exact external accounting export/integration requirements.
+- Whether missing/expired compliance ever hard-blocks payment.
+- External accounting export/integration requirements.
 - Full statutory chart-of-accounts/double-entry scope.
 
 ---
 
 ## 16. Work log
+
+### 2026-09-05 — Existing-system-first rule added
+
+- Rechecked the prior F0 baseline and current Finance source surfaces before refining this plan.
+- Confirmed current F1 source already includes Finance Overview, Accounts and Transactions routes/components plus canonical client operations for accounts, categories, FX, transaction draft/update/delete, links, posting, void and reversal.
+- Confirmed current Finance Transactions flow already contains Employee/Payroll lookup/link support; F4 must extend/bridge it rather than rebuild the basic capability.
+- Confirmed `/finance/payroll` renders the existing HR `PayrollManager` and `/finance/compensation` renders the existing HR `CompensationManager`; no duplicate Finance payroll/compensation engine will be created.
+- Preserved F0 decisions that `company_expenses`, customer invoices, Project payment history, HR payroll/advances and shared `payment_methods` are existing systems to bridge/reuse/extend.
+- Added the mandatory `REUSE / EXTEND / BRIDGE / MIGRATE / DEPRECATE / NEW` delta classification gate for every remaining package.
+- Locked `NEW` behind current-main + production absence evidence.
+- Changed F1 wording to explicit **closeout/gap-fix only**, not reimplementation.
+- No Finance schema, application behavior, production data or UI behavior was changed by this documentation update.
 
 ### 2026-09-05 — Final implementation plan created
 
@@ -1079,8 +1174,8 @@ These are intentionally not blockers for the current plan. Resolve them from cur
 - Adopted `AdminUICheck.md` as the mandatory UI acceptance contract.
 - Added Excel-derived requirements: check clearing lifecycle, scheduled payments, vendor compliance documents, canonical payment methods, partial payments, counterparty normalization and Procurement → AP linkage.
 - Expanded A6-F3 into executable AP sub-packages without changing the required F0→F7 architecture order.
-- No Finance schema, application code, production data or UI behavior was changed by this planning package.
+- No Finance schema, application code, production data or UI behavior was changed by that planning package.
 
 ### Next
 
-**A6-F1 closeout — fresh CI/UI/contract/build verification and explicit rollout-state recording.**
+**A6-F1 closeout — inventory current F1 implementation, produce the F1 delta matrix, run fresh CI/UI/contract/build verification, patch only proven gaps, and explicitly record production rollout state.**
