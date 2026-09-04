@@ -164,7 +164,7 @@ expect(
   table.includes("productImages") &&
     table.includes("previewImage") &&
     table.includes('aria-label={`View ${product.product_name} image`}') &&
-    table.includes('aria-label="Product image preview"'),
+    table.includes('ariaLabel="Product image preview"'),
   "Product List must render a clickable product thumbnail and an accessible lightbox preview"
 );
 expect(
