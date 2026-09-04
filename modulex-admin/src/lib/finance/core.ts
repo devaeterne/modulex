@@ -278,6 +278,14 @@ export async function updateFinanceTransactionDraft(
   return data as string;
 }
 
+export async function deleteFinanceTransactionDraft(transactionId: string) {
+  const { data, error } = await supabase.rpc("delete_finance_transaction_draft", {
+    p_transaction_id: transactionId,
+  });
+  if (error) throw normalizeRpcError(error);
+  return data as string;
+}
+
 export async function setFinanceTransactionLinks(transactionId: string, links: FinanceTransactionLinkInput[]) {
   const { data, error } = await supabase.rpc("set_finance_transaction_links", {
     p_transaction_id: transactionId,
