@@ -75,9 +75,8 @@ function basisLabel(commission: ProjectCommissionObligation) {
 }
 
 function payoutLabel(commission: ProjectCommissionObligation) {
-  if (commission.payoutCurrencyState === "restricted") return "Restricted";
-  if (commission.payoutCurrencyState === "mixed_currency") return "Mixed currency — review in Finance";
-  return money(commission.paidAmount ?? 0, commission.currencyCode);
+  if (commission.paidAmount === null) return "Restricted or currency review required in Finance";
+  return money(commission.paidAmount, commission.currencyCode);
 }
 
 export default function ProjectParticipantsCommissionPanel({ projectId }: Props) {
