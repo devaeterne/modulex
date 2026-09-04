@@ -14,7 +14,10 @@ import InputField from "@/components/form/input/InputField";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { Dropdown } from "@/components/ui/dropdown/Dropdown";
+import { DropdownItem } from "@/components/ui/dropdown/DropdownItem";
 import { Modal } from "@/components/ui/modal";
+import { ADMIN_FOCUS_RING } from "@/components/ui/theme/adminTheme";
 import {
   Table,
   TableBody,
@@ -66,6 +69,25 @@ type Product = {
   material_price_band?: string | null;
 };
 
+type ProductImage = {
+  url: string;
+  alt: string;
+};
+
+type ProductContentRow = {
+  id: string;
+  base_product_code: string;
+};
+
+type ProductMediaRow = {
+  product_content_id: string;
+  url: string;
+  alt_text: string | null;
+  title: string | null;
+  sort_order: number;
+  is_primary: boolean;
+};
+
 type FilterOption = {
   id: string;
   name: string;
@@ -88,6 +110,14 @@ type ProductsPagePayload = {
 type RpcError = {
   code?: string;
   message?: string;
+};
+
+type ProductRowActionsProps = {
+  product: Product;
+  isLoading: boolean;
+  onToggleStatus: () => void | Promise<void>;
+  onDuplicate: () => void;
+  onArchive: () => void;
 };
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
@@ -155,6 +185,78 @@ function getPageNumbers(currentPage: number, totalPages: number) {
   return Array.from({ length: 5 }, (_, index) => start + index);
 }
 
+function ProductRowActions({
+  product,
+  isLoading,
+  onToggleStatus,
+  onDuplicate,
+  onArchive,
+}: ProductRowActionsProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const isArchived = product.product_status === "archived";
+
+  const closeMenu = useCallback(() => setIsOpen(false), []);
+
+  return (
+    <span ref={anchorRef} className="relative inline-flex">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="dropdown-toggle"
+        aria-label={`Actions for ${product.product_name}`}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        disabled={isLoading}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        …
+      </Button>
+      <Dropdown
+        isOpen={isOpen}
+        onClose={closeMenu}
+        portal
+        anchorRef={anchorRef}
+        role="menu"
+        ariaLabel={`Actions for ${product.product_name}`}
+        className="w-48 p-2"
+      >
+        <DropdownItem tag="a" href={`/products/${product.product_id}/edit`} onItemClick={closeMenu}>
+          Edit
+        </DropdownItem>
+        {!isArchived ? (
+          <DropdownItem
+            onClick={() => {
+              closeMenu();
+              void onToggleStatus();
+            }}
+          >
+            {product.product_status === "active" ? "Deactivate" : "Activate"}
+          </DropdownItem>
+        ) : null}
+        <DropdownItem
+          onClick={() => {
+            closeMenu();
+            onDuplicate();
+          }}
+        >
+          Duplicate
+        </DropdownItem>
+        {!isArchived ? (
+          <DropdownItem
+            onClick={() => {
+              closeMenu();
+              onArchive();
+            }}
+          >
+            Archive
+          </DropdownItem>
+        ) : null}
+      </Dropdown>
+    </span>
+  );
+}
+
 export default function ProductsTable() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -163,6 +265,8 @@ export default function ProductsTable() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [productImages, setProductImages] = useState<Record<string, ProductImage>>({});
+  const [previewImage, setPreviewImage] = useState<ProductImage | null>(null);
   const [brands, setBrands] = useState<FilterOption[]>([]);
   const [categories, setCategories] = useState<FilterOption[]>([]);
   const [productTypes, setProductTypes] = useState<FilterOption[]>([]);
@@ -219,11 +323,89 @@ export default function ProductsTable() {
     [query, typeFilter, uomFilter, statusFilter, qrFilter, brandFilter, categoryFilter, sortBy, sortDirection]
   );
 
+  const loadProductImages = useCallback(async (items: Product[], requestId: number) => {
+    const baseProductCodes = Array.from(
+      new Set(items.map((product) => product.base_product_code || product.sku).filter(Boolean))
+    );
+
+    if (baseProductCodes.length === 0) {
+      if (requestId === requestIdRef.current) setProductImages({});
+      return;
+    }
+
+    const { data: contentRows, error: contentError } = await supabase
+      .from("store_product_content")
+      .select("id,base_product_code")
+      .in("base_product_code", baseProductCodes);
+
+    if (requestId !== requestIdRef.current) return;
+    if (contentError) {
+      reportProductError("product thumbnail content load failed", contentError);
+      setProductImages({});
+      return;
+    }
+
+    const contents = (contentRows ?? []) as ProductContentRow[];
+    const contentIds = contents.map((content) => content.id);
+    if (contentIds.length === 0) {
+      setProductImages({});
+      return;
+    }
+
+    const { data: mediaRows, error: mediaError } = await supabase
+      .from("store_product_media")
+      .select("product_content_id,url,alt_text,title,sort_order,is_primary")
+      .in("product_content_id", contentIds)
+      .eq("media_type", "image")
+      .order("is_primary", { ascending: false })
+      .order("sort_order", { ascending: true });
+
+    if (requestId !== requestIdRef.current) return;
+    if (mediaError) {
+      reportProductError("product thumbnail media load failed", mediaError);
+      setProductImages({});
+      return;
+    }
+
+    const firstImageByContentId = new Map<string, ProductMediaRow>();
+    for (const media of (mediaRows ?? []) as ProductMediaRow[]) {
+      if (!firstImageByContentId.has(media.product_content_id)) {
+        firstImageByContentId.set(media.product_content_id, media);
+      }
+    }
+
+    const imageByBaseProductCode = new Map<string, ProductImage>();
+    for (const content of contents) {
+      const media = firstImageByContentId.get(content.id);
+      if (!media) continue;
+      imageByBaseProductCode.set(content.base_product_code, {
+        url: media.url,
+        alt: media.alt_text || media.title || "Product image",
+      });
+    }
+
+    const nextImages: Record<string, ProductImage> = {};
+    for (const product of items) {
+      const image = imageByBaseProductCode.get(product.base_product_code || product.sku);
+      if (image) {
+        nextImages[product.product_id] = {
+          ...image,
+          alt: image.alt === "Product image" ? product.product_name : image.alt,
+        };
+      }
+    }
+    setProductImages(nextImages);
+  }, []);
+
   const loadProducts = useCallback(
     async (options?: { background?: boolean }) => {
       const requestId = ++requestIdRef.current;
       const background = options?.background === true;
-      if (!background) setIsLoading(true);
+      if (!background) {
+        setIsLoading(true);
+        setProductImages({});
+        setPreviewImage(null);
+      }
       setErrorMessage(null);
 
       const legacyArgs = getLegacyRpcArgs(currentPage, pageSize);
@@ -238,6 +420,7 @@ export default function ProductsTable() {
         setErrorMessage("Products are temporarily unavailable. Please try again.");
         if (!background) {
           setProducts([]);
+          setProductImages({});
           setTotalCount(0);
           setTotalPages(1);
           setIsLoading(false);
@@ -256,16 +439,18 @@ export default function ProductsTable() {
         return;
       }
 
-      setProducts(payload?.items ?? []);
+      const nextProducts = payload?.items ?? [];
+      setProducts(nextProducts);
       setBrands(payload?.filters?.brands ?? []);
       setCategories(payload?.filters?.categories ?? []);
       setProductTypes(payload?.filters?.product_types ?? []);
       setUoms(payload?.filters?.uoms ?? []);
       setTotalCount(Number(payload?.total_count ?? 0));
       setTotalPages(nextTotalPages);
+      void loadProductImages(nextProducts, requestId);
       if (!background) setIsLoading(false);
     },
-    [currentPage, pageSize, getLegacyRpcArgs, getV2RpcArgs]
+    [currentPage, pageSize, getLegacyRpcArgs, getV2RpcArgs, loadProductImages]
   );
 
   useEffect(() => {
@@ -447,7 +632,7 @@ export default function ProductsTable() {
           product.product_type_name || product.product_type_code,
           product.brand,
           product.category,
-                      product.product_type_pricing_model === "countertop_material_band" ? `${product.stone_type || "Stone"} · ${product.material_price_band || ""}` : `${product.base_product_code} · ${product.color_name || product.color_code}`,
+          product.product_type_pricing_model === "countertop_material_band" ? `${product.stone_type || "Stone"} · ${product.material_price_band || ""}` : `${product.base_product_code} · ${product.color_name || product.color_code}`,
           product.uom_name || product.uom_code || product.unit,
           product.on_hand,
           product.reserved,
@@ -546,9 +731,34 @@ export default function ProductsTable() {
               <TableBody variant="admin">
                 {isLoading ? <TableRow><TableCell variant="admin" colSpan={columnCount} className="py-10 text-center">Loading products...</TableCell></TableRow> : products.length === 0 ? <TableRow><TableCell variant="admin" colSpan={columnCount} className="py-10 text-center">No products found for the selected filters.</TableCell></TableRow> : products.map((product) => {
                   const isActionLoading = actionLoadingId === product.product_id;
-                  const isArchived = product.product_status === "archived";
+                  const productImage = productImages[product.product_id];
                   return <TableRow key={product.product_id} className="transition hover:bg-gray-50 dark:hover:bg-white/[0.03]">
-                    <TableCell variant="admin"><p className="font-medium text-gray-800 dark:text-white/90">{product.product_name}</p><p className="text-xs text-gray-500 dark:text-gray-400">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</p></TableCell>
+                    <TableCell variant="admin">
+                      <div className="flex min-w-[260px] items-center gap-3">
+                        {productImage ? (
+                          <button
+                            type="button"
+                            className={`${ADMIN_FOCUS_RING} block shrink-0`}
+                            aria-label={`View ${product.product_name} image`}
+                            onClick={() => setPreviewImage(productImage)}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={productImage.url}
+                              alt={productImage.alt}
+                              className="h-12 w-12 rounded-lg border border-gray-200 bg-white object-contain dark:border-gray-800 dark:bg-gray-900"
+                              loading="lazy"
+                            />
+                          </button>
+                        ) : (
+                          <div aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-xs text-gray-400 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-500">—</div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-800 dark:text-white/90">{product.product_name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</p>
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell variant="admin">{product.product_type_name || product.product_type_code || "—"}</TableCell>
                     <TableCell variant="admin">{product.brand || "—"}<br />{product.category || "—"}</TableCell>
                     <TableCell variant="admin">{product.product_type_pricing_model === "countertop_material_band" ? `${product.stone_type || "Stone"} · ${product.material_price_band || "—"}` : `${product.base_product_code || "—"} · ${product.color_name || product.color_code || "—"}`}</TableCell>
@@ -556,7 +766,17 @@ export default function ProductsTable() {
                     <TableCell variant="admin">{product.on_hand == null ? "—" : `${formatNumber(Number(product.on_hand))} / ${formatNumber(Number(product.reserved))} / ${formatNumber(Number(product.available))}`}</TableCell>
                     <TableCell variant="admin"><Badge size="sm" color={product.qr_status === "ready" ? "success" : "warning"}>{product.qr_status || "missing"}</Badge></TableCell>
                     <TableCell variant="admin"><Badge size="sm" color={statusColor(product.product_status)}>{formatStatus(product.product_status)}</Badge></TableCell>
-                    {canManage ? <TableCell variant="admin"><div className="flex items-center justify-end gap-2"><Link href={`/products/${product.product_id}/edit`} className="rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03]">Edit</Link><Button variant="outline" size="sm" onClick={() => void handleToggleStatus(product)} disabled={isActionLoading || isArchived}>{isActionLoading ? "Saving..." : product.product_status === "active" ? "Deactivate" : "Activate"}</Button><Button variant="outline" size="sm" onClick={() => handleDuplicateProduct(product)} disabled={isActionLoading}>Duplicate</Button><Button variant="outline" size="sm" onClick={() => setArchiveTarget(product)} disabled={isActionLoading || isArchived}>Archive</Button></div></TableCell> : null}
+                    {canManage ? (
+                      <TableCell variant="admin" className="text-right">
+                        <ProductRowActions
+                          product={product}
+                          isLoading={isActionLoading}
+                          onToggleStatus={() => handleToggleStatus(product)}
+                          onDuplicate={() => handleDuplicateProduct(product)}
+                          onArchive={() => setArchiveTarget(product)}
+                        />
+                      </TableCell>
+                    ) : null}
                   </TableRow>;
                 })}
               </TableBody>
@@ -569,6 +789,24 @@ export default function ProductsTable() {
           </div>
         </ComponentCard>
       </div>
+
+      <Modal
+        isOpen={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        ariaLabel="Product image preview"
+        className="m-4 max-w-5xl overflow-hidden"
+      >
+        {previewImage ? (
+          <div className="flex max-h-[calc(100vh-4rem)] items-center justify-center p-4 sm:p-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewImage.url}
+              alt={previewImage.alt}
+              className="max-h-[calc(100vh-7rem)] w-full object-contain"
+            />
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal isOpen={Boolean(archiveTarget)} onClose={closeArchiveModal} showCloseButton={false} className="max-w-md p-6">
         {archiveTarget ? <div role="dialog" aria-modal="true" aria-labelledby="archive-product-title" aria-describedby="archive-product-description"><h4 id="archive-product-title" className="text-lg font-semibold text-gray-900 dark:text-white">Archive product?</h4><p id="archive-product-description" className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">{archiveTarget.sku} will be archived. On-hand and reserved stock must be zero; archived status is terminal.</p><div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><span ref={archiveCancelRef}><Button variant="outline" size="sm" disabled={actionLoadingId === archiveTarget.product_id} onClick={closeArchiveModal}>Cancel</Button></span><Button size="sm" disabled={actionLoadingId === archiveTarget.product_id} onClick={() => void confirmArchiveProduct()}>{actionLoadingId === archiveTarget.product_id ? "Archiving..." : "Archive product"}</Button></div></div> : null}
