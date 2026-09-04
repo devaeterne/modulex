@@ -9,6 +9,7 @@ const exists = (relative) => fs.existsSync(path.join(root, relative));
 const coreMigration = "modulex-store/supabase/migrations/20260904102000_customer_project_procurement_core.sql";
 const syncMigration = "modulex-store/supabase/migrations/20260904102500_customer_project_procurement_order_sync.sql";
 const operationsMigration = "modulex-store/supabase/migrations/20260904103000_customer_project_procurement_operations.sql";
+const executeHardeningMigration = "modulex-store/supabase/migrations/20260904114000_customer_project_procurement_rpc_execute_hardening.sql";
 const adapter = "modulex-admin/src/lib/customers/project-procurement.ts";
 const component = "modulex-admin/src/components/customers/project-detail/ProjectProcurementTab.tsx";
 const workspacePath = "modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx";
@@ -64,6 +65,37 @@ for (const token of [
   "authenticated",
 ]) assert.match(ops.toLowerCase(), new RegExp(token.toLowerCase()));
 assert.doesNotMatch(ops, /insert\s+into\s+public\.inventory_movements/i);
+
+assert.equal(
+  exists(executeHardeningMigration),
+  true,
+  "PB-3B authenticated private RPC execute hardening migration must exist",
+);
+const executeHardening = read(executeHardeningMigration);
+for (const signature of [
+  "private.get_customer_project_procurement(uuid)",
+  "private.get_customer_project_procurement_status(uuid)",
+  "private.set_customer_project_procurement_vendor(uuid,text,text)",
+  "private.create_customer_project_procurement_commitment(uuid,numeric,numeric,text,text)",
+  "private.confirm_customer_project_procurement_commitment(uuid)",
+  "private.cancel_customer_project_procurement_commitment(uuid,text)",
+  "private.record_customer_project_procurement_delivery(uuid,numeric,date,text)",
+  "private.correct_customer_project_procurement_delivery(uuid,numeric,text)",
+  "private.record_customer_project_procurement_invoice(uuid,text,date,numeric,text,numeric,numeric)",
+  "private.reverse_customer_project_procurement_invoice_allocation(uuid,text)",
+]) {
+  const escaped = signature.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  assert.match(
+    executeHardening,
+    new RegExp(`grant\\s+execute\\s+on\\s+function\\s+${escaped}\\s+to\\s+authenticated`, "i"),
+    `${signature} must be callable by the authenticated public wrapper`,
+  );
+}
+assert.doesNotMatch(
+  executeHardening,
+  /grant\s+execute\s+on\s+function\s+private\.[\s\S]*?\s+to\s+anon\b/i,
+  "PB-3B private RPC cores must not be executable by anon",
+);
 
 assert.equal(exists(adapter), true, "Project Procurement adapter must exist");
 const adapterSource = read(adapter);
