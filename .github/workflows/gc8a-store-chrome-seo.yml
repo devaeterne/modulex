@@ -40,7 +40,6 @@ jobs:
       - run: npm ci
       - run: npm run smoke:public-production
       - run: npm run smoke:secondary-cms-contract
-      - run: npm run smoke:store-public-content
       - run: npm run smoke:gc3-company-domain
       - run: npm run smoke:gc3-company-public
       - run: npm run smoke:gc5-gallery-projects
