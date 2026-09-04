@@ -121,7 +121,7 @@ This map prevents already-built Finance work from being accidentally rebuilt. It
 | `payment_terms` | Existing commercial configuration | `REUSE` where applicable; do not confuse with payment movement |
 | Canonical Vendor/Supplier master | F0 did not identify one | **RE-CHECK at F3A**; `NEW` only if still absent |
 | General Vendor Bill/AP model | F0 did not identify one | **RE-CHECK at F3B**; `NEW` only if still absent |
-| Cash/bank Finance Core | Implemented by F1 source work | `REUSE / EXTEND / CLOSEOUT`; never rebuild |
+| Cash/bank Finance Core | Implemented and production-verified by F1 | `REUSE / EXTEND`; never rebuild |
 
 ### Current F1 evidence that must be preserved
 
@@ -142,7 +142,7 @@ The current Finance client already exposes canonical operations including:
 - `reverse_finance_transaction`;
 - Finance Employee/Payroll lookup helpers used for Employee payment linkage.
 
-F1 closeout is therefore **verification and gap correction**, not Finance Core reimplementation.
+F1 is **COMPLETE / VERIFIED 2026-09-05**. Later packages reuse or extend it; they do not reimplement it.
 
 ---
 
@@ -151,8 +151,8 @@ F1 closeout is therefore **verification and gap correction**, not Finance Core r
 | Package | Scope | Status | Existing-system posture | Exit dependency |
 | --- | --- | --- | --- | --- |
 | A6-F0 | Baseline & architecture contract | **COMPLETE / APPROVED 2026-09-04** | Baseline/source inventory | — |
-| A6-F1 | Finance Core + Cash/Bank | **ACTIVE / SOURCE IMPLEMENTATION COMPLETE / FRESH CI PENDING** | **REUSE / EXTEND / CLOSEOUT ONLY** | Fresh CI + required verification + rollout gate |
-| A6-F2 | Expenses | **NOT STARTED** | `company_expenses` → **BRIDGE/MIGRATE first** | F1 closure |
+| A6-F1 | Finance Core + Cash/Bank | **COMPLETE / VERIFIED 2026-09-05** | **REUSE / EXTEND ONLY** | — |
+| A6-F2 | Expenses | **NEXT / DELTA AUDIT REQUIRED** | `company_expenses` → **BRIDGE/MIGRATE first** | F1 satisfied |
 | A6-F3A | Vendor/Supplier Master + Compliance | **NOT STARTED** | Re-check canonical entity before `NEW` | F2 + current-state audit |
 | A6-F3B | Vendor Bills / AP Core | **NOT STARTED** | Re-check current AP primitives before `NEW` | F3A |
 | A6-F3C | Vendor Payments + Check Lifecycle | **NOT STARTED** | Finance Core + `payment_methods` → **REUSE/EXTEND** | F3B |
@@ -166,9 +166,7 @@ F1 closeout is therefore **verification and gap correction**, not Finance Core r
 
 ### Next executable package
 
-**A6-F1 closeout only.** Inventory the current F1 migrations/RPCs/UI/tests, run fresh Finance contract/RBAC/UI/typecheck/lint/build verification, patch only proven gaps, and record the production rollout state. **Do not reimplement Finance Core.**
-
-Do not begin F2 until that closeout is recorded.
+**A6-F2 Expenses — existing-system delta audit first.** Re-read current `company_expenses`, Finance Core, payment methods, expense UI/routes and production data; classify each requirement as `REUSE / EXTEND / BRIDGE / MIGRATE / NEW` before changing schema or code.
 
 ---
 
@@ -447,7 +445,7 @@ A Finance package is not UI-complete until its relevant `AdminUICheck.md` accept
 
 ## A6-F1 — Finance Core + Cash/Bank closeout
 
-Current state: **ACTIVE / SOURCE IMPLEMENTATION COMPLETE / FRESH CI PENDING**.
+Current state: **COMPLETE / VERIFIED 2026-09-05**.
 
 Existing current route surface:
 
@@ -457,39 +455,50 @@ Existing current route surface:
 - `/finance/payroll`;
 - `/finance/compensation`.
 
-Existing F1 client/UI already covers Finance accounts, categories, FX observations, transaction drafts, links, posting, draft deletion, void and reversal. Therefore F1 is not an implementation-from-zero package.
+Existing F1 client/UI already covers Finance accounts, categories, FX observations, transaction drafts, links, posting, draft deletion, void and reversal. F1 was closed by verification and gap analysis; no replacement Finance Core was created.
 
-### F1 existing-system delta audit — REQUIRED FIRST
+### F1 delta matrix — verified 2026-09-05
 
-- [ ] Inventory F1 migrations/tables/views/constraints/indexes/triggers on current `main` and production.
-- [ ] Inventory Finance RPC/private-core/RLS/grant surface.
-- [ ] Inventory current Finance Overview/Accounts/Transactions components and route RBAC.
-- [ ] Inventory F1 contract/regression/workflow tests.
-- [ ] Produce F1 delta matrix using section 0A.
-- [ ] Classify every finding as `REUSE`, `EXTEND`, `MIGRATE`, `DEPRECATE` or proven `NEW`.
-- [ ] Do **not** recreate accounts, categories, FX, transactions, links, posting, void/reversal, or Employee payment linkage already present.
+| Requirement | Existing asset | Decision | Required delta | Compatibility/migration |
+| --- | --- | --- | --- | --- |
+| Finance accounts/categories/FX | Production F1 tables + canonical RPC/client/UI | `REUSE` | None for F1 closeout | Preserve current IDs/history |
+| Finance transaction lifecycle | Existing draft/post/void/reverse RPCs + DB guards | `REUSE` | None | Posted/voided history remains immutable |
+| Transaction links/allocation | Existing `finance_transaction_links` + validators | `REUSE` | None | Existing link semantics preserved |
+| Audit/idempotency | Existing append-only audit + idempotency request model | `REUSE` | None | No new parallel audit/idempotency store |
+| Employee payment linkage | Existing Finance Employee/Payroll flow + PRs #298/#302 | `REUSE / BRIDGE` | None | HR stays payroll truth; Finance stays money-movement truth |
+| Finance UI | `/finance`, `/finance/accounts`, `/finance/transactions` + shared Admin components | `REUSE` | No F1 UI rewrite | Shared Admin UI contracts remain authoritative |
+| Finance CI | `Admin A6 Finance Core` workflow + Admin UI Foundation | `REUSE / VERIFY` | Record current evidence | Finance runtime unchanged after last Finance GREEN |
+| Production rollout | F1/hardening/employee/payroll-reconciliation migrations + Vercel production deployment | `REUSE / VERIFY` | None | Existing production lineage preserved |
+| Security Advisor findings | Intended public SECURITY DEFINER wrappers + private cores; private RLS-only internal tables | `REUSE / REVIEW` | No F1 privilege rewrite | Final advisor disposition re-run in F7 |
+| Performance Advisor INFO | New/small Finance schema has several unindexed actor/reference FKs and currently-unused indexes | `REUSE / REVIEW` | No speculative F1 index churn | Query/index tuning remains an explicit F7 gate |
 
-### F1 closeout tasks
+### F1 closeout verification
 
-- [ ] Re-read current `main` and open PRs before any follow-up implementation.
-- [ ] Patch only gaps proven by the delta audit.
-- [ ] Run fresh Finance contract tests.
-- [ ] Run fresh Finance RBAC/production-surface tests.
-- [ ] Run typecheck.
-- [ ] Run package/repo lint required by current CI contract.
-- [ ] Run production build.
-- [ ] Verify Finance Overview, Transactions and Accounts/Cash & Bank UI against `AdminUICheck.md`.
-- [ ] Verify create/post/void/reverse/draft-delete lifecycle boundaries.
-- [ ] Verify idempotency behavior for retryable mutations.
-- [ ] Verify inactive historical account/category records do not prevent audit/void/reversal history.
-- [ ] Verify FX snapshot behavior for same-currency, market-FX and manual/agreed-FX scenarios.
-- [ ] Verify current Employee/Payroll linkage behavior is preserved.
-- [ ] Record migration/production rollout state explicitly.
-- [ ] Update this file with CI/PR/deploy evidence.
+- [x] Re-read current `main` and open PR state before closeout.
+- [x] Inventory F1 migrations/tables/constraints/indexes/triggers in production.
+- [x] Inventory Finance RPC/private-core/RLS/grant surface.
+- [x] Inventory Finance Overview/Accounts/Transactions and existing HR-backed Finance routes.
+- [x] Produce the F1 delta matrix above.
+- [x] Confirm no Finance runtime files changed between merged payroll reconciliation `6e0b9619...` and closeout baseline `9d0d3b401...`; later changes in that compare are non-Finance runtime work plus this planning document.
+- [x] Finance-specific workflow evidence: `Admin A6 Finance Core` run `33879439467` GREEN on the latest Finance runtime head, including `smoke:a6-finance-core` and `finance-reports-ui-contract`.
+- [x] Current-main Admin UI Foundation run `33927578897` GREEN, including shared table/theme/full-route/resolution contracts, Admin regression, production-surface/RBAC, typecheck, lint and production build.
+- [x] Verify Finance Overview, Transactions and Accounts/Cash & Bank against the shared `AdminUICheck.md` automated contract stack.
+- [x] Production migration history includes `a6_finance_core`, `a6_finance_core_hardening`, `a6_finance_employee_payments` and `a6_payroll_finance_reconciliation`.
+- [x] Production Finance tables/RPC/private cores are present and RLS is enabled on the Finance tables.
+- [x] Public Finance RPC wrappers are authenticated callable, anonymous execute is revoked, and private Finance cores are not exposed to authenticated callers.
+- [x] Posted Finance history immutability guard is active; audit/idempotency append-only guards are active.
+- [x] Employee-payment posting/link and payroll-reconciliation validators/triggers are active.
+- [x] Production invariant audit returned zero for orphan audit rows, orphan links, orphan idempotency results, malformed reversals, draft rows carrying posted snapshots, posted/voided rows missing snapshots, overallocated transactions and posted employee payments missing Employee links.
+- [x] FX posting function verifies same-currency identity behavior, manual/agreed rate + source requirements, and latest eligible transaction-time FX observation at or before transaction time; no later-rate revaluation is used for posting.
+- [x] Production state observed during closeout: 1 Finance account, 13 Finance categories, 0 saved FX observations, 3 Finance transactions, 2 transaction links, 9 audit rows and 7 idempotency rows. These counts are evidence only, not permanent assumptions.
+- [x] Vercel production deployment for merged payroll-reconciliation/F1 lineage (`6e0b9619...`) is `READY`; F1 runtime has been deployed.
+- [x] Security Advisor reviewed: SECURITY DEFINER wrapper warnings are intentional under the locked public-wrapper/private-core architecture; internal idempotency tables remain non-public application state. No F1 authorization widening was made.
+- [x] Performance Advisor reviewed: Finance-specific findings are INFO-level index/unused-index observations on a tiny/new dataset; no speculative schema churn was introduced. Re-evaluate with realistic data in F7.
+- [x] No code, DDL or production mutation was required for F1 closeout because no proven F1 gap remained.
 
 ### F1 exit
 
-The **existing** F1 Finance Core is verified, any proven gaps are extended in-place, generic money movement works without Project/Order ownership, lifecycle/FX/idempotency rules pass fresh verification, and production rollout state is explicit.
+**SATISFIED 2026-09-05.** The existing F1 Finance Core is production-deployed and verified. Generic money movement remains independent of Project/Order ownership; lifecycle, audit, idempotency, allocation, Employee linkage, FX semantics, RLS/RPC boundaries and Admin CI/UI contracts have current evidence. Later packages must reuse/extend this Core rather than rebuild it.
 
 ---
 
@@ -1067,7 +1076,7 @@ Use small vertical packages instead of one Finance mega-PR.
 
 Recommended sequence:
 
-1. Close A6-F1 by auditing/verifying/extending existing F1 only.
+1. A6-F1 Finance Core/Cash & Bank — **COMPLETE / VERIFIED 2026-09-05**.
 2. A6-F2 Expenses — bridge existing `company_expenses`.
 3. A6-F3A Vendor/Supplier + Compliance — re-check canonical entity first.
 4. A6-F3B Vendor Bills — re-check AP primitives first.
@@ -1094,7 +1103,7 @@ Do not start the next package merely because code exists; use the prior package 
 | --- | --- | --- |
 | Existing-system-first before every package | **LOCKED** | Prevent duplicate tables/RPCs/routes/sources and repeated work |
 | `NEW` only after current-state absence evidence | **LOCKED** | Prior plans/baselines can become stale |
-| Preserve/extend existing F1 Finance Core | **LOCKED** | F1 source implementation already exists |
+| Preserve/extend existing F1 Finance Core | **LOCKED / F1 VERIFIED** | F1 is deployed and closed; later work builds on it |
 | Existing HR payroll/compensation remains canonical | **LOCKED** | Finance routes already project HR managers; no second payroll model |
 | Existing `company_expenses` is bridged/migrated, not casually replaced | **LOCKED** | Existing source model must not become duplicate history |
 | Existing customer invoices/Project payments are preserved and integrated | **LOCKED** | Live IDs/history and compatibility exist |
@@ -1155,6 +1164,22 @@ Resolve these from **current execution-time evidence**, not from assumptions in 
 
 ## 16. Work log
 
+### 2026-09-05 — A6-F1 closeout completed
+
+- Verified merged F1 lineage: PR #287 Finance Core/Cash & Bank, PR #298 Employee payment linkage, PR #302 Payroll settlement reconciliation.
+- Verified current `main` baseline `9d0d3b401381a86774c7d70c4416a2318c26efd0` and confirmed no Finance runtime file changed after merged payroll reconciliation `6e0b9619b3df05e8e8ae2588a4a9f4fda95f2386`; subsequent compared changes were other domains plus this Finance plan.
+- Verified production migrations `a6_finance_core`, `a6_finance_core_hardening`, `a6_finance_employee_payments`, `a6_payroll_finance_reconciliation` are applied.
+- Verified production Finance tables, public RPCs, private authorization/validation cores, RLS/grants and lifecycle triggers are present.
+- Verified public Finance RPCs use the intended authenticated SECURITY DEFINER wrapper pattern with anonymous execute revoked; private mutation cores are not authenticated-executable.
+- Verified production invariants with zero failures for orphan links/audit/idempotency, malformed reversals, snapshot-state errors, over-allocation and Employee payment linkage.
+- Verified posted/voided immutability, append-only audit/idempotency, link validation and payroll reconciliation guards from production function/trigger definitions.
+- Verified transaction-time FX behavior from production posting core: same-currency identity, explicit manual-rate source, or latest eligible saved observation at/before transaction time.
+- Verified Finance-specific CI GREEN on run `33879439467` and current-main Admin UI/typecheck/lint/build GREEN on run `33927578897`.
+- Verified merged F1/payroll reconciliation production deployment `6e0b9619...` is Vercel `READY` and therefore F1 runtime is in the production deployment lineage.
+- Reviewed Supabase Security and Performance Advisor results. No F1-blocking defect was found; intentional wrapper/internal-table warnings are documented and performance INFO findings remain subject to the F7 realistic-data index review.
+- F1 required no new code, DDL or production mutation during closeout. The correct action was verification, not reimplementation.
+- Marked A6-F1 **COMPLETE / VERIFIED 2026-09-05** and advanced the plan to A6-F2 existing-system delta audit.
+
 ### 2026-09-05 — Existing-system-first rule added
 
 - Rechecked the prior F0 baseline and current Finance source surfaces before refining this plan.
@@ -1178,4 +1203,4 @@ Resolve these from **current execution-time evidence**, not from assumptions in 
 
 ### Next
 
-**A6-F1 closeout — inventory current F1 implementation, produce the F1 delta matrix, run fresh CI/UI/contract/build verification, patch only proven gaps, and explicitly record production rollout state.**
+**A6-F2 Expenses — inventory the existing `company_expenses` domain and all reusable Finance/payment/UI primitives, produce the F2 delta matrix, then implement only proven gaps.**
