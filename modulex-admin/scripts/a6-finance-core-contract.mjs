@@ -140,6 +140,9 @@ expect(/status[\s\S]{0,500}'draft'[\s\S]{0,500}'posted'[\s\S]{0,500}'void'/i.tes
 expect(/source_document_type[\s\S]{0,300}'company_expense'|company_expense[\s\S]{0,300}source_document_type/i.test(expenseSql), "A6-F2 must link company_expenses through Finance transaction source-document links");
 expect(/transaction_kind[\s\S]{0,500}'expense'|'expense'[\s\S]{0,500}transaction_kind/i.test(expenseSql), "A6-F2 posting must reuse Finance expense transactions");
 expect(/revoke\s+(?:insert\s*,\s*update\s*,\s*delete\s*,\s*truncate|truncate\s*,\s*insert\s*,\s*update\s*,\s*delete)[\s\S]{0,300}company_expenses/i.test(expenseSql), "A6-F2 must close direct authenticated company_expenses mutations");
+expect(/company_expense_transaction_mutation/i.test(expenseSql), "A6-F2 must guard Finance expense drafts as company-expense source-managed records");
+expect(/finance_transaction_links[\s\S]{0,2200}company_expense/i.test(expenseSql), "A6-F2 must guard the company-expense source link from generic mutation/removal");
+expect(/Finance expense transaction must be linked to a company expense source/i.test(expenseSql), "A6-F2 must fail closed when a Finance expense attempts to post without its source document");
 
 for (const rpc of [
   "get_company_expenses_page",
@@ -168,5 +171,10 @@ for (const primitive of ["ComponentCard", "Alert", "Button", "Label", "Input", "
   expect(expenseUi.includes(primitive), `Finance Expenses must reuse shared ${primitive}`);
 }
 expect(sidebar.includes('path: "/finance/expenses"'), "Finance sidebar must expose the Expenses route under finance.view");
+
+const transactionManager = read("src/components/finance/FinanceTransactionsManager.tsx");
+const createKindBlock = transactionManager.match(/const kindOptions = \[([\s\S]*?)\];/)?.[1] ?? "";
+expect(!createKindBlock.includes('value: "expense"'), "Generic Finance Transactions must not create source-less expenses after A6-F2");
+expect(transactionManager.includes('value: "expense"'), "Finance Transactions filters/history must still recognize expense transactions");
 
 console.log("A6-F2 Finance Expenses bridge contract: PASS");
