@@ -56,14 +56,30 @@ expect(
 );
 expect(
   multiSelect.includes('event.key === "Escape"') &&
-    multiSelect.includes("setIsOpen(false)"),
-  "Allowed Units dropdown must close on Escape"
+    multiSelect.includes("closeDropdown(true)"),
+  "Allowed Units dropdown must close on Escape and restore trigger focus"
 );
 expect(
   multiSelect.includes("triggerRef") &&
     multiSelect.includes("rootRef") &&
-    multiSelect.includes("contains(event.target as Node)"),
-  "Allowed Units dropdown must restore focus behavior and close when clicking outside"
+    multiSelect.includes("menuRef") &&
+    multiSelect.includes("rootRef.current?.contains(target)") &&
+    multiSelect.includes("menuRef.current?.contains(target)"),
+  "Allowed Units dropdown must close on true outside clicks without treating its portal menu as outside"
+);
+expect(
+  multiSelect.includes('import { createPortal } from "react-dom"') &&
+    multiSelect.includes("createPortal(") &&
+    multiSelect.includes("document.body") &&
+    multiSelect.includes('position: "fixed"') &&
+    multiSelect.includes("zIndex: 100000"),
+  "Allowed Units menu must portal above clipped cards and the modal stacking context"
+);
+expect(
+  multiSelect.includes("getBoundingClientRect()") &&
+    multiSelect.includes('window.addEventListener("scroll", handleViewportChange, true)') &&
+    multiSelect.includes('window.addEventListener("resize", handleViewportChange)'),
+  "Allowed Units portal must stay anchored to its trigger while the modal scrolls or resizes"
 );
 expect(
   !multiSelect.includes('<div onClick={toggleDropdown}') &&
