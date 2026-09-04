@@ -26,6 +26,11 @@ const [
   repositorySource,
   oauthSource,
   calendarSource,
+  accessSource,
+  oauthStartRoute,
+  oauthCallbackRoute,
+  statusRoute,
+  connectionRoute,
 ] = await Promise.all([
   source("src/lib/google-calendar/config.ts"),
   source("src/lib/google-calendar/crypto.ts"),
@@ -37,6 +42,11 @@ const [
   source("src/lib/google-calendar/repository.ts"),
   source("src/lib/google-calendar/google-oauth.ts"),
   source("src/lib/google-calendar/google-calendar.ts"),
+  source("src/lib/google-calendar/access.ts"),
+  source("src/app/api/admin/google-calendar/oauth/start/route.ts"),
+  source("src/app/api/admin/google-calendar/oauth/callback/route.ts"),
+  source("src/app/api/admin/google-calendar/status/route.ts"),
+  source("src/app/api/admin/google-calendar/connection/route.ts"),
 ]);
 
 assert.match(configSource, /GOOGLE_CALENDAR_CLIENT_ID/);
@@ -111,4 +121,40 @@ assert.match(calendarSource, /deleteGoogleCalendarEvent/);
 assert.match(calendarSource, /GoogleCalendarProviderError/);
 assert.doesNotMatch(calendarSource, /console\.(log|info|warn|error)\([^\n]*(accessToken|refreshToken)/i);
 
-console.log("Google Calendar integration foundation, persistence, and server-boundary contract passed.");
+assert.match(accessSource, /getConnectedGoogleAccessToken/);
+assert.match(accessSource, /decryptRefreshToken/);
+assert.match(accessSource, /refreshGoogleAccessToken/);
+assert.match(accessSource, /invalid_grant/);
+
+assert.match(oauthStartRoute, /requirePermission\(request, "settings\.manage"\)/);
+assert.match(oauthStartRoute, /createCalendarOAuthState/);
+assert.match(oauthStartRoute, /HttpOnly/);
+assert.match(oauthStartRoute, /SameSite=Lax/);
+assert.match(oauthStartRoute, /Max-Age=600/);
+assert.match(oauthStartRoute, /withApiTiming/);
+assert.doesNotMatch(oauthStartRoute, /refresh_token|client_secret/i);
+
+assert.match(oauthCallbackRoute, /timingSafeOAuthStateEqual/);
+assert.match(oauthCallbackRoute, /consumeCalendarOAuthState/);
+assert.match(oauthCallbackRoute, /exchangeGoogleAuthorizationCode/);
+assert.match(oauthCallbackRoute, /fetchGoogleUserInfo/);
+assert.match(oauthCallbackRoute, /encryptRefreshToken/);
+assert.match(oauthCallbackRoute, /saveConnectedGoogleCredential/);
+assert.match(oauthCallbackRoute, /Max-Age=0/);
+assert.doesNotMatch(oauthCallbackRoute, /console\.(log|info|warn|error)/);
+
+assert.match(statusRoute, /requirePermission\(request, "settings\.view"\)/);
+assert.match(statusRoute, /requirePermission\(request, "settings\.manage"\)/);
+assert.match(statusRoute, /validateCalendarNameTemplate/);
+assert.match(statusRoute, /sync_deliveries: false/);
+assert.match(statusRoute, /sync_measurements: false/);
+assert.match(statusRoute, /sync_customer_appointments: false/);
+assert.match(statusRoute, /withApiTiming/);
+assert.doesNotMatch(statusRoute, /encrypted_refresh_token/);
+
+assert.match(connectionRoute, /requirePermission\(request, "settings\.manage"\)/);
+assert.match(connectionRoute, /revokeGoogleRefreshToken/);
+assert.match(connectionRoute, /retireGoogleCredential/);
+assert.match(connectionRoute, /withApiTiming/);
+
+console.log("Google Calendar integration foundation, persistence, server-boundary, and OAuth API contract passed.");
