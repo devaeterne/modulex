@@ -33,10 +33,36 @@ expect(sql.includes("delete from public.finance_transaction_links where transact
 expect(sql.includes("delete from public.finance_transaction_audit where transaction_id=p_transaction_id"), "Draft delete must remove draft-only audit rows before deleting the draft");
 expect(sql.includes("delete from public.finance_idempotency_requests where result_transaction_id=p_transaction_id"), "Draft delete must remove draft-only idempotency rows before deleting the draft");
 expect(sql.includes("delete from public.finance_transactions where id=p_transaction_id and status='draft'"), "Draft delete must never hard-delete posted/voided Finance history");
+expect(sql.includes("modulex.finance_draft_delete"), "Draft-only append-safe cleanup must use an explicit transaction-local guard");
 
-expect(sql.includes("new.status = 'draft' and new.transaction_kind <> 'reversal' and not v_source.is_active"), "Inactive source accounts must block ordinary drafts, not historical void/reversal corrections");
-expect(sql.includes("new.status = 'draft' and new.transaction_kind <> 'reversal' and not v_destination.is_active"), "Inactive destination accounts must block ordinary drafts, not historical void/reversal corrections");
-expect(sql.includes("new.status = 'draft' and new.transaction_kind <> 'reversal' and not v_category.is_active"), "Inactive categories must block ordinary drafts, not historical void/reversal corrections");
+expect(sql.includes("v_allow_inactive_history := new.transaction_kind = 'reversal'"), "Reversal corrections must tolerate historical inactive Finance dimensions");
+expect(sql.includes("old.status = 'posted' and new.status = 'voided'"), "Posted-to-voided correction must tolerate historical inactive Finance dimensions");
+expect(sql.includes("not v_source.is_active and not v_allow_inactive_history"), "Inactive source accounts must still block ordinary draft/post activity");
+expect(sql.includes("not v_destination.is_active and not v_allow_inactive_history"), "Inactive destination accounts must still block ordinary draft/post activity");
+expect(sql.includes("not v_category.is_active and not v_allow_inactive_history"), "Inactive categories must still block ordinary draft/post activity");
+
+const mutationWrappers = [
+  "create_finance_account",
+  "update_finance_account",
+  "create_finance_category",
+  "upsert_finance_fx_rate",
+  "create_finance_transaction_draft",
+  "update_finance_transaction_draft",
+  "set_finance_transaction_links",
+  "post_finance_transaction",
+  "void_finance_transaction",
+  "reverse_finance_transaction",
+  "delete_finance_transaction_draft",
+];
+for (const fn of mutationWrappers) {
+  const start = sql.indexOf(`create or replace function public.${fn}`);
+  expect(start >= 0, `Hardening SQL must redefine public.${fn}`);
+  const end = sql.indexOf("$function$;", start);
+  expect(end > start, `Hardening SQL must contain a complete wrapper body for public.${fn}`);
+  const definition = sql.slice(start, end);
+  expect(definition.includes("security definer"), `public.${fn} must be SECURITY DEFINER so authenticated callers cannot execute private cores directly`);
+  expect(definition.includes("set search_path = ''"), `public.${fn} must use a locked search_path`);
+}
 
 expect(sql.includes("revoke all on function public.delete_finance_transaction_draft(uuid) from public,anon"), "Draft delete RPC must not be public/anon executable");
 expect(sql.includes("grant execute on function public.delete_finance_transaction_draft(uuid) to authenticated"), "Draft delete RPC must be authenticated-only");
