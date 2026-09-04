@@ -44,9 +44,9 @@ expect(
   "Shared TextArea must pass its optional id to the native textarea"
 );
 expect(
-  select.includes('className="relative"') &&
+  select.includes('className="relative w-full"') &&
     select.includes('pointer-events-none absolute right-3 top-1/2'),
-  "ProductForm selects must inherit the canonical shared dropdown indicator"
+  "ProductForm selects must inherit the full-width canonical shared dropdown indicator"
 );
 expect(
   select.includes('"text-gray-400 dark:text-white/30"') &&
