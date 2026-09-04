@@ -2,6 +2,7 @@
 
 Date: 2026-09-05
 Branch: `fix/pb6-project-tab-permissions-percentage-basis`
+PR: #310
 
 ## Requested behavior
 
@@ -18,4 +19,21 @@ Branch: `fix/pb6-project-tab-permissions-percentage-basis`
 
 Production obligation `P-2026-000003` was created with a 2% rate and `basis_amount = 0.00` even though the Project had three active Orders totaling USD 6,635.0020. The client converted an empty basis field with `Number("")`, producing zero, and the database accepted zero as a valid percentage basis.
 
-This follow-up removes manual percentage-basis entry and moves basis calculation to the authoritative database boundary.
+At that snapshot the expected whole-Project 2% commission is approximately USD 132.70.
+
+## Implementation
+
+- `Participants & Commission` is part of the existing Project Detail tab workspace instead of rendering below the workspace.
+- UI visibility, client guards, table RLS and commission read helper are restricted to `super_admin`, `admin`, and `finance`.
+- Admin/Super Admin retain participant and role management; Finance retains commission management.
+- Sales receives no internal PB-6 detail. The future personal final-result surface remains a separate scope.
+- Percentage creation requests an authoritative basis preview from PostgreSQL and sends no client-entered basis amount.
+- PostgreSQL recalculates the authoritative basis again at create time and stores that value as the immutable obligation snapshot.
+- Whole-Project basis uses active Order `grand_total`; category/product basis uses matching active Order item `line_total`.
+- Empty/zero and mixed-currency scopes fail closed.
+
+## TDD
+
+The new contract `project-pb6-tab-access-percentage-basis-contract.mjs` was added before implementation. Admin Project Base run `33927312918` demonstrated RED: all preceding Project contracts passed and only the new PB-6 follow-up contract failed. Final-head CI is required before merge.
+
+The existing zero-basis obligation is historical immutable data and is not silently rewritten by this change. It should be cancelled/replaced through the commission lifecycle if the business record is to be corrected after deployment.
