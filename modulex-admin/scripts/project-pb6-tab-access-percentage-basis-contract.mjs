@@ -48,13 +48,14 @@ assert.equal(migration, mirror, "PB-6 access/basis migration and Admin SQL mirro
 
 assert.match(workspace, /Participants & Commission/, "Project workspace must expose Participants & Commission as a tab");
 assert.match(workspace, /ProjectParticipantsCommissionPanel/, "Project workspace must own the PB-6 commission panel");
-assert.doesNotMatch(workspace, /ProjectParticipantRoleManager/, "Project workspace must not render global participant-role configuration");
 assert.match(workspace, /super_admin[\s\S]*admin[\s\S]*finance|finance[\s\S]*admin[\s\S]*super_admin/, "PB-6 tab visibility must be restricted to Finance/Admin/Super Admin");
 assert.doesNotMatch(page, /ProjectParticipantsCommissionPanel|ProjectParticipantRoleManager/, "PB-6 must not render outside the Project tab workspace");
 
 assert.match(settingsOverview, /Project Participant Roles/, "General Settings overview must expose Project Participant Roles");
 assert.match(settingsOverview, /\/settings\/general\/project-participant-roles/, "General Settings overview must link to Project Participant Roles");
 assert.match(settingsRoute, /ProjectParticipantRoleManager/, "Project Participant Roles settings route must render the role manager");
+assert.match(roleManager, /usePathname/, "Participant role manager must know which route is rendering it");
+assert.match(roleManager, /\/settings\/general\/project-participant-roles/, "Participant role manager must render only on its General Settings route");
 assert.match(roleManager, /Participant Roles[\s\S]*Save Participant Role/i, "General Settings must retain participant-role configuration behavior");
 
 assert.match(domain, /const PB6_INTERNAL_ROLES = \["super_admin", "admin", "finance"\]/, "PB-6 client access must use one internal role boundary");
