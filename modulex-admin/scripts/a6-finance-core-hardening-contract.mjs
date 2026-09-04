@@ -24,6 +24,7 @@ expect(sql === migration, "A6-F1 hardening Admin SQL and Supabase migration must
 for (const fn of [
   "private.delete_finance_transaction_draft",
   "public.delete_finance_transaction_draft",
+  "private.validate_finance_transaction_link_context",
 ]) {
   expect(sql.includes(`function ${fn}`), `A6-F1 hardening must define ${fn}`);
 }
@@ -40,6 +41,14 @@ expect(sql.includes("old.status = 'posted' and new.status = 'voided'"), "Posted-
 expect(sql.includes("not v_source.is_active and not v_allow_inactive_history"), "Inactive source accounts must still block ordinary draft/post activity");
 expect(sql.includes("not v_destination.is_active and not v_allow_inactive_history"), "Inactive destination accounts must still block ordinary draft/post activity");
 expect(sql.includes("not v_category.is_active and not v_allow_inactive_history"), "Inactive categories must still block ordinary draft/post activity");
+
+expect(sql.includes("v_allocated_total"), "Transaction validation must account for existing attribution allocations");
+expect(sql.includes("where l.transaction_id = new.id"), "Changing a Finance transaction amount must reconcile its existing allocations");
+expect(sql.includes("v_allocated_total > new.amount"), "Finance transaction amount cannot be reduced below allocated total");
+expect(sql.includes("v_order_customer"), "Finance link validation must resolve the canonical Order customer");
+expect(sql.includes("new.customer_id is not null and v_order_customer is distinct from new.customer_id"), "Order + Customer Finance attribution must fail closed when the relationship does not match");
+expect(sql.includes("v_other_allocated + new.allocated_amount > v_transaction.amount"), "Row-level Finance attribution writes must not make total allocation exceed transaction amount");
+expect(sql.includes("trg_validate_finance_transaction_link_context"), "Finance attribution consistency must be protected by a DB trigger, not only the RPC loop");
 
 const mutationWrappers = [
   "create_finance_account",
@@ -67,6 +76,7 @@ for (const fn of mutationWrappers) {
 expect(sql.includes("revoke all on function public.delete_finance_transaction_draft(uuid) from public,anon"), "Draft delete RPC must not be public/anon executable");
 expect(sql.includes("grant execute on function public.delete_finance_transaction_draft(uuid) to authenticated"), "Draft delete RPC must be authenticated-only");
 expect(sql.includes("revoke all on function private.delete_finance_transaction_draft(uuid) from public,anon,authenticated"), "Draft delete private core must not be executable by app roles");
+expect(sql.includes("revoke all on function private.validate_finance_transaction_link_context() from public,anon,authenticated"), "Finance link validation trigger function must not be executable by app roles");
 
 expect(core.includes("export async function deleteFinanceTransactionDraft"), "Finance adapter must expose guarded draft delete RPC");
 expect(core.includes('supabase.rpc("delete_finance_transaction_draft"'), "Finance adapter must call delete_finance_transaction_draft RPC");
