@@ -16,6 +16,7 @@ import Button from "@/components/ui/button/Button";
 import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { loadOrderDetail, pricingModelLabel, setCustomerOrderStatus } from "@/lib/customers/order-domain";
+import { getOrderStatusGuidance, type OrderStatusGuidance } from "@/lib/customers/order-status-guidance";
 import { supabase } from "@/lib/supabase/client";
 import type {
   CountertopLineSummary,
@@ -41,6 +42,7 @@ const STATUSES: CustomerOrderStatus[] = [
 ];
 
 type StatusActor = { id: string; full_name: string | null; email: string | null };
+type OrderWithProject = CustomerOrder & { project_id?: string | null };
 
 function money(value: string | number | null | undefined, currency = "USD") {
   const amount = Number(value ?? 0);
@@ -90,6 +92,12 @@ function orderStatusActor(entry: CustomerOrderStatusHistory, actors: Map<string,
   return actor?.full_name || actor?.email || "Modulex user";
 }
 
+function customerContactLabel(contact: StatusActor | null) {
+  if (!contact) return "No Sales Representative assigned — contact Sales Manager.";
+  const name = contact.full_name?.trim() || "Assigned Sales Representative";
+  return contact.email ? `${name} · ${contact.email}` : name;
+}
+
 function AddressCard({ title, data }: { title: string; data: Record<string, string | null> | null }) {
   const lines = data
     ? [data.company_name, data.contact_name, data.address_line_1, data.address_line_2, [data.postal_code, data.city].filter(Boolean).join(" "), data.state_region, data.country_code, data.phone]
@@ -125,6 +133,7 @@ export default function CustomerOrderDetail() {
   const [items, setItems] = useState<CustomerOrderItem[]>([]);
   const [history, setHistory] = useState<CustomerOrderStatusHistory[]>([]);
   const [statusActors, setStatusActors] = useState<StatusActor[]>([]);
+  const [customerContact, setCustomerContact] = useState<StatusActor | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [canManage, setCanManage] = useState(false);
   const [contextCanManageCountertop, setContextCanManageCountertop] = useState(false);
@@ -135,25 +144,44 @@ export default function CustomerOrderDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusIssue, setStatusIssue] = useState<OrderStatusGuidance | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [countertopContext, setCountertopContext] = useState<CountertopOrderContext | null>(null);
 
   async function load() {
     setIsLoading(true);
     setErrorMessage(null);
+    setStatusIssue(null);
     try {
       const context = await loadOrderDetail(customerId, orderId);
       const actorIds = Array.from(new Set(context.history.map((entry) => entry.changed_by).filter((value): value is string => Boolean(value))));
+      let customerContactId = context.customer.sales_rep_id;
+      const projectId = (context.order as OrderWithProject).project_id ?? null;
+
+      if (projectId) {
+        const projectResult = await supabase
+          .from("customer_projects")
+          .select("sales_rep_id")
+          .eq("id", projectId)
+          .maybeSingle();
+        if (!projectResult.error && projectResult.data?.sales_rep_id) {
+          customerContactId = String(projectResult.data.sales_rep_id);
+        }
+      }
+
+      const profileIds = Array.from(new Set([...actorIds, customerContactId].filter((value): value is string => Boolean(value))));
       let nextActors: StatusActor[] = [];
-      if (actorIds.length > 0) {
-        const actorsResult = await supabase.from("profiles").select("id, full_name, email").in("id", actorIds);
+      if (profileIds.length > 0) {
+        const actorsResult = await supabase.from("profiles").select("id, full_name, email").in("id", profileIds);
         if (!actorsResult.error) nextActors = (actorsResult.data ?? []) as StatusActor[];
       }
+
       setCustomer(context.customer);
       setOrder(context.order);
       setItems(context.items);
       setHistory(context.history);
       setStatusActors(nextActors);
+      setCustomerContact(customerContactId ? nextActors.find((actor) => actor.id === customerContactId) ?? null : null);
       setPendingApprovals(context.pendingApprovals);
       setCanManage(context.canManage);
       setContextCanManageCountertop(context.canManageCountertop);
@@ -176,6 +204,7 @@ export default function CustomerOrderDetail() {
     if (!order || !canManage || newStatus === order.status) return;
     setIsSaving(true);
     setErrorMessage(null);
+    setStatusIssue(null);
     setSuccessMessage(null);
     try {
       const result = await setCustomerOrderStatus({ orderId: order.id, status: newStatus, note: statusNote });
@@ -183,7 +212,7 @@ export default function CustomerOrderDetail() {
       setStatusNote("");
       setSuccessMessage(result === "approval_requested" ? "Approval requested. The order status was not changed yet." : "Order status updated.");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to update order status.");
+      setStatusIssue(getOrderStatusGuidance(error));
     } finally {
       setIsSaving(false);
     }
@@ -233,6 +262,20 @@ export default function CustomerOrderDetail() {
       </ComponentCard>
 
       {errorMessage ? <Alert variant="error" title="Order action failed" message={errorMessage} /> : null}
+      {statusIssue ? (
+        <ComponentCard title="Status Change Blocked" desc="The Order status was not changed. Resolve the blocking condition below, then retry.">
+          <div className="grid gap-4 md:grid-cols-2">
+            <InfoBlock label="Reason" value={statusIssue.reason} />
+            <InfoBlock label="Required action" value={statusIssue.requiredAction} />
+            <InfoBlock label="Internal owner" value={statusIssue.internalOwner} />
+            <InfoBlock label="Customer contact" value={customerContactLabel(customerContact)} />
+          </div>
+          <details className="mt-4 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+            <summary className={`cursor-pointer text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>Technical detail</summary>
+            <p className={`mt-2 whitespace-pre-wrap break-words text-xs ${ADMIN_TEXT_STYLES.body}`}>{statusIssue.technicalDetail}</p>
+          </details>
+        </ComponentCard>
+      ) : null}
       {successMessage ? <Alert variant="success" title="Order updated" message={successMessage} /> : null}
       {pendingApprovals > 0 ? (
         <ComponentCard title="Approval Pending" desc={`${pendingApprovals} approval request${pendingApprovals === 1 ? " is" : "s are"} pending for this order.`} headerAction={<Button size="sm" variant="outline" onClick={() => router.push("/approvals")}>Open Approvals</Button>} collapsed><div /></ComponentCard>
