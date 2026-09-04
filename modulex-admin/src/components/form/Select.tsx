@@ -66,7 +66,7 @@ const Select: React.FC<SelectProps> = ({
     : "text-gray-500 dark:text-gray-400";
 
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <select
         id={id}
         name={name}
