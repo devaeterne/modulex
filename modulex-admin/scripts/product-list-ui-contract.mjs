@@ -34,8 +34,8 @@ for (const sharedComponent of [
 }
 
 expect(
-  !/<(?:input|select|table)\b/.test(table),
-  "Product List must not reimplement shared TailAdmin form or table primitives"
+  !/<(?:button|input|select|table)\b/.test(table),
+  "Product List must not reimplement shared TailAdmin button, form, or table primitives"
 );
 expect(
   /id\?:\s*string/.test(select) && /allowEmpty\?:\s*boolean/.test(select),
@@ -117,14 +117,13 @@ expect(
   "Product page-size control needs an explicit accessible label"
 );
 expect(
-  table.includes("focus-visible:ring-2"),
-  "Product List interactive controls need visible keyboard focus states"
+  !table.includes("ADMIN_FOCUS_RING") && !table.includes("focus-visible:ring-"),
+  "Product List feature UI must delegate focus-ring appearance to shared primitives"
 );
-const productTableClass = table.match(/<Table variant="admin" className="([^"]+)"/)?.[1] ?? "";
-const productTableMinWidth = Number(productTableClass.match(/min-w-\[(\d+)px\]/)?.[1] ?? 0);
 expect(
-  table.includes("<TableViewport>") && productTableMinWidth >= 1080,
-  "Product table needs full-width layout with an explicit responsive minimum width"
+  table.includes("<TableViewport>") &&
+    /<Table variant="admin" minWidth="(?:wide|extraWide)">/.test(table),
+  "Product table must use a shared responsive minimum-width preset"
 );
 expect(
   table.includes('className="flex flex-col gap-2 sm:flex-row"'),
@@ -166,6 +165,10 @@ expect(
     table.includes('aria-label={`View ${product.product_name} image`}') &&
     table.includes('ariaLabel="Product image preview"'),
   "Product List must render a clickable product thumbnail and an accessible lightbox preview"
+);
+expect(
+  table.includes('onClick={() => router.push("/products/new")}'),
+  "Add Product must use the shared Button primitive rather than route-owned link appearance"
 );
 expect(
   table.includes("ProductRowActions") &&
