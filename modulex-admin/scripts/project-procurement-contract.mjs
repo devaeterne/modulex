@@ -11,6 +11,7 @@ const syncMigration = "modulex-store/supabase/migrations/20260904102500_customer
 const operationsMigration = "modulex-store/supabase/migrations/20260904103000_customer_project_procurement_operations.sql";
 const adapter = "modulex-admin/src/lib/customers/project-procurement.ts";
 const component = "modulex-admin/src/components/customers/project-detail/ProjectProcurementTab.tsx";
+const workspacePath = "modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx";
 const permissions = "modulex-admin/src/lib/auth/permissions.ts";
 
 assert.equal(exists(coreMigration), true, "PB-3B core migration must exist");
@@ -80,6 +81,16 @@ for (const token of [
 ]) assert.match(adapterSource, new RegExp(token));
 
 assert.equal(exists(component), true, "Project Procurement tab must exist");
+const procurementUi = read(component);
+const workspace = read(workspacePath);
+assert.match(workspace, /ProjectProcurementTab/);
+for (const label of ["Vendor", "Product", "Vendor Cost", "Delivery", "Invoiced", "Invoice No", "Invoice Cost", "PO No"]) {
+  assert.match(procurementUi, new RegExp(label));
+}
+assert.match(procurementUi, /Vendor Required/);
+assert.match(procurementUi, /Open to Purchase/);
+assert.match(procurementUi, /Excess Ordered/);
+assert.match(procurementUi, /No confirmed Project purchases yet/);
 
 const permissionSource = read(permissions);
 assert.match(permissionSource, /project_procurement\.view/);
