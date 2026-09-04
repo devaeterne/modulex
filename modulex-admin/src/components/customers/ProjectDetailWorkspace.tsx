@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
 import ProjectFinanceTab from "@/components/customers/project-detail/ProjectFinanceTab";
+import ProjectFulfillmentTab from "@/components/customers/project-detail/ProjectFulfillmentTab";
 import ProjectPendingDomainTab from "@/components/customers/project-detail/ProjectPendingDomainTab";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
@@ -457,12 +458,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       ) : null}
 
       {activeTab === "Fulfillment" ? (
-        <div className="space-y-6">
-          <ProjectProgressSummary project={project} projectActivity={projectActivity} />
-          <ComponentCard title="Fulfillment" desc="Shipment and Installation remain canonical domains while this tab aggregates their Project progress.">
-            <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Detailed procurement blockers and fulfillment rollups will be added in PB-5 without replacing existing Shipment or Installation records.</p>
-          </ComponentCard>
-        </div>
+        <ProjectFulfillmentTab projectId={project.id} />
       ) : null}
 
       {activeTab === "Documents" ? (
