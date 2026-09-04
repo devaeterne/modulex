@@ -19,6 +19,7 @@ import {
   TableViewport,
 } from "@/components/ui/table";
 import { getCustomerProject } from "@/lib/customers/project-domain";
+import { getCustomerProjectCommissionEvents, type ProjectCommissionEventRow } from "@/lib/customers/project-commission-events";
 import {
   appendCustomerProjectCommissionEvent,
   createCustomerProjectCommissionObligation,
@@ -46,6 +47,11 @@ type BadgeColor = "success" | "warning" | "error" | "info" | "light" | "primary"
 function displayDate(value: string | null | undefined) {
   if (!value) return "—";
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+}
+
+function displayDateTime(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function money(value: number, currencyCode: string) {
@@ -84,6 +90,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
   const [roles, setRoles] = useState<ProjectParticipantRole[]>([]);
   const [candidates, setCandidates] = useState<ProjectParticipantCandidate[]>([]);
   const [commissions, setCommissions] = useState<ProjectCommissionObligation[]>([]);
+  const [commissionEvents, setCommissionEvents] = useState<ProjectCommissionEventRow[]>([]);
   const [categoryScopes, setCategoryScopes] = useState<ProjectCommissionScopeOption[]>([]);
   const [productScopes, setProductScopes] = useState<ProjectCommissionScopeOption[]>([]);
   const [canViewParticipants, setCanViewParticipants] = useState(false);
@@ -92,6 +99,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
   const [canManageCommissions, setCanManageCommissions] = useState(false);
   const [isSalesOnly, setIsSalesOnly] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingEvents, setLoadingEvents] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -165,9 +173,29 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     }
   }, [commissionParticipantId, eventObligationId, participantRoleKey, projectId]);
 
+  const loadEvents = useCallback(async () => {
+    if (!canViewCommissions || !eventObligationId) {
+      setCommissionEvents([]);
+      return;
+    }
+    setLoadingEvents(true);
+    try {
+      setCommissionEvents(await getCustomerProjectCommissionEvents(eventObligationId));
+    } catch (eventError) {
+      setError(eventError instanceof Error ? eventError.message : "Commission event history could not be loaded.");
+    } finally {
+      setLoadingEvents(false);
+    }
+  }, [canViewCommissions, eventObligationId]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    setReversalEventId("");
+    void loadEvents();
+  }, [loadEvents]);
 
   const participantRoleOptions = useMemo(
     () => roles.filter((role) => role.roleKey !== "sales_rep").map((role) => ({ value: role.roleKey, label: role.label })),
@@ -193,6 +221,13 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
   );
   const scopeOptions = commissionScopeType === "category" ? categoryScopes : productScopes;
   const scopeSelectOptions = scopeOptions.map((option) => ({ value: option.id, label: option.label }));
+  const selectedCommission = commissions.find((commission) => commission.obligationId === eventObligationId) ?? null;
+  const reversalOptions = commissionEvents
+    .filter((event) => ["adjustment", "offset"].includes(event.eventType) && !event.isReversed)
+    .map((event) => ({
+      value: event.eventId,
+      label: `${statusLabel(event.eventType)} · ${event.amountDelta > 0 ? "+" : ""}${money(event.amountDelta, selectedCommission?.currencyCode ?? "USD")} · ${displayDateTime(event.createdAt)}`,
+    }));
 
   async function runAction(action: () => Promise<unknown>, successMessage: string) {
     setSaving(true);
@@ -263,6 +298,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
       setEventAmount("");
       setEventReason("");
       setReversalEventId("");
+      await loadEvents();
     }, `Commission ${statusLabel(eventType)} event appended.`);
   }
 
@@ -314,21 +350,14 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                     <TableCell variant="admin">{participant.roleLabel}</TableCell>
                     <TableCell variant="admin">{participant.source === "project_sales_rep" ? "Project Sales Rep" : statusLabel(participant.subjectType)}</TableCell>
                     <TableCell variant="admin">{displayDate(participant.startedAt)}</TableCell>
-                    <TableCell variant="admin">
-                      <Badge color={participant.isActive ? "success" : "light"}>{participant.isActive ? "Active" : "Ended"}</Badge>
-                    </TableCell>
+                    <TableCell variant="admin"><Badge color={participant.isActive ? "success" : "light"}>{participant.isActive ? "Active" : "Ended"}</Badge></TableCell>
                     {canManageParticipants ? (
                       <TableCell variant="admin">
                         {participant.isActive && participant.source === "manual" ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={saving}
-                            onClick={() => void runAction(
-                              () => deactivateCustomerProjectParticipant(participant.id),
-                              `${participant.displayName} removed from active Project participants.`,
-                            )}
-                          >
+                          <Button variant="outline" size="sm" disabled={saving} onClick={() => void runAction(
+                            () => deactivateCustomerProjectParticipant(participant.id),
+                            `${participant.displayName} removed from active Project participants.`,
+                          )}>
                             End participation
                           </Button>
                         ) : participant.source === "project_sales_rep" ? "Manage in Project Settings" : "—"}
@@ -355,9 +384,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                 <Input id="pb6-participant-notes" value={participantNotes} onChange={(event) => setParticipantNotes(event.target.value)} />
               </div>
               <div className="flex justify-end lg:col-span-3">
-                <Button disabled={saving || !participantRoleKey || !participantCandidate} onClick={() => void addParticipant()}>
-                  {saving ? "Saving…" : "Add Participant"}
-                </Button>
+                <Button disabled={saving || !participantRoleKey || !participantCandidate} onClick={() => void addParticipant()}>{saving ? "Saving…" : "Add Participant"}</Button>
               </div>
             </div>
           ) : null}
@@ -406,127 +433,147 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
           </TableViewport>
 
           {canManageCommissions ? (
-            <div className="space-y-5">
-              <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4`}>
+            <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4`}>
+              <div>
+                <Label htmlFor="pb6-commission-participant">Participant</Label>
+                <Select id="pb6-commission-participant" options={commissionParticipantOptions} value={commissionParticipantId} onChange={setCommissionParticipantId} placeholder="Select participant" />
+              </div>
+              <div>
+                <Label htmlFor="pb6-commission-basis">Basis</Label>
+                <Select id="pb6-commission-basis" options={[{ value: "fixed", label: "Fixed amount" }, { value: "percentage", label: "Percentage" }]} value={commissionBasisType} onChange={(value) => setCommissionBasisType(value as ProjectCommissionBasisType)} />
+              </div>
+              <div>
+                <Label htmlFor="pb6-commission-scope">Scope</Label>
+                <Select
+                  id="pb6-commission-scope"
+                  options={[{ value: "project", label: "Whole Project" }, { value: "category", label: "Project product category" }, { value: "product", label: "Project product" }]}
+                  value={commissionScopeType}
+                  onChange={(value) => { setCommissionScopeType(value as ProjectCommissionScopeType); setCommissionScopeId(""); }}
+                />
+              </div>
+              {commissionScopeType !== "project" ? (
                 <div>
-                  <Label htmlFor="pb6-commission-participant">Participant</Label>
-                  <Select id="pb6-commission-participant" options={commissionParticipantOptions} value={commissionParticipantId} onChange={setCommissionParticipantId} placeholder="Select participant" />
+                  <Label htmlFor="pb6-commission-scope-id">{commissionScopeType === "category" ? "Category" : "Product"}</Label>
+                  <Select id="pb6-commission-scope-id" options={scopeSelectOptions} value={commissionScopeId} onChange={setCommissionScopeId} placeholder={scopeSelectOptions.length > 0 ? "Select Project scope" : "No matching Project scope"} allowEmpty />
                 </div>
+              ) : null}
+              {commissionBasisType === "fixed" ? (
                 <div>
-                  <Label htmlFor="pb6-commission-basis">Basis</Label>
-                  <Select
-                    id="pb6-commission-basis"
-                    options={[{ value: "fixed", label: "Fixed amount" }, { value: "percentage", label: "Percentage" }]}
-                    value={commissionBasisType}
-                    onChange={(value) => setCommissionBasisType(value as ProjectCommissionBasisType)}
-                  />
+                  <Label htmlFor="pb6-commission-flat">Fixed amount</Label>
+                  <Input id="pb6-commission-flat" type="number" min="0" step="0.01" value={commissionFlatAmount} onChange={(event) => setCommissionFlatAmount(event.target.value)} />
                 </div>
-                <div>
-                  <Label htmlFor="pb6-commission-scope">Scope</Label>
-                  <Select
-                    id="pb6-commission-scope"
-                    options={[
-                      { value: "project", label: "Whole Project" },
-                      { value: "category", label: "Project product category" },
-                      { value: "product", label: "Project product" },
-                    ]}
-                    value={commissionScopeType}
-                    onChange={(value) => {
-                      setCommissionScopeType(value as ProjectCommissionScopeType);
-                      setCommissionScopeId("");
-                    }}
-                  />
-                </div>
-                {commissionScopeType !== "project" ? (
+              ) : (
+                <>
                   <div>
-                    <Label htmlFor="pb6-commission-scope-id">{commissionScopeType === "category" ? "Category" : "Product"}</Label>
-                    <Select
-                      id="pb6-commission-scope-id"
-                      options={scopeSelectOptions}
-                      value={commissionScopeId}
-                      onChange={setCommissionScopeId}
-                      placeholder={scopeSelectOptions.length > 0 ? "Select Project scope" : "No matching Project scope"}
-                      allowEmpty
-                    />
+                    <Label htmlFor="pb6-commission-basis-amount">Basis amount snapshot</Label>
+                    <Input id="pb6-commission-basis-amount" type="number" min="0" step="0.01" value={commissionBasisAmount} onChange={(event) => setCommissionBasisAmount(event.target.value)} />
                   </div>
-                ) : null}
-                {commissionBasisType === "fixed" ? (
                   <div>
-                    <Label htmlFor="pb6-commission-flat">Fixed amount</Label>
-                    <Input id="pb6-commission-flat" type="number" min="0" step="0.01" value={commissionFlatAmount} onChange={(event) => setCommissionFlatAmount(event.target.value)} />
+                    <Label htmlFor="pb6-commission-rate">Rate %</Label>
+                    <Input id="pb6-commission-rate" type="number" min="0" max="100" step="0.01" value={commissionRate} onChange={(event) => setCommissionRate(event.target.value)} />
                   </div>
-                ) : (
-                  <>
-                    <div>
-                      <Label htmlFor="pb6-commission-basis-amount">Basis amount snapshot</Label>
-                      <Input id="pb6-commission-basis-amount" type="number" min="0" step="0.01" value={commissionBasisAmount} onChange={(event) => setCommissionBasisAmount(event.target.value)} />
-                    </div>
-                    <div>
-                      <Label htmlFor="pb6-commission-rate">Rate %</Label>
-                      <Input id="pb6-commission-rate" type="number" min="0" max="100" step="0.01" value={commissionRate} onChange={(event) => setCommissionRate(event.target.value)} />
-                    </div>
-                  </>
-                )}
-                <div>
-                  <Label htmlFor="pb6-commission-currency">Currency</Label>
-                  <Input id="pb6-commission-currency" maxLength={3} value={commissionCurrency} onChange={(event) => setCommissionCurrency(event.target.value.toUpperCase())} />
-                </div>
-                <div>
-                  <Label htmlFor="pb6-commission-description">Description</Label>
-                  <Input id="pb6-commission-description" value={commissionDescription} onChange={(event) => setCommissionDescription(event.target.value)} />
-                </div>
-                <div className="flex justify-end md:col-span-2 xl:col-span-4">
-                  <Button disabled={saving || !commissionParticipantId || (commissionScopeType !== "project" && !commissionScopeId)} onClick={() => void createCommission()}>
-                    {saving ? "Saving…" : "Create Pending Commission"}
-                  </Button>
-                </div>
+                </>
+              )}
+              <div>
+                <Label htmlFor="pb6-commission-currency">Currency</Label>
+                <Input id="pb6-commission-currency" maxLength={3} value={commissionCurrency} onChange={(event) => setCommissionCurrency(event.target.value.toUpperCase())} />
+              </div>
+              <div>
+                <Label htmlFor="pb6-commission-description">Description</Label>
+                <Input id="pb6-commission-description" value={commissionDescription} onChange={(event) => setCommissionDescription(event.target.value)} />
+              </div>
+              <div className="flex justify-end md:col-span-2 xl:col-span-4">
+                <Button disabled={saving || !commissionParticipantId || (commissionScopeType !== "project" && !commissionScopeId)} onClick={() => void createCommission()}>{saving ? "Saving…" : "Create Pending Commission"}</Button>
+              </div>
+            </div>
+          ) : null}
+
+          {commissions.length > 0 ? (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="pb6-event-obligation">Commission event history</Label>
+                <Select
+                  id="pb6-event-obligation"
+                  options={commissionOptions}
+                  value={eventObligationId}
+                  onChange={setEventObligationId}
+                  placeholder="Select commission"
+                />
               </div>
 
-              <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-5`}>
-                <div className="xl:col-span-2">
-                  <Label htmlFor="pb6-event-obligation">Commission</Label>
-                  <Select id="pb6-event-obligation" options={commissionOptions} value={eventObligationId} onChange={setEventObligationId} placeholder="Select commission" />
-                </div>
+              <TableViewport>
+                <Table variant="admin" minWidth="standard">
+                  <TableHeader variant="admin">
+                    <TableRow>
+                      <TableCell isHeader variant="admin">Event</TableCell>
+                      <TableCell isHeader variant="admin">Status after</TableCell>
+                      <TableCell isHeader variant="admin">Amount delta</TableCell>
+                      <TableCell isHeader variant="admin">Reason</TableCell>
+                      <TableCell isHeader variant="admin">Created</TableCell>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody variant="admin">
+                    {loadingEvents ? <TableStateRow colSpan={5}>Refreshing commission events…</TableStateRow> : null}
+                    {!loadingEvents && commissionEvents.length === 0 ? <TableStateRow colSpan={5}>No lifecycle events have been appended yet.</TableStateRow> : null}
+                    {!loadingEvents ? commissionEvents.map((event) => (
+                      <TableRow key={event.eventId}>
+                        <TableCell variant="admin">
+                          <div className="space-y-1">
+                            <p className="font-medium">{statusLabel(event.eventType)}</p>
+                            {event.isReversed ? <Badge color="light">Reversed</Badge> : null}
+                          </div>
+                        </TableCell>
+                        <TableCell variant="admin">{statusLabel(event.statusAfter)}</TableCell>
+                        <TableCell variant="admin">{event.amountDelta === 0 ? "—" : `${event.amountDelta > 0 ? "+" : ""}${money(event.amountDelta, selectedCommission?.currencyCode ?? "USD")}`}</TableCell>
+                        <TableCell variant="admin">{event.reason || "—"}</TableCell>
+                        <TableCell variant="admin">{displayDateTime(event.createdAt)}</TableCell>
+                      </TableRow>
+                    )) : null}
+                  </TableBody>
+                </Table>
+              </TableViewport>
+            </div>
+          ) : null}
+
+          {canManageCommissions && commissions.length > 0 ? (
+            <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4`}>
+              <div>
+                <Label htmlFor="pb6-event-type">Append event</Label>
+                <Select
+                  id="pb6-event-type"
+                  options={[
+                    { value: "earned", label: "Mark Earned" },
+                    { value: "approved", label: "Approve" },
+                    { value: "cancelled", label: "Cancel" },
+                    { value: "adjustment", label: "Adjustment" },
+                    { value: "offset", label: "Offset / deduction" },
+                    { value: "reversal", label: "Reverse adjustment/offset" },
+                  ]}
+                  value={eventType}
+                  onChange={(value) => { setEventType(value as ProjectCommissionEventType); setReversalEventId(""); }}
+                />
+              </div>
+              {["adjustment", "offset"].includes(eventType) ? (
                 <div>
-                  <Label htmlFor="pb6-event-type">Append event</Label>
-                  <Select
-                    id="pb6-event-type"
-                    options={[
-                      { value: "earned", label: "Mark Earned" },
-                      { value: "approved", label: "Approve" },
-                      { value: "cancelled", label: "Cancel" },
-                      { value: "adjustment", label: "Adjustment" },
-                      { value: "offset", label: "Offset / deduction" },
-                      { value: "reversal", label: "Reverse adjustment/offset" },
-                    ]}
-                    value={eventType}
-                    onChange={(value) => setEventType(value as ProjectCommissionEventType)}
-                  />
+                  <Label htmlFor="pb6-event-amount">Amount delta</Label>
+                  <Input id="pb6-event-amount" type="number" step="0.01" value={eventAmount} onChange={(event) => setEventAmount(event.target.value)} />
                 </div>
-                {["adjustment", "offset"].includes(eventType) ? (
-                  <div>
-                    <Label htmlFor="pb6-event-amount">Amount delta</Label>
-                    <Input id="pb6-event-amount" type="number" step="0.01" value={eventAmount} onChange={(event) => setEventAmount(event.target.value)} />
-                  </div>
-                ) : null}
-                {eventType === "reversal" ? (
-                  <div>
-                    <Label htmlFor="pb6-reversal-event">Target event UUID</Label>
-                    <Input id="pb6-reversal-event" value={reversalEventId} onChange={(event) => setReversalEventId(event.target.value)} />
-                  </div>
-                ) : null}
-                {["cancelled", "adjustment", "offset", "reversal"].includes(eventType) ? (
-                  <div>
-                    <Label htmlFor="pb6-event-reason">Reason</Label>
-                    <Input id="pb6-event-reason" value={eventReason} onChange={(event) => setEventReason(event.target.value)} />
-                  </div>
-                ) : null}
-                <div className="flex items-center justify-between gap-3 md:col-span-2 xl:col-span-5">
-                  <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Corrections append new events; approved history is never edited in place.</p>
-                  <Button disabled={saving || !eventObligationId} onClick={() => void appendCommissionEvent()}>
-                    {saving ? "Saving…" : "Append Commission Event"}
-                  </Button>
+              ) : null}
+              {eventType === "reversal" ? (
+                <div>
+                  <Label htmlFor="pb6-reversal-event">Adjustment / offset to reverse</Label>
+                  <Select id="pb6-reversal-event" options={reversalOptions} value={reversalEventId} onChange={setReversalEventId} placeholder={reversalOptions.length > 0 ? "Select event" : "No reversible event"} allowEmpty />
                 </div>
+              ) : null}
+              {["cancelled", "adjustment", "offset", "reversal"].includes(eventType) ? (
+                <div>
+                  <Label htmlFor="pb6-event-reason">Reason</Label>
+                  <Input id="pb6-event-reason" value={eventReason} onChange={(event) => setEventReason(event.target.value)} />
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between gap-3 md:col-span-2 xl:col-span-4">
+                <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Corrections append new events; approved history is never edited in place.</p>
+                <Button disabled={saving || !eventObligationId || (eventType === "reversal" && !reversalEventId)} onClick={() => void appendCommissionEvent()}>{saving ? "Saving…" : "Append Commission Event"}</Button>
               </div>
             </div>
           ) : null}
