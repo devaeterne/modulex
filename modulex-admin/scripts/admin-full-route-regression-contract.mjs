@@ -33,12 +33,13 @@ const sidebarRoutes = [...sidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) =>
 const uniqueSidebarRoutes = [...new Set(sidebarRoutes)];
 
 expect(sidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
-expect(uniqueSidebarRoutes.length === 79, `UI-2D expects 79 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
+expect(uniqueSidebarRoutes.length === 80, `UI-2D expects 80 current sidebar routes after Calendar, found ${uniqueSidebarRoutes.length}`);
 for (const route of uniqueSidebarRoutes) {
   expect(pageRoutes.has(route), `Sidebar route is missing a page.tsx: ${route}`);
 }
 
 for (const route of [
+  "/calendar",
   "/projects",
   "/products/vendor-imports",
   "/products/types",
@@ -58,6 +59,10 @@ for (const route of [
   expect(uniqueSidebarRoutes.includes(route), `Post-audit sidebar route missing: ${route}`);
 }
 
+expect(
+  /name:\s*"Calendar"[\s\S]{0,180}path:\s*"\/calendar"[\s\S]{0,180}permission:\s*"calendar\.view"/.test(sidebar),
+  "Calendar must be a first-class sidebar route protected by calendar.view",
+);
 expect(
   /name:\s*"Google Calendar"[\s\S]{0,180}path:\s*"\/settings\/integrations\/google-calendar"[\s\S]{0,180}permission:\s*"settings\.view"/.test(sidebar),
   "Google Calendar must be discoverable under settings.view navigation",
