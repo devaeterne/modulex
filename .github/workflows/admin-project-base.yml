@@ -65,5 +65,7 @@ jobs:
         run: node scripts/project-pb6-tab-access-percentage-basis-contract.mjs
       - name: Project PB-6 gross profit commission contract
         run: node scripts/project-pb6-gross-profit-commission-contract.mjs
+      - name: Project PB-7 Change Orders contract
+        run: node scripts/project-pb7-change-orders-contract.mjs
       - name: Countertop Sink fallback contract
         run: node scripts/countertop-sink-fallback-contract.mjs
