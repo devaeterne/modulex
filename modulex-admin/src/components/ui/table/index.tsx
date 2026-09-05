@@ -1,10 +1,11 @@
 import React, { ReactNode } from "react";
 
 type TableVariant = "plain" | "admin";
-type TableMinWidth = "standard" | "wide" | "extraWide";
+type TableMinWidth = "standard" | "medium" | "wide" | "extraWide";
 
 const TABLE_MIN_WIDTHS: Record<TableMinWidth, string> = {
   standard: "max(100%, 960px)",
+  medium: "max(100%, 1040px)",
   wide: "max(100%, 1120px)",
   extraWide: "max(100%, 1520px)",
 };
