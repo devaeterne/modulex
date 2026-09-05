@@ -98,6 +98,14 @@ expect(
 );
 expect(googleCalendarSettings.includes('addEventListener("pageshow"'), "Google Calendar must clear transient OAuth busy state when returning from browser history");
 
+const googleCalendarCallback = read("src/app/api/admin/google-calendar/oauth/callback/route.ts");
+expect(!googleCalendarCallback.includes("Response.redirect("), "Google Calendar callback must not mutate immutable Response.redirect headers");
+expect(
+  /new Response\(null,\s*\{[\s\S]{0,220}status:\s*303[\s\S]{0,220}Location:/m.test(googleCalendarCallback),
+  "Google Calendar callback must build a mutable 303 response with an explicit Location header",
+);
+expect(googleCalendarCallback.includes('"Set-Cookie"'), "Google Calendar callback must clear its OAuth state cookie on the mutable redirect response");
+
 for (const relativePath of [
   "src/components/store/StoreCabinetContentManager.tsx",
   "src/components/store/StoreReviewsManager.tsx",
