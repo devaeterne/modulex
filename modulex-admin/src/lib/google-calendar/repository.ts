@@ -38,25 +38,40 @@ export type GoogleCredentialRow = {
 
 export type ProjectCalendarBindingRow = {
   id: string;
-  project_id: string;
+  project_id: string | null;
+  admin_calendar_id: string;
+  binding_mode: "modulex_created" | "google_imported";
   provider: "google";
   provider_calendar_id: string;
   provider_calendar_name: string;
+  provider_data_owner: string | null;
+  provider_access_role: string | null;
+  provider_background_color: string | null;
+  provider_foreground_color: string | null;
+  provider_color_id: string | null;
+  provider_sync_token: string | null;
   timezone: string;
   sync_enabled: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
   last_sync_at: string | null;
+  last_mirror_sync_at: string | null;
   last_error_at: string | null;
   last_error_code: string | null;
 };
+
+export type ProjectCalendarEventSourceType =
+  | "installation"
+  | "project_start"
+  | "project_target"
+  | "project_delivery";
 
 export type ProjectCalendarEventLinkRow = {
   id: string;
   project_id: string;
   project_calendar_binding_id: string;
-  source_type: "installation";
+  source_type: ProjectCalendarEventSourceType;
   source_id: string;
   provider_event_id: string;
   source_fingerprint: string | null;
@@ -66,6 +81,21 @@ export type ProjectCalendarEventLinkRow = {
   last_error_code: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type GoogleCalendarMirrorMutation = {
+  providerEventId: string;
+  title: string;
+  startAt: string | null;
+  endAt: string | null;
+  allDay: boolean;
+  allDayStart: string | null;
+  allDayEnd: string | null;
+  status: string | null;
+  providerEventUrl: string | null;
+  providerColorId: string | null;
+  providerUpdatedAt: string | null;
+  providerEtag: string | null;
 };
 
 function assertNoError(error: { message: string } | null, fallback: string) {
@@ -205,10 +235,60 @@ export async function consumeCalendarOAuthState(input: {
   return data?.user_id ? { userId: String(data.user_id) } : null;
 }
 
+export async function getProjectAdminCalendar(projectId: string): Promise<{ id: string; timezone: string } | null> {
+  const { data, error } = await supabaseAdmin
+    .from("admin_calendars")
+    .select("id,timezone")
+    .eq("kind", "project")
+    .eq("project_id", projectId)
+    .maybeSingle();
+  assertNoError(error, "Project Modulex calendar could not be loaded.");
+  return data ? { id: String(data.id), timezone: String(data.timezone) } : null;
+}
+
 export async function getProjectCalendarBinding(projectId: string): Promise<ProjectCalendarBindingRow | null> {
   const { data, error } = await supabaseAdmin.from("project_calendar_bindings").select("*").eq("project_id", projectId).maybeSingle();
   assertNoError(error, "Project Calendar binding could not be loaded.");
   return data as ProjectCalendarBindingRow | null;
+}
+
+export async function getCalendarBindingById(bindingId: string): Promise<ProjectCalendarBindingRow | null> {
+  const { data, error } = await supabaseAdmin
+    .from("project_calendar_bindings")
+    .select("*")
+    .eq("id", bindingId)
+    .maybeSingle();
+  assertNoError(error, "Calendar provider binding could not be loaded.");
+  return data as ProjectCalendarBindingRow | null;
+}
+
+export async function getCalendarBindingByProviderId(providerCalendarId: string): Promise<ProjectCalendarBindingRow | null> {
+  const { data, error } = await supabaseAdmin
+    .from("project_calendar_bindings")
+    .select("*")
+    .eq("provider_calendar_id", providerCalendarId)
+    .maybeSingle();
+  assertNoError(error, "Calendar provider binding could not be loaded.");
+  return data as ProjectCalendarBindingRow | null;
+}
+
+export async function listImportedGoogleBindings(): Promise<ProjectCalendarBindingRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from("project_calendar_bindings")
+    .select("*")
+    .eq("binding_mode", "google_imported")
+    .order("provider_calendar_name");
+  assertNoError(error, "Imported Google Calendar bindings could not be loaded.");
+  return (data ?? []) as ProjectCalendarBindingRow[];
+}
+
+export async function listImportedProviderCalendarIds(): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from("project_calendar_bindings")
+    .select("provider_calendar_id")
+    .eq("binding_mode", "google_imported");
+  assertNoError(error, "Imported Google Calendar identities could not be loaded.");
+  return (data ?? []).map((row) => String(row.provider_calendar_id));
 }
 
 export async function upsertProjectCalendarBinding(input: {
@@ -219,10 +299,15 @@ export async function upsertProjectCalendarBinding(input: {
   syncEnabled?: boolean;
   createdBy?: string | null;
 }): Promise<ProjectCalendarBindingRow> {
+  const adminCalendar = await getProjectAdminCalendar(input.projectId);
+  if (!adminCalendar) throw new Error("Project Modulex calendar is missing.");
+
   const { data, error } = await supabaseAdmin
     .from("project_calendar_bindings")
     .upsert({
       project_id: input.projectId,
+      admin_calendar_id: adminCalendar.id,
+      binding_mode: "modulex_created",
       provider: "google",
       provider_calendar_id: input.providerCalendarId,
       provider_calendar_name: input.providerCalendarName,
@@ -236,6 +321,68 @@ export async function upsertProjectCalendarBinding(input: {
     .single();
   assertNoError(error, "Project Calendar binding could not be saved.");
   return data as ProjectCalendarBindingRow;
+}
+
+export async function createImportedGoogleCalendar(input: {
+  providerCalendarId: string;
+  providerCalendarName: string;
+  timezone: string;
+  providerDataOwner: string | null;
+  providerAccessRole: string;
+  providerBackgroundColor: string | null;
+  providerForegroundColor: string | null;
+  providerColorId: string | null;
+  ownerProfileId: string;
+  actorUserId: string;
+}): Promise<ProjectCalendarBindingRow> {
+  const existing = await getCalendarBindingByProviderId(input.providerCalendarId);
+  if (existing) return existing;
+
+  const { data: calendar, error: calendarError } = await supabaseAdmin
+    .from("admin_calendars")
+    .insert({
+      name: input.providerCalendarName,
+      kind: "google_imported",
+      owner_profile_id: input.ownerProfileId,
+      project_id: null,
+      timezone: input.timezone,
+      default_background_color: input.providerBackgroundColor,
+      default_foreground_color: input.providerForegroundColor,
+      created_by: input.actorUserId,
+      updated_by: input.actorUserId,
+    })
+    .select("id")
+    .single();
+  assertNoError(calendarError, "Imported Modulex calendar could not be created.");
+  const adminCalendarId = String(calendar.id);
+
+  const { data: binding, error: bindingError } = await supabaseAdmin
+    .from("project_calendar_bindings")
+    .insert({
+      project_id: null,
+      admin_calendar_id: adminCalendarId,
+      binding_mode: "google_imported",
+      provider: "google",
+      provider_calendar_id: input.providerCalendarId,
+      provider_calendar_name: input.providerCalendarName,
+      provider_data_owner: input.providerDataOwner,
+      provider_access_role: input.providerAccessRole,
+      provider_background_color: input.providerBackgroundColor,
+      provider_foreground_color: input.providerForegroundColor,
+      provider_color_id: input.providerColorId,
+      timezone: input.timezone,
+      sync_enabled: true,
+      created_by: input.actorUserId,
+    })
+    .select("*")
+    .single();
+
+  if (bindingError || !binding) {
+    await supabaseAdmin.from("admin_calendars").delete().eq("id", adminCalendarId);
+    throw new Error(bindingError?.message || "Imported Google Calendar binding could not be created.");
+  }
+
+  return binding as ProjectCalendarBindingRow;
 }
 
 export async function updateProjectCalendarBinding(
@@ -253,9 +400,48 @@ export async function updateProjectCalendarBinding(
   return data as ProjectCalendarBindingRow;
 }
 
+export async function updateImportedCalendarProviderMetadata(input: {
+  bindingId: string;
+  name: string;
+  timezone: string;
+  dataOwner: string | null;
+  accessRole: string;
+  backgroundColor: string | null;
+  foregroundColor: string | null;
+  colorId: string | null;
+}): Promise<void> {
+  const { data: binding, error: bindingError } = await supabaseAdmin
+    .from("project_calendar_bindings")
+    .update({
+      provider_calendar_name: input.name,
+      timezone: input.timezone,
+      provider_data_owner: input.dataOwner,
+      provider_access_role: input.accessRole,
+      provider_background_color: input.backgroundColor,
+      provider_foreground_color: input.foregroundColor,
+      provider_color_id: input.colorId,
+    })
+    .eq("id", input.bindingId)
+    .eq("binding_mode", "google_imported")
+    .select("admin_calendar_id")
+    .single();
+  assertNoError(bindingError, "Imported Google Calendar metadata could not be updated.");
+
+  const { error: calendarError } = await supabaseAdmin
+    .from("admin_calendars")
+    .update({
+      name: input.name,
+      timezone: input.timezone,
+      default_background_color: input.backgroundColor,
+      default_foreground_color: input.foregroundColor,
+    })
+    .eq("id", binding.admin_calendar_id);
+  assertNoError(calendarError, "Imported Modulex calendar metadata could not be updated.");
+}
+
 export async function getProjectCalendarEventLink(input: {
   bindingId: string;
-  sourceType: "installation";
+  sourceType: ProjectCalendarEventSourceType;
   sourceId: string;
 }): Promise<ProjectCalendarEventLinkRow | null> {
   const { data, error } = await supabaseAdmin
@@ -272,7 +458,7 @@ export async function getProjectCalendarEventLink(input: {
 export async function upsertProjectCalendarEventLink(input: {
   projectId: string;
   bindingId: string;
-  sourceType: "installation";
+  sourceType: ProjectCalendarEventSourceType;
   sourceId: string;
   providerEventId: string;
   sourceFingerprint: string | null;
@@ -299,4 +485,104 @@ export async function upsertProjectCalendarEventLink(input: {
     .single();
   assertNoError(error, "Project Calendar event link could not be saved.");
   return data as ProjectCalendarEventLinkRow;
+}
+
+function mirrorRow(binding: ProjectCalendarBindingRow, event: GoogleCalendarMirrorMutation) {
+  return {
+    admin_calendar_id: binding.admin_calendar_id,
+    project_calendar_binding_id: binding.id,
+    provider_event_id: event.providerEventId,
+    title: event.title,
+    start_at: event.startAt,
+    end_at: event.endAt,
+    all_day: event.allDay,
+    all_day_start: event.allDayStart,
+    all_day_end: event.allDayEnd,
+    status: event.status,
+    provider_event_url: event.providerEventUrl,
+    provider_color_id: event.providerColorId,
+    provider_updated_at: event.providerUpdatedAt,
+    provider_etag: event.providerEtag,
+    mirrored_at: new Date().toISOString(),
+  };
+}
+
+export async function replaceGoogleCalendarMirrorSnapshot(input: {
+  binding: ProjectCalendarBindingRow;
+  events: GoogleCalendarMirrorMutation[];
+  syncToken: string | null;
+}): Promise<void> {
+  const { error: deleteError } = await supabaseAdmin
+    .from("google_calendar_event_mirror")
+    .delete()
+    .eq("project_calendar_binding_id", input.binding.id);
+  assertNoError(deleteError, "Existing Google Calendar mirror could not be reset.");
+
+  const activeRows = input.events
+    .filter((event) => event.status !== "cancelled")
+    .map((event) => mirrorRow(input.binding, event));
+  if (activeRows.length > 0) {
+    const { error: insertError } = await supabaseAdmin
+      .from("google_calendar_event_mirror")
+      .insert(activeRows);
+    assertNoError(insertError, "Google Calendar mirror snapshot could not be stored.");
+  }
+
+  await markGoogleMirrorSyncSuccess(input.binding.id, input.syncToken);
+}
+
+export async function applyGoogleCalendarMirrorDelta(input: {
+  binding: ProjectCalendarBindingRow;
+  events: GoogleCalendarMirrorMutation[];
+  syncToken: string | null;
+}): Promise<void> {
+  const cancelledIds = input.events
+    .filter((event) => event.status === "cancelled")
+    .map((event) => event.providerEventId);
+  if (cancelledIds.length > 0) {
+    const { error: deleteError } = await supabaseAdmin
+      .from("google_calendar_event_mirror")
+      .delete()
+      .eq("project_calendar_binding_id", input.binding.id)
+      .in("provider_event_id", cancelledIds);
+    assertNoError(deleteError, "Cancelled Google Calendar mirror events could not be removed.");
+  }
+
+  const activeRows = input.events
+    .filter((event) => event.status !== "cancelled")
+    .map((event) => mirrorRow(input.binding, event));
+  if (activeRows.length > 0) {
+    const { error: upsertError } = await supabaseAdmin
+      .from("google_calendar_event_mirror")
+      .upsert(activeRows, { onConflict: "project_calendar_binding_id,provider_event_id" });
+    assertNoError(upsertError, "Google Calendar mirror changes could not be stored.");
+  }
+
+  await markGoogleMirrorSyncSuccess(input.binding.id, input.syncToken);
+}
+
+export async function markGoogleMirrorSyncSuccess(bindingId: string, syncToken: string | null): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await supabaseAdmin
+    .from("project_calendar_bindings")
+    .update({
+      provider_sync_token: syncToken,
+      last_mirror_sync_at: now,
+      last_sync_at: now,
+      last_error_at: null,
+      last_error_code: null,
+    })
+    .eq("id", bindingId);
+  assertNoError(error, "Google Calendar mirror sync state could not be saved.");
+}
+
+export async function markGoogleMirrorSyncError(bindingId: string, errorCode: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("project_calendar_bindings")
+    .update({
+      last_error_at: new Date().toISOString(),
+      last_error_code: errorCode,
+    })
+    .eq("id", bindingId);
+  assertNoError(error, "Google Calendar mirror error state could not be saved.");
 }
