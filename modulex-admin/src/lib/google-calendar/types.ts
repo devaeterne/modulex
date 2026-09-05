@@ -22,6 +22,8 @@ export type GoogleCalendarStatusDto = {
     last_success_at: string | null;
     last_error_at: string | null;
     last_error_code: string | null;
+    reconnect_required: boolean;
+    import_scopes_granted: boolean;
   };
   settings: GoogleCalendarIntegrationSettings;
   effective_timezone: string;
@@ -38,6 +40,21 @@ export type ProjectCalendarBindingDto = {
   last_sync_at: string | null;
   last_error_at: string | null;
   last_error_code: string | null;
+};
+
+export type GoogleCalendarDiscoveryItem = {
+  provider_calendar_id: string;
+  provider_calendar_name: string;
+  timezone: string;
+  data_owner: string | null;
+  access_role: string;
+  background_color: string | null;
+  foreground_color: string | null;
+  color_id: string | null;
+  primary: boolean;
+  selected: boolean;
+  already_imported: boolean;
+  write_eligible: boolean;
 };
 
 export type CalendarMutationResult = {
