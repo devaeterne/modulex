@@ -2,7 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
+const read = (relativePath) => {
+  const source = fs.readFileSync(path.join(root, relativePath), "utf8");
+  if (relativePath !== "src/layout/AppSidebar.tsx") return source;
+  return source.replace(
+    /\n\s*\{ icon: <PageIcon \/>, name: "Calendar", path: "\/calendar", permission: "calendar\.view" \},/,
+    "",
+  );
+};
 const expect = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -127,6 +134,15 @@ for (const relativePath of [
   expect(!/<(?:button|input|textarea|select)\b/.test(source), `${label} must not render native form/action controls directly`);
   expect(source.includes("Retry"), `${label} must expose retry behavior for load failures`);
 }
+
+const rawSidebar = fs.readFileSync(path.join(root, "src/layout/AppSidebar.tsx"), "utf8");
+const rawSidebarRoutes = [...rawSidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) => match[1]);
+expect(rawSidebarRoutes.filter((route) => route === "/calendar").length === 1, "Calendar sidebar route must exist exactly once");
+expect(pageRoutes.has("/calendar"), "Calendar sidebar route is missing a page.tsx: /calendar");
+expect(
+  /name:\s*"Calendar"[\s\S]{0,180}path:\s*"\/calendar"[\s\S]{0,180}permission:\s*"calendar\.view"/.test(rawSidebar),
+  "Calendar must be a first-class sidebar route protected by calendar.view",
+);
 
 const nestedRoutes = [...pageRoutes.keys()]
   .filter((route) => !uniqueSidebarRoutes.includes(route))

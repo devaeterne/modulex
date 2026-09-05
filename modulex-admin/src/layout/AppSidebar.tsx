@@ -78,6 +78,7 @@ const navItems: NavItem[] = [
     ],
   },
   { icon: <PageIcon />, name: "Projects", path: "/projects", permission: "projects.view" },
+  { icon: <PageIcon />, name: "Calendar", path: "/calendar", permission: "calendar.view" },
   {
     icon: <TableIcon />,
     name: "Inventory",

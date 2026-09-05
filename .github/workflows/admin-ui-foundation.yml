@@ -52,7 +52,9 @@ jobs:
       - name: API timing contract
         run: npm run smoke:api-timing
       - name: Google Calendar integration contract
-        run: node scripts/google-calendar-integration-contract.mjs
+        run: npm run smoke:google-calendar
+      - name: Admin Calendar scheduling core contract
+        run: npm run smoke:admin-calendar
       - name: Admin UI strict self-test
         run: npm run smoke:admin-ui-strict:self-test
       - name: Admin UI strict changed-file gate

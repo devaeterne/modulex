@@ -1,5 +1,8 @@
 import { jsonError, requirePermission } from "@/lib/auth/admin-api";
-import { isGoogleCalendarConfigured } from "@/lib/google-calendar/config";
+import {
+  hasGoogleCalendarImportScopes,
+  isGoogleCalendarConfigured,
+} from "@/lib/google-calendar/config";
 import {
   getCalendarIntegrationSettings,
   getGeneralTimezone,
@@ -25,6 +28,11 @@ async function buildStatus(): Promise<GoogleCalendarStatusDto> {
     getGeneralTimezone(),
     getGoogleCredential(),
   ]);
+  const importScopesGranted = hasGoogleCalendarImportScopes(credential?.granted_scopes);
+  const reconnectRequired = Boolean(
+    credential &&
+      (credential.status === "error" || (credential.status === "connected" && !importScopesGranted)),
+  );
 
   return {
     configured: isGoogleCalendarConfigured(),
@@ -36,6 +44,8 @@ async function buildStatus(): Promise<GoogleCalendarStatusDto> {
       last_success_at: credential?.last_success_at ?? null,
       last_error_at: credential?.last_error_at ?? null,
       last_error_code: credential?.last_error_code ?? null,
+      reconnect_required: reconnectRequired,
+      import_scopes_granted: importScopesGranted,
     },
     settings,
     effective_timezone: settings.timezone_override || generalTimezone,

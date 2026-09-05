@@ -28,6 +28,8 @@ export type Permission =
   | "customers.manage"
   | "projects.view"
   | "projects.manage"
+  | "calendar.view"
+  | "calendar.manage"
   | "project_payments.view"
   | "project_payments.manage"
   | "project_procurement.view"
@@ -79,6 +81,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "customers.manage": "Manage customer records",
   "projects.view": "View customer projects",
   "projects.manage": "Create & change customer projects",
+  "calendar.view": "View Admin calendars & schedules",
+  "calendar.manage": "Manage Admin calendars, owners & Google bindings",
   "project_payments.view": "View Project customer collection status",
   "project_payments.manage": "Manage Project customer payments & allocations",
   "project_procurement.view": "View Project procurement status",
@@ -130,6 +134,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "customers.manage",
     "projects.view",
     "projects.manage",
+    "calendar.view",
+    "calendar.manage",
     "project_payments.view",
     "project_procurement.view",
     "orders.view",
@@ -153,6 +159,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "pricing.view",
     "pricing.cost.view",
     "projects.view",
+    "calendar.view",
     "project_payments.view",
     "project_payments.manage",
     "project_procurement.view",
@@ -204,8 +211,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Full system access, including protected Super Admin account management.",
   admin: "Full business and system administration, except protected Super Admin account actions.",
-  sales: "Customer, project, procurement status, website lead, dealer application, order, invoice, shipment and installation workflows. Customer collection and procurement status are visible, while payment entry, vendor cost and internal finance remain restricted.",
-  finance: "Projects, invoices, customer payment ledger, vendor-invoice allocation, collections, cost/margin visibility and payroll processing. Procurement ordering/delivery and employee HR master data stay restricted.",
+  sales: "Customer, project, calendar, procurement status, website lead, dealer application, order, invoice, shipment and installation workflows. Customer collection and procurement status are visible, while payment entry, vendor cost and internal finance remain restricted.",
+  finance: "Projects, calendar visibility, invoices, customer payment ledger, vendor-invoice allocation, collections, cost/margin visibility and payroll processing. Procurement ordering/delivery and employee HR master data stay restricted.",
   hr: "Full personnel lifecycle management including attendance, leave, compensation, payroll, benefits, documents, compliance, onboarding/offboarding and performance.",
   warehouse: "Stock, shipment and QR operations with read access to warehouse structure. Warehouse master data remains Admin-managed.",
   shipping: "Shipment execution with inventory, warehouse-location and QR-label visibility. General stock operations, customer commercial data and order-financial screens stay restricted.",
@@ -238,6 +245,7 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
   { match: (path) => path === "/users" || path.startsWith("/users/"), permission: "users.view" },
+  { match: (path) => path === "/calendar" || path.startsWith("/calendar/"), permission: "calendar.view" },
   { match: (path) => path === "/projects" || path.startsWith("/projects/"), permission: "projects.view" },
   { match: (path) => path === "/store/leads", permission: "leads.view" },
   { match: (path) => path.startsWith("/store/leads/"), permission: "leads.manage" },
