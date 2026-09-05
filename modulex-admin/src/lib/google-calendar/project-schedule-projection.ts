@@ -228,7 +228,9 @@ export async function syncProjectScheduleToGoogle(
     if (!settings.auto_create_project_calendar) return { total: 3, synced: 0, errors: 0, skipped: 3 };
     binding = await ensureProjectCalendar(projectId, actorId, requestUrl);
   }
-  if (!binding.sync_enabled) return { total: 3, synced: 0, errors: 0, skipped: 3 };
+  if (!binding) throw new Error("Project Calendar binding could not be resolved.");
+  const activeBinding = binding;
+  if (!activeBinding.sync_enabled) return { total: 3, synced: 0, errors: 0, skipped: 3 };
 
   const milestones: MilestoneDefinition[] = [
     { sourceType: "project_start", label: "Project Start", date: source.startDate },
@@ -243,8 +245,8 @@ export async function syncProjectScheduleToGoogle(
     const result = await syncMilestone({
       source,
       milestone,
-      bindingId: binding.id,
-      providerCalendarId: binding.provider_calendar_id,
+      bindingId: activeBinding.id,
+      providerCalendarId: activeBinding.provider_calendar_id,
       accessToken,
     });
     if (!result.ok) errors += 1;
