@@ -1,0 +1,86 @@
+.root {
+  min-width: 0;
+}
+
+.root :global(.fc) {
+  --fc-border-color: #e4e7ec;
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #f9fafb;
+  --fc-neutral-text-color: #667085;
+  --fc-today-bg-color: rgba(70, 95, 255, 0.08);
+  --fc-button-bg-color: #ffffff;
+  --fc-button-border-color: #d0d5dd;
+  --fc-button-text-color: #344054;
+  --fc-button-hover-bg-color: #f9fafb;
+  --fc-button-hover-border-color: #98a2b3;
+  --fc-button-active-bg-color: #465fff;
+  --fc-button-active-border-color: #465fff;
+  --fc-event-border-color: transparent;
+  color: #344054;
+}
+
+.root :global(.fc .fc-toolbar) {
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.root :global(.fc .fc-toolbar-title) {
+  color: #1d2939;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.root :global(.fc .fc-button) {
+  border-radius: 0.5rem;
+  box-shadow: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.root :global(.fc .fc-col-header-cell-cushion),
+.root :global(.fc .fc-daygrid-day-number),
+.root :global(.fc .fc-list-day-text),
+.root :global(.fc .fc-list-day-side-text) {
+  color: #475467;
+}
+
+.root :global(.fc .fc-event) {
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.root :global(.fc .fc-list-event:hover td) {
+  background: #f9fafb;
+}
+
+:global(.dark) .root :global(.fc) {
+  --fc-border-color: #1f2937;
+  --fc-page-bg-color: #101828;
+  --fc-neutral-bg-color: #1d2939;
+  --fc-neutral-text-color: #98a2b3;
+  --fc-today-bg-color: rgba(83, 115, 255, 0.12);
+  --fc-button-bg-color: #101828;
+  --fc-button-border-color: #344054;
+  --fc-button-text-color: #eaecf0;
+  --fc-button-hover-bg-color: #1d2939;
+  --fc-button-hover-border-color: #475467;
+  --fc-button-active-bg-color: #465fff;
+  --fc-button-active-border-color: #6172f3;
+  color: #d0d5dd;
+}
+
+:global(.dark) .root :global(.fc .fc-toolbar-title) {
+  color: #f2f4f7;
+}
+
+:global(.dark) .root :global(.fc .fc-col-header-cell-cushion),
+:global(.dark) .root :global(.fc .fc-daygrid-day-number),
+:global(.dark) .root :global(.fc .fc-list-day-text),
+:global(.dark) .root :global(.fc .fc-list-day-side-text) {
+  color: #d0d5dd;
+}
+
+:global(.dark) .root :global(.fc .fc-list-event:hover td) {
+  background: #1d2939;
+}
