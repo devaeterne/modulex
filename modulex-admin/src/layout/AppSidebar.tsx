@@ -190,7 +190,7 @@ const managementItems: NavItem[] = [
       { name: "Notifications", path: "/settings/general/notifications", permission: "settings.view" },
       { name: "Email Delivery Log", path: "/settings/general/email-notifications", permission: "settings.view" },
       { name: "Google Calendar", path: "/settings/integrations/google-calendar", permission: "settings.view" },
-      { name: "Project Participant Roles", path: "/settings/general/project-participant-roles", permission: "settings.manage" },
+      { name: "Project Participant Roles", path: "/settings/general/project-participant-roles", permission: "settings.view" },
     ],
   },
 ];
