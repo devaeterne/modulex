@@ -201,6 +201,8 @@ export async function listGoogleCalendarEvents(input: {
   accessToken: string;
   calendarId: string;
   syncToken?: string | null;
+  timeMin?: string | null;
+  timeMax?: string | null;
 }): Promise<GoogleCalendarEventPage> {
   const items: GoogleCalendarEventResource[] = [];
   let pageToken: string | null = null;
@@ -211,7 +213,13 @@ export async function listGoogleCalendarEvents(input: {
     url.searchParams.set("maxResults", "2500");
     url.searchParams.set("showDeleted", "true");
     url.searchParams.set("singleEvents", "true");
-    if (input.syncToken) url.searchParams.set("syncToken", input.syncToken);
+    if (input.syncToken) {
+      url.searchParams.set("syncToken", input.syncToken);
+    } else {
+      if (input.timeMin) url.searchParams.set("timeMin", input.timeMin);
+      if (input.timeMax) url.searchParams.set("timeMax", input.timeMax);
+      url.searchParams.set("orderBy", "startTime");
+    }
     if (pageToken) url.searchParams.set("pageToken", pageToken);
 
     const page = await googleCalendarRequest<{
