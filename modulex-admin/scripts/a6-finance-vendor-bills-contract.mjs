@@ -13,13 +13,15 @@ expect(exists(adminSqlPath), "A6-F3B Vendor Bills SQL must exist");
 expect(exists(migrationPath), "A6-F3B shared Supabase migration mirror must exist");
 const sql = read(adminSqlPath);
 const migration = read(migrationPath);
+const vendorMasterSql = read("sql/a6-finance-vendor-master.sql");
 expect(sql === migration, "A6-F3B Admin SQL and shared migration must stay byte-identical");
 
 expect(/alter\s+table\s+public\.vendor_invoices[\s\S]{0,6000}due_date/i.test(sql), "F3B must extend existing vendor_invoices with due date");
 expect(/alter\s+table\s+public\.vendor_invoices[\s\S]{0,8000}payment_term_id/i.test(sql), "F3B must reuse canonical payment_terms");
 expect(/alter\s+table\s+public\.vendor_invoices[\s\S]{0,10000}status/i.test(sql), "F3B must extend existing vendor_invoices lifecycle");
 expect(!/create\s+table(?:\s+if\s+not\s+exists)?\s+public\.vendor_bills/i.test(sql), "F3B must not duplicate vendor_invoices with vendor_bills");
-expect(/vendor_id/i.test(sql) && /references\s+public\.vendors/i.test(sql), "Canonical Vendor FK must remain the AP identity");
+expect(/vendor_id/i.test(sql), "F3B must use canonical Vendor identity on AP bills");
+expect(/vendor_invoices[\s\S]{0,5000}vendor_id[\s\S]{0,3000}references\s+public\.vendors/i.test(vendorMasterSql), "F3B must reuse the canonical Vendor FK established by F3A");
 expect(/invoice_number_key/i.test(sql) && /duplicate|unique/i.test(sql), "Vendor invoice number duplicate protection must be preserved/strengthened");
 expect(/base_currency_code/i.test(sql) && /base_amount/i.test(sql) && /fx_rate/i.test(sql) && /fx_rate_source/i.test(sql), "Vendor bills must retain historical main-currency/FX snapshot fields");
 
