@@ -150,7 +150,10 @@ export default function FinanceVendorPaymentsManager() {
   }
 
   useEffect(() => {
-    void load(0).catch((error) => setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor Payments could not be loaded." }));
+    void load(0).catch((error) => setMessage({
+      variant: "error",
+      text: error instanceof Error ? error.message : "Vendor Payments could not be loaded.",
+    }));
     // Initial route load only; filters refresh explicitly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -289,8 +292,9 @@ export default function FinanceVendorPaymentsManager() {
   }
 
   async function voidCheck() {
-    if (!canManage || busy || !selectedId || selectedInstrumentStatus !== "issued" || !actionReason.trim()) {
-      if (!actionReason.trim()) setMessage({ variant: "error", text: "Void reason is required." });
+    if (!canManage || busy || !selectedId || selectedInstrumentStatus !== "issued") return;
+    if (!actionReason.trim()) {
+      setMessage({ variant: "error", text: "Void reason is required." });
       return;
     }
     setBusy(true);
@@ -307,8 +311,9 @@ export default function FinanceVendorPaymentsManager() {
   }
 
   async function returnCheck() {
-    if (!canManage || busy || !selectedId || !["issued", "cleared"].includes(selectedInstrumentStatus ?? "") || !actionReason.trim()) {
-      if (!actionReason.trim()) setMessage({ variant: "error", text: "Return reason is required." });
+    if (!canManage || busy || !selectedId || !["issued", "cleared"].includes(selectedInstrumentStatus ?? "")) return;
+    if (!actionReason.trim()) {
+      setMessage({ variant: "error", text: "Return reason is required." });
       return;
     }
     setBusy(true);
@@ -325,8 +330,9 @@ export default function FinanceVendorPaymentsManager() {
   }
 
   async function reverseSelected() {
-    if (!canManage || busy || !selectedId || detail?.transaction.status !== "posted" || detail.instrument || !actionReason.trim()) {
-      if (!actionReason.trim()) setMessage({ variant: "error", text: "Reversal reason is required." });
+    if (!canManage || busy || !selectedId || detail?.transaction.status !== "posted" || detail.instrument) return;
+    if (!actionReason.trim()) {
+      setMessage({ variant: "error", text: "Reversal reason is required." });
       return;
     }
     setBusy(true);
@@ -387,7 +393,7 @@ export default function FinanceVendorPaymentsManager() {
                     <TableCell variant="admin" className="text-right">{money(payment.allocated_amount, payment.currency_code)}</TableCell>
                     <TableCell variant="admin" className="text-right">{money(payment.unapplied_amount, payment.currency_code)}</TableCell>
                     <TableCell variant="admin"><Badge color={paymentColor(payment.status)}>{payment.status}</Badge></TableCell>
-                    <TableCell variant="admin">{payment.instrument_number ? <div className="flex flex-col gap-1"><span>{payment.instrument_number}</span><Badge color={instrumentColor(payment.instrument_status)}>{payment.instrument_status || "—"}</Badge></div> : "—"}</TableCell>
+                    <TableCell variant="admin">{payment.instrument_number ? <div className="space-y-1"><span>{payment.instrument_number}</span><div><Badge color={instrumentColor(payment.instrument_status)}>{payment.instrument_status || "—"}</Badge></div></div> : "—"}</TableCell>
                     <TableCell variant="admin"><Button size="sm" variant="outline" disabled={detailLoading} onClick={() => void loadDetail(payment.id)}>View</Button></TableCell>
                   </TableRow>
                 ))}
@@ -399,40 +405,62 @@ export default function FinanceVendorPaymentsManager() {
       </ComponentCard>
 
       {detail ? (
-        <ComponentCard title="Vendor Payment Detail" desc="Bill allocation, Check lifecycle and Finance reversal remain separately auditable but reconciled.">
+        <ComponentCard title="Vendor Payment Detail" desc="Bill allocation, Check lifecycle and Finance reversal stay separately auditable while reconciling to one Finance movement.">
           {detailLoading ? <div className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading Vendor Payment detail…</div> : (
-            <div className="space-y-5">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Vendor</span><div className="font-medium">{String(detail.vendor?.display_name ?? detail.vendor?.code ?? "—")}</div></div>
-                <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Payment Method</span><div className="font-medium">{String(detail.payment_method?.name ?? "—")}</div></div>
-                <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Allocated</span><div className="font-medium">{money(Number(detail.transaction.allocated_amount || 0), String(detail.transaction.currency_code || "USD"))}</div></div>
-                <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Unapplied</span><div className="font-medium">{money(Number(detail.transaction.unapplied_amount || 0), String(detail.transaction.currency_code || "USD"))}</div></div>
-              </div>
-
-              {canManage && detail.transaction.status === "draft" ? (
-                <div className="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div><Label htmlFor="vendor-payment-bill-id">Bill ID</Label><Input id="vendor-payment-bill-id" value={allocationInvoiceId} onChange={(event) => setAllocationInvoiceId(event.target.value)} placeholder="Optional open Vendor Bill" /></div>
-                    <div><Label htmlFor="vendor-payment-allocation">Allocation amount</Label><Input id="vendor-payment-allocation" type="number" min="0.0001" step="0.0001" value={allocationAmount} onChange={(event) => setAllocationAmount(event.target.value)} /></div>
-                    {selectedMethodKey === "check" ? <><div><Label htmlFor="vendor-payment-check">Check number</Label><Input id="vendor-payment-check" value={checkNumber} onChange={(event) => setCheckNumber(event.target.value)} required /></div><div><Label htmlFor="vendor-payment-issued">Issued at</Label><Input id="vendor-payment-issued" type="datetime-local" value={issuedAt} onChange={(event) => setIssuedAt(event.target.value)} required /></div></> : null}
-                    <div><Label htmlFor="vendor-payment-fx-rate">Manual FX rate</Label><Input id="vendor-payment-fx-rate" type="number" min="0.0000000001" step="0.0000000001" value={manualFxRate} onChange={(event) => setManualFxRate(event.target.value)} /></div>
-                    <div><Label htmlFor="vendor-payment-fx-source">Manual FX source</Label><Input id="vendor-payment-fx-source" value={manualFxSource} onChange={(event) => setManualFxSource(event.target.value)} /></div>
-                    {selectedMethodKey === "check" ? <><div><Label htmlFor="vendor-payment-instrument-reference">Check reference</Label><Input id="vendor-payment-instrument-reference" value={instrumentReference} onChange={(event) => setInstrumentReference(event.target.value)} /></div><div><Label htmlFor="vendor-payment-instrument-notes">Check notes</Label><Input id="vendor-payment-instrument-notes" value={instrumentNotes} onChange={(event) => setInstrumentNotes(event.target.value)} /></div></> : null}
-                  </div>
-                  <div className="flex flex-wrap gap-3"><Button disabled={busy} onClick={() => void postSelected()}>Post Vendor Payment</Button><Button variant="danger" disabled={busy} onClick={() => void removeDraft()}>Delete Draft</Button></div>
-                </div>
-              ) : null}
-
-              {canManage && detail.transaction.status === "posted" && !detail.reversal ? (
-                <div className="space-y-4 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-                  <div className="grid gap-4 md:grid-cols-2"><div><Label htmlFor="vendor-payment-action-at">Lifecycle time</Label><Input id="vendor-payment-action-at" type="datetime-local" value={actionAt} onChange={(event) => setActionAt(event.target.value)} /></div><div><Label htmlFor="vendor-payment-action-reason">Void / Return / Reversal reason</Label><Input id="vendor-payment-action-reason" value={actionReason} onChange={(event) => setActionReason(event.target.value)} /></div></div>
-                  <div className="flex flex-wrap gap-3">{selectedInstrumentStatus === "issued" ? <><Button variant="outline" disabled={busy} onClick={() => void clearCheck()}>Clear Check</Button><Button variant="danger" disabled={busy} onClick={() => void voidCheck()}>Void Check</Button></> : null}{["issued", "cleared"].includes(selectedInstrumentStatus ?? "") ? <Button variant="danger" disabled={busy} onClick={() => void returnCheck()}>Return Check</Button> : null}{!detail.instrument ? <Button variant="danger" disabled={busy} onClick={() => void reverseSelected()}>Reverse Vendor Payment</Button> : null}</div>
-                </div>
-              ) : null}
-
-              <TableViewport><Table variant="admin" minWidth="medium"><TableHeader variant="admin"><TableRow><TableCell isHeader variant="admin">Bill allocation</TableCell><TableCell isHeader variant="admin">Bill date</TableCell><TableCell isHeader variant="admin">Due</TableCell><TableCell isHeader variant="admin" className="text-right">Amount</TableCell></TableRow></TableHeader><TableBody variant="admin">{detail.bill_allocations.length === 0 ? <TableStateRow colSpan={4}>No bill allocation. This Vendor Payment is currently Unapplied.</TableStateRow> : detail.bill_allocations.map((allocation, index) => <TableRow key={String(allocation.id ?? index)}><TableCell variant="admin">{String(allocation.invoice_number ?? allocation.invoice_id ?? "—")}</TableCell><TableCell variant="admin">{String(allocation.invoice_date ?? "—")}</TableCell><TableCell variant="admin">{String(allocation.due_date ?? "—")}</TableCell><TableCell variant="admin" className="text-right">{money(Number(allocation.amount_delta ?? 0), String(detail.transaction.currency_code || "USD"))}</TableCell></TableRow>)}</TableBody></Table></TableViewport>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Vendor</span><div className="font-medium">{String(detail.vendor?.display_name ?? detail.vendor?.code ?? "—")}</div></div>
+              <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Payment Method</span><div className="font-medium">{String(detail.payment_method?.name ?? "—")}</div></div>
+              <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Allocated</span><div className="font-medium">{money(Number(detail.transaction.allocated_amount || 0), String(detail.transaction.currency_code || "USD"))}</div></div>
+              <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Unapplied</span><div className="font-medium">{money(Number(detail.transaction.unapplied_amount || 0), String(detail.transaction.currency_code || "USD"))}</div></div>
             </div>
           )}
+        </ComponentCard>
+      ) : null}
+
+      {canManage && detail?.transaction.status === "draft" ? (
+        <ComponentCard title="Post Selected Vendor Payment" desc="Allocate to an open Vendor Bill if applicable. Check payments create an issued instrument; they are not cleared automatically.">
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div><Label htmlFor="vendor-payment-bill-id">Bill ID</Label><Input id="vendor-payment-bill-id" value={allocationInvoiceId} onChange={(event) => setAllocationInvoiceId(event.target.value)} placeholder="Optional open Vendor Bill" /></div>
+              <div><Label htmlFor="vendor-payment-allocation">Allocation amount</Label><Input id="vendor-payment-allocation" type="number" min="0.0001" step="0.0001" value={allocationAmount} onChange={(event) => setAllocationAmount(event.target.value)} /></div>
+              {selectedMethodKey === "check" ? <><div><Label htmlFor="vendor-payment-check">Check number</Label><Input id="vendor-payment-check" value={checkNumber} onChange={(event) => setCheckNumber(event.target.value)} required /></div><div><Label htmlFor="vendor-payment-issued">Issued at</Label><Input id="vendor-payment-issued" type="datetime-local" value={issuedAt} onChange={(event) => setIssuedAt(event.target.value)} required /></div></> : null}
+              <div><Label htmlFor="vendor-payment-fx-rate">Manual FX rate</Label><Input id="vendor-payment-fx-rate" type="number" min="0.0000000001" step="0.0000000001" value={manualFxRate} onChange={(event) => setManualFxRate(event.target.value)} /></div>
+              <div><Label htmlFor="vendor-payment-fx-source">Manual FX source</Label><Input id="vendor-payment-fx-source" value={manualFxSource} onChange={(event) => setManualFxSource(event.target.value)} /></div>
+              {selectedMethodKey === "check" ? <><div><Label htmlFor="vendor-payment-instrument-reference">Check reference</Label><Input id="vendor-payment-instrument-reference" value={instrumentReference} onChange={(event) => setInstrumentReference(event.target.value)} /></div><div><Label htmlFor="vendor-payment-instrument-notes">Check notes</Label><Input id="vendor-payment-instrument-notes" value={instrumentNotes} onChange={(event) => setInstrumentNotes(event.target.value)} /></div></> : null}
+            </div>
+            <div className="flex flex-wrap gap-3"><Button disabled={busy} onClick={() => void postSelected()}>Post Vendor Payment</Button><Button variant="danger" disabled={busy} onClick={() => void removeDraft()}>Delete Draft</Button></div>
+          </div>
+        </ComponentCard>
+      ) : null}
+
+      {canManage && detail?.transaction.status === "posted" && !detail.reversal ? (
+        <ComponentCard title="Vendor Payment / Check Lifecycle" desc="Clear changes only Check lifecycle. Void, Return and non-Check Reversal create compensating Finance history and reverse AP allocations.">
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div><Label htmlFor="vendor-payment-action-at">Lifecycle time</Label><Input id="vendor-payment-action-at" type="datetime-local" value={actionAt} onChange={(event) => setActionAt(event.target.value)} /></div>
+              <div><Label htmlFor="vendor-payment-action-reason">Void / Return / Reversal reason</Label><Input id="vendor-payment-action-reason" value={actionReason} onChange={(event) => setActionReason(event.target.value)} /></div>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {selectedInstrumentStatus === "issued" ? <><Button variant="outline" disabled={busy} onClick={() => void clearCheck()}>Clear Check</Button><Button variant="danger" disabled={busy} onClick={() => void voidCheck()}>Void Check</Button></> : null}
+              {["issued", "cleared"].includes(selectedInstrumentStatus ?? "") ? <Button variant="danger" disabled={busy} onClick={() => void returnCheck()}>Return Check</Button> : null}
+              {!detail.instrument ? <Button variant="danger" disabled={busy} onClick={() => void reverseSelected()}>Reverse Vendor Payment</Button> : null}
+            </div>
+          </div>
+        </ComponentCard>
+      ) : null}
+
+      {detail ? (
+        <ComponentCard title="Bill Allocation History" desc="Allocated entries reuse the F3B Vendor Bill payment-allocation ledger. No second settlement table is created.">
+          <TableViewport>
+            <Table variant="admin" minWidth="medium">
+              <TableHeader variant="admin"><TableRow><TableCell isHeader variant="admin">Bill allocation</TableCell><TableCell isHeader variant="admin">Bill date</TableCell><TableCell isHeader variant="admin">Due</TableCell><TableCell isHeader variant="admin" className="text-right">Amount</TableCell></TableRow></TableHeader>
+              <TableBody variant="admin">
+                {detail.bill_allocations.length === 0 ? <TableStateRow colSpan={4}>No bill allocation. This Vendor Payment is currently Unapplied.</TableStateRow> : detail.bill_allocations.map((allocation, index) => (
+                  <TableRow key={String(allocation.id ?? index)}><TableCell variant="admin">{String(allocation.invoice_number ?? allocation.invoice_id ?? "—")}</TableCell><TableCell variant="admin">{String(allocation.invoice_date ?? "—")}</TableCell><TableCell variant="admin">{String(allocation.due_date ?? "—")}</TableCell><TableCell variant="admin" className="text-right">{money(Number(allocation.amount_delta ?? 0), String(detail.transaction.currency_code || "USD"))}</TableCell></TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableViewport>
         </ComponentCard>
       ) : null}
     </div>
