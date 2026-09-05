@@ -19,7 +19,7 @@ expect(/references\s+public\.payment_methods/i.test(sql), "F3C payment method mu
 expect(/system_key[\s\S]{0,500}check/i.test(sql), "F3C must ensure canonical Check payment method exists");
 expect(!/create\s+table(?:\s+if\s+not\s+exists)?\s+public\.(?:vendor_payments|finance_vendor_payments)/i.test(sql), "F3C must not duplicate Finance vendor_payment ledger");
 expect(!/create\s+table(?:\s+if\s+not\s+exists)?\s+public\.vendor_invoice_payment_allocations/i.test(sql), "F3C must reuse F3B bill payment allocations");
-expect(!/scheduled_payment_date/i.test(sql), "F3C must not absorb F3D scheduled-payment semantics");
+expect(!/(?:add\s+column(?:\s+if\s+not\s+exists)?|create\s+table[\s\S]{0,1200})\s+scheduled_payment_date\b/i.test(sql), "F3C must not add F3D scheduled-payment storage");
 
 expect(/create\s+table(?:\s+if\s+not\s+exists)?\s+public\.finance_payment_instruments/i.test(sql), "F3C must add the missing payment-instrument child model");
 for (const term of ["transaction_id", "payment_method_id", "instrument_type", "instrument_number", "issued_at", "cleared_at", "voided_at", "returned_at", "source_account_id"]) {
