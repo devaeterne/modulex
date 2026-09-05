@@ -28,12 +28,14 @@ on:
       - "modulex-admin/sql/a6-finance-expenses.sql"
       - "modulex-admin/sql/a6-finance-vendor-master.sql"
       - "modulex-admin/sql/a6-finance-vendor-bills.sql"
+      - "modulex-admin/sql/a6-finance-vendor-bills-hardening.sql"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - "modulex-store/supabase/migrations/20260904150000_a6_finance_employee_payments.sql"
       - "modulex-store/supabase/migrations/20260905050000_a6_finance_expenses.sql"
       - "modulex-store/supabase/migrations/20260905223000_a6_finance_vendor_master.sql"
       - "modulex-store/supabase/migrations/20260905234500_a6_finance_vendor_bills.sql"
+      - "modulex-store/supabase/migrations/20260905234600_a6_finance_vendor_bills_hardening.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
   pull_request:
     paths:
@@ -62,12 +64,14 @@ on:
       - "modulex-admin/sql/a6-finance-expenses.sql"
       - "modulex-admin/sql/a6-finance-vendor-master.sql"
       - "modulex-admin/sql/a6-finance-vendor-bills.sql"
+      - "modulex-admin/sql/a6-finance-vendor-bills-hardening.sql"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - "modulex-store/supabase/migrations/20260904150000_a6_finance_employee_payments.sql"
       - "modulex-store/supabase/migrations/20260905050000_a6_finance_expenses.sql"
       - "modulex-store/supabase/migrations/20260905223000_a6_finance_vendor_master.sql"
       - "modulex-store/supabase/migrations/20260905234500_a6_finance_vendor_bills.sql"
+      - "modulex-store/supabase/migrations/20260905234600_a6_finance_vendor_bills_hardening.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
 
 concurrency:
