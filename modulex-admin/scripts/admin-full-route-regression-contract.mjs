@@ -63,8 +63,8 @@ expect(
   "Google Calendar must be discoverable under settings.view navigation",
 );
 expect(
-  /name:\s*"Project Participant Roles"[\s\S]{0,180}path:\s*"\/settings\/general\/project-participant-roles"[\s\S]{0,180}permission:\s*"settings\.manage"/.test(sidebar),
-  "Project Participant Roles must be discoverable to settings managers",
+  /name:\s*"Project Participant Roles"[\s\S]{0,180}path:\s*"\/settings\/general\/project-participant-roles"[\s\S]{0,180}permission:\s*"settings\.view"/.test(sidebar),
+  "Project Participant Roles must be discoverable under canonical settings.view navigation",
 );
 
 for (const route of ["/products/new", "/products/[id]/edit", "/signin"]) {
