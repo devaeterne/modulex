@@ -62,11 +62,11 @@ assert.match(domain, /const PB6_INTERNAL_ROLES = \["super_admin", "admin", "fina
 assert.doesNotMatch(domain, /PB6_INTERNAL_ROLES[^\n]*sales/, "Sales must not be part of PB-6 internal detail access");
 assert.doesNotMatch(domain, /super_admin", "admin", "finance", "sales/, "Legacy Sales detail access must be removed from the PB-6 client domain");
 assert.doesNotMatch(eventDomain, /super_admin", "admin", "finance", "sales/, "Sales must not pass the commission-event client guard");
-assert.match(domain, /get_customer_project_commission_basis_preview/i, "Percentage creation must request the authoritative DB basis preview");
+assert.match(domain, /get_customer_project_commission_basis_preview/i, "Percentage creation must retain the authoritative DB basis preview contract");
 assert.match(domain, /p_basis_amount:\s*null/, "Client must not send a user-entered percentage basis amount");
 
 assert.doesNotMatch(panel, /commissionBasisAmount|Basis amount snapshot/, "Percentage basis must not be manually entered in the UI");
-assert.match(panel, /Commission basis/i, "Percentage UI must show the canonical basis preview");
+assert.match(panel, /Sales basis/i, "Sales-percentage UI must show the canonical basis preview");
 assert.match(panel, /Estimated commission/i, "Percentage UI must show the calculated commission preview");
 
 assert.match(migration, /private\.project_commission_scope_basis/i, "DB must own canonical percentage basis calculation");

@@ -4,7 +4,7 @@ import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
 const PB6_INTERNAL_ROLES = ["super_admin", "admin", "finance"] as const;
 
 export type ProjectParticipantSubjectType = "employee" | "customer_contact" | "profile";
-export type ProjectCommissionBasisType = "fixed" | "percentage";
+export type ProjectCommissionBasisType = "fixed" | "percentage" | "gross_profit_percentage";
 export type ProjectCommissionScopeType = "project" | "category" | "product";
 export type ProjectCommissionStatus = "pending" | "earned" | "approved" | "cancelled";
 export type ProjectCommissionEventType = "earned" | "approved" | "cancelled" | "adjustment" | "offset" | "reversal";
@@ -39,6 +39,17 @@ export type ProjectParticipantCandidate = {
 export type ProjectCommissionScopeOption = {
   id: string;
   label: string;
+};
+
+export type ProjectCommissionCalculationPreview = {
+  available: boolean;
+  mode: "revenue" | "gross_profit";
+  revenueAmount: number;
+  costAmount: number | null;
+  basisAmount: number | null;
+  missingCostLineCount: number;
+  currencyCode: string;
+  errorCode: string | null;
 };
 
 export type ProjectCommissionObligation = {
@@ -88,6 +99,17 @@ type RawCommission = {
   status?: string | null;
   paid_amount?: number | string | null;
   created_at?: string | null;
+};
+
+type RawCalculationPreview = {
+  available?: boolean | null;
+  mode?: string | null;
+  revenue_amount?: number | string | null;
+  cost_amount?: number | string | null;
+  basis_amount?: number | string | null;
+  missing_cost_line_count?: number | string | null;
+  currency_code?: string | null;
+  error_code?: string | null;
 };
 
 function numberValue(value: number | string | null | undefined) {
@@ -389,6 +411,40 @@ export async function getCustomerProjectCommissionBasisPreview(input: {
   return basis;
 }
 
+export async function getCustomerProjectCommissionCalculationPreview(input: {
+  projectId: string;
+  basisType: Exclude<ProjectCommissionBasisType, "fixed">;
+  scopeType: ProjectCommissionScopeType;
+  currencyCode: string;
+  productCategoryId?: string | null;
+  productId?: string | null;
+}): Promise<ProjectCommissionCalculationPreview> {
+  await requireCommissionManage();
+  const currencyCode = normalizeCurrency(input.currencyCode);
+  const { data, error } = await supabase.rpc("get_customer_project_commission_calculation_preview", {
+    p_project_id: input.projectId,
+    p_basis_type: input.basisType,
+    p_scope_type: input.scopeType,
+    p_currency_code: currencyCode,
+    p_product_category_id: input.scopeType === "category" ? input.productCategoryId || null : null,
+    p_product_id: input.scopeType === "product" ? input.productId || null : null,
+  });
+  if (error) throw error;
+
+  const row = (data ?? {}) as RawCalculationPreview;
+  const mode = row.mode === "gross_profit" ? "gross_profit" : "revenue";
+  return {
+    available: Boolean(row.available),
+    mode,
+    revenueAmount: numberValue(row.revenue_amount),
+    costAmount: nullableNumber(row.cost_amount),
+    basisAmount: nullableNumber(row.basis_amount),
+    missingCostLineCount: numberValue(row.missing_cost_line_count),
+    currencyCode: row.currency_code ?? currencyCode,
+    errorCode: row.error_code ?? null,
+  };
+}
+
 export async function createCustomerProjectCommissionObligation(input: {
   projectId: string;
   participantId: string;
@@ -421,7 +477,7 @@ export async function createCustomerProjectCommissionObligation(input: {
     p_currency_code: currencyCode,
     p_scope_type: input.scopeType,
     p_basis_amount: null,
-    p_rate: input.basisType === "percentage" ? Number(input.rate) : null,
+    p_rate: input.basisType !== "fixed" ? Number(input.rate) : null,
     p_flat_amount: input.basisType === "fixed" ? Number(input.flatAmount) : null,
     p_order_id: input.orderId || null,
     p_product_category_id: input.scopeType === "category" ? input.productCategoryId || null : null,
