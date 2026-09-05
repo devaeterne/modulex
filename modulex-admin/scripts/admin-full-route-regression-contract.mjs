@@ -30,16 +30,19 @@ const pageFiles = walkPages(path.join(root, "src/app"));
 const pageRoutes = new Map(pageFiles.map((file) => [routeFromPage(file), file]));
 const sidebar = read("src/layout/AppSidebar.tsx");
 const sidebarRoutes = [...sidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) => match[1]);
-const uniqueSidebarRoutes = [...new Set(sidebarRoutes)];
+const calendarSidebarRoutes = sidebarRoutes.filter((route) => route === "/calendar");
+const legacySidebarRoutes = sidebarRoutes.filter((route) => route !== "/calendar");
+const uniqueSidebarRoutes = [...new Set(legacySidebarRoutes)];
 
-expect(sidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
-expect(uniqueSidebarRoutes.length === 80, `UI-2D expects 80 current sidebar routes after Calendar, found ${uniqueSidebarRoutes.length}`);
+expect(legacySidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
+expect(calendarSidebarRoutes.length === 1, "Calendar sidebar route must exist exactly once");
+expect(uniqueSidebarRoutes.length === 79, `UI-2D expects 79 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
 for (const route of uniqueSidebarRoutes) {
   expect(pageRoutes.has(route), `Sidebar route is missing a page.tsx: ${route}`);
 }
+expect(pageRoutes.has("/calendar"), "Calendar sidebar route is missing a page.tsx: /calendar");
 
 for (const route of [
-  "/calendar",
   "/projects",
   "/products/vendor-imports",
   "/products/types",
@@ -133,9 +136,9 @@ for (const relativePath of [
 }
 
 const nestedRoutes = [...pageRoutes.keys()]
-  .filter((route) => !uniqueSidebarRoutes.includes(route))
+  .filter((route) => !sidebarRoutes.includes(route))
   .filter((route) => /(?:\/new(?:\/|$)|\/edit(?:\/|$)|\/print(?:\/|$)|\[[^/]+\])/.test(route))
   .sort();
 expect(nestedRoutes.length >= 2, "UI-2D must inventory nested new/edit/detail/print routes");
 
-console.log(`PASS: admin full route regression contract (${uniqueSidebarRoutes.length} sidebar routes, ${nestedRoutes.length} nested routes)`);
+console.log(`PASS: admin full route regression contract (${sidebarRoutes.length} sidebar routes, ${nestedRoutes.length} nested routes)`);
