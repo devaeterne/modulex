@@ -32,13 +32,14 @@ function settingsUrl(request: Request, result: string) {
 }
 
 function redirectResult(request: Request, result: string) {
-  const response = Response.redirect(settingsUrl(request, result), 303);
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  response.headers.append(
-    "Set-Cookie",
-    `${OAUTH_COOKIE}=; Path=/api/admin/google-calendar/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=0${secure}`
-  );
-  return response;
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: settingsUrl(request, result).toString(),
+      "Set-Cookie": `${OAUTH_COOKIE}=; Path=/api/admin/google-calendar/oauth/callback; HttpOnly; SameSite=Lax; Max-Age=0${secure}`,
+    },
+  });
 }
 
 async function handleGet(request: Request) {

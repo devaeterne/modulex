@@ -8,6 +8,7 @@ import Input from "@/components/form/input/InputField";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { hasPermission } from "@/lib/auth/permissions";
 import { authenticatedFetch } from "@/lib/auth/authenticated-fetch";
 import type {
@@ -26,6 +27,8 @@ const emptySettings: GoogleCalendarIntegrationSettings = {
   sync_measurements: false,
   sync_customer_appointments: false,
 };
+
+type BusyAction = "connect" | "save" | "disconnect" | null;
 
 function statusBadge(status: GoogleCalendarStatusDto["connection"]["status"]) {
   if (status === "connected") return <Badge color="success">Connected</Badge>;
@@ -57,7 +60,7 @@ export default function GoogleCalendarSettings() {
   const [form, setForm] = useState<GoogleCalendarIntegrationSettings>(emptySettings);
   const [canManage, setCanManage] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -88,8 +91,14 @@ export default function GoogleCalendarSettings() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const clearTransientAction = () => setBusyAction(null);
+    window.addEventListener("pageshow", clearTransientAction);
+    return () => window.removeEventListener("pageshow", clearTransientAction);
+  }, []);
+
   async function startConnection() {
-    setBusy(true);
+    setBusyAction("connect");
     setError(null);
     setSuccess(null);
     try {
@@ -100,12 +109,12 @@ export default function GoogleCalendarSettings() {
       window.location.assign(result.authorization_url);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Google authorization could not be started.");
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function saveSettings() {
-    setBusy(true);
+    setBusyAction("save");
     setError(null);
     setSuccess(null);
     try {
@@ -128,7 +137,7 @@ export default function GoogleCalendarSettings() {
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Google Calendar settings could not be saved.");
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -138,7 +147,7 @@ export default function GoogleCalendarSettings() {
       return;
     }
 
-    setBusy(true);
+    setBusyAction("disconnect");
     setError(null);
     setSuccess(null);
     try {
@@ -152,14 +161,14 @@ export default function GoogleCalendarSettings() {
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "Google Calendar could not be disconnected.");
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   if (loading && !status) {
     return (
       <ComponentCard title="Google Calendar" desc="Loading integration status and settings.">
-        <p className="text-sm" role="status">Loading Google Calendar settings…</p>
+        <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`} role="status">Loading Google Calendar settings…</p>
       </ComponentCard>
     );
   }
@@ -174,6 +183,10 @@ export default function GoogleCalendarSettings() {
   }
 
   const connected = status.connection.status === "connected";
+  const busy = busyAction !== null;
+  const savingSettings = busyAction === "save";
+  const connecting = busyAction === "connect";
+  const disconnecting = busyAction === "disconnect";
   const disabled = !canManage || busy;
 
   return (
@@ -187,7 +200,7 @@ export default function GoogleCalendarSettings() {
         desc="One company Google account authorizes Modulex to create and manage Project calendars."
         headerAction={statusBadge(status.connection.status)}
       >
-        <div className="space-y-4">
+        <div className={`space-y-4 ${ADMIN_TEXT_STYLES.body}`}>
           <div className="flex flex-wrap gap-3">
             <Badge color={status.configured ? "success" : "warning"}>
               {status.configured ? "OAuth app configured" : "OAuth app not configured"}
@@ -206,11 +219,11 @@ export default function GoogleCalendarSettings() {
           {canManage ? (
             <div className="flex flex-wrap gap-3">
               <Button disabled={busy || !status.configured} onClick={() => void startConnection()}>
-                {connected ? "Reconnect Google Calendar" : "Connect Google Calendar"}
+                {connecting ? "Connecting…" : connected ? "Reconnect Google Calendar" : "Connect Google Calendar"}
               </Button>
               {connected || status.connection.status === "error" ? (
                 <Button variant="outline" disabled={busy} onClick={() => void disconnect()}>
-                  {confirmDisconnect ? "Confirm Disconnect" : "Disconnect"}
+                  {disconnecting ? "Disconnecting…" : confirmDisconnect ? "Confirm Disconnect" : "Disconnect"}
                 </Button>
               ) : null}
               {confirmDisconnect ? (
@@ -226,7 +239,7 @@ export default function GoogleCalendarSettings() {
       <ComponentCard
         title="Project Calendar Behavior"
         desc="These settings are stored in Modulex and can be changed without a deploy."
-        headerAction={canManage ? <Button disabled={busy} onClick={() => void saveSettings()}>{busy ? "Saving…" : "Save Settings"}</Button> : undefined}
+        headerAction={canManage ? <Button disabled={busy} onClick={() => void saveSettings()}>{savingSettings ? "Saving…" : "Save Settings"}</Button> : undefined}
       >
         <div className="space-y-5">
           <Checkbox
