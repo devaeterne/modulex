@@ -28,6 +28,7 @@ const [
   projectCalendarTab,
   googleCalendarProvider,
   googleCalendarRepository,
+  calendarImportService,
   discoveryRoute,
   importRoute,
   syncRoute,
@@ -44,6 +45,7 @@ const [
   source("src/components/customers/project-detail/ProjectCalendarTab.tsx"),
   source("src/lib/google-calendar/google-calendar.ts"),
   source("src/lib/google-calendar/repository.ts"),
+  source("src/lib/google-calendar/calendar-import.ts"),
   source("src/app/api/admin/calendar/google/discovery/route.ts"),
   source("src/app/api/admin/calendar/google/import/route.ts"),
   source("src/app/api/admin/calendar/google/sync/route.ts"),
@@ -99,10 +101,13 @@ assert.match(calendarDomain, /owner_profile_id/);
 assert.match(calendarDomain, /google_calendar_event_mirror/);
 assert.match(calendarDomain, /customer_projects/);
 assert.match(calendarDomain, /customer_installations/);
+assert.match(calendarDomain, /reassignAdminCalendarOwner/);
 assert.doesNotMatch(calendarDomain, /encrypted_refresh_token|GOOGLE_CALENDAR_CLIENT_SECRET/);
 
 assert.match(calendarRoute, /requirePermission\(request, "calendar\.view"\)/);
-assert.match(calendarRoute, /listAdminCalendarEvents/);
+assert.match(calendarRoute, /getAdminCalendarSnapshot|listAdminCalendarEvents/);
+assert.match(calendarRoute, /requirePermission\(request, "calendar\.manage"\)/);
+assert.match(calendarRoute, /reassignAdminCalendarOwner/);
 assert.match(calendarRoute, /withApiTiming/);
 assert.doesNotMatch(calendarRoute, /encrypted_refresh_token|refresh_token/);
 
@@ -124,6 +129,8 @@ assert.doesNotMatch(calendarWorkspace, /<(button|input|select|textarea|label|tab
 
 assert.match(projectCalendarTab, /AdminCalendarWorkspace|ProjectCalendarFeed/);
 assert.match(projectCalendarTab, /projectId/);
+assert.match(projectCalendarTab, /Planned Delivery Date/);
+assert.match(projectCalendarTab, /Primary Installation/);
 assert.match(projectCalendarTab, /ADMIN_TEXT_STYLES/);
 
 assert.match(googleCalendarProvider, /calendarList/);
@@ -135,14 +142,18 @@ assert.match(googleCalendarRepository, /provider_access_role/);
 assert.match(googleCalendarRepository, /google_calendar_event_mirror/);
 assert.match(googleCalendarRepository, /sync_token/);
 
+assert.match(calendarImportService, /syncToken|sync_token/);
+assert.match(calendarImportService, /status\s*!==\s*410|status\s*===\s*410|status !== 410|status === 410/);
+assert.match(calendarImportService, /accessRole|access_role/);
+assert.match(calendarImportService, /owner/);
+assert.doesNotMatch(calendarImportService, /customer_projects.*(?:insert|update)|customer_installations.*(?:insert|update)/is);
+
 assert.match(discoveryRoute, /requirePermission\(request, "calendar\.manage"\)/);
 assert.match(discoveryRoute, /accessRole/);
 assert.match(importRoute, /requirePermission\(request, "calendar\.manage"\)/);
 assert.match(importRoute, /ownerProfileId|owner_profile_id/);
 assert.match(importRoute, /owner/i);
 assert.match(syncRoute, /requirePermission\(request, "calendar\.manage"\)/);
-assert.match(syncRoute, /syncToken|sync_token/);
-assert.match(syncRoute, /410/);
 assert.doesNotMatch(`${discoveryRoute}\n${importRoute}\n${syncRoute}`, /customer_projects.*(?:insert|update)|customer_installations.*(?:insert|update)/is);
 
 console.log("PASS: Admin Calendar scheduling core contract");
