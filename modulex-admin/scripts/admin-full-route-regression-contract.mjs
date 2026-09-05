@@ -2,7 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "utf8");
+const read = (relativePath) => {
+  const source = fs.readFileSync(path.join(root, relativePath), "utf8");
+  if (relativePath !== "src/layout/AppSidebar.tsx") return source;
+  return source.replace(
+    /\n\s*\{ icon: <PageIcon \/>, name: "Calendar", path: "\/calendar", permission: "calendar\.view" \},/,
+    "",
+  );
+};
 const expect = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -30,17 +37,13 @@ const pageFiles = walkPages(path.join(root, "src/app"));
 const pageRoutes = new Map(pageFiles.map((file) => [routeFromPage(file), file]));
 const sidebar = read("src/layout/AppSidebar.tsx");
 const sidebarRoutes = [...sidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) => match[1]);
-const calendarSidebarRoutes = sidebarRoutes.filter((route) => route === "/calendar");
-const legacySidebarRoutes = sidebarRoutes.filter((route) => route !== "/calendar");
-const uniqueSidebarRoutes = [...new Set(legacySidebarRoutes)];
+const uniqueSidebarRoutes = [...new Set(sidebarRoutes)];
 
-expect(legacySidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
-expect(calendarSidebarRoutes.length === 1, "Calendar sidebar route must exist exactly once");
+expect(sidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
 expect(uniqueSidebarRoutes.length === 79, `UI-2D expects 79 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
 for (const route of uniqueSidebarRoutes) {
   expect(pageRoutes.has(route), `Sidebar route is missing a page.tsx: ${route}`);
 }
-expect(pageRoutes.has("/calendar"), "Calendar sidebar route is missing a page.tsx: /calendar");
 
 for (const route of [
   "/projects",
@@ -62,10 +65,6 @@ for (const route of [
   expect(uniqueSidebarRoutes.includes(route), `Post-audit sidebar route missing: ${route}`);
 }
 
-expect(
-  /name:\s*"Calendar"[\s\S]{0,180}path:\s*"\/calendar"[\s\S]{0,180}permission:\s*"calendar\.view"/.test(sidebar),
-  "Calendar must be a first-class sidebar route protected by calendar.view",
-);
 expect(
   /name:\s*"Google Calendar"[\s\S]{0,180}path:\s*"\/settings\/integrations\/google-calendar"[\s\S]{0,180}permission:\s*"settings\.view"/.test(sidebar),
   "Google Calendar must be discoverable under settings.view navigation",
@@ -135,10 +134,19 @@ for (const relativePath of [
   expect(source.includes("Retry"), `${label} must expose retry behavior for load failures`);
 }
 
+const rawSidebar = fs.readFileSync(path.join(root, "src/layout/AppSidebar.tsx"), "utf8");
+const rawSidebarRoutes = [...rawSidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) => match[1]);
+expect(rawSidebarRoutes.filter((route) => route === "/calendar").length === 1, "Calendar sidebar route must exist exactly once");
+expect(pageRoutes.has("/calendar"), "Calendar sidebar route is missing a page.tsx: /calendar");
+expect(
+  /name:\s*"Calendar"[\s\S]{0,180}path:\s*"\/calendar"[\s\S]{0,180}permission:\s*"calendar\.view"/.test(rawSidebar),
+  "Calendar must be a first-class sidebar route protected by calendar.view",
+);
+
 const nestedRoutes = [...pageRoutes.keys()]
-  .filter((route) => !sidebarRoutes.includes(route))
+  .filter((route) => !uniqueSidebarRoutes.includes(route))
   .filter((route) => /(?:\/new(?:\/|$)|\/edit(?:\/|$)|\/print(?:\/|$)|\[[^/]+\])/.test(route))
   .sort();
 expect(nestedRoutes.length >= 2, "UI-2D must inventory nested new/edit/detail/print routes");
 
-console.log(`PASS: admin full route regression contract (${sidebarRoutes.length} sidebar routes, ${nestedRoutes.length} nested routes)`);
+console.log(`PASS: admin full route regression contract (${uniqueSidebarRoutes.length} sidebar routes, ${nestedRoutes.length} nested routes)`);
