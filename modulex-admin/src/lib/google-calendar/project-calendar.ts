@@ -10,6 +10,7 @@ import {
   getCalendarIntegrationSettings,
   getGeneralTimezone,
   getGoogleCredential,
+  getProjectAdminCalendar,
   getProjectCalendarBinding,
   updateProjectCalendarBinding,
 } from "@/lib/google-calendar/repository";
@@ -93,11 +94,15 @@ export async function ensureProjectCalendar(
     throw new ProjectCalendarError("google_not_configured", "Google Calendar OAuth application is not configured.");
   }
 
-  const [settings, credential, project] = await Promise.all([
+  const [settings, credential, project, adminCalendar] = await Promise.all([
     getCalendarIntegrationSettings(),
     getGoogleCredential(),
     loadProjectContext(projectId),
+    getProjectAdminCalendar(projectId),
   ]);
+  if (!adminCalendar) {
+    throw new ProjectCalendarError("modulex_calendar_missing", "This Project does not have its Modulex Calendar registry row.");
+  }
   if (!settings.enabled) {
     throw new ProjectCalendarError("integration_disabled", "Google Calendar synchronization is disabled.");
   }
@@ -118,6 +123,8 @@ export async function ensureProjectCalendar(
     .from("project_calendar_bindings")
     .insert({
       project_id: projectId,
+      admin_calendar_id: adminCalendar.id,
+      binding_mode: "modulex_created",
       provider: "google",
       provider_calendar_id: created.id,
       provider_calendar_name: created.summary || calendarName,
@@ -181,12 +188,25 @@ export async function resyncProjectCalendar(projectId: string, actorId: string, 
   if (!binding.sync_enabled) {
     throw new ProjectCalendarError("project_sync_disabled", "Project Calendar synchronization is disabled.");
   }
-  const { syncProjectInstallations } = await import("@/lib/google-calendar/installation-projection");
-  const result = await syncProjectInstallations(projectId, actorId, requestUrl);
+  const [{ syncProjectInstallations }, { syncProjectScheduleToGoogle }] = await Promise.all([
+    import("@/lib/google-calendar/installation-projection"),
+    import("@/lib/google-calendar/project-schedule-projection"),
+  ]);
+  const [installations, milestones] = await Promise.all([
+    syncProjectInstallations(projectId, actorId, requestUrl),
+    syncProjectScheduleToGoogle(projectId, actorId, requestUrl),
+  ]);
   await updateProjectCalendarBinding(projectId, {
     last_sync_at: new Date().toISOString(),
     last_error_at: null,
     last_error_code: null,
   });
-  return result;
+  return {
+    total: installations.total + milestones.total,
+    synced: installations.synced + milestones.synced,
+    errors: installations.errors + milestones.errors,
+    skipped: milestones.skipped,
+    installations,
+    milestones,
+  };
 }
