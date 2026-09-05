@@ -9,7 +9,7 @@ import Input from "@/components/form/input/InputField";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
-import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
+import { ADMIN_SURFACE_CARD, ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   Table,
   TableBody,
@@ -515,7 +515,7 @@ export default function ProjectChangeOrdersTab({ projectId, customerId, orders, 
                     .filter((item) => !line.targetOrderId || item.orderId === line.targetOrderId)
                     .map((item) => ({ value: item.id, label: item.label }));
                   return (
-                    <div key={line.key} className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+                    <div key={line.key} className={`${ADMIN_SURFACE_CARD} p-4`}>
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <p className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>Line {index + 1}</p>
                         <Button variant="ghost" size="sm" onClick={() => setLines((current) => current.filter((entry) => entry.key !== line.key))}>Remove</Button>
@@ -612,7 +612,7 @@ export default function ProjectChangeOrdersTab({ projectId, customerId, orders, 
           )}
 
           {detail.status === "submitted" && canReview ? (
-            <div className="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+            <div className={`${ADMIN_SURFACE_CARD} space-y-3 p-4`}>
               <Alert variant="warning" title="Approval authorizes the change only" message="Change Order approval does not update the Order, Procurement, Invoice, or Finance records. Apply it later through the canonical Order revision workflow." />
               <div>
                 <Label htmlFor="pb7-review-note">Review note / cancellation reason</Label>
@@ -627,7 +627,7 @@ export default function ProjectChangeOrdersTab({ projectId, customerId, orders, 
           ) : null}
 
           {detail.status === "draft" && canReview ? (
-            <div className="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+            <div className={`${ADMIN_SURFACE_CARD} space-y-3 p-4`}>
               <Label htmlFor="pb7-draft-cancel-reason">Cancellation reason</Label>
               <Input id="pb7-draft-cancel-reason" value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} />
               <Button variant="outline" onClick={() => void cancel()} disabled={saving}>Cancel Draft</Button>
@@ -635,7 +635,7 @@ export default function ProjectChangeOrdersTab({ projectId, customerId, orders, 
           ) : null}
 
           {detail.status === "approved" ? (
-            <div className="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+            <div className={`${ADMIN_SURFACE_CARD} space-y-4 p-4`}>
               <div>
                 <p className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>Application to canonical Order history</p>
                 <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>Approval does not update the Order. Create/use the normal Order revision first, then explicitly link that canonical revision here.</p>
@@ -681,7 +681,7 @@ export default function ProjectChangeOrdersTab({ projectId, customerId, orders, 
           <div className="space-y-2">
             <p className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>Lifecycle history</p>
             {detail.events.length === 0 ? <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>No lifecycle events recorded.</p> : detail.events.map((event) => (
-              <div key={event.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
+              <div key={event.id} className={`${ADMIN_SURFACE_CARD} flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm`}>
                 <div className="flex items-center gap-2">
                   <Badge color={badgeColor(event.statusAfter)}>{statusLabel(event.eventType)}</Badge>
                   <span className={ADMIN_TEXT_STYLES.body}>{event.note || statusLabel(event.statusAfter)}</span>
