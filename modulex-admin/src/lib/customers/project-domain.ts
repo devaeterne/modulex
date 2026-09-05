@@ -30,6 +30,8 @@ export type CustomerProject = {
   project_address_snapshot: Record<string, unknown> | null;
   start_date: string | null;
   target_date: string | null;
+  planned_delivery_date: string | null;
+  primary_installation_id: string | null;
   completed_at: string | null;
   customer_notes: string | null;
   internal_notes: string | null;
@@ -63,6 +65,14 @@ export type ProjectMutationInput = {
   customerNotes?: string | null;
   internalNotes?: string | null;
   status?: ProjectStatus | null;
+};
+
+export type ProjectScheduleMutationInput = {
+  projectId: string;
+  startDate?: string | null;
+  targetDate?: string | null;
+  plannedDeliveryDate?: string | null;
+  primaryInstallationId?: string | null;
 };
 
 export type CreateProjectInput = ProjectMutationInput & { customerId: string };
@@ -181,6 +191,19 @@ export async function updateCustomerProject(input: UpdateProjectInput): Promise<
     p_customer_notes: nullableText(input.customerNotes),
     p_internal_notes: nullableText(input.internalNotes),
     p_status: input.status ?? null,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function updateCustomerProjectSchedule(input: ProjectScheduleMutationInput): Promise<string> {
+  await requireProjectManager();
+  const { data, error } = await supabase.rpc("set_customer_project_schedule", {
+    p_project_id: input.projectId,
+    p_start_date: nullableText(input.startDate),
+    p_target_date: nullableText(input.targetDate),
+    p_planned_delivery_date: nullableText(input.plannedDeliveryDate),
+    p_primary_installation_id: nullableId(input.primaryInstallationId),
   });
   if (error) throw error;
   return data as string;
