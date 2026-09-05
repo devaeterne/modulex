@@ -354,6 +354,7 @@ export async function createImportedGoogleCalendar(input: {
     .select("id")
     .single();
   assertNoError(calendarError, "Imported Modulex calendar could not be created.");
+  if (!calendar) throw new Error("Imported Modulex calendar could not be created.");
   const adminCalendarId = String(calendar.id);
 
   const { data: binding, error: bindingError } = await supabaseAdmin
@@ -426,6 +427,7 @@ export async function updateImportedCalendarProviderMetadata(input: {
     .select("admin_calendar_id")
     .single();
   assertNoError(bindingError, "Imported Google Calendar metadata could not be updated.");
+  if (!binding) throw new Error("Imported Google Calendar metadata could not be updated.");
 
   const { error: calendarError } = await supabaseAdmin
     .from("admin_calendars")
