@@ -8,13 +8,19 @@ const expect = (ok, message) => { if (!ok) throw new Error(message); };
 
 const adminSqlPath = "sql/a6-finance-vendor-bills.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260905234500_a6_finance_vendor_bills.sql";
+const hardeningSqlPath = "sql/a6-finance-vendor-bills-hardening.sql";
+const hardeningMigrationPath = "../modulex-store/supabase/migrations/20260905234600_a6_finance_vendor_bills_hardening.sql";
 
-expect(exists(adminSqlPath), "A6-F3B Vendor Bills SQL must exist");
-expect(exists(migrationPath), "A6-F3B shared Supabase migration mirror must exist");
+for (const file of [adminSqlPath, migrationPath, hardeningSqlPath, hardeningMigrationPath]) {
+  expect(exists(file), `Missing A6-F3B SQL artifact: ${file}`);
+}
 const sql = read(adminSqlPath);
 const migration = read(migrationPath);
+const hardening = read(hardeningSqlPath);
+const hardeningMigration = read(hardeningMigrationPath);
 const vendorMasterSql = read("sql/a6-finance-vendor-master.sql");
 expect(sql === migration, "A6-F3B Admin SQL and shared migration must stay byte-identical");
+expect(hardening === hardeningMigration, "A6-F3B hardening SQL and migration must stay byte-identical");
 
 expect(/alter\s+table\s+public\.vendor_invoices[\s\S]{0,6000}due_date/i.test(sql), "F3B must extend existing vendor_invoices with due date");
 expect(/alter\s+table\s+public\.vendor_invoices[\s\S]{0,8000}payment_term_id/i.test(sql), "F3B must reuse canonical payment_terms");
@@ -55,6 +61,10 @@ expect(/revoke[\s\S]{0,500}(insert|update|delete|truncate)[\s\S]{0,700}vendor_in
 expect(/customer_project_procurement_invoice_allocations/i.test(sql), "Existing procurement invoice allocation history must be preserved/bridged");
 expect(!/drop\s+table[\s\S]{0,200}customer_project_procurement_invoice_allocations/i.test(sql), "F3B must not replace procurement invoice allocation truth");
 expect(/record_customer_project_procurement_invoice/i.test(sql), "Existing procurement invoice recorder must be extended for AP semantics");
+expect(/vendor_invoice_resolve_vendor_by_code/i.test(hardening) && /vendor_source_identities/i.test(hardening), "F3B hardening must resolve explicitly mapped source identities to canonical Vendors");
+expect(/Preserve source-system snapshot identity/i.test(hardening) && /new\.vendor_code\s*:=\s*btrim\(new\.vendor_code\)/i.test(hardening), "F3B hardening must preserve incoming source vendor snapshots");
+expect(/draft_cancel/i.test(hardening) && !/delete\s+from\s+public\.vendor_invoices/i.test(hardening), "Cancelling a Vendor Bill draft must preserve the source-document header and audit history");
+expect(/tg_op\s*=\s*'DELETE'[\s\S]{0,1200}return\s+old/i.test(hardening), "Bill-line hardening must use explicit DELETE trigger return semantics");
 
 const route = "src/app/(admin)/finance/bills/page.tsx";
 const manager = "src/components/finance/FinanceVendorBillsManager.tsx";
