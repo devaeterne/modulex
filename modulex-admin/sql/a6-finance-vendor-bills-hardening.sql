@@ -1,6 +1,31 @@
 -- A6-F3B hardening:
 --   * preserve incoming procurement/vendor source snapshots while canonical vendor_id owns AP identity;
+--   * allow any explicitly mapped Vendor source identity (including Vendor Catalog) to resolve to canonical AP identity;
+--   * keep Bill-line trigger return semantics explicit for INSERT/UPDATE/DELETE;
 --   * cancelling a draft preserves the AP source-document and audit history instead of deleting it.
+
+create or replace function private.vendor_invoice_resolve_vendor_by_code(p_vendor_code text)
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $function$
+  select x.vendor_id
+  from (
+    select v.id as vendor_id, 0 as priority
+    from public.vendors v
+    where lower(v.code) = lower(btrim($1))
+
+    union all
+
+    select s.vendor_id, 1
+    from public.vendor_source_identities s
+    where lower(s.source_code) = lower(btrim($1))
+  ) x
+  order by x.priority
+  limit 1;
+$function$;
 
 create or replace function private.vendor_invoice_before_insert()
 returns trigger
@@ -87,6 +112,40 @@ begin
 end;
 $function$;
 
+create or replace function private.guard_vendor_invoice_lines()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_invoice_id uuid;
+  v_status text;
+begin
+  if tg_op = 'DELETE' then
+    v_invoice_id := old.invoice_id;
+  else
+    v_invoice_id := new.invoice_id;
+  end if;
+
+  select status into v_status
+  from public.vendor_invoices
+  where id = v_invoice_id;
+
+  if v_status is null then
+    raise exception 'Vendor Bill not found.' using errcode = '23503';
+  end if;
+  if v_status <> 'draft' then
+    raise exception 'Vendor Bill lines may change only while Draft.' using errcode = '23514';
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$function$;
+
 create or replace function private.delete_vendor_invoice_draft(p_invoice_id uuid)
 returns uuid
 language plpgsql
@@ -132,5 +191,7 @@ begin
 end;
 $function$;
 
+revoke all on function private.vendor_invoice_resolve_vendor_by_code(text) from public, anon, authenticated, service_role;
 revoke all on function private.vendor_invoice_before_insert() from public, anon, authenticated, service_role;
+revoke all on function private.guard_vendor_invoice_lines() from public, anon, authenticated, service_role;
 revoke all on function private.delete_vendor_invoice_draft(uuid) from public, anon, authenticated, service_role;
