@@ -655,7 +655,7 @@ export default function ProjectChangeOrdersTab({ projectId, customerId, orders, 
               ) : null}
               {detail.applications.length === 0 ? <p className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>No canonical Order revision has been linked yet.</p> : (
                 <TableViewport>
-                  <Table variant="admin" minWidth="compact">
+                  <Table variant="admin" minWidth="standard">
                     <TableHeader variant="admin">
                       <TableRow>
                         <TableCell isHeader variant="admin">Revision</TableCell>
