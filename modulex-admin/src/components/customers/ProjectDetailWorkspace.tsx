@@ -5,11 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
 import ProjectCalendarTab from "@/components/customers/project-detail/ProjectCalendarTab";
+import ProjectChangeOrdersTab from "@/components/customers/project-detail/ProjectChangeOrdersTab";
 import ProjectFinanceTab from "@/components/customers/project-detail/ProjectFinanceTab";
 import ProjectFulfillmentTab from "@/components/customers/project-detail/ProjectFulfillmentTab";
 import ProjectProcurementTab from "@/components/customers/project-detail/ProjectProcurementTab";
 import ProjectPendingDomainTab from "@/components/customers/project-detail/ProjectPendingDomainTab";
-import ProjectParticipantRoleManager from "@/components/customers/project-detail/ProjectParticipantRoleManager";
 import ProjectParticipantsCommissionPanel from "@/components/customers/project-detail/ProjectParticipantsCommissionPanel";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
@@ -51,7 +51,7 @@ type ProjectStatusHistory = {
 };
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
 
-const PROJECT_TABS = ["Overview", "Orders", "Finance", "Participants & Commission", "Procurement", "Fulfillment", "Calendar", "Documents", "Activity"] as const;
+const PROJECT_TABS = ["Overview", "Orders", "Finance", "Participants & Commission", "Change Orders", "Procurement", "Fulfillment", "Calendar", "Documents", "Activity"] as const;
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const projectStatusOptions: Array<{ value: ProjectStatus; label: string }> = [
@@ -139,6 +139,10 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   const [canManageProcurement, setCanManageProcurement] = useState(false);
   const [canManageProcurementInvoices, setCanManageProcurementInvoices] = useState(false);
   const [canViewParticipantsCommission, setCanViewParticipantsCommission] = useState(false);
+  const [canViewChangeOrders, setCanViewChangeOrders] = useState(false);
+  const [canManageChangeOrders, setCanManageChangeOrders] = useState(false);
+  const [canReviewChangeOrders, setCanReviewChangeOrders] = useState(false);
+  const [canViewChangeOrderCost, setCanViewChangeOrderCost] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
@@ -179,8 +183,12 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   }, [activeOrders]);
 
   const visibleProjectTabs = useMemo(
-    () => PROJECT_TABS.filter((tab) => tab !== "Participants & Commission" || canViewParticipantsCommission),
-    [canViewParticipantsCommission],
+    () => PROJECT_TABS.filter((tab) => {
+      if (tab === "Participants & Commission") return canViewParticipantsCommission;
+      if (tab === "Change Orders") return canViewChangeOrders;
+      return true;
+    }),
+    [canViewChangeOrders, canViewParticipantsCommission],
   );
 
   const load = useCallback(async () => {
@@ -226,6 +234,18 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       const nextCanViewParticipantsCommission = Boolean(
         profile && profile.roles.some((role) => ["super_admin", "admin", "finance"].includes(role)),
       );
+      const nextCanViewChangeOrders = Boolean(
+        profile && profile.roles.some((role) => ["super_admin", "admin", "sales", "finance"].includes(role)),
+      );
+      const nextCanManageChangeOrders = Boolean(
+        profile && profile.roles.some((role) => ["super_admin", "admin", "sales"].includes(role)),
+      );
+      const nextCanReviewChangeOrders = Boolean(
+        profile && profile.roles.some((role) => ["super_admin", "admin"].includes(role)),
+      );
+      const nextCanViewChangeOrderCost = Boolean(
+        profile && profile.roles.some((role) => ["super_admin", "admin", "finance"].includes(role)),
+      );
       let nextProfiles: ProfileOption[] = [];
       if (nextCanManageProjects) {
         const profilesResult = await supabase
@@ -248,6 +268,10 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       setCanManageProcurement(nextCanManageProcurement);
       setCanManageProcurementInvoices(nextCanManageProcurementInvoices);
       setCanViewParticipantsCommission(nextCanViewParticipantsCommission);
+      setCanViewChangeOrders(nextCanViewChangeOrders);
+      setCanManageChangeOrders(nextCanManageChangeOrders);
+      setCanReviewChangeOrders(nextCanReviewChangeOrders);
+      setCanViewChangeOrderCost(nextCanViewChangeOrderCost);
       setStandaloneOrders((ordersResult.data ?? []) as StandaloneOrder[]);
       setProjectActivity((activityResult.data ?? []) as ProjectStatusHistory[]);
       setProjectProfiles(nextProfiles);
@@ -270,8 +294,12 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       setActiveTab("Overview");
       return;
     }
+    if (requestedTab === "Change Orders" && !canViewChangeOrders) {
+      setActiveTab("Overview");
+      return;
+    }
     setActiveTab(requestedTab as ProjectTab);
-  }, [canViewParticipantsCommission, searchParams]);
+  }, [canViewChangeOrders, canViewParticipantsCommission, searchParams]);
 
   useEffect(() => {
     void load();
@@ -489,10 +517,23 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       ) : null}
 
       {activeTab === "Participants & Commission" && canViewParticipantsCommission ? (
-        <div className="space-y-6">
-          <ProjectParticipantsCommissionPanel projectId={project.id} />
-          <ProjectParticipantRoleManager />
-        </div>
+        <ProjectParticipantsCommissionPanel projectId={project.id} />
+      ) : null}
+
+      {activeTab === "Change Orders" && canViewChangeOrders ? (
+        <ProjectChangeOrdersTab
+          projectId={project.id}
+          customerId={project.customer_id}
+          orders={activeOrders.map((order) => ({
+            id: order.id,
+            orderNumber: order.order_number,
+            status: order.status,
+            currencyCode: order.currency_code,
+          }))}
+          canManage={canManageChangeOrders}
+          canReview={canReviewChangeOrders}
+          canViewCost={canViewChangeOrderCost}
+        />
       ) : null}
 
       {activeTab === "Procurement" ? (
