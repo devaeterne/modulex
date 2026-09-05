@@ -139,6 +139,7 @@ const managementItems: NavItem[] = [
       { name: "Expenses", path: "/finance/expenses", permission: "finance.view" },
       { name: "Vendors", path: "/finance/vendors", permission: "finance.view" },
       { name: "Vendor Bills", path: "/finance/bills", permission: "finance.view" },
+      { name: "Vendor Payments", path: "/finance/vendor-payments", permission: "finance.view" },
       { name: "Invoices", path: "/customers/invoices", permission: "invoices.view" },
       { name: "Payroll", path: "/finance/payroll", permission: "finance.view", new: true },
       { name: "Compensation", path: "/finance/compensation", permission: "finance.view" },
