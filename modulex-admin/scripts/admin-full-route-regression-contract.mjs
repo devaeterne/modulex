@@ -88,6 +88,29 @@ expect(materialBands.includes("minWidth="), "Material Bands must use a shared ta
 expect(!/<Table[\s\S]{0,180}min-w-\[\d+px\]/m.test(materialBands), "Material Bands must not use a route-local fixed table width");
 expect(!materialBands.includes('new Intl.NumberFormat("en-US"'), "Material Bands must use runtime locale formatting");
 
+const googleCalendarSettings = read("src/components/settings/GoogleCalendarSettings.tsx");
+expect(googleCalendarSettings.includes("ADMIN_TEXT_STYLES"), "Google Calendar settings must use shared admin text tokens for dark mode");
+expect(
+  /space-y-4[^\n]*ADMIN_TEXT_STYLES\.body/.test(googleCalendarSettings),
+  "Google Calendar connection details must inherit the shared dark-mode body text token",
+);
+expect(!googleCalendarSettings.includes("const [busy, setBusy]"), "Google Calendar must not share one ambiguous busy state across unrelated actions");
+expect(googleCalendarSettings.includes("busyAction"), "Google Calendar must track the active action explicitly");
+expect(googleCalendarSettings.includes("savingSettings"), "Save Settings must derive its loading label from the save action only");
+expect(
+  /savingSettings\s*\?\s*"Saving…"\s*:\s*"Save Settings"/.test(googleCalendarSettings),
+  "Save Settings must not display Saving during OAuth connect/disconnect actions",
+);
+expect(googleCalendarSettings.includes('addEventListener("pageshow"'), "Google Calendar must clear transient OAuth busy state when returning from browser history");
+
+const googleCalendarCallback = read("src/app/api/admin/google-calendar/oauth/callback/route.ts");
+expect(!googleCalendarCallback.includes("Response.redirect("), "Google Calendar callback must not mutate immutable Response.redirect headers");
+expect(
+  /new Response\(null,\s*\{[\s\S]{0,220}status:\s*303[\s\S]{0,220}Location:/m.test(googleCalendarCallback),
+  "Google Calendar callback must build a mutable 303 response with an explicit Location header",
+);
+expect(googleCalendarCallback.includes('"Set-Cookie"'), "Google Calendar callback must clear its OAuth state cookie on the mutable redirect response");
+
 for (const relativePath of [
   "src/components/store/StoreCabinetContentManager.tsx",
   "src/components/store/StoreReviewsManager.tsx",
