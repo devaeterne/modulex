@@ -4,6 +4,13 @@ export const GOOGLE_CALENDAR_SCOPES = [
   "openid",
   "email",
   "https://www.googleapis.com/auth/calendar.app.created",
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+  "https://www.googleapis.com/auth/calendar.events.owned",
+] as const;
+
+export const GOOGLE_CALENDAR_IMPORT_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+  "https://www.googleapis.com/auth/calendar.events.owned",
 ] as const;
 
 export type GoogleCalendarConfig = {
@@ -43,6 +50,11 @@ function resolveRedirectUri(requestUrl?: string) {
   }
 
   throw new Error("Google Calendar redirect URI cannot be resolved.");
+}
+
+export function hasGoogleCalendarImportScopes(grantedScopes: readonly string[] | null | undefined) {
+  const granted = new Set(grantedScopes ?? []);
+  return GOOGLE_CALENDAR_IMPORT_SCOPES.every((scope) => granted.has(scope));
 }
 
 export function isGoogleCalendarConfigured() {
