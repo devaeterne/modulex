@@ -10,7 +10,11 @@ async function handleGet(request: Request) {
   if (auth.response) return auth.response;
 
   try {
-    const calendars = await discoverGoogleCalendars(request.url);
+    const discovered = await discoverGoogleCalendars(request.url);
+    const calendars = discovered.map((calendar) => {
+      const accessRole = calendar.access_role;
+      return { ...calendar, access_role: accessRole };
+    });
     return Response.json({ calendars });
   } catch (error) {
     if (error instanceof GoogleCalendarImportError) {
