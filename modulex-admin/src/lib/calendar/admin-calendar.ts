@@ -130,6 +130,31 @@ export async function listCalendarOwnerOptions(): Promise<AdminCalendarOwnerOpti
   }));
 }
 
+export async function reassignAdminCalendarOwner(input: {
+  calendarId: string;
+  ownerProfileId: string;
+  actorUserId: string;
+}) {
+  const { data: owner, error: ownerError } = await supabaseAdmin
+    .from("profiles")
+    .select("id,is_active")
+    .eq("id", input.ownerProfileId)
+    .maybeSingle();
+  assertNoError(ownerError, "Calendar owner could not be validated.");
+  if (!owner?.is_active) throw new Error("Calendar owner must be an active Modulex user.");
+
+  const { data, error } = await supabaseAdmin
+    .from("admin_calendars")
+    .update({ owner_profile_id: input.ownerProfileId, updated_by: input.actorUserId })
+    .eq("id", input.calendarId)
+    .eq("is_active", true)
+    .select("id,owner_profile_id")
+    .maybeSingle();
+  assertNoError(error, "Calendar owner could not be updated.");
+  if (!data) throw new Error("Calendar was not found.");
+  return { id: String(data.id), owner_profile_id: String(data.owner_profile_id) };
+}
+
 export async function listAdminCalendars(): Promise<AdminCalendarListItem[]> {
   const calendars = await readCalendarRows();
   if (calendars.length === 0) return [];
