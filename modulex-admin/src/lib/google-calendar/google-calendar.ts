@@ -2,6 +2,7 @@ import "server-only";
 
 const CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3/calendars";
 const CALENDAR_LIST_API = "https://www.googleapis.com/calendar/v3/users/me/calendarList";
+const CALENDAR_COLORS_API = "https://www.googleapis.com/calendar/v3/colors";
 
 export class GoogleCalendarProviderError extends Error {
   constructor(
@@ -32,6 +33,11 @@ export type GoogleCalendarListEntry = {
   primary?: boolean;
   selected?: boolean;
   deleted?: boolean;
+};
+
+export type GoogleCalendarColor = {
+  background?: string;
+  foreground?: string;
 };
 
 export type GoogleCalendarEventDate = {
@@ -152,6 +158,16 @@ export async function listGoogleCalendars(input: {
   } while (pageToken);
 
   return calendars;
+}
+
+export async function getGoogleCalendarEventColors(input: {
+  accessToken: string;
+}): Promise<Record<string, GoogleCalendarColor>> {
+  const colors = await googleCalendarRequest<{ event?: Record<string, GoogleCalendarColor> }>({
+    accessToken: input.accessToken,
+    url: CALENDAR_COLORS_API,
+  });
+  return colors.event ?? {};
 }
 
 export async function createGoogleProjectCalendar(input: {
