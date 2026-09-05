@@ -11,6 +11,8 @@ const exists = (file) => fs.existsSync(path.join(root, file));
 
 const migrationPath = "../modulex-store/supabase/migrations/20260905100000_customer_project_change_orders.sql";
 const sqlPath = "sql/project-pb7-change-orders.sql";
+const hardeningMigrationPath = "../modulex-store/supabase/migrations/20260905213000_customer_project_change_orders_security_hardening.sql";
+const hardeningSqlPath = "sql/project-pb7-change-orders-security-hardening.sql";
 const domainPath = "src/lib/customers/project-change-orders-domain.ts";
 const componentPath = "src/components/customers/project-detail/ProjectChangeOrdersTab.tsx";
 const workspacePath = "src/components/customers/ProjectDetailWorkspace.tsx";
@@ -18,6 +20,8 @@ const workspacePath = "src/components/customers/ProjectDetailWorkspace.tsx";
 for (const [file, message] of [
   [migrationPath, "PB-7 canonical migration must exist"],
   [sqlPath, "PB-7 Admin SQL mirror must exist"],
+  [hardeningMigrationPath, "PB-7 security hardening migration must exist"],
+  [hardeningSqlPath, "PB-7 security hardening Admin SQL mirror must exist"],
   [domainPath, "PB-7 client domain must exist"],
   [componentPath, "PB-7 Project tab must exist"],
   [workspacePath, "Project workspace must exist"],
@@ -25,12 +29,15 @@ for (const [file, message] of [
 
 const migration = read(migrationPath);
 const sql = read(sqlPath);
+const hardeningMigration = read(hardeningMigrationPath);
+const hardeningSql = read(hardeningSqlPath);
 const domain = read(domainPath);
 const component = read(componentPath);
 const workspace = read(workspacePath);
-const dbSql = `${migration}\n${sql}`;
+const dbSql = `${migration}\n${sql}\n${hardeningMigration}\n${hardeningSql}`;
 
 assert.equal(migration, sql, "PB-7 Admin SQL mirror and Supabase migration must stay byte-identical");
+assert.equal(hardeningMigration, hardeningSql, "PB-7 hardening Admin SQL mirror and Supabase migration must stay byte-identical");
 
 for (const token of [
   "customer_project_change_orders",
@@ -63,11 +70,25 @@ assert.match(dbSql, /canonical_sell_delta/i, "Application links must snapshot ca
 assert.match(dbSql, /mixed_currency/i, "PB-7 reconciliation/summary must fail closed on mixed currency");
 assert.match(dbSql, /0\.01|0\.0100|<=\s*0\.01/i, "Application reconciliation must use explicit rounding tolerance");
 
+const lineWriteStart = hardeningMigration.toLowerCase().indexOf("set_customer_project_change_order_lines");
+const lineWriteEnd = lineWriteStart >= 0 ? hardeningMigration.toLowerCase().indexOf("link_customer_project_change_order_revision", lineWriteStart) : -1;
+const lineWriteFunction = lineWriteStart >= 0 ? hardeningMigration.slice(lineWriteStart, lineWriteEnd > lineWriteStart ? lineWriteEnd : lineWriteStart + 18000) : "";
+assert.ok(lineWriteFunction.length > 0, "PB-7 line mutation RPC must be present in the hardening migration");
+assert.match(lineWriteFunction, /PROJECT_CHANGE_ORDER_COST_WRITE_FORBIDDEN/i, "Sales must be blocked from writing hidden cost/vendor data");
+assert.match(lineWriteFunction, /can_view_customer_project_change_order_cost/i, "PB-7 line mutation must enforce the internal-cost role boundary at the DB RPC");
+assert.match(lineWriteFunction, /expected_cost_delta[\s\S]*cost_currency_code[\s\S]*vendor_code/i, "PB-7 line mutation guard must cover all hidden internal fields");
+assert.match(lineWriteFunction, /exists[\s\S]*customer_project_change_order_lines[\s\S]*expected_cost_delta[\s\S]*vendor_code/i, "Sales line replacement must fail closed instead of erasing existing hidden cost/vendor detail");
+
 const reviewStart = migration.toLowerCase().indexOf("review_customer_project_change_order");
 const reviewEnd = reviewStart >= 0 ? migration.toLowerCase().indexOf("cancel_customer_project_change_order", reviewStart) : -1;
 const reviewFunction = reviewStart >= 0 ? migration.slice(reviewStart, reviewEnd > reviewStart ? reviewEnd : reviewStart + 12000) : "";
 assert.ok(reviewFunction.length > 0, "PB-7 review RPC must be present");
 assert.doesNotMatch(reviewFunction, /update_customer_order|insert\s+into\s+public\.customer_order_items|update\s+public\.customer_orders|finance_transactions|procurement_commitments/i, "Approving a PB-7 Change Order must not mutate canonical Order/Finance/Procurement truth");
+
+const linkStart = hardeningMigration.toLowerCase().indexOf("link_customer_project_change_order_revision");
+const linkFunction = linkStart >= 0 ? hardeningMigration.slice(linkStart, linkStart + 20000) : "";
+assert.ok(linkFunction.length > 0, "PB-7 canonical revision link RPC must be present in the hardening migration");
+assert.match(linkFunction, /customer_order_revisions[\s\S]*for\s+update/i, "Canonical revision linking must lock the revision row before testing global uniqueness");
 
 assert.match(dbSql, /super_admin[\s\S]*admin[\s\S]*sales[\s\S]*finance/i, "PB-7 read authorization must explicitly cover supported roles");
 assert.match(dbSql, /expected_cost_delta[\s\S]*(?:null|can_view_customer_project_change_order_cost)/i, "Sales projection must sanitize internal cost");
