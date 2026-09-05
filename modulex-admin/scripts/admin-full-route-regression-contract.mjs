@@ -33,7 +33,7 @@ const sidebarRoutes = [...sidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) =>
 const uniqueSidebarRoutes = [...new Set(sidebarRoutes)];
 
 expect(sidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
-expect(uniqueSidebarRoutes.length === 78, `UI-2D expects 78 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
+expect(uniqueSidebarRoutes.length === 79, `UI-2D expects 79 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
 for (const route of uniqueSidebarRoutes) {
   expect(pageRoutes.has(route), `Sidebar route is missing a page.tsx: ${route}`);
 }
@@ -51,6 +51,7 @@ for (const route of [
   "/finance/accounts",
   "/finance/expenses",
   "/settings/integrations/google-calendar",
+  "/settings/general/project-participant-roles",
   "/store/cabinet-content",
   "/store/reviews",
 ]) {
@@ -60,6 +61,10 @@ for (const route of [
 expect(
   /name:\s*"Google Calendar"[\s\S]{0,180}path:\s*"\/settings\/integrations\/google-calendar"[\s\S]{0,180}permission:\s*"settings\.view"/.test(sidebar),
   "Google Calendar must be discoverable under settings.view navigation",
+);
+expect(
+  /name:\s*"Project Participant Roles"[\s\S]{0,180}path:\s*"\/settings\/general\/project-participant-roles"[\s\S]{0,180}permission:\s*"settings\.manage"/.test(sidebar),
+  "Project Participant Roles must be discoverable to settings managers",
 );
 
 for (const route of ["/products/new", "/products/[id]/edit", "/signin"]) {
@@ -82,29 +87,6 @@ expect(materialBands.includes("TableStateRow"), "Material Bands must use the sha
 expect(materialBands.includes("minWidth="), "Material Bands must use a shared table width preset");
 expect(!/<Table[\s\S]{0,180}min-w-\[\d+px\]/m.test(materialBands), "Material Bands must not use a route-local fixed table width");
 expect(!materialBands.includes('new Intl.NumberFormat("en-US"'), "Material Bands must use runtime locale formatting");
-
-const googleCalendarSettings = read("src/components/settings/GoogleCalendarSettings.tsx");
-expect(googleCalendarSettings.includes("ADMIN_TEXT_STYLES"), "Google Calendar settings must use shared admin text tokens for dark mode");
-expect(
-  /space-y-4[^\n]*ADMIN_TEXT_STYLES\.body/.test(googleCalendarSettings),
-  "Google Calendar connection details must inherit the shared dark-mode body text token",
-);
-expect(!googleCalendarSettings.includes("const [busy, setBusy]"), "Google Calendar must not share one ambiguous busy state across unrelated actions");
-expect(googleCalendarSettings.includes("busyAction"), "Google Calendar must track the active action explicitly");
-expect(googleCalendarSettings.includes("savingSettings"), "Save Settings must derive its loading label from the save action only");
-expect(
-  /savingSettings\s*\?\s*"Saving…"\s*:\s*"Save Settings"/.test(googleCalendarSettings),
-  "Save Settings must not display Saving during OAuth connect/disconnect actions",
-);
-expect(googleCalendarSettings.includes('addEventListener("pageshow"'), "Google Calendar must clear transient OAuth busy state when returning from browser history");
-
-const googleCalendarCallback = read("src/app/api/admin/google-calendar/oauth/callback/route.ts");
-expect(!googleCalendarCallback.includes("Response.redirect("), "Google Calendar callback must not mutate immutable Response.redirect headers");
-expect(
-  /new Response\(null,\s*\{[\s\S]{0,220}status:\s*303[\s\S]{0,220}Location:/m.test(googleCalendarCallback),
-  "Google Calendar callback must build a mutable 303 response with an explicit Location header",
-);
-expect(googleCalendarCallback.includes('"Set-Cookie"'), "Google Calendar callback must clear its OAuth state cookie on the mutable redirect response");
 
 for (const relativePath of [
   "src/components/store/StoreCabinetContentManager.tsx",

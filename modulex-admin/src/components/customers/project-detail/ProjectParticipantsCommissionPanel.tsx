@@ -24,8 +24,8 @@ import {
   appendCustomerProjectCommissionEvent,
   createCustomerProjectCommissionObligation,
   deactivateCustomerProjectParticipant,
+  getCustomerProjectCommissionCalculationPreview,
   getCustomerProjectCommissions,
-  getCustomerProjectCommissionBasisPreview,
   getCustomerProjectParticipants,
   getProjectCommissionScopeOptions,
   getProjectParticipantAccess,
@@ -33,6 +33,7 @@ import {
   getProjectParticipantRoles,
   setCustomerProjectParticipant,
   type ProjectCommissionBasisType,
+  type ProjectCommissionCalculationPreview,
   type ProjectCommissionEventType,
   type ProjectCommissionObligation,
   type ProjectCommissionScopeOption,
@@ -78,12 +79,33 @@ function basisLabel(commission: ProjectCommissionObligation) {
   if (commission.basisType === "fixed") {
     return `Fixed ${money(commission.flatAmount ?? commission.baseAmount, commission.currencyCode)}`;
   }
-  return `${commission.rate ?? 0}% × ${money(commission.basisAmount ?? 0, commission.currencyCode)}`;
+  if (commission.basisType === "gross_profit_percentage") {
+    return `${commission.rate ?? 0}% of gross profit ${money(commission.basisAmount ?? 0, commission.currencyCode)}`;
+  }
+  return `${commission.rate ?? 0}% of sales ${money(commission.basisAmount ?? 0, commission.currencyCode)}`;
 }
 
 function payoutLabel(commission: ProjectCommissionObligation) {
   if (commission.paidAmount === null) return "Restricted or currency review required in Finance";
   return money(commission.paidAmount, commission.currencyCode);
+}
+
+function previewIssue(preview: ProjectCommissionCalculationPreview | null, fallback: string | null) {
+  if (preview?.errorCode === "PROJECT_COMMISSION_COST_INCOMPLETE") {
+    const count = preview.missingCostLineCount;
+    return {
+      title: "Incomplete cost data",
+      detail: `${count} scoped Order line${count === 1 ? " is" : "s are"} missing a canonical current product cost. Add product costs before creating a gross-profit commission.`,
+    };
+  }
+  if (preview?.errorCode === "PROJECT_COMMISSION_GROSS_PROFIT_NONPOSITIVE") {
+    return {
+      title: "Gross profit is not positive",
+      detail: "Gross-profit commission requires scoped revenue to exceed canonical product cost.",
+    };
+  }
+  if (fallback) return { title: "Commission preview could not be calculated", detail: fallback };
+  return null;
 }
 
 export default function ProjectParticipantsCommissionPanel({ projectId }: Props) {
@@ -113,9 +135,9 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
   const [commissionScopeType, setCommissionScopeType] = useState<ProjectCommissionScopeType>("project");
   const [commissionScopeId, setCommissionScopeId] = useState("");
   const [commissionFlatAmount, setCommissionFlatAmount] = useState("");
-  const [commissionBasisPreview, setCommissionBasisPreview] = useState<number | null>(null);
-  const [commissionBasisPreviewError, setCommissionBasisPreviewError] = useState<string | null>(null);
-  const [loadingCommissionBasis, setLoadingCommissionBasis] = useState(false);
+  const [commissionPreview, setCommissionPreview] = useState<ProjectCommissionCalculationPreview | null>(null);
+  const [commissionPreviewError, setCommissionPreviewError] = useState<string | null>(null);
+  const [loadingCommissionPreview, setLoadingCommissionPreview] = useState(false);
   const [commissionRate, setCommissionRate] = useState("");
   const [commissionCurrency, setCommissionCurrency] = useState("USD");
   const [commissionDescription, setCommissionDescription] = useState("");
@@ -200,41 +222,42 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
 
   useEffect(() => {
     let active = true;
-    if (commissionBasisType !== "percentage") {
-      setCommissionBasisPreview(null);
-      setCommissionBasisPreviewError(null);
-      setLoadingCommissionBasis(false);
+    if (commissionBasisType === "fixed") {
+      setCommissionPreview(null);
+      setCommissionPreviewError(null);
+      setLoadingCommissionPreview(false);
       return () => { active = false; };
     }
     if (commissionScopeType !== "project" && !commissionScopeId) {
-      setCommissionBasisPreview(null);
-      setCommissionBasisPreviewError(null);
-      setLoadingCommissionBasis(false);
+      setCommissionPreview(null);
+      setCommissionPreviewError(null);
+      setLoadingCommissionPreview(false);
       return () => { active = false; };
     }
     if (!/^[A-Z]{3}$/.test(commissionCurrency.trim().toUpperCase())) {
-      setCommissionBasisPreview(null);
-      setCommissionBasisPreviewError("Enter a valid three-letter currency code.");
-      setLoadingCommissionBasis(false);
+      setCommissionPreview(null);
+      setCommissionPreviewError("Enter a valid three-letter currency code.");
+      setLoadingCommissionPreview(false);
       return () => { active = false; };
     }
 
-    setLoadingCommissionBasis(true);
-    setCommissionBasisPreviewError(null);
-    void getCustomerProjectCommissionBasisPreview({
+    setLoadingCommissionPreview(true);
+    setCommissionPreviewError(null);
+    void getCustomerProjectCommissionCalculationPreview({
       projectId,
+      basisType: commissionBasisType,
       scopeType: commissionScopeType,
       currencyCode: commissionCurrency,
       productCategoryId: commissionScopeType === "category" ? commissionScopeId || null : null,
       productId: commissionScopeType === "product" ? commissionScopeId || null : null,
-    }).then((basis) => {
-      if (active) setCommissionBasisPreview(basis);
-    }).catch((previewError) => {
+    }).then((preview) => {
+      if (active) setCommissionPreview(preview);
+    }).catch((previewErrorValue) => {
       if (!active) return;
-      setCommissionBasisPreview(null);
-      setCommissionBasisPreviewError(previewError instanceof Error ? previewError.message : "Commission basis could not be calculated.");
+      setCommissionPreview(null);
+      setCommissionPreviewError(previewErrorValue instanceof Error ? previewErrorValue.message : "Commission preview could not be calculated.");
     }).finally(() => {
-      if (active) setLoadingCommissionBasis(false);
+      if (active) setLoadingCommissionPreview(false);
     });
 
     return () => { active = false; };
@@ -271,6 +294,19 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
       value: event.eventId,
       label: `${statusLabel(event.eventType)} · ${event.amountDelta > 0 ? "+" : ""}${money(event.amountDelta, selectedCommission?.currencyCode ?? "USD")} · ${displayDateTime(event.createdAt)}`,
     }));
+
+  const numericRate = Number(commissionRate);
+  const estimatedCommission = commissionPreview?.basisAmount !== null
+    && commissionPreview?.basisAmount !== undefined
+    && Number.isFinite(numericRate)
+    && numericRate > 0
+    ? (commissionPreview.basisAmount * numericRate) / 100
+    : null;
+  const previewProblem = previewIssue(commissionPreview, commissionPreviewError);
+  const scopeReady = commissionScopeType === "project" || Boolean(commissionScopeId);
+  const commissionReady = commissionBasisType === "fixed"
+    ? Number(commissionFlatAmount) > 0
+    : Boolean(commissionPreview?.available && commissionPreview.basisAmount !== null && numericRate > 0 && numericRate <= 100);
 
   async function runAction(action: () => Promise<unknown>, successMessage: string) {
     setSaving(true);
@@ -315,7 +351,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
         currencyCode: commissionCurrency,
         scopeType: commissionScopeType,
         flatAmount: commissionBasisType === "fixed" ? Number(commissionFlatAmount) : null,
-        rate: commissionBasisType === "percentage" ? Number(commissionRate) : null,
+        rate: commissionBasisType !== "fixed" ? Number(commissionRate) : null,
         productCategoryId: commissionScopeType === "category" ? commissionScopeId || null : null,
         productId: commissionScopeType === "product" ? commissionScopeId || null : null,
         description: commissionDescription || null,
@@ -357,6 +393,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     <section className="space-y-6" aria-label="Project Participants and Commission">
       {error ? <div role="alert"><Alert variant="error" title="Participants & Commission action failed" message={error} /></div> : null}
       {message ? <div role="status"><Alert variant="success" title="Participants & Commission updated" message={message} /></div> : null}
+
       {canViewParticipants ? (
         <ComponentCard
           title="Participants"
@@ -466,62 +503,108 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
           </TableViewport>
 
           {canManageCommissions ? (
-            <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4`}>
-              <div>
-                <Label htmlFor="pb6-commission-participant">Participant</Label>
-                <Select id="pb6-commission-participant" options={commissionParticipantOptions} value={commissionParticipantId} onChange={setCommissionParticipantId} placeholder="Select participant" />
-              </div>
-              <div>
-                <Label htmlFor="pb6-commission-basis">Basis</Label>
-                <Select id="pb6-commission-basis" options={[{ value: "fixed", label: "Fixed amount" }, { value: "percentage", label: "Percentage" }]} value={commissionBasisType} onChange={(value) => setCommissionBasisType(value as ProjectCommissionBasisType)} />
-              </div>
-              <div>
-                <Label htmlFor="pb6-commission-scope">Scope</Label>
-                <Select
-                  id="pb6-commission-scope"
-                  options={[{ value: "project", label: "Whole Project" }, { value: "category", label: "Project product category" }, { value: "product", label: "Project product" }]}
-                  value={commissionScopeType}
-                  onChange={(value) => { setCommissionScopeType(value as ProjectCommissionScopeType); setCommissionScopeId(""); }}
-                />
-              </div>
-              {commissionScopeType !== "project" ? (
+            <div className={`${ADMIN_SURFACE_CARD} space-y-5 p-5`}>
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div>
-                  <Label htmlFor="pb6-commission-scope-id">{commissionScopeType === "category" ? "Category" : "Product"}</Label>
-                  <Select id="pb6-commission-scope-id" options={scopeSelectOptions} value={commissionScopeId} onChange={setCommissionScopeId} placeholder={scopeSelectOptions.length > 0 ? "Select Project scope" : "No matching Project scope"} allowEmpty />
+                  <Label htmlFor="pb6-commission-participant">Participant</Label>
+                  <Select id="pb6-commission-participant" options={commissionParticipantOptions} value={commissionParticipantId} onChange={setCommissionParticipantId} placeholder="Select participant" />
                 </div>
-              ) : null}
-              {commissionBasisType === "fixed" ? (
                 <div>
-                  <Label htmlFor="pb6-commission-flat">Fixed amount</Label>
-                  <Input id="pb6-commission-flat" type="number" min="0" step="0.01" value={commissionFlatAmount} onChange={(event) => setCommissionFlatAmount(event.target.value)} />
+                  <Label htmlFor="pb6-commission-basis">Commission method</Label>
+                  <Select
+                    id="pb6-commission-basis"
+                    options={[
+                      { value: "fixed", label: "Fixed amount" },
+                      { value: "percentage", label: "Sales %" },
+                      { value: "gross_profit_percentage", label: "Gross profit %" },
+                    ]}
+                    value={commissionBasisType}
+                    onChange={(value) => setCommissionBasisType(value as ProjectCommissionBasisType)}
+                  />
                 </div>
-              ) : (
-                <>
-                  <div className={`${ADMIN_SURFACE_CARD} p-3`}>
-                    <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Commission basis</p>
-                    <p className="font-medium">{loadingCommissionBasis ? "Calculating…" : commissionBasisPreview !== null ? money(commissionBasisPreview, commissionCurrency) : "Unavailable"}</p>
-                    {commissionBasisPreviewError ? <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{commissionBasisPreviewError}</p> : null}
+                <div>
+                  <Label htmlFor="pb6-commission-scope">Scope</Label>
+                  <Select
+                    id="pb6-commission-scope"
+                    options={[
+                      { value: "project", label: "Whole Project" },
+                      { value: "category", label: "Project product category" },
+                      { value: "product", label: "Project product" },
+                    ]}
+                    value={commissionScopeType}
+                    onChange={(value) => { setCommissionScopeType(value as ProjectCommissionScopeType); setCommissionScopeId(""); }}
+                  />
+                </div>
+                {commissionScopeType !== "project" ? (
+                  <div>
+                    <Label htmlFor="pb6-commission-scope-id">{commissionScopeType === "category" ? "Category" : "Product"}</Label>
+                    <Select id="pb6-commission-scope-id" options={scopeSelectOptions} value={commissionScopeId} onChange={setCommissionScopeId} placeholder={scopeSelectOptions.length > 0 ? "Select Project scope" : "No matching Project scope"} allowEmpty />
                   </div>
+                ) : null}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {commissionBasisType === "fixed" ? (
+                  <div>
+                    <Label htmlFor="pb6-commission-flat">Fixed amount</Label>
+                    <Input id="pb6-commission-flat" type="number" min="0" step="0.01" value={commissionFlatAmount} onChange={(event) => setCommissionFlatAmount(event.target.value)} />
+                  </div>
+                ) : (
                   <div>
                     <Label htmlFor="pb6-commission-rate">Rate %</Label>
                     <Input id="pb6-commission-rate" type="number" min="0" max="100" step="0.01" value={commissionRate} onChange={(event) => setCommissionRate(event.target.value)} />
                   </div>
-                  <div className={`${ADMIN_SURFACE_CARD} p-3`}>
-                    <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Estimated commission</p>
-                    <p className="font-medium">{commissionBasisPreview !== null && Number(commissionRate) > 0 ? money((commissionBasisPreview * Number(commissionRate)) / 100, commissionCurrency) : "—"}</p>
+                )}
+                <div>
+                  <Label htmlFor="pb6-commission-currency">Currency</Label>
+                  <Input id="pb6-commission-currency" maxLength={3} value={commissionCurrency} onChange={(event) => setCommissionCurrency(event.target.value.toUpperCase())} />
+                </div>
+                <div className="md:col-span-2">
+                  <Label htmlFor="pb6-commission-description">Description</Label>
+                  <Input id="pb6-commission-description" value={commissionDescription} onChange={(event) => setCommissionDescription(event.target.value)} />
+                </div>
+              </div>
+
+              {commissionBasisType !== "fixed" ? (
+                <div className={`${ADMIN_SURFACE_CARD} space-y-4 p-4`}>
+                  <div>
+                    <p className="font-medium">Commission Preview</p>
+                    <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Calculated from canonical Project Order and product-cost data. The DB recalculates the snapshot again when the obligation is created.</p>
                   </div>
-                </>
-              )}
-              <div>
-                <Label htmlFor="pb6-commission-currency">Currency</Label>
-                <Input id="pb6-commission-currency" maxLength={3} value={commissionCurrency} onChange={(event) => setCommissionCurrency(event.target.value.toUpperCase())} />
-              </div>
-              <div>
-                <Label htmlFor="pb6-commission-description">Description</Label>
-                <Input id="pb6-commission-description" value={commissionDescription} onChange={(event) => setCommissionDescription(event.target.value)} />
-              </div>
-              <div className="flex justify-end md:col-span-2 xl:col-span-4">
-                <Button disabled={saving || !commissionParticipantId || (commissionScopeType !== "project" && !commissionScopeId) || (commissionBasisType === "percentage" && (loadingCommissionBasis || commissionBasisPreview === null))} onClick={() => void createCommission()}>{saving ? "Saving…" : "Create Pending Commission"}</Button>
+
+                  {loadingCommissionPreview ? <p role="status" className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Calculating commission preview…</p> : null}
+
+                  {!loadingCommissionPreview && previewProblem ? (
+                    <div role="status" className="space-y-1">
+                      <p className="font-medium">{previewProblem.title}</p>
+                      <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>{previewProblem.detail}</p>
+                    </div>
+                  ) : null}
+
+                  {!loadingCommissionPreview && commissionPreview?.available && commissionBasisType === "percentage" ? (
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Sales basis</p><p className="font-medium">{money(commissionPreview.revenueAmount, commissionPreview.currencyCode)}</p></div>
+                      <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Rate</p><p className="font-medium">{numericRate > 0 ? `${numericRate}%` : "—"}</p></div>
+                      <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Estimated commission</p><p className="font-medium">{estimatedCommission !== null ? money(estimatedCommission, commissionPreview.currencyCode) : "—"}</p></div>
+                    </div>
+                  ) : null}
+
+                  {!loadingCommissionPreview && commissionPreview?.available && commissionBasisType === "gross_profit_percentage" ? (
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                      <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Scoped sales</p><p className="font-medium">{money(commissionPreview.revenueAmount, commissionPreview.currencyCode)}</p></div>
+                      <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Product cost</p><p className="font-medium">{commissionPreview.costAmount !== null ? money(commissionPreview.costAmount, commissionPreview.currencyCode) : "—"}</p></div>
+                      <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Gross profit</p><p className="font-medium">{commissionPreview.basisAmount !== null ? money(commissionPreview.basisAmount, commissionPreview.currencyCode) : "—"}</p></div>
+                      <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Rate</p><p className="font-medium">{numericRate > 0 ? `${numericRate}%` : "—"}</p></div>
+                      <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Estimated commission</p><p className="font-medium">{estimatedCommission !== null ? money(estimatedCommission, commissionPreview.currencyCode) : "—"}</p></div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="flex justify-end">
+                <Button disabled={saving || !commissionParticipantId || !scopeReady || !commissionReady} onClick={() => void createCommission()}>
+                  {saving ? "Saving…" : "Create Pending Commission"}
+                </Button>
               </div>
             </div>
           ) : null}
