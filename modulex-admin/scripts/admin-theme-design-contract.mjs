@@ -39,8 +39,9 @@ expect(
 );
 
 const globals = read("src/app/globals.css");
+const bodyBlock = globals.match(/body\s*\{([^}]*)\}/m)?.[1] ?? "";
 expect(
-  /body\s*\{[\s\S]*?@apply[^;]*text-gray-700[^;]*dark:text-gray-300[^;]*;/m.test(globals),
+  bodyBlock.includes("text-gray-700") && bodyBlock.includes("dark:text-gray-300"),
   "Admin body must provide a theme-aware default foreground so unstyled text cannot fall back to black in dark mode",
 );
 
