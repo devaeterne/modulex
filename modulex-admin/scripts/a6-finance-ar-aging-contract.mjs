@@ -108,7 +108,7 @@ expect(/count\(\*\)\s+over\s*\(\)/i.test(invoicePage), "Invoice balance drill-do
 const history = functionBlock(sql, "private.get_customer_payment_history_page");
 expect(/customer_receipt/i.test(history), "Customer Payment History must be built from canonical Customer Receipts");
 expect(/reversal/i.test(history), "Customer Payment History must expose receipt corrections/reversals");
-expect(/status/i.test(history) && /voided/i.test(history), "Customer Payment History must preserve voided receipt history");
+expect(/t\.status/i.test(history) && !/t\.status\s*=\s*'posted'/i.test(history), "Customer Payment History must preserve voided/non-posted receipt status history instead of filtering to posted only");
 expect(/base_amount/i.test(history) && /base_currency_code/i.test(history), "Customer Payment History must use stored Finance transaction-time base/FX snapshots");
 expect(/customer_project_payment_finance_links/i.test(history), "Customer Payment History may expose Project bridge attribution for a canonical Finance receipt");
 expect(!/union[\s\S]{0,400}customer_project_payment_transactions/i.test(history), "Customer Payment History must not double-count Project payment rows as a second cash ledger");
