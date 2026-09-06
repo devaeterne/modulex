@@ -17,6 +17,7 @@ import type { Customer, CustomerInvoice, CustomerInvoiceItem, CustomerInvoiceSta
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettings } from "@/lib/settings/types";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { parseDbDecimal } from "@/lib/validation";
 
 type LedgerAwareInvoice = CustomerInvoice & { ledger_managed?: boolean };
 
@@ -130,7 +131,7 @@ export default function CustomerInvoiceDetail() {
     setCustomer(customerResult.data as Customer);
     setProjectId(nextProjectId);
     if (!settingsResult.error && settingsResult.data) setSettings(settingsResult.data as GeneralSettings);
-    setPaidAmount(String(Number(loadedInvoice.paid_amount ?? 0)));
+    setPaidAmount(String(loadedInvoice.paid_amount ?? 0));
     setPendingApprovals(approvalsResult.error ? 0 : approvalsResult.count ?? 0);
     setIsLoading(false);
   }
@@ -144,19 +145,24 @@ export default function CustomerInvoiceDetail() {
     return Math.max(Number(invoice.total_amount ?? 0) - Number(invoice.paid_amount ?? 0), 0);
   }, [invoice]);
 
-  async function updateState(status?: CustomerInvoiceStatus, explicitPaid?: number) {
+  async function updateState(status?: CustomerInvoiceStatus, explicitPaid?: string | number) {
     if (!invoice || !canManage || isSaving) return;
     setErrorMessage(null);
     setSuccessMessage(null);
     setIsSaving(true);
 
-    const amount = invoice.ledger_managed || !canManagePayments
-      ? null
-      : explicitPaid ?? (paidAmount.trim() ? Number(paidAmount) : null);
-    if (amount !== null && (!Number.isFinite(amount) || amount < 0 || amount > Number(invoice.total_amount))) {
-      setErrorMessage("Paid amount must be between zero and invoice total.");
-      setIsSaving(false);
-      return;
+    let amount: string | null = null;
+    if (!invoice.ledger_managed && canManagePayments) {
+      const rawAmount = explicitPaid ?? (paidAmount.trim() ? paidAmount : null);
+      if (rawAmount !== null) {
+        const parsedAmount = parseDbDecimal(rawAmount, { precision: 18, scale: 4, min: 0 });
+        if (parsedAmount.error || parsedAmount.value === null) {
+          setErrorMessage(parsedAmount.error ?? "Enter a valid paid amount.");
+          setIsSaving(false);
+          return;
+        }
+        amount = parsedAmount.value;
+      }
     }
 
     const { data, error } = await supabase.rpc("update_customer_invoice_state", {
@@ -305,9 +311,9 @@ export default function CustomerInvoiceDetail() {
             {invoice.status === "draft" ? <Button disabled={isSaving} onClick={() => void updateState("issued")}>Issue Invoice</Button> : null}
             {!ledgerManaged && canManagePayments && !["draft", "void"].includes(invoice.status) ? (
               <>
-                <div className="w-44"><Label htmlFor="invoice-paid-amount">Paid amount</Label><Input id="invoice-paid-amount" type="number" min="0" max={Number(invoice.total_amount)} step="0.01" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} /></div>
+                <div className="w-44"><Label htmlFor="invoice-paid-amount">Paid amount</Label><Input id="invoice-paid-amount" type="number" min="0" max={String(invoice.total_amount)} step="0.0001" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} /></div>
                 <Button variant="outline" disabled={isSaving} onClick={() => void updateState()}>Save Payment</Button>
-                {invoice.status !== "paid" ? <Button disabled={isSaving} onClick={() => void updateState("paid", Number(invoice.total_amount))}>Mark Paid</Button> : null}
+                {invoice.status !== "paid" ? <Button disabled={isSaving} onClick={() => void updateState("paid", invoice.total_amount)}>Mark Paid</Button> : null}
               </>
             ) : null}
             {!ledgerManaged && !canManagePayments && !["draft", "void"].includes(invoice.status) ? <FormHint>Customer payment entry is Finance/Admin-only.</FormHint> : null}
