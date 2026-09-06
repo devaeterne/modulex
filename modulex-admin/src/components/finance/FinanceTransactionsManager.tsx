@@ -22,7 +22,6 @@ import {
   getFinanceTransactionsPage,
   postFinanceTransaction,
   reverseFinanceTransaction,
-  setFinanceTransactionLinks,
   voidFinanceTransaction,
   type FinanceAccount,
   type FinanceCategory,
@@ -32,6 +31,7 @@ import {
   type FinanceTransactionKind,
   type FinanceTransactionStatus,
 } from "@/lib/finance/core";
+import { saveEmployeePaymentDraft } from "@/lib/finance/payroll";
 
 const kindOptions = [
   { value: "customer_receipt", label: "Customer receipt" },
@@ -131,6 +131,20 @@ export default function FinanceTransactionsManager() {
   }, []);
 
   useEffect(() => {
+    if (!canManage) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("kind") !== "employee_payment") return;
+    const prefillEmployeeId = params.get("employeeId")?.trim() || "";
+    const prefillPayrollItemId = params.get("payrollItemId")?.trim() || "";
+    const prefillAmount = params.get("amount")?.trim() || "";
+    if (!prefillEmployeeId) return;
+    setKind("employee_payment");
+    setEmployeeId(prefillEmployeeId);
+    setPayrollItemId(prefillPayrollItemId);
+    if (prefillAmount) setAmount(prefillAmount);
+  }, [canManage]);
+
+  useEffect(() => {
     if (kind !== "employee_payment" || !employeeId || !canManage) {
       setPayrollItems([]);
       setPayrollItemId("");
@@ -139,10 +153,10 @@ export default function FinanceTransactionsManager() {
     void getFinanceEmployeePayrollItems(employeeId)
       .then((items) => {
         setPayrollItems(items);
-        if (payrollItemId && !items.some((item) => item.payroll_item_id === payrollItemId)) setPayrollItemId("");
+        setPayrollItemId((current) => current && items.some((item) => item.payroll_item_id === current) ? current : "");
       })
       .catch((error) => setMessage({ variant: "error", text: error instanceof Error ? error.message : "Payroll items could not be loaded." }));
-  }, [canManage, employeeId, kind, payrollItemId]);
+  }, [canManage, employeeId, kind]);
 
   const activeAccounts = useMemo(() => accounts.filter((account) => account.is_active), [accounts]);
   const accountOptions = useMemo(() => activeAccounts.map((account) => ({ value: account.id, label: `${account.name} · ${account.currency_code}` })), [activeAccounts]);
@@ -208,27 +222,32 @@ export default function FinanceTransactionsManager() {
     }
 
     setBusyId("create");
-    let createdTransactionId: string | null = null;
     try {
-      createdTransactionId = await createFinanceTransactionDraft({
-        transactionKind: kind,
-        sourceAccountId: sourceAccountId || null,
-        destinationAccountId: destinationAccountId || null,
-        categoryId: categoryId || null,
-        amount: numericAmount,
-        currencyCode,
-        transactionAt: new Date(transactionAt).toISOString(),
-        referenceNo,
-        notes,
-      });
-
+      const transactionTime = new Date(transactionAt).toISOString();
       if (kind === "employee_payment") {
-        await setFinanceTransactionLinks(createdTransactionId, [{
-          employee_id: employeeId,
-          source_document_type: payrollItemId ? "hr_payroll_item" : null,
-          source_document_id: payrollItemId || null,
-          allocated_amount: numericAmount,
-        }]);
+        await saveEmployeePaymentDraft({
+          sourceAccountId,
+          amount: numericAmount,
+          currencyCode,
+          transactionAt: transactionTime,
+          referenceNo,
+          notes,
+          employeeId,
+          sourceDocumentType: payrollItemId ? "hr_payroll_item" : null,
+          sourceDocumentId: payrollItemId || null,
+        });
+      } else {
+        await createFinanceTransactionDraft({
+          transactionKind: kind,
+          sourceAccountId: sourceAccountId || null,
+          destinationAccountId: destinationAccountId || null,
+          categoryId: categoryId || null,
+          amount: numericAmount,
+          currencyCode,
+          transactionAt: transactionTime,
+          referenceNo,
+          notes,
+        });
       }
 
       setAmount("");
@@ -237,11 +256,10 @@ export default function FinanceTransactionsManager() {
       setEmployeeId("");
       setPayrollItemId("");
       setPayrollItems([]);
-      setMessage({ variant: "success", text: kind === "employee_payment" ? "Employee Finance draft created and linked. It does not affect Payroll settlement until posted." : "Finance draft created. It does not affect balances until posted." });
+      setMessage({ variant: "success", text: kind === "employee_payment" ? "Employee Finance draft created atomically with its Employee/Payroll attribution. It does not affect Payroll settlement until posted." : "Finance draft created. It does not affect balances until posted." });
       await load(0);
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "Finance draft could not be created.";
-      setMessage({ variant: "error", text: createdTransactionId ? `Finance draft ${createdTransactionId} was created, but its Employee/Payroll link failed: ${detail}. Delete the draft before retrying.` : detail });
+      setMessage({ variant: "error", text: error instanceof Error ? error.message : "Finance draft could not be created." });
     } finally {
       setBusyId(null);
     }
@@ -336,7 +354,7 @@ export default function FinanceTransactionsManager() {
               <>
                 <div><Label htmlFor="finance-employee">Employee</Label><Select id="finance-employee" options={employeeOptions} value={employeeId} placeholder="Select Employee" onChange={chooseEmployee} /></div>
                 <div className="md:col-span-2 xl:col-span-3"><Label htmlFor="finance-payroll-item">Payroll Item (optional salary allocation)</Label><Select id="finance-payroll-item" options={payrollItemOptions} value={payrollItemId} allowEmpty placeholder={employeeId ? "No Payroll Item / other employee payment" : "Select Employee first"} onChange={choosePayrollItem} /></div>
-                <div className="md:col-span-2 xl:col-span-4"><Alert variant="info" title="Single payment record" message="This creates only one Finance payment. If a Payroll Item is selected, Personnel/Payroll derives Finance Paid, Remaining and payment status from the posted Finance history." /></div>
+                <div className="md:col-span-2 xl:col-span-4"><Alert variant="info" title="Single payment record" message="Employee Payment draft and its attribution are saved atomically. If a Payroll Item is selected, Personnel/Payroll derives Finance Paid, Remaining and payment status from posted Finance history." /></div>
               </>
             ) : null}
             <div className="md:col-span-2 xl:col-span-4"><Label htmlFor="finance-notes">Notes</Label><TextArea id="finance-notes" value={notes} onChange={setNotes} rows={2} /></div>
