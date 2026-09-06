@@ -1,23 +1,104 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import StatTile from "@/components/common/StatTile";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
 
-type Employee={id:string;employee_number:string;first_name:string;last_name:string};
-type Review={id:string;employee_id:string;reviewer_id:string|null;review_type:string;period_start:string|null;period_end:string|null;review_date:string|null;overall_rating:number|null;goals:string|null;strengths:string|null;development_areas:string|null;manager_comments:string|null;employee_comments:string|null;status:string};
-const input="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const area="min-h-24 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const card="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]";
+type Employee = { id: string; employee_number: string; first_name: string; last_name: string };
+type Review = { id: string; employee_id: string; reviewer_id: string | null; review_type: string; period_start: string | null; period_end: string | null; review_date: string | null; overall_rating: number | null; goals: string | null; strengths: string | null; development_areas: string | null; manager_comments: string | null; employee_comments: string | null; status: string };
+type Notice = { variant: "success" | "error"; title: string; message: string };
 
-export default function PerformanceManager(){
- const [employees,setEmployees]=useState<Employee[]>([]);const [reviews,setReviews]=useState<Review[]>([]);const [employeeId,setEmployeeId]=useState("");const [reviewerId,setReviewerId]=useState("");const [reviewType,setReviewType]=useState("annual");const [periodStart,setPeriodStart]=useState("");const [periodEnd,setPeriodEnd]=useState("");const [reviewDate,setReviewDate]=useState(new Date().toISOString().slice(0,10));const [rating,setRating]=useState("");const [goals,setGoals]=useState("");const [strengths,setStrengths]=useState("");const [development,setDevelopment]=useState("");const [comments,setComments]=useState("");const [message,setMessage]=useState<string|null>(null);
- async function load(){const [e,r]=await Promise.all([supabase.from("hr_employees").select("id,employee_number,first_name,last_name").order("last_name"),supabase.from("hr_performance_reviews").select("id,employee_id,reviewer_id,review_type,period_start,period_end,review_date,overall_rating,goals,strengths,development_areas,manager_comments,employee_comments,status").order("review_date",{ascending:false}).limit(300)]);if(e.error)throw e.error;if(r.error)throw r.error;const es=(e.data??[]) as Employee[];setEmployees(es);setReviews((r.data??[]) as Review[]);if(!employeeId&&es[0])setEmployeeId(es[0].id);}
- useEffect(()=>{void load().catch(e=>setMessage(e instanceof Error?e.message:"Performance reviews could not be loaded.")); // eslint-disable-next-line react-hooks/exhaustive-deps
- },[]);
- async function save(ev:FormEvent){ev.preventDefault();const {error}=await supabase.from("hr_performance_reviews").insert({employee_id:employeeId,reviewer_id:reviewerId||null,review_type:reviewType,period_start:periodStart||null,period_end:periodEnd||null,review_date:reviewDate||null,overall_rating:rating?Number(rating):null,goals:goals.trim()||null,strengths:strengths.trim()||null,development_areas:development.trim()||null,manager_comments:comments.trim()||null,status:"completed"});if(error)return setMessage(error.message);setRating("");setGoals("");setStrengths("");setDevelopment("");setComments("");setMessage("Performance review saved.");await load();}
- async function remove(id:string){if(!window.confirm("Delete this review?"))return;const {error}=await supabase.from("hr_performance_reviews").delete().eq("id",id);if(error)setMessage(error.message);else await load();}
- const employeeMap=useMemo(()=>new Map(employees.map(e=>[e.id,`${e.employee_number} · ${e.first_name} ${e.last_name}`])),[employees]);const selected=employeeId?reviews.filter(r=>r.employee_id===employeeId):reviews;const average=reviews.filter(r=>r.overall_rating!=null).reduce((s,r)=>s+Number(r.overall_rating),0)/(reviews.filter(r=>r.overall_rating!=null).length||1);
- return <div className="space-y-6"><div><h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">Performance</h1><p className="mt-1 text-sm text-gray-500">Probation, periodic and annual performance reviews with goals and development areas.</p></div>{message&&<div className={card+" text-sm"}>{message}</div>}<div className="grid gap-4 sm:grid-cols-2"><div className={card}><p className="text-sm text-gray-500">Completed reviews</p><p className="mt-2 text-2xl font-semibold">{reviews.filter(r=>r.status==="completed").length}</p></div><div className={card}><p className="text-sm text-gray-500">Average rating</p><p className="mt-2 text-2xl font-semibold">{average.toFixed(2)} / 5</p></div></div>
- <div className="grid gap-6 xl:grid-cols-[420px_1fr]"><form onSubmit={save} className={card+" space-y-3"}><h2 className="font-semibold text-gray-800 dark:text-white/90">New Review</h2><select className={input} value={employeeId} onChange={e=>setEmployeeId(e.target.value)}>{employees.map(e=><option key={e.id} value={e.id}>{e.employee_number} · {e.first_name} {e.last_name}</option>)}</select><select className={input} value={reviewerId} onChange={e=>setReviewerId(e.target.value)}><option value="">Reviewer not specified</option>{employees.filter(e=>e.id!==employeeId).map(e=><option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}</select><div className="grid grid-cols-2 gap-3"><select className={input} value={reviewType} onChange={e=>setReviewType(e.target.value)}>{["probation","quarterly","semiannual","annual","ad_hoc"].map(x=><option key={x} value={x}>{x.replace("_"," ")}</option>)}</select><input className={input} type="number" min="0" max="5" step="0.1" placeholder="Rating 0-5" value={rating} onChange={e=>setRating(e.target.value)}/></div><div className="grid grid-cols-2 gap-3"><input className={input} type="date" value={periodStart} onChange={e=>setPeriodStart(e.target.value)}/><input className={input} type="date" value={periodEnd} onChange={e=>setPeriodEnd(e.target.value)}/></div><input className={input} type="date" value={reviewDate} onChange={e=>setReviewDate(e.target.value)}/><textarea className={area} placeholder="Goals" value={goals} onChange={e=>setGoals(e.target.value)}/><textarea className={area} placeholder="Strengths" value={strengths} onChange={e=>setStrengths(e.target.value)}/><textarea className={area} placeholder="Development areas" value={development} onChange={e=>setDevelopment(e.target.value)}/><textarea className={area} placeholder="Manager comments" value={comments} onChange={e=>setComments(e.target.value)}/><button className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white">Save Review</button></form>
- <div className={card+" overflow-hidden p-0"}><div className="border-b border-gray-200 p-4 dark:border-gray-800"><select className={input+" max-w-md"} value={employeeId} onChange={e=>setEmployeeId(e.target.value)}><option value="">All employees</option>{employees.map(e=><option key={e.id} value={e.id}>{e.employee_number} · {e.first_name} {e.last_name}</option>)}</select></div><div className="divide-y divide-gray-100 dark:divide-gray-800">{selected.map(r=><div key={r.id} className="p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold text-gray-800 dark:text-white/90">{employeeMap.get(r.employee_id)||r.employee_id}</h3><p className="text-xs capitalize text-gray-500">{r.review_type.replace("_"," ")} · {r.review_date||"No date"} · {r.status}</p></div><div className="flex items-center gap-3">{r.overall_rating!=null&&<span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-700">{Number(r.overall_rating).toFixed(1)} / 5</span>}<button onClick={()=>void remove(r.id)} className="text-xs text-error-600">Delete</button></div></div>{r.strengths&&<p className="mt-3 text-sm"><b>Strengths:</b> {r.strengths}</p>}{r.development_areas&&<p className="mt-2 text-sm"><b>Development:</b> {r.development_areas}</p>}{r.goals&&<p className="mt-2 text-sm"><b>Goals:</b> {r.goals}</p>}{r.manager_comments&&<p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{r.manager_comments}</p>}</div>)}{selected.length===0&&<div className="p-10 text-center text-sm text-gray-500">No performance reviews.</div>}</div></div></div></div>;
+function labelize(value: string) { return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+function formatDate(value: string | null) { if (!value) return "—"; const [year, month, day] = value.split("-"); return year && month && day ? `${day}.${month}.${year}` : value; }
+
+export default function PerformanceManager() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [employeeId, setEmployeeId] = useState("");
+  const [reviewerId, setReviewerId] = useState("");
+  const [reviewType, setReviewType] = useState("annual");
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
+  const [reviewDate, setReviewDate] = useState(new Date().toISOString().slice(0, 10));
+  const [rating, setRating] = useState("");
+  const [goals, setGoals] = useState("");
+  const [strengths, setStrengths] = useState("");
+  const [development, setDevelopment] = useState("");
+  const [comments, setComments] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+
+  function fail(title: string, message: string, error: unknown) { console.error(title, error); setNotice({ variant: "error", title, message }); }
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [e, r] = await Promise.all([
+        supabase.from("hr_employees").select("id,employee_number,first_name,last_name").order("last_name"),
+        supabase.from("hr_performance_reviews").select("id,employee_id,reviewer_id,review_type,period_start,period_end,review_date,overall_rating,goals,strengths,development_areas,manager_comments,employee_comments,status").order("review_date", { ascending: false }).limit(300),
+      ]);
+      if (e.error) throw e.error; if (r.error) throw r.error;
+      const nextEmployees = (e.data ?? []) as Employee[];
+      setEmployees(nextEmployees); setReviews((r.data ?? []) as Review[]);
+      if (!employeeId && nextEmployees[0]) setEmployeeId(nextEmployees[0].id);
+    } catch (error) { fail("Performance unavailable", "Performance reviews could not be loaded. Please try again.", error); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  async function save(event: FormEvent) {
+    event.preventDefault(); setBusy("save"); setNotice(null);
+    const { error } = await supabase.from("hr_performance_reviews").insert({ employee_id: employeeId, reviewer_id: reviewerId || null, review_type: reviewType, period_start: periodStart || null, period_end: periodEnd || null, review_date: reviewDate || null, overall_rating: rating ? Number(rating) : null, goals: goals.trim() || null, strengths: strengths.trim() || null, development_areas: development.trim() || null, manager_comments: comments.trim() || null, status: "completed" });
+    if (error) fail("Review not saved", "The performance review could not be saved. Please try again.", error);
+    else { setRating(""); setGoals(""); setStrengths(""); setDevelopment(""); setComments(""); setNotice({ variant: "success", title: "Review saved", message: "The completed performance review was recorded." }); await load(); }
+    setBusy(null);
+  }
+
+  async function remove(id: string) {
+    setBusy(id); setNotice(null);
+    const { error } = await supabase.from("hr_performance_reviews").delete().eq("id", id);
+    if (error) fail("Review not deleted", "The performance review could not be deleted. Please try again.", error);
+    else { setDeleteCandidateId(null); setNotice({ variant: "success", title: "Review deleted", message: "The performance review was removed." }); await load(); }
+    setBusy(null);
+  }
+
+  const employeeOptions = employees.map((employee) => ({ value: employee.id, label: `${employee.employee_number} · ${employee.first_name} ${employee.last_name}` }));
+  const reviewerOptions = employees.filter((employee) => employee.id !== employeeId).map((employee) => ({ value: employee.id, label: `${employee.first_name} ${employee.last_name}` }));
+  const employeeMap = useMemo(() => new Map(employees.map((employee) => [employee.id, `${employee.employee_number} · ${employee.first_name} ${employee.last_name}`])), [employees]);
+  const selected = employeeId ? reviews.filter((review) => review.employee_id === employeeId) : reviews;
+  const rated = reviews.filter((review) => review.overall_rating != null);
+  const average = rated.reduce((sum, review) => sum + Number(review.overall_rating), 0) / (rated.length || 1);
+
+  return <div className="space-y-6">
+    {notice ? <Alert variant={notice.variant} title={notice.title} message={notice.message} /> : null}
+    <div className="grid gap-4 sm:grid-cols-2"><StatTile label="Completed reviews" value={loading ? "—" : reviews.filter((review) => review.status === "completed").length} /><StatTile label="Average rating" value={loading ? "—" : `${average.toFixed(2)} / 5`} /></div>
+    <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <form onSubmit={save}><ComponentCard title="New Review" desc="Record probation, periodic or annual performance feedback.">
+        <div><Label htmlFor="performance-employee">Employee</Label><Select id="performance-employee" options={employeeOptions} value={employeeId} onChange={(value) => { setEmployeeId(value); setDeleteCandidateId(null); }} placeholder="Select employee" /></div>
+        <div><Label htmlFor="performance-reviewer">Reviewer</Label><Select id="performance-reviewer" options={reviewerOptions} value={reviewerId} onChange={setReviewerId} allowEmpty placeholder="Reviewer not specified" /></div>
+        <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="performance-type">Review type</Label><Select id="performance-type" options={["probation", "quarterly", "semiannual", "annual", "ad_hoc"].map((value) => ({ value, label: labelize(value) }))} value={reviewType} onChange={setReviewType} /></div><div><Label htmlFor="performance-rating">Rating (0–5)</Label><Input id="performance-rating" type="number" min="0" max="5" step="0.1" value={rating} onChange={(event) => setRating(event.target.value)} /></div></div>
+        <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="performance-start">Period start</Label><Input id="performance-start" type="date" value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} /></div><div><Label htmlFor="performance-end">Period end</Label><Input id="performance-end" type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} /></div></div>
+        <div><Label htmlFor="performance-date">Review date</Label><Input id="performance-date" type="date" value={reviewDate} onChange={(event) => setReviewDate(event.target.value)} /></div>
+        <div><Label htmlFor="performance-goals">Goals</Label><TextArea id="performance-goals" rows={4} value={goals} onChange={setGoals} /></div><div><Label htmlFor="performance-strengths">Strengths</Label><TextArea id="performance-strengths" rows={4} value={strengths} onChange={setStrengths} /></div><div><Label htmlFor="performance-development">Development areas</Label><TextArea id="performance-development" rows={4} value={development} onChange={setDevelopment} /></div><div><Label htmlFor="performance-comments">Manager comments</Label><TextArea id="performance-comments" rows={4} value={comments} onChange={setComments} /></div>
+        <Button type="submit" className="w-full" disabled={!employeeId || busy !== null}>{busy === "save" ? "Saving…" : "Save Review"}</Button>
+      </ComponentCard></form>
+      <ComponentCard title="Review History" desc="Completed reviews for the selected employee.">
+        <div className="space-y-4" aria-busy={loading}>
+          {loading ? <p className={`${ADMIN_TEXT_STYLES.muted} text-sm`}>Loading performance reviews…</p> : selected.length === 0 ? <p className={`${ADMIN_TEXT_STYLES.muted} py-8 text-center text-sm`}>No performance reviews yet.</p> : selected.map((review) => <article key={review.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-800"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className={`${ADMIN_TEXT_STYLES.strong} font-semibold`}>{employeeMap.get(review.employee_id) || "Unknown employee"}</h3><div className="mt-1 flex flex-wrap items-center gap-2"><Badge color="info">{labelize(review.review_type)}</Badge><Badge color={review.status === "completed" ? "success" : "warning"}>{labelize(review.status)}</Badge><span className={`${ADMIN_TEXT_STYLES.muted} text-xs`}>{formatDate(review.review_date)}</span></div></div><div className="flex flex-wrap items-center gap-2">{review.overall_rating != null ? <Badge color="primary">{Number(review.overall_rating).toFixed(1)} / 5</Badge> : null}{deleteCandidateId === review.id ? <><Button size="sm" variant="outline" onClick={() => setDeleteCandidateId(null)} disabled={busy === review.id}>Cancel</Button><Button size="sm" onClick={() => void remove(review.id)} disabled={busy === review.id}>{busy === review.id ? "Deleting…" : "Confirm delete"}</Button></> : <Button size="sm" variant="outline" onClick={() => setDeleteCandidateId(review.id)} disabled={busy !== null}>Delete</Button>}</div></div>{review.period_start || review.period_end ? <p className={`${ADMIN_TEXT_STYLES.muted} mt-3 text-xs`}>Review period: {formatDate(review.period_start)} → {formatDate(review.period_end)}</p> : null}{review.strengths ? <p className={`${ADMIN_TEXT_STYLES.body} mt-3 text-sm`}><strong className={ADMIN_TEXT_STYLES.strong}>Strengths:</strong> {review.strengths}</p> : null}{review.development_areas ? <p className={`${ADMIN_TEXT_STYLES.body} mt-2 text-sm`}><strong className={ADMIN_TEXT_STYLES.strong}>Development:</strong> {review.development_areas}</p> : null}{review.goals ? <p className={`${ADMIN_TEXT_STYLES.body} mt-2 text-sm`}><strong className={ADMIN_TEXT_STYLES.strong}>Goals:</strong> {review.goals}</p> : null}{review.manager_comments ? <p className={`${ADMIN_TEXT_STYLES.muted} mt-2 text-sm`}>{review.manager_comments}</p> : null}</article>)}
+        </div>
+      </ComponentCard>
+    </div>
+  </div>;
 }
