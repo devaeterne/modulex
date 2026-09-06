@@ -16,6 +16,8 @@ const sidebar = read("src/layout/AppSidebar.tsx");
 
 expect(sql.length > 0, "A6-F5A customer receipt SQL must exist");
 expect(sql === migration, "A6-F5A Admin SQL and shared migration must stay byte-identical");
+expect(!/select\s+i\s*,\s*o\.project_id\s+into\s+v_invoice\s*,\s*v_project_id/i.test(sql), "F5A invoice validator must not mix a %rowtype record with a scalar in one SELECT INTO list");
+expect(/select\s+i\.\*\s+into\s+v_invoice[\s\S]{0,260}where\s+i\.id\s*=\s*p_invoice_id[\s\S]{0,120}for\s+update[\s\S]{0,360}select\s+o\.project_id\s+into\s+v_project_id[\s\S]{0,180}where\s+o\.id\s*=\s*v_invoice\.order_id/i.test(sql), "F5A invoice validator must lock the Invoice row and resolve Project context in a separate scalar read");
 expect(/create or replace function private\.record_customer_receipt\s*\(/i.test(sql), "F5A must define a private atomic customer receipt mutation");
 expect(/'customer_receipt'/i.test(sql), "F5A must reuse Finance Core customer_receipt transactions");
 expect(/private\.create_finance_transaction_draft/i.test(sql), "F5A receipt creation must reuse Finance Core draft/idempotency primitives");
