@@ -83,6 +83,7 @@ const expectedInventory = [
   "src/app/api/admin/calendar/google/discovery/route.ts",
   "src/app/api/admin/calendar/google/import/route.ts",
   "src/app/api/admin/calendar/google/reconcile/route.ts",
+  "src/app/api/admin/calendar/google/refresh/route.ts",
   "src/app/api/admin/calendar/google/sync/route.ts",
   "src/app/api/admin/calendar/google/webhook/route.ts",
   "src/app/api/admin/calendar/route.ts",
@@ -113,7 +114,7 @@ const expectedInventory = [
   "src/app/api/vendor-catalog/vendors/route.ts",
 ].sort();
 
-assert.equal(routeInventory.length, 35, `Expected 35 API route files, found ${routeInventory.length}`);
+assert.equal(routeInventory.length, 36, `Expected 36 API route files, found ${routeInventory.length}`);
 assert.deepEqual(routeInventory, expectedInventory, "API route inventory changed; review timing coverage");
 
 const uninstrumented = [];
