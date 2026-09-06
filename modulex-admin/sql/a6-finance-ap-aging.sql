@@ -357,7 +357,8 @@ returns table(
 )
 language sql
 stable
-set search_path = pg_catalog, private
+security definer
+set search_path = ''
 as $$
   select * from private.get_ap_aging_page($1,$2,$3,$4,$5,$6);
 $$;
@@ -369,7 +370,8 @@ create or replace function public.get_ap_aging_summary(
 returns jsonb
 language sql
 stable
-set search_path = pg_catalog, private
+security definer
+set search_path = ''
 as $$
   select private.get_ap_aging_summary($1,$2);
 $$;
