@@ -731,7 +731,7 @@ export default function CompensationManager() {
                 </div>
               </div>
 
-              <div className="grid gap-4 border-y border-gray-200 py-4 dark:border-gray-800 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className={`${ADMIN_TEXT_STYLES.strong} mb-2 text-sm font-medium`}>
                     Overtime eligible
