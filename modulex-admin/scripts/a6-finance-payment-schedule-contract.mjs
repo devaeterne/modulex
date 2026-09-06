@@ -8,11 +8,20 @@ const expect = (ok, message) => { if (!ok) throw new Error(message); };
 
 const sqlPath = "sql/a6-finance-payment-schedule.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260906113000_a6_finance_payment_schedule.sql";
+const hardeningSqlPath = "sql/a6-finance-payment-schedule-hardening.sql";
+const hardeningMigrationPath = "../modulex-store/supabase/migrations/20260906113100_a6_finance_payment_schedule_hardening.sql";
 expect(exists(sqlPath), "A6-F3D Payment Schedule SQL must exist");
 expect(exists(migrationPath), "A6-F3D shared migration mirror must exist");
+expect(exists(hardeningSqlPath), "A6-F3D Payment Schedule hardening SQL must exist");
+expect(exists(hardeningMigrationPath), "A6-F3D Payment Schedule hardening migration mirror must exist");
 const sql = read(sqlPath);
 const migration = read(migrationPath);
+const hardeningSql = read(hardeningSqlPath);
+const hardeningMigration = read(hardeningMigrationPath);
 expect(sql === migration, "A6-F3D Admin SQL and shared migration must stay byte-identical");
+expect(hardeningSql === hardeningMigration, "A6-F3D hardening SQL and migration must stay byte-identical");
+expect(/vendor_invoices[\s\S]{0,180}for\s+update/i.test(hardeningSql), "F3D must serialize schedule capacity decisions on the canonical Vendor Bill row");
+expect(/validate_vendor_payment_schedule_context/i.test(hardeningSql), "F3D concurrency hardening must protect canonical schedule validation");
 
 // Existing-system-first boundary: schedule is planning, never a second AP settlement ledger.
 expect(/create\s+table(?:\s+if\s+not\s+exists)?\s+public\.vendor_payment_schedules/i.test(sql), "F3D must add the missing AP payment schedule model");
