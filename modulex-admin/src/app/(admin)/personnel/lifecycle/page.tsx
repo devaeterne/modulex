@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import EmployeeTasksManager from "@/components/hr/EmployeeTasksManager";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function LifecyclePage() {
-  return <EmployeeTasksManager />;
+  return (
+    <div>
+      <PageBreadcrumb pageTitle="Onboarding & Offboarding" />
+      <EmployeeTasksManager />
+    </div>
+  );
 }
