@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import BenefitsManager from "@/components/hr/BenefitsManager";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function BenefitsPage() {
-  return <BenefitsManager />;
+  return (
+    <div>
+      <PageBreadcrumb pageTitle="Benefits" />
+      <BenefitsManager />
+    </div>
+  );
 }
