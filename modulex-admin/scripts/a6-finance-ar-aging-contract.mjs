@@ -53,8 +53,8 @@ expect(/create\s+or\s+replace\s+function\s+private\.ar_aging_invoice_projection\
 expect(/finance_assert_view/i.test(functionBlock(sql, "private.ar_aging_invoice_projection")), "AR projection must enforce finance.view");
 expect(/revoke\s+all\s+on\s+function\s+private\./i.test(sql), "F5B private cores must remain revoked from browser roles");
 for (const rpc of privateRpcs) {
-  expect(new RegExp(`revoke\\s+all\\s+on\\s+function\\s+public\\.${rpc}[\\s\\S]{0,500}from\\s+public\\s*,\\s*anon`, "i").test(sql), `public.${rpc} must revoke PUBLIC/anon execute`);
-  expect(new RegExp(`grant\\s+execute\\s+on\\s+function\\s+public\\.${rpc}[\\s\\S]{0,500}to\\s+authenticated`, "i").test(sql), `public.${rpc} must grant authenticated execute explicitly`);
+  expect(new RegExp(`revoke\\s+all\\s+on\\s+function\\s+public\\.${rpc}\\([^;]*\\)\\s+from\\s+public\\s*,\\s*anon`, "i").test(sql), `public.${rpc} must revoke PUBLIC/anon execute`);
+  expect(new RegExp(`grant\\s+execute\\s+on\\s+function\\s+public\\.${rpc}\\([^;]*\\)\\s+to\\s+authenticated`, "i").test(sql), `public.${rpc} must grant authenticated execute explicitly`);
 }
 
 for (const source of [
@@ -86,7 +86,7 @@ expect(/else\s+'90_plus'/i.test(projection), "90+ AR bucket boundary must be exp
 
 expect(/finance_base_currency/i.test(sql), "F5B reporting must reuse the canonical Finance base currency");
 expect(/unconverted/i.test(sql), "F5B must surface unresolved Invoice FX instead of silently converting or zeroing it");
-expect(/currency_code\s*=\s*v_base[\s\S]{0,180}outstanding_amount[\s\S]{0,180}else\s+null/i.test(projection) || /when\s+i\.currency_code\s*=\s*v_base[\s\S]{0,220}else\s+null/i.test(projection), "Invoice base outstanding may only be populated without a stored FX snapshot when Invoice currency already equals Finance base currency");
+expect(/when\s+[a-z0-9_.]*currency_code\s*=\s*v_base[\s\S]{0,220}else\s+null/i.test(projection), "Invoice base outstanding may only be populated without a stored FX snapshot when Invoice currency already equals Finance base currency");
 
 const agingPage = functionBlock(sql, "private.get_ar_aging_page");
 expect(/p_bucket/i.test(agingPage) && /current/i.test(agingPage) && /90_plus/i.test(agingPage), "AR Aging page must validate/filter canonical aging buckets");
