@@ -8,14 +8,23 @@ const adminRoot = path.resolve(here, "..");
 const repoRoot = path.resolve(adminRoot, "..");
 const readAdmin = (relative) => readFile(path.join(adminRoot, relative), "utf8");
 const readRepo = (relative) => readFile(path.join(repoRoot, relative), "utf8");
+const readRepoOptional = async (relative) => {
+  try {
+    return await readRepo(relative);
+  } catch {
+    return "";
+  }
+};
 
-const [route, panel, customerPage, customerCard, mailer, migration] = await Promise.all([
+const [route, panel, customerPage, customerCard, mailer, migration, privacySql, privacyMigration] = await Promise.all([
   readAdmin("src/app/api/admin/dealer-portal/route.ts"),
   readAdmin("src/components/customers/CustomerPortalAccessCard.tsx"),
   readAdmin("src/app/(admin)/customers/[id]/page.tsx"),
   readAdmin("src/components/customers/CustomerCard.tsx"),
   readAdmin("src/lib/email/dealer-portal.ts"),
   readRepo("modulex-store/supabase/migrations/20260828200000_dealer_portal_activation_lifecycle.sql"),
+  readRepoOptional("modulex-admin/sql/customer-portal-document-privacy-hardening.sql"),
+  readRepoOptional("modulex-store/supabase/migrations/20260906230000_customer_portal_document_privacy_hardening.sql"),
 ]);
 
 assert.match(route, /requireAdmin\(request\)/, "dealer portal API must use the Admin gate");
@@ -49,5 +58,20 @@ assert.match(migration, /revoke insert, update, delete on table public\.customer
 assert.match(mailer, /RESEND_API_KEY/, "portal activation mail must remain server-side");
 assert.match(mailer, /token_hash/, "email must route through the controlled Store token-hash activation page");
 assert.match(mailer, /activation/i, "portal mail must contain activation copy");
+
+assert.ok(privacySql.length > 0, "CUST-6 customer document privacy hardening SQL must exist");
+assert.equal(privacySql, privacyMigration, "CUST-6 Admin SQL and Store migration must stay byte-identical");
+assert.match(privacySql, /create or replace function private\.guard_customer_document_portal_lifecycle\s*\(/i, "CUST-6 must guard sensitive customer-document lifecycle fields at the DB boundary");
+assert.match(privacySql, /create trigger trg_guard_customer_document_portal_lifecycle/i, "CUST-6 must install the customer-document privacy guard trigger");
+assert.match(privacySql, /split_part\(new\.storage_path\s*,\s*'\/'\s*,\s*1\)\s*<>\s*new\.customer_id::text/i, "CUST-6 must keep document storage paths scoped to their customer");
+assert.match(privacySql, /new\.portal_visible\s+is\s+distinct\s+from\s+old\.portal_visible/i, "CUST-6 must guard direct portal visibility changes");
+assert.match(privacySql, /new\.is_active\s+is\s+distinct\s+from\s+old\.is_active/i, "CUST-6 must guard direct document activation changes");
+assert.match(privacySql, /current_setting\('modulex\.customer_document_lifecycle'\s*,\s*true\)/i, "CUST-6 sensitive lifecycle mutations must require the canonical RPC transaction guard");
+assert.match(privacySql, /set_config\('modulex\.customer_document_lifecycle'\s*,\s*'on'\s*,\s*true\)/i, "CUST-6 lifecycle RPCs must set the transaction-local document guard");
+assert.match(privacySql, /create or replace function public\.register_customer_document\s*\(/i, "CUST-6 forward hardening must restore the merged document registration RPC when production drift skipped the earlier migration");
+assert.match(privacySql, /create or replace function public\.set_customer_document_portal_visibility\s*\(/i, "CUST-6 forward hardening must own portal visibility mutation");
+assert.match(privacySql, /create or replace function public\.deactivate_customer_document\s*\(/i, "CUST-6 forward hardening must own document deactivation");
+assert.match(privacySql, /v_role\s+not\s+in\s*\('super_admin'\s*,\s*'admin'\)/i, "Only Admin roles may promote customer documents to Portal visibility");
+assert.match(privacySql, /revoke all on function public\.set_customer_document_portal_visibility[\s\S]*from anon/i, "CUST-6 portal visibility RPC must keep anon execute revoked");
 
 console.log("dealer portal admin contract: ok");
