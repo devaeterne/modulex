@@ -206,7 +206,7 @@ export default function CalendarEventEditorModal({ isOpen, onClose, event, initi
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="relative m-4 w-full max-w-3xl p-6 sm:p-8" ariaLabel={heading}>
       <div className="space-y-5">
-        <div className="pr-10"><h2 className={ADMIN_TEXT_STYLES.title}>{heading}</h2><p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.body}`}>Google Calendar-compatible fields synchronize through the shared Company Calendar.</p></div>
+        <div className="pr-10"><h2 className={`text-xl font-semibold ${ADMIN_TEXT_STYLES.strong}`}>{heading}</h2><p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.body}`}>Google Calendar-compatible fields synchronize through the shared Company Calendar.</p></div>
         {error ? <Alert variant="error" title="Calendar event action failed" message={error} /> : null}
         {event ? <div className="flex flex-wrap gap-2"><Badge color={event.provider_event_type === "default" ? "info" : "light"}>{event.provider_event_type || "default"}</Badge>{event.provider_event_url ? <Badge color="success">Google linked</Badge> : null}</div> : null}
         {business && event ? <Alert variant="warning" title="Business event" message={deleteCopy(event)} /> : null}
