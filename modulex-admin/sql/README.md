@@ -24,6 +24,17 @@ Until the project is moved to Supabase CLI migrations under `supabase/migrations
 
 `performance-rls.sql` is a query-planning hardening step. It preserves the existing RLS role rules while converting known stable role/permission helper predicates to one-time statement checks. Apply it after all schema files that create those policies. Existing environments can apply it once as the final performance migration.
 
+## Calendar incremental packages
+
+Existing environments apply Calendar packages in this dependency order:
+
+1. `google-calendar-project-integration.sql` — legacy single-account Google OAuth plus per-Project provider projection foundation.
+2. `admin-calendar-scheduling-core.sql` — first-class Modulex Calendar registry, Project scheduling fields, imported Google mirror, and owner/RBAC persistence.
+3. `admin-calendar-scheduling-advisor-hardening.sql` — Calendar index hardening discovered during post-migration advisor review.
+4. `calendar-v3-bidirectional.sql` — additive single Company Operational Calendar model, ordinary event replica, generic provider mappings, durable outbox/jobs/watch/audit state, and controlled Google→Modulex business schedule mutation boundary.
+
+Calendar V3 does **not** delete legacy Project Google calendars or mappings during migration and does not perform network I/O from PostgreSQL. The Company Operational Calendar and its `company_shared` provider binding are activated later through the reviewed Admin Settings flow.
+
 After applying schema changes, reload the PostgREST schema cache when required:
 
 ```sql
