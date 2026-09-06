@@ -38,6 +38,12 @@ expect(
   "Shared Admin text tokens must expose body, strong, and muted theme-aware text roles",
 );
 
+const globals = read("src/app/globals.css");
+expect(
+  /body\s*\{[\s\S]*?@apply[^;]*text-gray-700[^;]*dark:text-gray-300[^;]*;/m.test(globals),
+  "Admin body must provide a theme-aware default foreground so unstyled text cannot fall back to black in dark mode",
+);
+
 const button = read("src/components/ui/button/Button.tsx");
 expect(button.includes("ADMIN_BUTTON_VARIANTS"), "Button must consume shared semantic button tokens");
 expect(button.includes("AdminButtonVariant"), "Button variant typing must derive from shared semantic tokens");
