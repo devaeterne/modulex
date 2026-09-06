@@ -66,12 +66,15 @@ assert.match(privacySql, /create trigger trg_guard_customer_document_portal_life
 assert.match(privacySql, /split_part\(new\.storage_path\s*,\s*'\/'\s*,\s*1\)\s*<>\s*new\.customer_id::text/i, "CUST-6 must keep document storage paths scoped to their customer");
 assert.match(privacySql, /new\.portal_visible\s+is\s+distinct\s+from\s+old\.portal_visible/i, "CUST-6 must guard direct portal visibility changes");
 assert.match(privacySql, /new\.is_active\s+is\s+distinct\s+from\s+old\.is_active/i, "CUST-6 must guard direct document activation changes");
+assert.match(privacySql, /tg_op\s*=\s*'DELETE'[\s\S]*append-safe/i, "CUST-6 must reject hard delete of Customer document metadata");
 assert.match(privacySql, /current_setting\('modulex\.customer_document_lifecycle'\s*,\s*true\)/i, "CUST-6 sensitive lifecycle mutations must require the canonical RPC transaction guard");
 assert.match(privacySql, /set_config\('modulex\.customer_document_lifecycle'\s*,\s*'on'\s*,\s*true\)/i, "CUST-6 lifecycle RPCs must set the transaction-local document guard");
 assert.match(privacySql, /create or replace function public\.register_customer_document\s*\(/i, "CUST-6 forward hardening must restore the merged document registration RPC when production drift skipped the earlier migration");
 assert.match(privacySql, /create or replace function public\.set_customer_document_portal_visibility\s*\(/i, "CUST-6 forward hardening must own portal visibility mutation");
 assert.match(privacySql, /create or replace function public\.deactivate_customer_document\s*\(/i, "CUST-6 forward hardening must own document deactivation");
+assert.match(privacySql, /security\s+invoker/i, "CUST-6 document lifecycle RPCs must preserve caller RLS");
 assert.match(privacySql, /v_role\s+not\s+in\s*\('super_admin'\s*,\s*'admin'\)/i, "Only Admin roles may promote customer documents to Portal visibility");
-assert.match(privacySql, /revoke all on function public\.set_customer_document_portal_visibility[\s\S]*from anon/i, "CUST-6 portal visibility RPC must keep anon execute revoked");
+assert.match(privacySql, /revoke all on function public\.set_customer_document_portal_visibility\(uuid,uuid,boolean\) from public, anon, authenticated/i, "CUST-6 portal visibility RPC must keep PUBLIC/anon execute revoked before granting authenticated");
+assert.match(privacySql, /grant execute on function public\.set_customer_document_portal_visibility\(uuid,uuid,boolean\) to authenticated/i, "CUST-6 portal visibility RPC must grant authenticated execute explicitly");
 
 console.log("dealer portal admin contract: ok");
