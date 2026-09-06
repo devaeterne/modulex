@@ -32,6 +32,7 @@ interface TableBodyProps {
   children: ReactNode;
   className?: string;
   variant?: TableVariant;
+  "aria-busy"?: React.AriaAttributes["aria-busy"];
 }
 
 interface TableRowProps {
@@ -97,12 +98,17 @@ const TableBody: React.FC<TableBodyProps> = ({
   children,
   className = "",
   variant = "plain",
+  "aria-busy": ariaBusy,
 }) => {
   const variantClass =
     variant === "admin"
       ? "divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-transparent"
       : "";
-  return <tbody className={`${variantClass} ${className}`}>{children}</tbody>;
+  return (
+    <tbody aria-busy={ariaBusy} className={`${variantClass} ${className}`}>
+      {children}
+    </tbody>
+  );
 };
 
 const TableRow: React.FC<TableRowProps> = ({
