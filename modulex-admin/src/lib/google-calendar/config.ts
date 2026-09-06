@@ -8,12 +8,14 @@ export const GOOGLE_CALENDAR_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
 ] as const;
 
-export const GOOGLE_CALENDAR_IMPORT_SCOPES = [
+export const GOOGLE_CALENDAR_BIDIRECTIONAL_SCOPES = [
   "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
   "https://www.googleapis.com/auth/calendar.events",
 ] as const;
 
-export const GOOGLE_CALENDAR_V3_SCOPES = GOOGLE_CALENDAR_IMPORT_SCOPES;
+// Compatibility export used by the existing Calendar import/status routes.
+export const GOOGLE_CALENDAR_IMPORT_SCOPES = GOOGLE_CALENDAR_BIDIRECTIONAL_SCOPES;
+export const GOOGLE_CALENDAR_V3_SCOPES = GOOGLE_CALENDAR_BIDIRECTIONAL_SCOPES;
 
 export type GoogleCalendarConfig = {
   clientId: string;
@@ -42,23 +44,20 @@ function resolveRedirectUri(requestUrl?: string) {
   throw new Error("Google Calendar redirect URI cannot be resolved.");
 }
 
-export function hasGoogleCalendarImportScopes(grantedScopes: readonly string[] | null | undefined) {
+export function hasGoogleCalendarBidirectionalScopes(grantedScopes: readonly string[] | null | undefined) {
   const granted = new Set(grantedScopes ?? []);
-  return GOOGLE_CALENDAR_IMPORT_SCOPES.every((scope) => granted.has(scope));
+  return GOOGLE_CALENDAR_BIDIRECTIONAL_SCOPES.every((scope) => granted.has(scope));
 }
 
-export const hasGoogleCalendarV3Scopes = hasGoogleCalendarImportScopes;
+export const hasGoogleCalendarImportScopes = hasGoogleCalendarBidirectionalScopes;
+export const hasGoogleCalendarV3Scopes = hasGoogleCalendarBidirectionalScopes;
 
 export function isGoogleCalendarConfigured() {
   const clientId = trimEnv("GOOGLE_CALENDAR_CLIENT_ID");
   const clientSecret = trimEnv("GOOGLE_CALENDAR_CLIENT_SECRET");
   const key = trimEnv("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY");
   if (!clientId || !clientSecret || !key) return false;
-  try {
-    return decodeEncryptionKey(key).length === 32;
-  } catch {
-    return false;
-  }
+  try { return decodeEncryptionKey(key).length === 32; } catch { return false; }
 }
 
 export function getGoogleCalendarConfig(requestUrl?: string): GoogleCalendarConfig {
