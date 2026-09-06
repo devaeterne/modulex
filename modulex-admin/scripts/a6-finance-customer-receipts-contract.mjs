@@ -6,8 +6,12 @@ const expect = (ok, message) => { if (!ok) throw new Error(message); };
 
 const sqlPath = "sql/a6-finance-customer-receipts.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260906193000_a6_finance_customer_receipts.sql";
+const hardeningSqlPath = "sql/a6-f5a-customer-receipts-rpc-hardening.sql";
+const hardeningMigrationPath = "../modulex-store/supabase/migrations/20260906203000_a6_f5a_customer_receipts_rpc_hardening.sql";
 const sql = read(sqlPath);
 const migration = read(migrationPath);
+const hardeningSql = read(hardeningSqlPath);
+const hardeningMigration = read(hardeningMigrationPath);
 const domain = read("src/lib/finance/customer-receipts.ts");
 const manager = read("src/components/finance/FinanceCustomerReceiptsManager.tsx");
 const genericTransactions = read("src/components/finance/FinanceTransactionsManager.tsx");
@@ -16,6 +20,23 @@ const sidebar = read("src/layout/AppSidebar.tsx");
 
 expect(sql.length > 0, "A6-F5A customer receipt SQL must exist");
 expect(sql === migration, "A6-F5A Admin SQL and shared migration must stay byte-identical");
+expect(hardeningSql.length > 0, "A6-F5A authenticated RPC hardening SQL must exist");
+expect(hardeningSql === hardeningMigration, "A6-F5A RPC hardening Admin SQL and shared migration must stay byte-identical");
+const hardenedPublicRpcs = [
+  "record_customer_receipt",
+  "void_customer_receipt",
+  "reverse_customer_receipt",
+  "link_customer_project_payment_to_finance",
+  "get_customer_receipt_reference_data",
+  "get_customer_receipt_invoices",
+  "get_customer_receipts_page",
+];
+for (const rpc of hardenedPublicRpcs) {
+  const rpcPattern = new RegExp(`create\\s+or\\s+replace\\s+function\\s+public\\.${rpc}\\s*\\([\\s\\S]*?security\\s+definer[\\s\\S]*?set\\s+search_path\\s*=\\s*''`, "i");
+  expect(rpcPattern.test(hardeningSql), `F5A public RPC ${rpc} must bridge to revoked private core through SECURITY DEFINER with empty search_path`);
+}
+expect(/revoke\s+all\s+on\s+function\s+public\.record_customer_receipt[\s\S]*?from\s+public\s*,\s*anon/i.test(hardeningSql), "F5A hardened receipt RPC must keep PUBLIC/anon execute revoked");
+expect(/grant\s+execute\s+on\s+function\s+public\.record_customer_receipt[\s\S]*?to\s+authenticated/i.test(hardeningSql), "F5A hardened receipt RPC must keep authenticated execute explicit");
 // Production compile regression: a %rowtype record and scalar cannot share one SELECT INTO target list.
 expect(!/select\s+i\s*,\s*o\.project_id\s+into\s+v_invoice\s*,\s*v_project_id/i.test(sql), "F5A invoice validator must not mix a %rowtype record with a scalar in one SELECT INTO list");
 expect(/select\s+i\.\*\s+into\s+v_invoice[\s\S]{0,260}where\s+i\.id\s*=\s*p_invoice_id[\s\S]{0,120}for\s+update[\s\S]{0,360}select\s+o\.project_id\s+into\s+v_project_id[\s\S]{0,180}where\s+o\.id\s*=\s*v_invoice\.order_id/i.test(sql), "F5A invoice validator must lock the Invoice row and resolve Project context in a separate scalar read");
