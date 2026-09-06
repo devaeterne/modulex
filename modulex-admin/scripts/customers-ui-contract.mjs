@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const exists = (file) => fs.existsSync(path.join(root, file));
 const expect = (ok, message) => { if (!ok) throw new Error(message); };
 const routes = [
   ["src/app/(admin)/customers/dashboard/page.tsx", "/customers/dashboard"],
@@ -10,7 +11,7 @@ const routes = [
   ["src/app/(admin)/customers/shipments/page.tsx", "/customers/shipments"],
   ["src/app/(admin)/customers/installations/page.tsx", "/customers/installations"],
 ];
-for (const [file] of routes) expect(fs.existsSync(path.join(root, file)), `Missing Customers route: ${file}`);
+for (const [file] of routes) expect(exists(file), `Missing Customers route: ${file}`);
 const sidebar = read("src/layout/AppSidebar.tsx");
 for (const [, route] of routes) expect(sidebar.includes(`path: "${route}"`), `Sidebar missing ${route}`);
 function collect(dir) {
@@ -53,5 +54,31 @@ const ordersTableEnd = orders.indexOf("</Table>", ordersTableStart);
 const ordersTableMarkup = orders.slice(ordersTableStart, ordersTableEnd);
 const orderTableCellTags = [...ordersTableMarkup.matchAll(/<TableCell\b[^>]*>/g)].map((match) => match[0]);
 expect(orderTableCellTags.length > 0 && orderTableCellTags.every((tag) => tag.includes('variant="admin"')), "Every Customer Orders table cell must retain the admin variant");
+
+// Customer → Project should be a first-class customer-scoped operation rather than a global detour.
+const customerProjectsRoute = "src/app/(admin)/customers/[id]/projects/page.tsx";
+expect(exists(customerProjectsRoute), "Customer detail must expose a real customer-scoped Projects route");
+const operations = read("src/components/customers/CustomerOrderActions.tsx");
+expect(operations.includes('/customers/${customerId}/projects'), "Customer operations must link directly to customer-scoped Projects");
+const customerProjects = read("src/components/customers/CustomerProjectsList.tsx");
+expect(customerProjects.includes("listCustomerProjects") && customerProjects.includes("customerId"), "Customer Projects must reuse the canonical Project list domain with customer scope");
+expect(customerProjects.includes("createCustomerProject"), "Customer Projects must support Project creation without leaving customer context");
+expect(customerProjects.includes('<TableHeader variant="admin">') && customerProjects.includes('<TableBody variant="admin">'), "Customer Projects must use the canonical admin table system");
+
+// Private customer documents need one real lifecycle surface: explicit visibility, signed access, and soft deactivation.
+const documents = read("src/components/customers/CustomerDocumentsPanel.tsx");
+const documentSqlPath = "sql/customer-document-lifecycle.sql";
+expect(exists(documentSqlPath), "Customer document lifecycle SQL contract must exist");
+const documentSql = read(documentSqlPath);
+expect(documents.includes("portal_visible: false"), "New customer documents must remain portal-hidden by default");
+expect(documents.includes("createSignedUrl"), "Private customer documents must use short-lived signed access for preview/download");
+expect(documents.includes('supabase.rpc("set_customer_document_portal_visibility"'), "Portal visibility must use the canonical document lifecycle RPC");
+expect(documents.includes('supabase.rpc("deactivate_customer_document"'), "Document removal must be soft/deactivation through the canonical RPC");
+expect(!documents.includes("storage_path}</"), "Customer document UI must not expose raw storage paths");
+expect(/create or replace function public\.set_customer_document_portal_visibility\s*\(/i.test(documentSql), "Document lifecycle SQL must define portal visibility mutation");
+expect(/create or replace function public\.deactivate_customer_document\s*\(/i.test(documentSql), "Document lifecycle SQL must define soft deactivation");
+expect(/security\s+invoker/i.test(documentSql), "Customer document lifecycle RPCs must preserve caller RLS with SECURITY INVOKER");
+expect(/insert into public\.customer_activity/i.test(documentSql), "Document lifecycle mutations must write Customer activity atomically");
+expect(!/delete\s+from\s+public\.customer_documents/i.test(documentSql), "Customer document lifecycle must remain append-safe and avoid physical document deletion");
 
 console.log("customers UI contract: ok");
