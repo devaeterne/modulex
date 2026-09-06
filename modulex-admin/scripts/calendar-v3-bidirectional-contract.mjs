@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = (p) => readFile(path.join(root, p), "utf8");
 
-const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconcile, workspace, projectTab, vercelConfig] = await Promise.all([
+const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconcile, workspace, projectTab, vercelConfig, watchChannels] = await Promise.all([
   source("sql/calendar-v3-bidirectional.sql"),
   source("../modulex-store/supabase/migrations/20260906113000_calendar_v3_bidirectional.sql"),
   source("src/lib/google-calendar/config.ts"),
@@ -18,6 +18,7 @@ const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconc
   source("src/components/calendar/AdminCalendarWorkspace.tsx"),
   source("src/components/customers/project-detail/ProjectCalendarTab.tsx"),
   source("vercel.json"),
+  source("src/lib/google-calendar/watch-channels.ts"),
 ]);
 
 assert.equal(sql.trim(), migration.trim(), "Calendar V3 canonical SQL and migration must remain byte-identical.");
@@ -70,6 +71,11 @@ assert.equal(
   calendarReconcileCron?.schedule,
   "5 7 * * *",
   "Google Calendar reconciliation must remain on a Hobby-compatible daily Vercel cron.",
+);
+assert.match(
+  watchChannels,
+  /const RENEW_BEFORE_MS = 48 \* 60 \* 60 \* 1000;/,
+  "Daily reconciliation must renew Google watch channels at least 48 hours before expiry.",
 );
 
 console.log("PASS: Calendar V3 bidirectional contract");
