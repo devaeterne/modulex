@@ -40,16 +40,21 @@ declare
   v_project_id uuid;
   v_remaining numeric(18,4);
 begin
-  select i, o.project_id
-  into v_invoice, v_project_id
+  select i.*
+  into v_invoice
   from public.customer_invoices i
-  left join public.customer_orders o on o.id = i.order_id
   where i.id = p_invoice_id
-  for update of i;
+  for update;
 
   if v_invoice.id is null then
     raise exception 'Customer Invoice not found.' using errcode = 'P0002';
   end if;
+
+  select o.project_id
+  into v_project_id
+  from public.customer_orders o
+  where o.id = v_invoice.order_id;
+
   if v_invoice.customer_id is distinct from p_customer_id then
     raise exception 'Customer Receipt allocation must belong to the selected Customer.' using errcode = '23514';
   end if;
