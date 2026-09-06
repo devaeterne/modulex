@@ -37,7 +37,9 @@ expect(/isLoading|loading|Loading/.test(sources) && /error|Error/.test(sources),
 expect(!sources.includes('href="#"') && !sources.includes("javascript:void") && !sources.includes("TailAdmin") && !/lorem ipsum/i.test(sources), "Personnel surfaces must not ship dead/template UI");
 
 const compensation = read("src/components/hr/CompensationManager.tsx");
-const globals = read("src/app/globals.css");
+const layout = read("src/app/layout.tsx");
+const contrastFixPath = path.join(root, "src/app/theme-contrast-fixes.css");
+const contrastFixes = fs.existsSync(contrastFixPath) ? fs.readFileSync(contrastFixPath, "utf8") : "";
 
 for (const primitive of [
   "ComponentCard",
@@ -98,6 +100,11 @@ expect(compensation.includes("formatDisplayDate"), "Compensation dates must use 
 expect(compensation.includes("getStatusPresentation"), "Compensation statuses must use semantic badges");
 expect(!compensation.includes("setMessage(error.message)"), "Compensation must not expose raw Supabase mutation errors");
 expect(!compensation.includes("setMessage(e instanceof Error ? e.message"), "Compensation must not expose raw Supabase load errors");
-expect(!/\.custom-calendar \.fc-h-event\s*\{[^}]*color:\s*black\s*;/s.test(globals), "FullCalendar event text must not be hard-coded black across themes");
+
+expect(layout.includes("./theme-contrast-fixes.css"), "Root layout must load scoped third-party theme contrast fixes");
+expect(contrastFixes.includes(".custom-calendar .fc-h-event"), "FullCalendar event text needs an explicit theme-aware override");
+expect(contrastFixes.includes("var(--color-gray-700)"), "FullCalendar light-mode event text needs a readable token");
+expect(contrastFixes.includes(".dark .custom-calendar .fc-h-event"), "FullCalendar event text needs a dark-mode override");
+expect(contrastFixes.includes("var(--color-gray-300)"), "FullCalendar dark-mode event text needs a readable token");
 
 console.log("personnel UI contract: ok");
