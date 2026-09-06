@@ -54,4 +54,26 @@ const ordersTableMarkup = orders.slice(ordersTableStart, ordersTableEnd);
 const orderTableCellTags = [...ordersTableMarkup.matchAll(/<TableCell\b[^>]*>/g)].map((match) => match[0]);
 expect(orderTableCellTags.length > 0 && orderTableCellTags.every((tag) => tag.includes('variant="admin"')), "Every Customer Orders table cell must retain the admin variant");
 
+const customerCard = read("src/components/customers/CustomerCard.tsx");
+const lifecycleSqlPath = "sql/customer-contact-address-lifecycle.sql";
+expect(fs.existsSync(path.join(root, lifecycleSqlPath)), "Customer contact/address lifecycle SQL contract must exist");
+const lifecycleSql = fs.existsSync(path.join(root, lifecycleSqlPath)) ? read(lifecycleSqlPath) : "";
+for (const rpc of ["create_customer_contact", "update_customer_contact", "set_customer_contact_primary", "deactivate_customer_contact", "update_customer_address", "deactivate_customer_address"]) {
+  expect(new RegExp(`create or replace function public\\.${rpc}\\s*\\(`, "i").test(lifecycleSql), `Missing canonical Customer lifecycle RPC: ${rpc}`);
+}
+expect(/current_user_has_any_role\s*\(\s*array\s*\[\s*['"]super_admin['"]\s*,\s*['"]admin['"]\s*,\s*['"]sales['"]/i.test(lifecycleSql), "Customer lifecycle RPCs must authorize super_admin/admin/sales at the database boundary");
+expect(/from public\.customers[\s\S]{0,180}for update/i.test(lifecycleSql), "Customer contact/address lifecycle mutations must serialize on the customer row");
+expect(/insert into public\.customer_activity/i.test(lifecycleSql), "Customer contact/address lifecycle mutations must append Customer activity");
+expect(!/security\s+definer/i.test(lifecycleSql), "Customer contact/address lifecycle RPCs must remain SECURITY INVOKER");
+expect(/revoke all on function public\.create_customer_contact[\s\S]{0,500}from public/i.test(lifecycleSql), "Customer lifecycle RPCs must revoke PUBLIC execute");
+expect(/grant execute on function public\.create_customer_contact[\s\S]{0,500}to authenticated/i.test(lifecycleSql), "Customer lifecycle RPCs must grant authenticated execute explicitly");
+expect(customerCard.includes('supabase.rpc("create_customer_contact"'), "CustomerCard contact create must use create_customer_contact RPC");
+expect(customerCard.includes('supabase.rpc("update_customer_contact"'), "CustomerCard contact edit must use update_customer_contact RPC");
+expect(customerCard.includes('supabase.rpc("set_customer_contact_primary"'), "CustomerCard primary contact action must use set_customer_contact_primary RPC");
+expect(customerCard.includes('supabase.rpc("deactivate_customer_contact"'), "CustomerCard contact removal must soft-deactivate through RPC");
+expect(customerCard.includes('supabase.rpc("update_customer_address"'), "CustomerCard address edit must use update_customer_address RPC");
+expect(customerCard.includes('supabase.rpc("deactivate_customer_address"'), "CustomerCard address removal must soft-deactivate through RPC");
+expect(!/from\("customer_contacts"\)\.(?:insert|update|delete)/.test(customerCard), "CustomerCard must not mutate contacts directly from the browser");
+expect(!/from\("customer_addresses"\)\.delete/.test(customerCard), "CustomerCard must not hard-delete customer addresses from the browser");
+
 console.log("customers UI contract: ok");
