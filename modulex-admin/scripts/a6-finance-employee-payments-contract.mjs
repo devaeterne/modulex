@@ -9,6 +9,7 @@ const expect = (ok, message) => { if (!ok) throw new Error(message); };
 const adminSqlPath = "sql/a6-finance-employee-payments.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260904150000_a6_finance_employee_payments.sql";
 const corePath = "src/lib/finance/core.ts";
+const payrollFinancePath = "src/lib/finance/payroll.ts";
 const financeManagerPath = "src/components/finance/FinanceTransactionsManager.tsx";
 const payrollPath = "src/components/hr/PayrollManager.tsx";
 const employeesPath = "src/components/hr/EmployeeDirectory.tsx";
@@ -19,6 +20,7 @@ expect(exists(migrationPath), "A6 Finance Employee Payments migration mirror mus
 const sql = read(adminSqlPath);
 const migration = read(migrationPath);
 const core = read(corePath);
+const payrollFinance = exists(payrollFinancePath) ? read(payrollFinancePath) : "";
 const financeManager = read(financeManagerPath);
 const payroll = read(payrollPath);
 const employees = read(employeesPath);
@@ -73,9 +75,15 @@ expect(core.includes("get_finance_employee_payroll_items"), "Finance adapter mus
 
 expect(financeManager.includes('id="finance-employee"'), "Employee payment UI must expose Employee selection");
 expect(financeManager.includes('id="finance-payroll-item"'), "Employee payment UI must expose optional Payroll Item selection");
-expect(financeManager.includes("setFinanceTransactionLinks"), "Employee payment draft save must persist canonical Finance links");
-expect(financeManager.includes('source_document_type: payrollItemId ? "hr_payroll_item" : null'), "Salary payment must identify Payroll Item source type");
-expect(financeManager.includes("allocated_amount: numericAmount"), "Employee payment link must allocate the Finance amount");
+if (payrollFinance.includes("saveEmployeePaymentDraft")) {
+  expect(financeManager.includes("saveEmployeePaymentDraft"), "Employee payment draft save must use the atomic Finance/Payroll RPC adapter");
+  expect(payrollFinance.includes("save_employee_payment_draft"), "Atomic employee payment adapter must call the canonical RPC");
+  expect(!financeManager.includes("Employee/Payroll link failed"), "Atomic Employee Payment UX must not expose the legacy orphan-draft failure mode");
+} else {
+  expect(financeManager.includes("setFinanceTransactionLinks"), "Employee payment draft save must persist canonical Finance links");
+  expect(financeManager.includes('source_document_type: payrollItemId ? "hr_payroll_item" : null'), "Salary payment must identify Payroll Item source type");
+  expect(financeManager.includes("allocated_amount: numericAmount"), "Employee payment link must allocate the Finance amount");
+}
 
 expect(payroll.includes("get_hr_payroll_finance_settlement"), "Payroll UI must load Finance settlement projection");
 expect(payroll.includes("Finance Paid"), "Payroll UI must show Finance paid amount");
