@@ -52,9 +52,14 @@ export default function FinanceOverview() {
         </ComponentCard>
       </div>
 
-      <ComponentCard title="Accounts Payable" desc="Vendor Bill aging, scheduled payments and check lifecycle are projected from canonical AP and Finance records.">
-        <Button onClick={() => router.push("/finance/ap-aging")}>Open AP Aging</Button>
-      </ComponentCard>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <ComponentCard title="Accounts Payable" desc="Vendor Bill aging, scheduled payments and check lifecycle are projected from canonical AP and Finance records.">
+          <Button onClick={() => router.push("/finance/ap-aging")}>Open AP Aging</Button>
+        </ComponentCard>
+        <ComponentCard title="Accounts Receivable" desc="Customer balances, Invoice aging and payment history are projected from canonical Invoice, Finance receipt and correction records.">
+          <Button onClick={() => router.push("/finance/ar-aging")}>Open AR Aging</Button>
+        </ComponentCard>
+      </div>
 
       <ComponentCard title="Cash & Bank Balances" desc="Balances are derived from posted Finance transactions; no balance snapshot is maintained.">
         {overview.account_balances.length === 0 ? (
