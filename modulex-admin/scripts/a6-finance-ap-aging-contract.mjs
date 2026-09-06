@@ -51,7 +51,7 @@ for (const primitive of ["ComponentCard", "Alert", "Badge", "Button", "Select", 
 for (const term of ["AP Aging", "Open AP", "Overdue", "Scheduled", "Outstanding Checks", "Cleared Checks", "Vendor", "Invoice"]) {
   expect(ui.toLowerCase().includes(term.toLowerCase()), `AP Aging UI must expose ${term}`);
 }
-expect(ui.includes("getVendorPaymentsPage") && ui.includes("getVendorPaymentSchedulesPage"), "Vendor financial drill-down must reuse existing payment/schedule projections");
+expect(ui.includes("getVendorPaymentsPage") && ui.includes("getPaymentSchedulesPage"), "Vendor financial drill-down must reuse existing payment/schedule projections");
 expect(ui.includes("getVendorBillDetail"), "AP Aging drill-down must reuse canonical Vendor Bill detail");
 expect(!/<(?:input|select|button)\b/.test(ui), "AP Aging UI must not render native controls directly");
 
