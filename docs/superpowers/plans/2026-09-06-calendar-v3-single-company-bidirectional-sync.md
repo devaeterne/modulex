@@ -44,15 +44,15 @@
 - Create: `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs`
 - Modify: `modulex-admin/package.json`
 - Modify: `.github/workflows/admin-ui-foundation.yml`
-- Modify: `modulex-admin/scripts/admin-full-route-regression-contract.mjs` only if route inventory assertions need V3 wording/content changes; preserve all concurrent route additions.
+- Modify: `modulex-admin/scripts/admin-full-route-regression-contract.mjs` only if V3 route inventory changes it; preserve concurrent route additions.
 
 **Interfaces:**
-- Consumes: existing Calendar V2 files and package smoke infrastructure.
-- Produces: `npm run smoke:calendar-v3`, wired into `npm run smoke` and the existing Admin UI foundation CI job.
+- Consumes: current V2 Calendar implementation and existing smoke/CI infrastructure.
+- Produces: `npm run smoke:calendar-v3` wired into the existing smoke chain and Admin UI foundation CI.
 
-- [ ] **Step 1: Re-read execution-time `main`, open PRs, repo rules, Admin UI guide, validation guide, current Calendar files, and this spec/plan before creating the feature branch.**
+- [ ] **Step 1: Re-read execution-time `main`, open PRs, repo rules, UI/validation guides, roadmap, and current Calendar code.**
 
-Run/verify equivalent repository reads for:
+Read:
 
 ```text
 AGENTS.md
@@ -67,9 +67,9 @@ modulex-admin/src/app/api/admin/calendar/**
 modulex-admin/src/app/api/admin/google-calendar/**
 ```
 
-Expected: feature work starts from the then-current `main`, not from the old V2 implementation SHA or the design branch.
+Expected: execution starts from the then-current `main`, not from the design branch or an older Calendar SHA.
 
-- [ ] **Step 2: Create an isolated feature branch from execution-time `main`.**
+- [ ] **Step 2: Create an isolated feature branch.**
 
 Use:
 
@@ -77,11 +77,11 @@ Use:
 feat/calendar-v3-bidirectional
 ```
 
-If occupied, use a safe unique suffix. Copy the approved V3 spec and this plan into the feature branch without reverting newer `main` changes.
+If that ref already exists, use a safe unique suffix. Copy the approved V3 spec and this plan into the feature branch while preserving all newer `main` changes.
 
 - [ ] **Step 3: Write the RED contract before implementation.**
 
-Create `calendar-v3-bidirectional-contract.mjs` with concrete required paths and assertions. Minimum contract body:
+Create `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs` with exact required paths and assertions:
 
 ```js
 import assert from "node:assert/strict";
@@ -94,7 +94,7 @@ const source = (p) => readFile(path.join(root, p), "utf8");
 
 const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconcile, workspace, projectTab] = await Promise.all([
   source("sql/calendar-v3-bidirectional.sql"),
-  source("../modulex-store/supabase/migrations/20260906XXXXXX_calendar_v3_bidirectional.sql"),
+  source("../modulex-store/supabase/migrations/20260906113000_calendar_v3_bidirectional.sql"),
   source("src/lib/google-calendar/config.ts"),
   source("src/lib/google-calendar/google-calendar.ts"),
   source("src/lib/google-calendar/bidirectional-sync.ts"),
@@ -136,28 +136,24 @@ assert.doesNotMatch(projectTab, /Create Calendar/);
 console.log("PASS: Calendar V3 bidirectional contract");
 ```
 
-Replace `20260906XXXXXX` with the actual migration timestamp chosen in Task 2 and keep the contract exact.
-
-- [ ] **Step 4: Run the new contract and verify RED.**
-
-Run:
+- [ ] **Step 4: Run the contract and verify RED.**
 
 ```bash
 cd modulex-admin
 node scripts/calendar-v3-bidirectional-contract.mjs
 ```
 
-Expected: FAIL because `sql/calendar-v3-bidirectional.sql` and V3 service/API files do not exist yet.
+Expected: FAIL because the V3 SQL/service/API files do not exist yet.
 
-- [ ] **Step 5: Wire the contract without adding a new workflow.**
+- [ ] **Step 5: Wire the contract without adding a workflow.**
 
-Add to `package.json`:
+Add to `modulex-admin/package.json`:
 
 ```json
 "smoke:calendar-v3": "node scripts/calendar-v3-bidirectional-contract.mjs"
 ```
 
-Add `npm run smoke:calendar-v3` to the existing `smoke` chain after `smoke:admin-calendar`. Update `.github/workflows/admin-ui-foundation.yml` path filters and job steps for the V3 contract/SQL/migration/Calendar files.
+Add `npm run smoke:calendar-v3` immediately after `smoke:admin-calendar` in the existing `smoke` chain. Add V3 paths and the command to `.github/workflows/admin-ui-foundation.yml`.
 
 - [ ] **Step 6: Commit the RED gate.**
 
@@ -166,20 +162,18 @@ git add modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs modulex-adm
 git commit -m "test(calendar): add V3 bidirectional RED contract"
 ```
 
-Expected: CI demonstrates the new contract is RED before implementation.
-
 ---
 
-### Task 2: Add the additive V3 database model and safe cutover state
+### Task 2: Add the additive V3 database model and cutover state
 
 **Files:**
 - Create: `modulex-admin/sql/calendar-v3-bidirectional.sql`
-- Create: `modulex-store/supabase/migrations/20260906XXXXXX_calendar_v3_bidirectional.sql`
+- Create: `modulex-store/supabase/migrations/20260906113000_calendar_v3_bidirectional.sql`
 - Modify: `modulex-admin/sql/README.md`
 - Test: `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs`
 
 **Interfaces:**
-- Produces tables/types required by every later service:
+- Produces:
   - `admin_calendars.kind += 'company'`
   - `project_calendar_bindings.binding_mode += 'company_shared'`
   - `calendar_integration_settings.company_provider_binding_id uuid null`
@@ -189,17 +183,14 @@ Expected: CI demonstrates the new contract is RED before implementation.
   - `calendar_sync_outbox`
   - `calendar_google_watch_channels`
   - `calendar_sync_conflicts`
-- Produces server-only/private RPCs for Google-origin business mutations and normal-event mutation integrity.
+  - domain-safe provider-origin schedule mutation RPCs.
 
-- [ ] **Step 1: Extend the RED SQL assertions with exact invariants.**
-
-Add assertions for:
+- [ ] **Step 1: Extend RED SQL assertions with invariants.**
 
 ```js
 assert.match(sql, /kind in \([^)]*company/i);
 assert.match(sql, /binding_mode[\s\S]*company_shared/i);
 assert.match(sql, /create unique index[\s\S]*admin_calendars[\s\S]*kind = 'company'/i);
-assert.match(sql, /create unique index[\s\S]*company_shared/i);
 assert.match(sql, /calendar_events[\s\S]*project_id uuid/i);
 assert.match(sql, /calendar_provider_event_links[\s\S]*provider_event_id text not null/i);
 assert.match(sql, /calendar_sync_outbox[\s\S]*source_type/i);
@@ -209,9 +200,9 @@ assert.match(sql, /alter table public\.calendar_events enable row level security
 assert.match(sql, /revoke all on public\.calendar_events from anon, authenticated/i);
 ```
 
-- [ ] **Step 2: Write canonical SQL as one additive transaction.**
+- [ ] **Step 2: Extend the existing registry/binding/settings additively.**
 
-Use these concrete shapes; names/types must remain stable through later tasks:
+Use:
 
 ```sql
 alter table public.admin_calendars
@@ -234,7 +225,11 @@ alter table public.calendar_integration_settings
   add column if not exists company_provider_binding_id uuid;
 ```
 
-Create `calendar_events` with typed schedule shape and JSONB provider-compatible fields:
+Add the FK from `company_provider_binding_id` to the existing provider-binding table with `on delete set null`.
+
+- [ ] **Step 3: Create `calendar_events`.**
+
+Use a server-owned table with this stable field set:
 
 ```sql
 create table if not exists public.calendar_events (
@@ -276,7 +271,11 @@ create table if not exists public.calendar_events (
 );
 ```
 
-Create the generic link/outbox/watch/conflict/extension tables with uniqueness:
+All-day end dates use Google's exclusive-end convention.
+
+- [ ] **Step 4: Create extension/link/outbox/watch/conflict tables with exact uniqueness.**
+
+Required uniqueness:
 
 ```sql
 unique (provider_binding_id, source_type, source_id)
@@ -284,11 +283,27 @@ unique (provider_binding_id, provider_event_id)
 unique (provider_binding_id, source_type, source_id) -- outbox coalescing key
 ```
 
-`calendar_google_watch_channels` must persist `channel_id`, `provider_binding_id`, `resource_id`, `resource_uri`, `channel_token_hash`, `expires_at`, `status`, `last_message_number`, `created_at`, `renewed_at`, `stopped_at`.
+`calendar_google_watch_channels` stores:
 
-- [ ] **Step 3: Add domain-safe private/public functions used by provider-origin apply.**
+```text
+channel_id
+provider_binding_id
+resource_id
+resource_uri
+channel_token_hash
+expires_at
+status
+last_message_number
+created_at
+renewed_at
+stopped_at
+```
 
-Add a private function that takes trusted source identity rather than arbitrary table/column names:
+`calendar_provider_event_links` stores provider etag/updated/fingerprint, Modulex fingerprint, last sync origin/status/error, provider tombstone state, optional `project_id`, and the stable source type/id.
+
+- [ ] **Step 5: Add domain-safe Google-origin schedule function.**
+
+Create:
 
 ```sql
 private.apply_google_business_schedule_change(
@@ -301,26 +316,26 @@ private.apply_google_business_schedule_change(
 ) returns void
 ```
 
-Behavior:
+Mapping is fixed:
 
 ```text
-project_start    -> update customer_projects.start_date
-project_target   -> update customer_projects.target_date
-project_delivery -> update customer_projects.planned_delivery_date
-installation     -> update scheduled_start_at/end_at; if p_deleted=true set status='cancelled'
+project_start    -> customer_projects.start_date
+project_target   -> customer_projects.target_date
+project_delivery -> customer_projects.planned_delivery_date
+installation     -> scheduled_start_at/scheduled_end_at; if deleted, status='cancelled'
 ```
 
-The function must reject unsupported `source_type`, reject recurrence for business sources at the service layer, validate Installation linkage through existing tables, and set a transaction-local origin marker such as:
+The function sets a transaction-local origin marker:
 
 ```sql
 perform set_config('modulex.calendar_sync_origin', 'google', true);
 ```
 
-Outbox trigger functions must skip enqueueing when `current_setting('modulex.calendar_sync_origin', true) = 'google'` and the resulting source fingerprint equals the provider-applied state.
+Outbox trigger logic must suppress identical echo work while provider-origin state is being applied.
 
-- [ ] **Step 4: Add RLS/revokes/grants/indexes.**
+- [ ] **Step 6: Add indexes, RLS, revokes, and service-role grants.**
 
-All V3 provider/sync persistence tables remain server-only:
+All V3 Calendar persistence remains server-only; for every new table:
 
 ```sql
 alter table public.calendar_events enable row level security;
@@ -328,7 +343,7 @@ revoke all on public.calendar_events from anon, authenticated;
 grant all on public.calendar_events to service_role;
 ```
 
-Apply the same server-only pattern to extension/link/outbox/watch/conflict tables. Calendar browser UI continues through permission-checked Next.js APIs.
+Apply the same pattern to business extensions, provider links, outbox, watch channels, and conflicts.
 
 Add indexes for:
 
@@ -342,39 +357,39 @@ calendar_provider_event_links(provider_binding_id, provider_event_id)
 calendar_sync_conflicts(provider_binding_id, created_at desc)
 ```
 
-- [ ] **Step 5: Preserve legacy Project Google rows without activating them for V3.**
+- [ ] **Step 7: Backfill only the logical company calendar; do not mutate Google.**
 
-Migration rules:
+Migration behavior:
 
 ```text
-existing modulex_created bindings: unchanged, no deletion
-existing google_imported bindings: unchanged, no deletion
-new company admin calendar: create/backfill exactly one using existing active calendar owner logic
-company_provider_binding_id: remains NULL until explicit Settings selection
-no Google network writes during migration
+create exactly one active `company` admin calendar using an existing valid active Modulex owner
+leave existing `modulex_created` and `google_imported` bindings untouched
+leave `company_provider_binding_id` NULL
+leave all legacy Project event links untouched
+perform no Google network writes
 ```
 
-Do not repoint old `project_calendar_event_links` to the company binding.
+Fail closed if no active owner can be resolved.
 
-- [ ] **Step 6: Mirror canonical SQL byte-for-byte into the migration file and run the contract.**
+- [ ] **Step 8: Mirror SQL byte-for-byte and run the contract.**
 
 ```bash
 cd modulex-admin
 npm run smoke:calendar-v3
 ```
 
-Expected: SQL/schema assertions pass; later service/API assertions remain RED.
+Expected: schema assertions pass; later V3 service/API/UI assertions remain RED.
 
-- [ ] **Step 7: Commit schema.**
+- [ ] **Step 9: Commit schema.**
 
 ```bash
-git add modulex-admin/sql/calendar-v3-bidirectional.sql modulex-store/supabase/migrations/20260906XXXXXX_calendar_v3_bidirectional.sql modulex-admin/sql/README.md modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs
+git add modulex-admin/sql/calendar-v3-bidirectional.sql modulex-store/supabase/migrations/20260906113000_calendar_v3_bidirectional.sql modulex-admin/sql/README.md modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs
 git commit -m "feat(calendar): add V3 bidirectional persistence"
 ```
 
 ---
 
-### Task 3: Expand Google OAuth and provider primitives for shared writable calendars
+### Task 3: Expand Google OAuth and provider primitives
 
 **Files:**
 - Modify: `modulex-admin/src/lib/google-calendar/config.ts`
@@ -386,7 +401,6 @@ git commit -m "feat(calendar): add V3 bidirectional persistence"
 - Test: `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs`
 
 **Interfaces:**
-- Produces:
 
 ```ts
 hasGoogleCalendarBidirectionalScopes(scopes): boolean
@@ -395,22 +409,15 @@ watchGoogleCalendarEvents(...): Promise<GoogleCalendarWatchChannel>
 stopGoogleCalendarWatchChannel(...): Promise<void>
 ```
 
-Provider event resource expands to preserve recurrence, attendees, reminders, conferenceData, extendedProperties, eventType, recurringEventId, originalStartTime, visibility, transparency, organizer/creator.
-
-- [ ] **Step 1: Tighten RED contract around scopes and shared role eligibility.**
-
-Assert:
+- [ ] **Step 1: Make the V3 scope requirement RED.**
 
 ```js
 assert.match(config, /https:\/\/www\.googleapis\.com\/auth\/calendar\.events/);
 assert.match(config, /calendar\.calendarlist\.readonly/);
 assert.match(config, /hasGoogleCalendarBidirectionalScopes/);
-assert.doesNotMatch(config, /GOOGLE_CALENDAR_IMPORT_SCOPES[\s\S]*calendar\.events\.owned/);
 ```
 
-- [ ] **Step 2: Replace the V3 write-scope requirement.**
-
-Use:
+- [ ] **Step 2: Replace the V3 write-scope check.**
 
 ```ts
 export const GOOGLE_CALENDAR_BIDIRECTIONAL_SCOPES = [
@@ -419,50 +426,30 @@ export const GOOGLE_CALENDAR_BIDIRECTIONAL_SCOPES = [
 ] as const;
 ```
 
-Keep `calendar.app.created` only if required to avoid breaking legacy routes; mark those routes legacy and stop calling them from V3 UI.
+Retain `calendar.app.created` only for legacy compatibility; no V3 UI/service may depend on it.
 
-- [ ] **Step 3: Expand provider DTOs.**
+- [ ] **Step 3: Expand Google event DTOs.**
 
-Use safe types similar to:
+Add fields for:
 
 ```ts
-export type GoogleCalendarAttendee = {
-  email: string;
-  displayName?: string;
-  responseStatus?: string;
-  optional?: boolean;
-  organizer?: boolean;
-  self?: boolean;
-};
-
-export type GoogleCalendarEventResource = {
-  id: string;
-  summary?: string;
-  description?: string;
-  location?: string;
-  start?: GoogleCalendarEventDate;
-  end?: GoogleCalendarEventDate;
-  colorId?: string;
-  recurrence?: string[];
-  recurringEventId?: string;
-  originalStartTime?: GoogleCalendarEventDate;
-  attendees?: GoogleCalendarAttendee[];
-  reminders?: { useDefault?: boolean; overrides?: Array<{ method: string; minutes: number }> };
-  conferenceData?: Record<string, unknown>;
-  extendedProperties?: { private?: Record<string, string>; shared?: Record<string, string> };
-  eventType?: string;
-  visibility?: string;
-  transparency?: string;
-  status?: string;
-  updated?: string;
-  etag?: string;
-  htmlLink?: string;
-};
+recurrence?: string[];
+recurringEventId?: string;
+originalStartTime?: GoogleCalendarEventDate;
+attendees?: GoogleCalendarAttendee[];
+reminders?: { useDefault?: boolean; overrides?: Array<{ method: string; minutes: number }> };
+conferenceData?: Record<string, unknown>;
+extendedProperties?: { private?: Record<string, string>; shared?: Record<string, string> };
+eventType?: string;
+visibility?: string;
+transparency?: string;
+creator?: Record<string, unknown>;
+organizer?: Record<string, unknown>;
 ```
 
-- [ ] **Step 4: Add PATCH and watch/stop provider calls.**
+- [ ] **Step 4: Add PATCH/watch/stop provider calls.**
 
-Provider methods must use these concrete endpoints:
+Use:
 
 ```text
 PATCH /calendar/v3/calendars/{calendarId}/events/{eventId}
@@ -470,9 +457,9 @@ POST  /calendar/v3/calendars/{calendarId}/events/watch
 POST  /calendar/v3/channels/stop
 ```
 
-`patchGoogleCalendarEvent` accepts optional `sendUpdates` and `conferenceDataVersion` query params. Semantic attendee mutations use `sendUpdates=all`; mirror/fingerprint-only patches omit invitation mail.
+`patchGoogleCalendarEvent` accepts optional `sendUpdates` and `conferenceDataVersion` query parameters. Semantic attendee changes use `sendUpdates=all`; sync-only metadata work must not send invitation email.
 
-`watchGoogleCalendarEvents` request body:
+Watch request:
 
 ```ts
 {
@@ -483,19 +470,17 @@ POST  /calendar/v3/channels/stop
 }
 ```
 
-Return/persist Google `resourceId`, `resourceUri`, and numeric expiration.
+Persist the returned resource id/URI/expiration through later repository APIs.
 
-- [ ] **Step 5: Keep CalendarList discovery but change `write_eligible`.**
-
-Eligibility in discovery service becomes:
+- [ ] **Step 5: Change discovery eligibility.**
 
 ```ts
 const writeEligible = entry.accessRole === "owner" || entry.accessRole === "writer";
 ```
 
-Explicitly reject `writerWithoutPrivateAccess`.
+Reject `writerWithoutPrivateAccess` for the active Company binding.
 
-- [ ] **Step 6: Update status DTO/UI reconnect state and run provider contracts.**
+- [ ] **Step 6: Update reconnect status and run contracts.**
 
 ```bash
 cd modulex-admin
@@ -503,9 +488,9 @@ npm run smoke:google-calendar
 npm run smoke:calendar-v3
 ```
 
-Expected: provider/scope assertions GREEN; sync-engine/API/UI assertions still RED.
+Expected: scope/provider assertions GREEN; sync-engine/API/UI assertions remain RED.
 
-- [ ] **Step 7: Commit provider primitives.**
+- [ ] **Step 7: Commit.**
 
 ```bash
 git add modulex-admin/src/lib/google-calendar modulex-admin/src/app/api/admin/google-calendar/status/route.ts modulex-admin/scripts/google-calendar-integration-contract.mjs modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs
@@ -514,7 +499,7 @@ git commit -m "feat(calendar): add shared-calendar Google primitives"
 
 ---
 
-### Task 4: Build the V3 repository and event domain layer
+### Task 4: Build the V3 local event domain and repository
 
 **Files:**
 - Create: `modulex-admin/src/lib/calendar/calendar-events.ts`
@@ -522,11 +507,10 @@ git commit -m "feat(calendar): add shared-calendar Google primitives"
 - Create: `modulex-admin/src/lib/google-calendar/v3-repository.ts`
 - Modify: `modulex-admin/src/lib/calendar/event-normalization.ts`
 - Modify: `modulex-admin/src/lib/calendar/admin-calendar.ts`
-- Modify: `modulex-admin/src/lib/google-calendar/repository.ts` only for legacy compatibility helpers; new V3 code should prefer `v3-repository.ts`.
+- Modify: `modulex-admin/src/lib/google-calendar/repository.ts` only for legacy compatibility helpers.
 - Test: `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs`
 
 **Interfaces:**
-- Produces normal-event CRUD and mapping/outbox/watch repository APIs.
 
 ```ts
 createCalendarEvent(input): Promise<CalendarEventRecord>
@@ -547,7 +531,7 @@ getProviderEventLinkBySource(...)
 upsertProviderEventLink(...)
 ```
 
-- [ ] **Step 1: Add failing contract assertions for normal-event types and generic links.**
+- [ ] **Step 1: Add RED repository/domain assertions.**
 
 ```js
 assert.match(calendarEventsSource, /createCalendarEvent/);
@@ -557,9 +541,7 @@ assert.match(v3RepoSource, /calendar_sync_outbox/);
 assert.match(v3RepoSource, /calendar_google_watch_channels/);
 ```
 
-- [ ] **Step 2: Define one normalized editable event DTO.**
-
-In `calendar-event-validation.ts`:
+- [ ] **Step 2: Define one editable event mutation DTO.**
 
 ```ts
 export type CalendarEventMutation = {
@@ -587,34 +569,32 @@ export type CalendarEventMutation = {
 };
 ```
 
-Validation rules:
+Validation is exact:
 
 ```text
 title trimmed/non-empty
 end > start for timed events
-all-day end uses exclusive date semantics and must be > start
-recurrence accepts RFC5545 lines only for normal/default events
-attendee emails normalized/deduplicated
-reminder minutes >= 0 and supported methods only
-Project id optional and must reference a real Project when supplied
-owner must be active
+all-day end > start and remains exclusive
+recurrence RFC5545 strings allowed only for normal/default events
+attendee emails normalized and deduplicated
+reminder minutes >= 0 and method is email or popup
+project id, when supplied, must resolve to a real Project
+owner profile must be active
 ```
 
-- [ ] **Step 3: Implement server-only normal-event CRUD with same-transaction outbox enqueue.**
+- [ ] **Step 3: Implement normal-event CRUD with transaction-safe outbox enqueue.**
 
-Normal event mutation and outbox insertion must succeed/fail together, using a server RPC or transaction-safe SQL function rather than two unrelated browser requests. The service must return the local event immediately; provider sync is best-effort afterward.
+The local event mutation and outbox upsert must be atomic through a private/public SQL RPC or equivalent DB transaction boundary. Browser code must not perform direct writes to server-only tables.
 
 - [ ] **Step 4: Extend normalized Calendar feed.**
 
-Add event types:
+Add:
 
 ```ts
 "calendar_event" | "google_special"
 ```
 
-`calendar_event` represents editable normal events. `google_special` is read-only. Business events continue as the four existing types.
-
-Each feed event includes:
+Every feed event also exposes:
 
 ```ts
 editable: boolean;
@@ -624,11 +604,11 @@ provider_event_type: string | null;
 sync_status: "local" | "synced" | "pending" | "error" | "conflict";
 ```
 
-- [ ] **Step 5: Change Admin Calendar filtering to the company calendar/read model.**
+- [ ] **Step 5: Change filtering semantics.**
 
-Project filtering must filter event `project_id`, not require a Project-specific Google/Admin calendar. `My Calendar` uses `responsible_profile_id` / effective responsibility rather than the company calendar owner alone.
+Project filter operates on event `project_id`, not a Project-specific Google calendar. `My Calendar` filters effective event responsibility. Project milestones prefer active Sales Rep; Installations prefer existing assigned employee/installer when the current domain exposes one, otherwise Project responsibility, then Company Calendar owner.
 
-- [ ] **Step 6: Run V3 + existing Calendar contracts.**
+- [ ] **Step 6: Run Calendar contracts.**
 
 ```bash
 cd modulex-admin
@@ -636,7 +616,7 @@ npm run smoke:calendar-v3
 npm run smoke:admin-calendar
 ```
 
-Expected: repository/domain assertions GREEN without breaking the existing core contract.
+Expected: domain/repository assertions GREEN.
 
 - [ ] **Step 7: Commit.**
 
@@ -647,14 +627,14 @@ git commit -m "feat(calendar): add V3 event domain and repository"
 
 ---
 
-### Task 5: Implement the bidirectional sync engine, outbox, conflict logic, and watch lifecycle
+### Task 5: Implement bidirectional sync, conflict logic, and Google watch lifecycle
 
 **Files:**
 - Create: `modulex-admin/src/lib/google-calendar/bidirectional-sync.ts`
 - Create: `modulex-admin/src/lib/google-calendar/event-mapping.ts`
 - Create: `modulex-admin/src/lib/google-calendar/watch-channels.ts`
 - Create: `modulex-admin/src/lib/google-calendar/sync-conflicts.ts`
-- Modify: `modulex-admin/src/lib/google-calendar/calendar-import.ts` to delegate V3 company sync rather than duplicate logic where appropriate.
+- Modify: `modulex-admin/src/lib/google-calendar/calendar-import.ts` to delegate company-calendar sync rather than duplicate V3 logic.
 - Test: `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs`
 
 **Interfaces:**
@@ -668,7 +648,7 @@ ensureCompanyCalendarWatch(): Promise<WatchState>
 renewExpiringCompanyCalendarWatch(now?: Date): Promise<WatchState>
 ```
 
-- [ ] **Step 1: Add RED assertions for source mapping, echo suppression, conflicts, and 410 recovery.**
+- [ ] **Step 1: Add RED sync assertions.**
 
 ```js
 assert.match(syncEngine, /applyGoogleEventChange/);
@@ -679,9 +659,9 @@ assert.match(syncEngine, /sync_token_gone|410/);
 assert.match(syncEngine, /extendedProperties/);
 ```
 
-- [ ] **Step 2: Implement Modulex → Google mapping.**
+- [ ] **Step 2: Map Modulex normal/business events to Google.**
 
-Normal event private extended properties:
+Normal events use private extended properties:
 
 ```ts
 private: {
@@ -691,32 +671,28 @@ private: {
 }
 ```
 
-Business mapping uses existing trusted source type/id and stores the provider mapping row after create.
-
-Use Google `PATCH` for updates. Use `DELETE` for normal event deletion. For business deletion from Modulex, remove the Google event after the canonical date is cleared/cancelled and retain a link tombstone/audit state sufficient to recognize late provider notifications.
+Business events use trusted link rows and corresponding source type/id. Use Google PATCH for updates. Use Google DELETE for normal event deletion. Business date clear/cancel removes the corresponding provider event and retains enough tombstone/link history to recognize late provider notifications.
 
 - [ ] **Step 3: Implement Google → Modulex classification.**
 
-Algorithm:
-
 ```text
-1. Look up existing provider link by company binding + provider_event_id.
-2. If link exists and source_type is business: apply only schedule/delete semantics to canonical business source.
-3. If link exists and source_type=calendar_event: patch local normal event.
-4. If no link and eventType=default: create/import normal calendar_event, then link it.
-5. If no link and special event type: persist/update read-only provider mirror/special record; do not create editable normal event.
-6. Never trust extendedProperties alone to mutate business data without an existing trusted link.
+1. Find link by company binding + provider_event_id.
+2. Existing business link -> apply only allowed schedule/delete semantics.
+3. Existing calendar_event link -> patch local normal event.
+4. No link + eventType=default -> create/import normal calendar_event and link it.
+5. No link + special event type -> mirror as read-only `google_special`.
+6. Never mutate business data solely from untrusted extendedProperties.
 ```
 
-- [ ] **Step 4: Implement recurrence and occurrence behavior for normal events.**
+- [ ] **Step 4: Implement recurrence/occurrence behavior.**
 
-Master recurring event maps to one `calendar_events` series source. Provider instances use `recurringEventId + originalStartTime` identity. A single-instance override/deletion must be represented as provider occurrence metadata/local exception data without cloning a Project/Installation.
+One recurring normal-event series maps to one normal source. Single occurrence identity uses `recurringEventId + originalStartTime`. Single occurrence edit/delete remains an exception/override; it never clones a Project or Installation. `this and following` is not implemented.
 
-Do not accept recurrence on business links. If Google changes a mapped business event into recurrence, write a sync conflict with code `business_recurrence_not_supported` and enqueue restoration of the singular Modulex representation.
+If a mapped business event is made recurring in Google, record conflict code `business_recurrence_not_supported` and enqueue restoration of its singular Modulex representation.
 
 - [ ] **Step 5: Implement fingerprint/conflict decisions.**
 
-For each mapping store/compare:
+Persist and compare:
 
 ```text
 last_provider_etag
@@ -727,39 +703,40 @@ last_modulex_fingerprint
 last_sync_origin
 ```
 
-Decision:
+Decision table:
 
 ```text
 provider changed only -> apply provider
-Modulex changed only -> push Modulex
-neither -> no-op
-both -> choose deterministic winner by changed timestamp/observed-at fallback, write calendar_sync_conflicts row, then converge loser
+Modulex changed only   -> push Modulex
+neither                -> no-op
+both                    -> deterministic timestamp/observed-at winner + conflict audit + converge loser
 ```
 
-Reminder-only provider changes may not advance `event.updated`; when fingerprint changes but provider timestamp does not, use `provider_observed_at` as the provider side conflict timestamp.
+Reminder-only provider fingerprint changes may use `provider_observed_at` when Google `updated` did not advance.
 
-- [ ] **Step 6: Implement incremental sync and 410 reset.**
+- [ ] **Step 6: Implement incremental sync and HTTP 410 recovery.**
 
 ```ts
 try {
   const page = await listGoogleCalendarEvents({ syncToken: binding.provider_sync_token, ... });
-  // apply every item, then persist nextSyncToken only after full batch success
+  // apply every changed/deleted event
+  // persist nextSyncToken only after the full batch succeeds
 } catch (error) {
   if (error instanceof GoogleCalendarProviderError && error.code === "sync_token_gone") {
-    // bounded full resync, rebuild provider replica/link observations, store new nextSyncToken
+    // bounded full resync, then replace provider_sync_token
   } else {
-    // retain prior data/token, mark stale/error
+    // keep last successful local replica/token and mark provider health stale/error
   }
 }
 ```
 
-- [ ] **Step 7: Implement watch-channel creation/renewal.**
+- [ ] **Step 7: Implement watch creation and renewal.**
 
-Generate a random channel token, persist only a SHA-256 hash, and send the raw token only to Google during watch creation. Persist pending channel row before/while creating so an early initial `sync` notification can be accepted. On success update resource id/expiration and mark active.
+Generate a random channel token, persist only its SHA-256 hash, and send the raw token only to Google when creating the channel. Create a `pending` channel record before/with the watch request so Google's initial `sync` notification can be accepted even if it arrives before the watch response is fully persisted.
 
-Renew before expiration using a replacement channel id, allow overlap, then stop/retire the older channel. Do not assume fixed lifetime.
+Renew before expiration by creating a replacement channel with a new id, allow overlap, then stop/retire the older channel.
 
-- [ ] **Step 8: Run contract.**
+- [ ] **Step 8: Run provider/sync contracts.**
 
 ```bash
 cd modulex-admin
@@ -767,9 +744,9 @@ npm run smoke:calendar-v3
 npm run smoke:google-calendar
 ```
 
-Expected: sync-engine/provider assertions GREEN.
+Expected: sync engine/provider assertions GREEN.
 
-- [ ] **Step 9: Commit sync engine.**
+- [ ] **Step 9: Commit.**
 
 ```bash
 git add modulex-admin/src/lib/google-calendar modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs
@@ -778,7 +755,7 @@ git commit -m "feat(calendar): add bidirectional Google sync engine"
 
 ---
 
-### Task 6: Add permission-checked event CRUD, company binding, webhook, manual sync, and reconciliation APIs
+### Task 6: Add event CRUD, company binding, webhook, manual sync, and reconciliation APIs
 
 **Files:**
 - Create: `modulex-admin/src/app/api/admin/calendar/events/route.ts`
@@ -787,8 +764,8 @@ git commit -m "feat(calendar): add bidirectional Google sync engine"
 - Create: `modulex-admin/src/app/api/admin/calendar/google/webhook/route.ts`
 - Create: `modulex-admin/src/app/api/admin/calendar/google/reconcile/route.ts`
 - Modify: `modulex-admin/src/app/api/admin/calendar/google/discovery/route.ts`
-- Modify: `modulex-admin/src/app/api/admin/calendar/google/import/route.ts` or replace V3 usage with company-binding route while keeping legacy compatibility.
-- Modify: `modulex-admin/src/app/api/admin/calendar/google/sync/route.ts` for V3 manual company sync.
+- Modify: `modulex-admin/src/app/api/admin/calendar/google/sync/route.ts`
+- Keep legacy `.../google/import/route.ts` only for backward compatibility; V3 UI no longer uses it as the primary company-binding action.
 - Modify: `modulex-admin/vercel.json`
 - Test: `modulex-admin/scripts/api-timing-contract.mjs`
 - Test: `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs`
@@ -801,12 +778,12 @@ PATCH  /api/admin/calendar/events/:eventId
 DELETE /api/admin/calendar/events/:eventId
 GET    /api/admin/calendar/company-binding
 PUT    /api/admin/calendar/company-binding
-POST   /api/admin/calendar/google/webhook     # Google, no user auth; channel verification required
-POST   /api/admin/calendar/google/sync        # authorized manual sync
-GET/POST /api/admin/calendar/google/reconcile # CRON_SECRET protected
+POST   /api/admin/calendar/google/webhook
+POST   /api/admin/calendar/google/sync
+GET    /api/admin/calendar/google/reconcile
 ```
 
-- [ ] **Step 1: Add RED assertions for route permissions and webhook verification headers.**
+- [ ] **Step 1: Add RED route/security assertions.**
 
 ```js
 assert.match(eventRoute, /calendar\.manage/);
@@ -818,7 +795,7 @@ assert.match(webhook, /timingSafeEqual|timingSafe/i);
 
 - [ ] **Step 2: Implement normal event CRUD routes.**
 
-`POST/PATCH/DELETE` require `calendar.manage`, call the server domain, commit local mutation/outbox, then attempt immediate flush. Response must distinguish local success from provider status:
+`POST/PATCH/DELETE` require `calendar.manage`. Local mutation/outbox commits first, then immediate provider flush is attempted. Response shape:
 
 ```ts
 {
@@ -828,11 +805,11 @@ assert.match(webhook, /timingSafeEqual|timingSafe/i);
 }
 ```
 
-Google failure returns local success (2xx) with pending/error sync status rather than undoing the Modulex mutation.
+A Google failure returns local success with pending/error sync status instead of rolling back Modulex.
 
 - [ ] **Step 3: Implement company binding selection.**
 
-`PUT /company-binding` accepts:
+`PUT /api/admin/calendar/company-binding` accepts:
 
 ```ts
 {
@@ -841,27 +818,36 @@ Google failure returns local success (2xx) with pending/error sync status rather
 }
 ```
 
-Validate active Modulex owner, Google access role owner/writer, required bidirectional scopes, uniqueness, and provider metadata. Set `calendar_integration_settings.company_provider_binding_id`, disable legacy `auto_create_project_calendar`, perform initial full sync, then establish watch. If initial Google sync/watch fails after binding selection, keep the binding but surface health/error state; do not delete user Google data.
+Validate active owner, connected OAuth scopes, CalendarList entry, `accessRole` owner/writer, uniqueness, timezone/colors/provider metadata. Persist `company_provider_binding_id`, set `auto_create_project_calendar=false`, run initial full sync, then establish watch. Initial provider/watch failure after DB selection leaves the binding present with explicit error health; it never deletes Google data.
 
-- [ ] **Step 4: Implement webhook verification and coalesced sync.**
+- [ ] **Step 4: Implement webhook verification.**
 
-Webhook does **not** use user session auth. Verify stored active/pending channel using all relevant `X-Goog-*` headers and token hash. Ignore duplicate/lower message numbers safely. Record/coalesce sync work, then attempt incremental sync. Respond quickly with 2xx for accepted duplicate/change notifications so Google does not amplify retries.
+Webhook does not require a user session. Verify stored pending/active channel using `X-Goog-Channel-ID`, `X-Goog-Channel-Token`, `X-Goog-Resource-ID`, status/expiration, and timing-safe token hash comparison. Duplicate/lower message numbers are harmless. Coalesce sync work and attempt incremental sync; return promptly for valid notifications.
 
-- [ ] **Step 5: Implement reconciliation route and cron.**
+- [ ] **Step 5: Implement hourly reconciliation.**
 
-Protect with existing Vercel cron pattern/`CRON_SECRET`. Reconciliation performs in order:
+Protect `/api/admin/calendar/google/reconcile` with the repository's existing Vercel cron-secret convention. Run in this order:
 
 ```text
 1. flush due outbox items
-2. incremental provider sync if binding active
+2. incremental company-calendar sync
 3. renew watch if near expiration
-4. refresh CalendarList access role / detect downgrade
-5. record health
+4. refresh CalendarList access role and detect downgrade/removal
+5. persist health state
 ```
 
-Update `vercel.json` by adding one Calendar reconciliation schedule alongside vendor sync, e.g. every 15 minutes if Vercel plan permits the repository's current cron policy. If deployment plan only permits daily cron, use hourly/daily reconciliation while push remains the real-time path; document the actual selected cadence in PR notes.
+Add to `modulex-admin/vercel.json`:
 
-- [ ] **Step 6: Run API timing and V3 contracts.**
+```json
+{
+  "path": "/api/admin/calendar/google/reconcile",
+  "schedule": "5 * * * *"
+}
+```
+
+Keep the existing vendor cron unchanged. If the deployed Vercel plan rejects hourly cron, stop deployment and surface that infrastructure constraint before substituting another scheduler.
+
+- [ ] **Step 6: Run API/V3 contracts.**
 
 ```bash
 cd modulex-admin
@@ -871,7 +857,7 @@ npm run smoke:api-timing
 
 Expected: GREEN.
 
-- [ ] **Step 7: Commit APIs.**
+- [ ] **Step 7: Commit.**
 
 ```bash
 git add modulex-admin/src/app/api/admin/calendar modulex-admin/vercel.json modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs
@@ -880,21 +866,21 @@ git commit -m "feat(calendar): expose V3 sync and event APIs"
 
 ---
 
-### Task 7: Refactor the full Admin Calendar into the rich event CRUD workspace
+### Task 7: Turn `/calendar` into the full rich CRUD workspace
 
 **Files:**
 - Modify: `modulex-admin/src/components/calendar/AdminCalendarWorkspace.tsx`
 - Create: `modulex-admin/src/components/calendar/CalendarEventEditorModal.tsx`
 - Create: `modulex-admin/src/components/calendar/CalendarCompanyStatus.tsx`
-- Modify: `modulex-admin/src/app/(admin)/calendar/page.tsx` if page-level props/copy are needed.
+- Modify: `modulex-admin/src/app/(admin)/calendar/page.tsx` if page copy/props need updating.
 - Test: `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs`
 - Test: `modulex-admin/scripts/admin-ui-strict-contract.mjs`
 
 **Interfaces:**
-- Admin Calendar consumes Calendar feed + event CRUD + company binding status.
-- FullCalendar uses `@fullcalendar/interaction` for select/drag/resize.
+- FullCalendar uses existing day/week/month/list plugins plus `@fullcalendar/interaction`.
+- Shared event editor is reused by Project Calendar.
 
-- [ ] **Step 1: Add RED UI assertions.**
+- [ ] **Step 1: Add RED rich-UI assertions.**
 
 ```js
 assert.match(workspace, /interactionPlugin/);
@@ -907,9 +893,9 @@ assert.match(eventEditor, /Reminders/);
 assert.match(eventEditor, /Google Meet/);
 ```
 
-- [ ] **Step 2: Add `CalendarEventEditorModal`.**
+- [ ] **Step 2: Implement `CalendarEventEditorModal`.**
 
-Use shared Admin components only. Fields:
+Use shared Admin primitives for:
 
 ```text
 Title
@@ -927,42 +913,32 @@ Guest permissions
 Reminders
 Google Meet add/remove
 Visibility
-Availability (busy/free -> transparency)
+Availability (busy/free)
 ```
 
-When opened on a read-only special Google event, show provider details and `Open in Google Calendar` but disable mutation actions.
+Special Google event types render read-only provider details plus `Open in Google Calendar`.
 
-- [ ] **Step 3: Add create/edit/delete behavior.**
+- [ ] **Step 3: Add create/edit/delete.**
 
-Calendar blank-range selection opens create modal. Event click opens edit modal instead of navigating away for editable events. Normal event delete uses confirmation. Business event editor exposes supported schedule/presentation fields and clearly warns deletion consequence:
+Blank-range select opens create. Editable event click opens edit. Normal delete requires confirmation. Business delete warning text states the exact canonical effect before confirmation:
 
 ```text
-Project Start/Target/Delivery deletion clears that Project date.
-Installation deletion cancels the Installation.
+Project Start -> clear Start Date
+Project Target -> clear Target Completion Date
+Planned Delivery -> clear Planned Delivery Date
+Installation -> cancel Installation; row remains
 ```
 
-- [ ] **Step 4: Add drag/drop + resize.**
+- [ ] **Step 4: Add drag/drop and resize.**
 
-Use FullCalendar interaction callbacks. Optimistically revert on local API failure:
+On local API failure, call FullCalendar `info.revert()`. On local success + provider pending/error, keep the local move and show sync state; do not revert a valid Modulex change because Google is temporarily unavailable.
 
-```ts
-async function handleEventDrop(info: EventDropArg) {
-  try {
-    await updateEventTime(...);
-  } catch {
-    info.revert();
-  }
-}
-```
+- [ ] **Step 5: Replace imported-calendar management with Company Calendar status.**
 
-Provider pending/error state does **not** revert a successful local mutation; instead show `Sync pending`/`Sync error` badge.
-
-- [ ] **Step 5: Simplify company/calendar management.**
-
-Replace generic imported-calendar management as the main workflow with one Company Calendar status/selector card:
+Show:
 
 ```text
-Company Calendar: <provider name>
+Company Calendar: <name>
 Google account: <email>
 Access: writer/owner
 Sync: healthy/pending/error/conflict
@@ -971,13 +947,13 @@ Watch expires
 [Change Calendar] [Sync Now] [Open in Google]
 ```
 
-CalendarList discovery remains available inside `Change Calendar` management, not as multiple imported calendars the user must manage individually.
+Calendar discovery remains inside `Change Calendar` management.
 
-- [ ] **Step 6: Preserve top-level Month / Week / Day / List and filters.**
+- [ ] **Step 6: Keep full Month / Week / Day / List and filters.**
 
-Filters remain Owner, Project, Calendar/Event Type where still meaningful; `My Calendar` becomes effective responsibility filter. For single company topology, hide/reduce the redundant Calendar filter if only one active company calendar exists, while retaining compatibility if legacy/read-only calendars are displayed.
+Preserve Owner, Project, Event Type and `My Calendar`. The Calendar filter may be reduced/hidden when only the single Company Calendar is active, but legacy/read-only calendars may still be exposed when useful.
 
-- [ ] **Step 7: Run strict UI + Calendar contracts.**
+- [ ] **Step 7: Run UI gates.**
 
 ```bash
 cd modulex-admin
@@ -986,9 +962,9 @@ npm run smoke:admin-calendar
 npm run smoke:admin-ui-strict
 ```
 
-Expected: GREEN and no native button/input/select/textarea/label/table violations in changed feature TSX.
+Expected: GREEN with no forbidden native form/table elements in changed feature TSX.
 
-- [ ] **Step 8: Commit Admin Calendar UI.**
+- [ ] **Step 8: Commit.**
 
 ```bash
 git add modulex-admin/src/components/calendar modulex-admin/src/app/'(admin)'/calendar/page.tsx modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs
@@ -997,21 +973,20 @@ git commit -m "feat(calendar): add rich bidirectional Admin Calendar UI"
 
 ---
 
-### Task 8: Compact the Project Calendar tab and remove per-Project Google management
+### Task 8: Compact the Project Calendar and remove per-Project Google controls
 
 **Files:**
 - Modify: `modulex-admin/src/components/customers/project-detail/ProjectCalendarTab.tsx`
 - Create: `modulex-admin/src/components/customers/project-detail/ProjectCalendarEventList.tsx`
 - Reuse: `modulex-admin/src/components/calendar/CalendarEventEditorModal.tsx`
-- Modify legacy Project Google API usage only as needed so the tab no longer calls create/rename/toggle Project Calendar endpoints.
 - Test: `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs`
 - Test: existing customer/project detail contracts.
 
 **Interfaces:**
-- Project tab uses the same event APIs as `/calendar` with fixed `project_id`.
-- Large visual Calendar is collapsed by default.
+- Project tab uses the same company-calendar/event APIs with fixed `project_id`.
+- Large visual calendar is hidden by default.
 
-- [ ] **Step 1: Add RED assertions for compact UX and removed legacy controls.**
+- [ ] **Step 1: Add RED compact-UX assertions.**
 
 ```js
 assert.match(projectTab, /Upcoming Calendar Events/);
@@ -1025,7 +1000,7 @@ assert.doesNotMatch(projectTab, /Disable Sync/);
 
 - [ ] **Step 2: Keep Project Schedule compact.**
 
-Display/edit:
+Keep:
 
 ```text
 Start Date
@@ -1034,33 +1009,29 @@ Planned Delivery Date
 Primary Installation
 ```
 
-Keep existing domain mutation `updateCustomerProjectSchedule`; stop manually calling the old per-Project `/resync` endpoint. The domain/outbox path now handles provider projection.
+Continue using `updateCustomerProjectSchedule`. Remove the explicit legacy per-Project `/resync` call; outbox/immediate provider flush handles projection.
 
-- [ ] **Step 3: Add upcoming event list.**
+- [ ] **Step 3: Add upcoming Project events.**
 
-Show the nearest relevant events with time, title, type, sync state, and edit affordance. `+ Add Event` opens the shared editor with `projectId` preselected.
+List nearest Project-linked events with date/time, title, type, responsible user, and sync status. `+ Add Event` opens the shared normal-event editor with current `projectId` preselected.
 
-- [ ] **Step 4: Add collapsed visual calendar.**
-
-Initial state:
+- [ ] **Step 4: Add collapsed Month/List visual calendar.**
 
 ```ts
 const [calendarVisible, setCalendarVisible] = useState(false);
 ```
 
-Render `Show Calendar`; once open, render a project-filtered Month/List workspace only. Provide `Hide Calendar` to collapse again. Do not render Week/Day controls in the Project compact view.
+Initial UI shows `Show Calendar`. When expanded, show only the project-filtered Month/List workspace and a `Hide Calendar` action. Week/Day controls remain exclusive to the top-level `/calendar` workspace.
 
-- [ ] **Step 5: Replace legacy Google cards with one small company status row.**
-
-Example copy:
+- [ ] **Step 5: Replace legacy Google cards with one small status row.**
 
 ```text
 Company Calendar · <Family / Operations> · Synced <time> · Open in Google
 ```
 
-No Project-level create/rename/enable/disable controls.
+No Project-level create, rename, enable/disable, or resync controls.
 
-- [ ] **Step 6: Run tests.**
+- [ ] **Step 6: Run Project/UI tests.**
 
 ```bash
 cd modulex-admin
@@ -1071,7 +1042,7 @@ npm run smoke:admin-ui-strict
 
 Expected: GREEN.
 
-- [ ] **Step 7: Commit Project UX.**
+- [ ] **Step 7: Commit.**
 
 ```bash
 git add modulex-admin/src/components/customers/project-detail modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs
@@ -1080,32 +1051,33 @@ git commit -m "refactor(calendar): compact Project Calendar around company sync"
 
 ---
 
-### Task 9: Disable new legacy per-Project provider creation and preserve backward compatibility
+### Task 9: Cut new projection over from per-Project bindings to the Company binding
 
 **Files:**
 - Modify: `modulex-admin/src/lib/google-calendar/project-calendar.ts`
 - Modify: `modulex-admin/src/lib/google-calendar/project-schedule-projection.ts`
 - Modify: `modulex-admin/src/lib/google-calendar/installation-projection.ts`
-- Modify: legacy `/api/admin/google-calendar/projects/**` routes as needed.
+- Modify: legacy `modulex-admin/src/app/api/admin/google-calendar/projects/**` only as needed for compatibility/read-only status.
 - Modify: `modulex-admin/scripts/google-calendar-integration-contract.mjs`
 - Test: `modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs`
 
 **Interfaces:**
-- New Project creation never creates a Google Calendar.
-- Existing legacy binding status/read operations continue to work for audit/transition, but V3 UI does not use them as active destination.
+- New Project creation never creates Google Calendars.
+- Project/Installation schedule changes enqueue V3 source identities against the Company binding.
+- Legacy provider data remains but receives no new V3 writes after cutover.
 
-- [ ] **Step 1: Add a failing regression assertion that V3 project flow does not create calendars.**
+- [ ] **Step 1: Add regression assertion for no V3 Project Calendar creation.**
+
+Target the new V3 projection path, not the legacy low-level helper:
 
 ```js
-assert.doesNotMatch(projectCalendarV3Path, /createGoogleProjectCalendar\(/);
-assert.match(settingsSqlOrService, /auto_create_project_calendar[\s\S]*false/);
+assert.doesNotMatch(v3ProjectionSource, /createGoogleProjectCalendar\(/);
+assert.match(v3ProjectionSource, /calendar_sync_outbox|enqueueCalendarSync/);
 ```
 
-Keep the low-level legacy provider helper itself if existing tests/records still require it; the assertion targets V3 flow, not necessarily deleting the function from the repository.
+- [ ] **Step 2: Route schedule sources through the V3 outbox.**
 
-- [ ] **Step 2: Route Project/Installation projection through the company outbox.**
-
-Project schedule save and Installation mutations must enqueue source identities:
+Use exact source identities:
 
 ```text
 project_start:<project_id>
@@ -1114,17 +1086,17 @@ project_delivery:<project_id>
 installation:<installation_id>
 ```
 
-No Project binding lookup is required for new V3 projection.
+No Project provider-binding lookup is required for new V3 writes.
 
-- [ ] **Step 3: Disable legacy auto-create setting on V3 company binding activation.**
+- [ ] **Step 3: Disable legacy auto-create when Company binding activates.**
 
-Do not delete the column in this package. Set it false and ensure V3 Project flows ignore it.
+Keep the column for backward compatibility but set `auto_create_project_calendar=false` during V3 company-binding activation and ensure V3 Project flows ignore it.
 
-- [ ] **Step 4: Preserve legacy data and prevent double writes.**
+- [ ] **Step 4: Prevent double writes.**
 
-If a source has both a legacy Project provider link and a V3 company link, only the V3 company link is active for new writes after cutover. Legacy rows are retained and marked/treated inactive for projection.
+If a source has both a legacy Project provider link and a V3 Company link, only the Company link is active for new synchronization. Legacy rows remain queryable for audit/history.
 
-- [ ] **Step 5: Run projection regression contracts.**
+- [ ] **Step 5: Run regressions.**
 
 ```bash
 cd modulex-admin
@@ -1135,7 +1107,7 @@ npm run smoke:calendar-v3
 
 Expected: GREEN.
 
-- [ ] **Step 6: Commit cutover behavior.**
+- [ ] **Step 6: Commit.**
 
 ```bash
 git add modulex-admin/src/lib/google-calendar modulex-admin/src/app/api/admin/google-calendar modulex-admin/scripts/google-calendar-integration-contract.mjs modulex-admin/scripts/calendar-v3-bidirectional-contract.mjs
@@ -1144,20 +1116,19 @@ git commit -m "refactor(calendar): cut over projection to company calendar"
 
 ---
 
-### Task 10: Documentation, roadmap, full verification, production preflight, and PR readiness
+### Task 10: Documentation, roadmap, full verification, preflight, and review-ready PR
 
 **Files:**
 - Modify: `modulex-admin/ADMIN_ROADMAP.md`
 - Modify: `modulex-admin/sql/README.md`
-- Modify: V3 spec/plan only if implementation discovered a necessary approved clarification; do not silently change product decisions.
-- PR body: summarize migration/cutover/reconnect/acceptance steps.
+- Keep V3 spec/plan aligned if an implementation detail requires an explicitly approved clarification.
 
 **Interfaces:**
-- Produces a review-ready draft PR with no production migration applied yet.
+- Produces a review-ready draft PR. Production migration/deploy is not part of this task.
 
-- [ ] **Step 1: Update roadmap as in-progress.**
+- [ ] **Step 1: Update roadmap as in progress.**
 
-Add/modify the Calendar package with `[~]`, not `[x]`, until production acceptance passes. Record:
+Mark `[~]` for:
 
 ```text
 single Company Operational Calendar
@@ -1168,9 +1139,9 @@ watch/reconciliation
 legacy per-Project Calendar cutover
 ```
 
-Preserve all parallel Finance/Product/Store roadmap changes from current main.
+Preserve parallel Finance/Product/Store roadmap changes.
 
-- [ ] **Step 2: Run the focused contract suite.**
+- [ ] **Step 2: Run focused contracts.**
 
 ```bash
 cd modulex-admin
@@ -1196,122 +1167,122 @@ npm run build
 
 Expected: exit 0 for all three.
 
-- [ ] **Step 4: Run the wider smoke chain or the existing Calendar CI job and inspect logs.**
+- [ ] **Step 4: Run the wider smoke chain or equivalent existing GitHub Actions gate.**
 
 ```bash
 cd modulex-admin
 npm run smoke
 ```
 
-If CI is the only executable environment, require the corresponding GitHub Actions job to complete GREEN and inspect failed job logs before claiming readiness.
+When CI is the only executable environment, require the corresponding Actions jobs to complete GREEN and inspect failed logs before claiming readiness.
 
-- [ ] **Step 5: Re-run production data preflight before DB apply.**
+- [ ] **Step 5: Re-run production read-only preflight.**
 
-Read-only checks must confirm:
+Verify:
 
 ```text
-exactly one intended active Modulex company calendar can be established
-all existing Project calendars/bindings remain resolvable
-no duplicate provider calendar id that would violate company_shared uniqueness
-connected Google credential is known and can reconnect for calendar.events
-all active business source mappings resolve to real Projects/Installations
-no orphan primary Installation integrity issues
+one valid active Modulex Company Calendar can exist
+all legacy Project calendars/bindings remain resolvable
+no provider calendar-id collision violates company_shared uniqueness
+connected credential can be re-consented for calendar.events
+all active business source mappings resolve to real Project/Installation rows
+no orphan Primary Installation integrity issue exists
 ```
 
 Do not mutate production during preflight.
 
-- [ ] **Step 6: Open/update a draft PR from the feature branch.**
+- [ ] **Step 6: Open/update a draft PR.**
 
 PR notes must state:
 
 ```text
-Production migration NOT applied yet.
-Google OAuth re-consent for calendar.events required after deploy.
+Production migration NOT applied.
+OAuth re-consent for calendar.events is required after deploy.
 Company Calendar must be selected explicitly after reconnect.
-Legacy Project Google calendars are retained but no longer receive V3 writes after cutover.
+Legacy Project Google calendars are retained but stop receiving V3 writes after cutover.
 Webhook URL must be publicly HTTPS reachable before watch activation.
+Hourly Vercel reconciliation cron is required; deployment must stop if the plan rejects that schedule.
 ```
 
-- [ ] **Step 7: Verify PR mergeability/current-main conflicts.**
+- [ ] **Step 7: Verify current-main mergeability and resolve conflicts without dropping either side.**
 
-If `main` moved, resolve by preserving both newer main behavior and V3 behavior; pay particular attention to shared regression scripts, package scripts, roadmap, `vercel.json`, and Google Calendar files. Re-run all gates after conflict resolution.
+Recheck shared regression scripts, package scripts, roadmap, `vercel.json`, Google Calendar files, and other overlapping current-main changes. Re-run all gates after conflict resolution.
 
-- [ ] **Step 8: Stop at review-ready state unless the user explicitly requests production migration/deploy.**
+- [ ] **Step 8: Stop at review-ready state.**
 
-No merge, production DB migration, OAuth reconnect, watch activation, or deployment is implicit in this plan execution.
+Do not merge, migrate production DB, deploy, reconnect OAuth, or activate watch unless the user explicitly requests those production actions.
 
 ---
 
-### Task 11: Production migration, reconnect, company binding activation, and end-to-end acceptance
+### Task 11: Production migration, reconnect, Company binding activation, and end-to-end acceptance
 
-**Files/Systems:**
-- Supabase production project
-- Vercel Admin deployment
-- Google OAuth consent / Calendar API
-- Production Admin Calendar
+**Systems:**
+- Supabase production
+- Vercel Admin production
+- Google OAuth / Calendar API
+- Admin `/calendar`
+- Project Calendar
 
 **Interfaces:**
-- This task starts only after the user explicitly asks to migrate/deploy/activate production.
+- Starts only after the user explicitly requests production migration/deploy/activation.
 
-- [ ] **Step 1: Apply the mirrored V3 migration after final preflight.**
+- [ ] **Step 1: Apply only the committed V3 migration after final preflight.**
 
-Apply only the committed migration file. Verify migration history records the expected version and canonical SQL remains byte-identical to the repository mirror.
+Verify the production migration history records `20260906113000_calendar_v3_bidirectional.sql` and repository canonical SQL remains byte-identical.
 
-- [ ] **Step 2: Run Supabase Security + Performance Advisors immediately after migration.**
+- [ ] **Step 2: Run Supabase Security + Performance Advisors immediately.**
 
-Classify new Calendar findings separately from pre-existing baseline warnings. Fix only Calendar regressions introduced by V3 in the same package and mirror any hardening SQL back into the repo.
+Separate new Calendar findings from existing baseline. Fix only V3-introduced regressions in this package and mirror hardening SQL back to the repository.
 
-- [ ] **Step 3: Deploy Admin and verify the webhook/reconcile endpoints are reachable.**
+- [ ] **Step 3: Deploy Admin and verify webhook/reconcile security behavior.**
 
-Confirm HTTPS webhook returns an intentional non-success/validation response for an unauthenticated fake Google request rather than 404/500, and reconcile endpoint rejects requests without the cron secret.
+A fake Google webhook must get an intentional validation rejection, not 404/500. Reconcile must reject requests without the cron secret.
 
 - [ ] **Step 4: Reconnect Google with `calendar.events`.**
 
-Verify status shows bidirectional scopes granted. Never ask the user to paste OAuth secrets/tokens.
+Verify status reports bidirectional scopes granted. Never request pasted OAuth secrets/tokens.
 
-- [ ] **Step 5: Select the real Family/shared/operations calendar as Company Calendar.**
+- [ ] **Step 5: Select the real Family/shared/operations Calendar.**
 
-Acceptance requires Google access role `writer` or `owner`, initial full sync success, a stored `nextSyncToken`, and an active watch channel with expiration.
+Acceptance requires effective Google accessRole `writer` or `owner`, successful initial full sync, stored `nextSyncToken`, and active watch channel with expiration.
 
-- [ ] **Step 6: Run normal-event bidirectional acceptance.**
-
-Test all directions without leaving test artifacts:
+- [ ] **Step 6: Run normal-event bidirectional acceptance and clean up test artifacts.**
 
 ```text
-Google create -> appears in Modulex
+Google create -> Modulex appears
 Google edit -> Modulex updates
 Google delete -> Modulex deletes/tombstones
-Modulex create -> appears in Google
+Modulex create -> Google appears
 Modulex edit -> Google updates
 Modulex delete -> Google deletes
 ```
 
-Also test color, description, location, all-day/timed, recurrence, one occurrence edit/delete, attendees, reminder, Google Meet, visibility/transparency where supported by the chosen calendar.
+Also verify color, description, location, all-day/timed, recurrence, single occurrence edit/delete, attendees, guest options, reminders, Google Meet, visibility/transparency where supported.
 
 - [ ] **Step 7: Run business-event bidirectional acceptance.**
 
-Use a safe test Project/Installation and verify:
+Using a safe test Project/Installation:
 
 ```text
-Modulex Start/Target/Delivery change -> Google event converges
+Modulex Start/Target/Delivery change -> Google converges
 Google business event move -> canonical Project date changes
-Google Project Start deletion -> start_date clears
-Google Target deletion -> target_date clears
-Google Delivery deletion -> planned_delivery_date clears
-Google Installation deletion -> Installation becomes cancelled, row remains
+Google Project Start delete -> start_date clears
+Google Target delete -> target_date clears
+Google Delivery delete -> planned_delivery_date clears
+Google Installation delete -> Installation status cancelled; row remains
 Modulex Installation change -> Google converges
 ```
 
-Verify no sync loop and no duplicate provider events.
+Verify no sync loop and no duplicate provider event.
 
-- [ ] **Step 8: Verify push + reconciliation resilience.**
+- [ ] **Step 8: Verify watch + reconciliation resilience.**
 
-Check Google-side change reaches Modulex through watch without manual refresh/sync. Then exercise manual/reconciliation sync to prove missed-push safety. Confirm repeated webhook/reconcile calls are idempotent.
+Confirm a Google-side edit reaches Modulex through push without manual sync. Then run manual/hourly reconciliation and confirm repeated notifications/reconciliation are idempotent.
 
 - [ ] **Step 9: Verify Project UX.**
 
-Project Calendar opens with the large calendar hidden, shows schedule summary/upcoming events, `Add Event` works, `Show Calendar` reveals only the Project-filtered compact calendar, and legacy Project Google management cards are absent.
+Project Calendar starts collapsed, shows schedule summary/upcoming events, `Add Event` works, `Show Calendar` reveals Project-filtered Month/List only, and legacy Project Google management cards are absent.
 
 - [ ] **Step 10: Close roadmap only after user acceptance.**
 
-Change `[~]` to `[x]` only when production migration, reconnect, company binding activation, two-way CRUD, business delete semantics, watch delivery, reconciliation, and Project compact UX are all accepted.
+Change `[~]` to `[x]` only when production migration, reconnect, Company binding activation, two-way CRUD, business deletion semantics, push delivery, reconciliation, and compact Project UX are accepted.
