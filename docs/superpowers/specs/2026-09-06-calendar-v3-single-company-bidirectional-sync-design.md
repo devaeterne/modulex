@@ -40,7 +40,7 @@ The following decisions are fixed for V3:
    - deleting an Installation event does not delete the Installation row; it cancels the Installation;
    - deleting a normal calendar event deletes it from the user's calendar experience on both sides.
 4. Normal/default Google events support rich editing in Modulex: title, dates, all-day, timezone, description, location, color, recurrence, attendees, reminders, Google Meet, visibility, and transparency where Google exposes them.
-5. Google-specific special event types such as focus time, out-of-office, and working location may be mirrored/displayed but are not created or edited by Modulex V3.
+5. Non-default Google event types with provider-specific semantics may be mirrored/displayed but are not created or edited by Modulex V3.
 6. The Project Calendar's large visual calendar is hidden by default and shown only on demand.
 
 ## Current state being replaced
@@ -137,6 +137,8 @@ Family Calendar receives no name-based special case. If Google exposes it throug
 
 Persist provider calendar id, name, timezone, access role, data owner when available, and provider colors separately from the Modulex owner.
 
+If the selected provider calendar already exists in `project_calendar_bindings` as a legacy/imported row, the selection flow reuses and upgrades that existing provider-calendar identity instead of violating the provider-calendar uniqueness constraint or creating a duplicate binding.
+
 ## OAuth scopes
 
 V3 replaces `calendar.events.owned` as the write scope with:
@@ -153,7 +155,7 @@ Retain:
 
 Existing credentials without `calendar.events` must show `Reconnect required` and must not activate bidirectional company sync until the user re-consents.
 
-The application does not add Calendar ACL-management, full-calendar administration, or free/busy scopes.
+The application does not add Calendar ACL-management, full-calendar administration, Drive-attachment, or free/busy scopes.
 
 ## Modulex ownership and My Calendar
 
@@ -214,7 +216,7 @@ Business schedule identity and schedule remain canonical in their domain tables.
 - description;
 - location;
 - provider color id;
-- attendees;
+- attendee list and guest option metadata;
 - reminders;
 - conference data / Google Meet metadata;
 - visibility;
@@ -243,7 +245,7 @@ Required core fields include:
 - recurrence rules;
 - optional recurring parent identity for occurrence overrides;
 - provider recurring event id/original start identity where applicable;
-- attendee data;
+- attendee data and guest options;
 - reminder configuration;
 - Google Meet/conference data;
 - visibility;
@@ -269,6 +271,7 @@ For normal/default events, Modulex V3 supports Google-compatible fields that mat
 - `colorId`;
 - recurrence rules;
 - attendee email/list plus provider-returned response status for display;
+- guest options such as `guestsCanInviteOthers`, `guestsCanModify`, and `guestsCanSeeOtherGuests` when supported;
 - reminders (`useDefault` and supported overrides);
 - conference/Google Meet data;
 - visibility;
@@ -278,9 +281,11 @@ For normal/default events, Modulex V3 supports Google-compatible fields that mat
 - `htmlLink`;
 - provider `etag` and `updated` metadata.
 
-Modulex does not edit attendee response statuses on behalf of invitees. It edits the attendee list; Google remains authoritative for attendee responses.
+Modulex does not edit attendee response statuses on behalf of invitees. It edits the attendee list and organizer-controlled guest options; Google remains authoritative for attendee responses.
 
 Updates from Modulex use Google `events.patch` for partial mutations so unsupported or unedited provider fields are not accidentally erased.
+
+Google Drive attachments are intentionally not part of V3 because supporting them would broaden the approved scope and permissions.
 
 ### Recurring events
 
@@ -305,15 +310,15 @@ Provider-origin changes are never echoed back merely to rewrite the same attende
 
 ### Google Meet
 
-Normal/default events can add, preserve, and remove Google Meet conference data when the selected calendar supports Google Meet.
+Normal/default events can add, preserve, and remove Google Meet conference data when the selected calendar exposes an allowed Google Meet conference solution.
 
 Before V3 enables conference modifications on an existing mirrored calendar, the selected company calendar must complete an initial full event sync. Provider mutations involving conference data use `conferenceDataVersion=1` and unique conference creation request ids.
 
-### Special Google event types
+### Non-default Google event types
 
-Provider event types with specialized Google semantics, including focus time, out-of-office, and working location, are mirrored for display when visible through the API.
+Provider event types with specialized Google semantics—including `birthday`, `focusTime`, `fromGmail`, `outOfOffice`, and `workingLocation`—are mirrored for display when visible through the API.
 
-V3 does not create or edit these specialized types from Modulex. They remain provider-owned/read-only entries in Modulex Calendar.
+V3 does not create or edit these non-default types from Modulex. They remain provider-owned/read-only entries in Modulex Calendar.
 
 ## Provider identity and extended properties
 
@@ -345,6 +350,7 @@ Each row contains:
 - last provider `etag`;
 - last provider `updated` timestamp;
 - last provider fingerprint;
+- last provider observation timestamp;
 - last Modulex fingerprint/version;
 - last successful sync time;
 - last sync origin;
@@ -381,23 +387,35 @@ For the selected company provider calendar, Modulex creates one Google Events no
 - resource URI when useful;
 - channel token hash;
 - returned expiration;
-- active/replaced/stopped status;
+- pending/active/replaced/stopped status;
 - last accepted message number;
 - created/renewed/stopped timestamps.
 
 The channel token contains no OAuth token or secret business data.
 
-The webhook validates at least:
+#### Watch creation ordering
 
-- active channel id;
+Google may deliver the initial `sync` notification before the `watch` HTTP response has been processed. V3 therefore uses this order:
+
+1. generate channel id and high-entropy channel token;
+2. insert a `calendar_watch_channels` row in `pending` state with the binding id, channel id, and token hash;
+3. call Google `events.watch`;
+4. update the pending row with returned resource id, resource URI, expiration, and `active` state;
+5. if the provider request fails, mark the pending row failed/stopped rather than leaving an apparently active channel.
+
+The webhook may accept the initial `sync` message for a matching pending channel id/token before the watch response is stored. In that narrow state, it records/coalesces a sync job and records the received resource id; normal active-channel resource-id equality validation applies after activation.
+
+The webhook otherwise validates at least:
+
+- pending/active channel id;
 - channel token using constant-time comparison against the stored hash model;
-- Google resource id;
+- Google resource id once known;
 - binding association;
 - expiration/status.
 
 Google notification messages contain no event body. A valid notification only signals that the watched event collection changed.
 
-The webhook first upserts/coalesces a `calendar_sync_jobs` row for the binding and returns an idempotent success path. It then attempts the incremental sync inline when execution budget allows; the durable job remains the retry source if inline work fails or times out.
+The webhook first upserts/coalesces a `calendar_sync_jobs` row for the binding. It then attempts the incremental sync inline when execution budget allows; the durable job remains the retry source if inline work fails or times out.
 
 Duplicate/retried notifications are harmless.
 
@@ -454,10 +472,12 @@ A conflict exists when both the Modulex source fingerprint and the Google provid
 
 V3 resolves conflicts deterministically:
 
-1. compare Google's provider `updated` timestamp with the canonical Modulex row/event `updated_at`;
-2. the later server timestamp wins;
-3. if timestamps are within two seconds, Modulex wins;
-4. write a `calendar_sync_audit` row with event/source identity, both fingerprints/timestamps, chosen winner, origin, and resolution time.
+1. use Google's provider `updated` timestamp as the provider change time when it advances;
+2. if a provider fingerprint changed without an advancing `updated` timestamp (Google documents reminder changes as one such case), use the provider observation timestamp from the incremental/full sync as the provider change time;
+3. compare that provider change time with the canonical Modulex row/event `updated_at`;
+4. the later timestamp wins;
+5. if timestamps are within two seconds, Modulex wins;
+6. write a `calendar_sync_audit` row with event/source identity, both fingerprints/timestamps, chosen winner, origin, and resolution time.
 
 Deletion participates in the same rule.
 
@@ -580,7 +600,7 @@ When a Company Operational Calendar is successfully activated:
 5. disable legacy per-Project provider synchronization only after the company binding is healthy;
 6. retain legacy provider bindings/event links for audit and optional manual cleanup;
 7. mark/exclude legacy Project logical calendars from the default V3 Calendar feed so users do not see duplicate scheduling surfaces;
-8. disable the `ensure_project_admin_calendar` creation path for new Projects in V3 company mode.
+8. make the existing `ensure_project_admin_calendar` path a no-op while V3 company mode is active, preserving pre-activation compatibility without creating new Project calendars after cutover.
 
 Existing legacy Google calendars remain untouched unless a future explicit cleanup action is approved.
 
@@ -612,9 +632,9 @@ Rules:
 
 - viewing Calendar requires `calendar.view`;
 - normal event create/edit/delete requires `calendar.manage`;
-- company provider selection, reconnect, watch maintenance controls, and ownership reassignment require `calendar.manage` plus the existing Settings-management permission where applicable;
-- editing Project-backed schedule fields through Calendar must also satisfy the existing Project mutation permission;
-- editing/cancelling Installation-backed events through Calendar must satisfy the existing Installation/Fulfillment mutation permission;
+- Company Operational Calendar selection/change, Google reconnect/disconnect, ownership reassignment, and manual watch/reconciliation controls require both `calendar.manage` and `settings.manage`;
+- editing Project-backed schedule fields through Calendar requires both `calendar.manage` and `projects.manage`;
+- editing/cancelling Installation-backed events through Calendar requires both `calendar.manage` and `installations.manage`;
 - webhook/provider-origin synchronization is server-only and limited to the domain-safe mappings defined above.
 
 Browser clients never receive refresh tokens, access tokens, OAuth codes, webhook channel secrets, client secrets, or encryption material.
@@ -632,7 +652,7 @@ Required invariants:
 - generic event mapping is unique by binding + source/occurrence identity;
 - business source mappings are validated before any Google-origin domain mutation;
 - unknown/malformed Google extended properties cannot grant business mutation authority;
-- webhook channel id/token/resource id must match active server-side channel state;
+- webhook channel id/token/resource id must match active server-side channel state, except for the documented pending-channel initial-sync race;
 - all provider/OAuth/watch persistence remains server-only under RLS/revokes;
 - webhook and sync processing are idempotent;
 - no Google failure rolls back a successful canonical Modulex mutation;
@@ -652,7 +672,7 @@ The UI distinguishes:
 - last provider sync stale/error;
 - pending Modulex→Google retry;
 - conflict automatically resolved with audit available;
-- unsupported special provider event type;
+- unsupported non-default provider event type;
 - invalid business-event edit rejected by domain rules.
 
 Modulex Calendar always renders valid local business schedules and normal events from its durable local data even when provider sync is degraded.
@@ -672,7 +692,7 @@ Implementation is additive and staged:
 3. add `calendar_business_event_extensions`;
 4. add `calendar_provider_event_links`, `calendar_sync_outbox`, `calendar_sync_jobs`, `calendar_watch_channels`, and `calendar_sync_audit`;
 5. expand OAuth to `calendar.events` and expose reconnect-required state;
-6. add provider `PATCH`, watch/stop, conference, recurrence, attendee, reminder, and richer event DTO support;
+6. add provider `PATCH`, watch/stop, conference, recurrence, attendee, reminder, guest-option, and richer event DTO support;
 7. build full/incremental V3 sync engine and safe business mutation adapters;
 8. build Company Operational Calendar selection UI;
 9. perform initial full sync before enabling Google Meet mutations;
@@ -694,6 +714,7 @@ TDD/contract coverage includes at least:
 - only one active company calendar/binding;
 - new Projects do not create Google calendars after V3 activation;
 - legacy bindings are preserved and not destructively deleted;
+- selecting an already-known provider calendar reuses its binding identity;
 - company cutover does not duplicate active Calendar feed events.
 
 ### OAuth and access
@@ -724,10 +745,11 @@ TDD/contract coverage includes at least:
 - recurrence series;
 - single occurrence edit/delete;
 - attendees and response-status preservation;
-- reminders;
+- guest options;
+- reminders, including fingerprint change when provider `updated` does not advance;
 - Google Meet after full sync;
 - visibility/transparency;
-- unsupported special event types remain read-only;
+- non-default event types remain read-only;
 - partial patch does not erase unrelated provider fields.
 
 ### Business event bidirectional rules
@@ -744,17 +766,20 @@ TDD/contract coverage includes at least:
 
 ### Sync engine
 
-- watch webhook header/token/resource validation;
+- watch pending row exists before provider watch call;
+- initial `sync` notification arriving before watch response is accepted safely;
+- normal watch webhook header/token/resource validation;
 - duplicate notifications idempotent;
-- initial Google `sync` notification handling safe;
 - durable inbound job exists before provider pull is considered complete;
 - incremental sync stores token only after successful apply;
+- full sync/incremental sync preserve recurring master resources;
 - HTTP 410 triggers full resync;
 - watch renewal creates replacement before expiration;
 - provider failure preserves local data;
 - outbox retries provider failure;
 - provider-origin mutation does not echo-loop;
-- both-side conflict resolution chooses later timestamp and audits;
+- both-side conflict resolution chooses later effective change timestamp and audits;
+- provider observation time is used when provider fingerprint changes without `updated` advancement;
 - tie within two seconds chooses Modulex.
 
 ### UI
@@ -813,8 +838,9 @@ V3 does not include:
 - per-employee Google OAuth;
 - automatic creation of Google calendars per Project;
 - automatic deletion of legacy Project Google calendars;
-- Google special event type creation/editing (`focusTime`, `outOfOffice`, `workingLocation`);
+- creating/editing non-default Google event types such as `birthday`, `focusTime`, `fromGmail`, `outOfOffice`, or `workingLocation`;
 - recurring-series "this and following" split editing;
+- Google Drive event attachments;
 - arbitrary Google changes to non-scheduling Project/Order/Installation fields;
 - customer SMS/notification automation;
 - Store/Portal Calendar UX;
@@ -828,6 +854,7 @@ V3 does not include:
 - Incremental synchronization/sync tokens: https://developers.google.com/workspace/calendar/api/guides/sync
 - Extended properties: https://developers.google.com/workspace/calendar/api/guides/extended-properties
 - Recurring events: https://developers.google.com/workspace/calendar/api/guides/recurringevents
+- Event resource: https://developers.google.com/workspace/calendar/api/v3/reference/events
 - Event creation, reminders, attendees, conference data: https://developers.google.com/workspace/calendar/api/guides/create-events
 
 ## Decision summary
