@@ -9,21 +9,35 @@ const storeMigrationPath = path.join(
   here,
   "../../modulex-store/supabase/migrations/20260906170000_a6_f4_payroll_integration_hardening.sql",
 );
+const atomicFixSqlPath = path.join(here, "../sql/a6-f4-atomic-employee-payment-draft-fix.sql");
+const atomicFixMigrationPath = path.join(
+  here,
+  "../../modulex-store/supabase/migrations/20260906182000_a6_f4_atomic_employee_payment_draft_fix.sql",
+);
 const financePayrollClientPath = path.join(here, "../src/lib/finance/payroll.ts");
 const financeManagerPath = path.join(here, "../src/components/finance/FinanceTransactionsManager.tsx");
 const payrollManagerPath = path.join(here, "../src/components/hr/PayrollManager.tsx");
 
 assert.ok(existsSync(adminSqlPath), "F4 hardening SQL must exist");
 assert.ok(existsSync(storeMigrationPath), "Store migration mirror must exist");
+assert.ok(existsSync(atomicFixSqlPath), "F4 atomic Employee Payment corrective SQL must exist");
+assert.ok(existsSync(atomicFixMigrationPath), "F4 atomic Employee Payment corrective migration must exist");
 assert.ok(existsSync(financePayrollClientPath), "F4 Finance payroll client must exist");
 
 const sql = readFileSync(adminSqlPath, "utf8");
 const storeSql = readFileSync(storeMigrationPath, "utf8");
+const atomicFixSql = readFileSync(atomicFixSqlPath, "utf8");
+const atomicFixMigration = readFileSync(atomicFixMigrationPath, "utf8");
 const financePayrollClient = readFileSync(financePayrollClientPath, "utf8");
 const financeManager = readFileSync(financeManagerPath, "utf8");
 const payrollManager = readFileSync(payrollManagerPath, "utf8");
 
 assert.equal(storeSql, sql, "Admin SQL and Store migration mirror must be byte-identical");
+assert.equal(
+  atomicFixMigration,
+  atomicFixSql,
+  "F4 atomic Employee Payment corrective Admin SQL and Store migration must be byte-identical",
+);
 
 for (const required of [
   "hr_payroll_item",
@@ -68,9 +82,14 @@ assert.match(
   "Atomic employee payment draft RPC must be authenticated-only",
 );
 assert.match(
-  sql,
+  atomicFixSql,
+  /private\.create_finance_transaction_draft\(\s*'employee_payment',\s*p_source_account_id,\s*null,\s*null,\s*p_amount,/i,
+  "Atomic Employee Payment draft must match the canonical 10-argument Finance draft signature",
+);
+assert.doesNotMatch(
+  atomicFixSql,
   /private\.create_finance_transaction_draft\(\s*'employee_payment',\s*p_source_account_id,\s*null,\s*null,\s*null,\s*p_amount,/i,
-  "Atomic Employee Payment draft must pass destination, category and payment-method NULLs before amount",
+  "Atomic Employee Payment draft must not pass the removed/nonexistent extra NULL argument",
 );
 assert.ok(
   !/create\s+table\s+(?:if\s+not\s+exists\s+)?public\.(?:finance_payroll|payroll_ledger|employee_payment_ledger)/i.test(sql),
