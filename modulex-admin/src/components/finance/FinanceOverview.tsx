@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Alert from "@/components/ui/alert/Alert";
+import Button from "@/components/ui/button/Button";
 import ComponentCard from "@/components/common/ComponentCard";
 import { getFinanceOverview, type FinanceOverview as FinanceOverviewData } from "@/lib/finance/core";
 
@@ -9,6 +11,7 @@ const money = (value: number, currency: string) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(value || 0));
 
 export default function FinanceOverview() {
+  const router = useRouter();
   const [overview, setOverview] = useState<FinanceOverviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +51,10 @@ export default function FinanceOverview() {
           <p className="text-2xl font-semibold">{overview.posted_transaction_count}</p>
         </ComponentCard>
       </div>
+
+      <ComponentCard title="Accounts Payable" desc="Vendor Bill aging, scheduled payments and check lifecycle are projected from canonical AP and Finance records.">
+        <Button onClick={() => router.push("/finance/ap-aging")}>Open AP Aging</Button>
+      </ComponentCard>
 
       <ComponentCard title="Cash & Bank Balances" desc="Balances are derived from posted Finance transactions; no balance snapshot is maintained.">
         {overview.account_balances.length === 0 ? (
