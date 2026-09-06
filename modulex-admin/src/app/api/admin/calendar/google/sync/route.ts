@@ -24,7 +24,13 @@ async function handlePost(request: Request) {
     if (legacyBindingId) {
       if (!UUID_PATTERN.test(legacyBindingId)) return jsonError("A valid imported Calendar binding is required.", 400);
       const result = await syncImportedGoogleCalendar(legacyBindingId, request.url);
-      return Response.json({ ok: true, mode: "legacy_import", ...result });
+      const { mode: providerSyncMode, ...syncResult } = result;
+      return Response.json({
+        ok: true,
+        mode: "legacy_import",
+        provider_sync_mode: providerSyncMode,
+        ...syncResult,
+      });
     }
 
     const outbox = await flushCalendarOutboxBatch(50, request.url);
