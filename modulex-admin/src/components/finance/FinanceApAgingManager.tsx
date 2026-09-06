@@ -18,6 +18,13 @@ import { getVendorsPage, type VendorListItem } from "@/lib/finance/vendors";
 
 const pageSize = 50;
 
+type ReportFilters = {
+  asOf: string;
+  vendorId: string;
+  bucket: string;
+  search: string;
+};
+
 const bucketOptions = [
   { value: "", label: "All aging buckets" },
   { value: "current", label: "Current" },
@@ -82,20 +89,24 @@ export default function FinanceApAgingManager() {
   const totalCount = Number(rows[0]?.total_count ?? 0);
   const baseCurrency = summary?.base_currency_code ?? "USD";
 
-  async function load(nextOffset = offset) {
+  async function load(nextOffset = offset, filterOverrides?: Partial<ReportFilters>) {
+    const nextAsOf = filterOverrides?.asOf ?? asOf;
+    const nextVendorId = filterOverrides?.vendorId ?? vendorId;
+    const nextBucket = filterOverrides?.bucket ?? bucket;
+    const nextSearch = filterOverrides?.search ?? search;
     setLoading(true);
     setMessage(null);
     try {
-      const selectedVendor = vendorId || null;
+      const selectedVendor = nextVendorId || null;
       const [nextSummary, nextRows, nextVendors, nextPayments, nextSchedules] = await Promise.all([
-        getApAgingSummary({ asOf: asOf || null, vendorId: selectedVendor }),
+        getApAgingSummary({ asOf: nextAsOf || null, vendorId: selectedVendor }),
         getApAgingPage({
-          asOf: asOf || null,
+          asOf: nextAsOf || null,
           limit: pageSize,
           offset: nextOffset,
           vendorId: selectedVendor,
-          bucket: (bucket || null) as ApAgingBucket | null,
-          search,
+          bucket: (nextBucket || null) as ApAgingBucket | null,
+          search: nextSearch,
         }),
         getVendorsPage({ limit: 200, offset: 0 }),
         selectedVendor ? getVendorPaymentsPage({ vendorId: selectedVendor, limit: 10, offset: 0 }) : Promise.resolve([]),
@@ -116,6 +127,15 @@ export default function FinanceApAgingManager() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function resetFilters() {
+    setAsOf("");
+    setVendorId("");
+    setBucket("");
+    setSearch("");
+    setBillDetail(null);
+    void load(0, { asOf: "", vendorId: "", bucket: "", search: "" });
   }
 
   async function viewBill(invoiceId: string) {
@@ -170,7 +190,7 @@ export default function FinanceApAgingManager() {
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={() => void load(0)} disabled={loading}>{loading ? "Refreshing…" : "Refresh Report"}</Button>
-          <Button variant="outline" onClick={() => { setAsOf(""); setVendorId(""); setBucket(""); setSearch(""); void load(0); }} disabled={loading}>Reset Filters</Button>
+          <Button variant="outline" onClick={resetFilters} disabled={loading}>Reset Filters</Button>
         </div>
       </ComponentCard>
 
@@ -207,8 +227,8 @@ export default function FinanceApAgingManager() {
       </ComponentCard>
 
       <ComponentCard title="Open Vendor Bills" desc="Outstanding is derived from append-only payment allocations; no payable balance is manually maintained.">
-        <TableViewport minWidth="xl">
-          <Table>
+        <TableViewport>
+          <Table minWidth="wide">
             <TableHeader>
               <TableRow>
                 <TableCell isHeader>Vendor</TableCell>
@@ -262,16 +282,16 @@ export default function FinanceApAgingManager() {
       {vendorId ? (
         <div className="grid gap-6 xl:grid-cols-2">
           <ComponentCard title="Vendor Payment History" desc="Canonical Finance vendor payments and check lifecycle for the selected Vendor.">
-            <TableViewport minWidth="md">
-              <Table>
+            <TableViewport>
+              <Table minWidth="medium">
                 <TableHeader><TableRow><TableCell isHeader>Date</TableCell><TableCell isHeader>Amount</TableCell><TableCell isHeader>Method / Check</TableCell><TableCell isHeader>Status</TableCell></TableRow></TableHeader>
                 <TableBody>{vendorPayments.length === 0 ? <TableStateRow colSpan={4}>No Vendor payment history.</TableStateRow> : vendorPayments.map((payment) => <TableRow key={payment.id}><TableCell>{dateLabel(payment.transaction_at)}</TableCell><TableCell>{amount(payment.amount, payment.currency_code)}</TableCell><TableCell>{payment.payment_method_name ?? "—"}{payment.instrument_number ? <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Check {payment.instrument_number}</div> : null}</TableCell><TableCell>{payment.instrument_status ?? payment.status}</TableCell></TableRow>)}</TableBody>
               </Table>
             </TableViewport>
           </ComponentCard>
           <ComponentCard title="Vendor Scheduled Payments" desc="Planned payments remain operational schedules and do not change account balances.">
-            <TableViewport minWidth="md">
-              <Table>
+            <TableViewport>
+              <Table minWidth="medium">
                 <TableHeader><TableRow><TableCell isHeader>Invoice</TableCell><TableCell isHeader>Scheduled</TableCell><TableCell isHeader>Amount</TableCell><TableCell isHeader>Status</TableCell></TableRow></TableHeader>
                 <TableBody>{vendorSchedules.length === 0 ? <TableStateRow colSpan={4}>No Vendor payment schedules.</TableStateRow> : vendorSchedules.map((schedule) => <TableRow key={schedule.id}><TableCell>{schedule.invoice_number}</TableCell><TableCell>{dateLabel(schedule.scheduled_payment_date)}</TableCell><TableCell>{amount(schedule.planned_amount, schedule.currency_code)}</TableCell><TableCell>{schedule.display_status}</TableCell></TableRow>)}</TableBody>
               </Table>
