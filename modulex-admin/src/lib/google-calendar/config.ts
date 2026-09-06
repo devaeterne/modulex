@@ -5,13 +5,15 @@ export const GOOGLE_CALENDAR_SCOPES = [
   "email",
   "https://www.googleapis.com/auth/calendar.app.created",
   "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
-  "https://www.googleapis.com/auth/calendar.events.owned",
+  "https://www.googleapis.com/auth/calendar.events",
 ] as const;
 
 export const GOOGLE_CALENDAR_IMPORT_SCOPES = [
   "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
-  "https://www.googleapis.com/auth/calendar.events.owned",
+  "https://www.googleapis.com/auth/calendar.events",
 ] as const;
+
+export const GOOGLE_CALENDAR_V3_SCOPES = GOOGLE_CALENDAR_IMPORT_SCOPES;
 
 export type GoogleCalendarConfig = {
   clientId: string;
@@ -25,30 +27,18 @@ function trimEnv(name: string) {
 }
 
 function decodeEncryptionKey(value: string): Buffer {
-  if (!value) {
-    throw new Error("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY is not configured.");
-  }
-
+  if (!value) throw new Error("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY is not configured.");
   const key = Buffer.from(value, "base64");
-  if (key.length !== 32) {
-    throw new Error("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
-  }
+  if (key.length !== 32) throw new Error("GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY must be a base64-encoded 32-byte key.");
   return key;
 }
 
 function resolveRedirectUri(requestUrl?: string) {
   const configuredRedirect = trimEnv("GOOGLE_CALENDAR_REDIRECT_URI");
   if (configuredRedirect) return configuredRedirect;
-
   const configuredSite = trimEnv("NEXT_PUBLIC_SITE_URL");
-  if (configuredSite) {
-    return `${configuredSite.replace(/\/$/, "")}/api/admin/google-calendar/oauth/callback`;
-  }
-
-  if (requestUrl) {
-    return `${new URL(requestUrl).origin}/api/admin/google-calendar/oauth/callback`;
-  }
-
+  if (configuredSite) return `${configuredSite.replace(/\/$/, "")}/api/admin/google-calendar/oauth/callback`;
+  if (requestUrl) return `${new URL(requestUrl).origin}/api/admin/google-calendar/oauth/callback`;
   throw new Error("Google Calendar redirect URI cannot be resolved.");
 }
 
@@ -56,6 +46,8 @@ export function hasGoogleCalendarImportScopes(grantedScopes: readonly string[] |
   const granted = new Set(grantedScopes ?? []);
   return GOOGLE_CALENDAR_IMPORT_SCOPES.every((scope) => granted.has(scope));
 }
+
+export const hasGoogleCalendarV3Scopes = hasGoogleCalendarImportScopes;
 
 export function isGoogleCalendarConfigured() {
   const clientId = trimEnv("GOOGLE_CALENDAR_CLIENT_ID");
@@ -72,10 +64,8 @@ export function isGoogleCalendarConfigured() {
 export function getGoogleCalendarConfig(requestUrl?: string): GoogleCalendarConfig {
   const clientId = trimEnv("GOOGLE_CALENDAR_CLIENT_ID");
   const clientSecret = trimEnv("GOOGLE_CALENDAR_CLIENT_SECRET");
-
   if (!clientId) throw new Error("GOOGLE_CALENDAR_CLIENT_ID is not configured.");
   if (!clientSecret) throw new Error("GOOGLE_CALENDAR_CLIENT_SECRET is not configured.");
-
   return {
     clientId,
     clientSecret,
