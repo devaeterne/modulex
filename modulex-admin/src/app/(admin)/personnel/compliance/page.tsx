@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComplianceManager from "@/components/hr/ComplianceManager";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function CompliancePage() {
-  return <ComplianceManager />;
+  return (
+    <div>
+      <PageBreadcrumb pageTitle="Compliance & Emergency" />
+      <ComplianceManager />
+    </div>
+  );
 }
