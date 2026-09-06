@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
@@ -8,7 +9,19 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
-import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableStateRow,
+  TableViewport,
+} from "@/components/ui/table";
+import {
+  getFinancePayrollObligations,
+  type FinancePayrollObligation,
+} from "@/lib/finance/payroll";
 import { supabase } from "@/lib/supabase/client";
 
 type Period = {
@@ -89,15 +102,20 @@ function paymentStatusColor(status: FinanceSettlement["payment_status"]) {
 }
 
 export default function PayrollManager() {
+  const router = useRouter();
   const [periods, setPeriods] = useState<Period[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [settlements, setSettlements] = useState<FinanceSettlement[]>([]);
+  const [financeObligations, setFinanceObligations] = useState<FinancePayrollObligation[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [periodId, setPeriodId] = useState("");
   const [runId, setRunId] = useState("");
   const [editing, setEditing] = useState<Item | null>(null);
-  const [message, setMessage] = useState<{ variant: "success" | "error" | "info"; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    variant: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState("");
   const [start, setStart] = useState("");
@@ -112,8 +130,14 @@ export default function PayrollManager() {
 
   async function load() {
     const [periodResult, runResult, employeeResult] = await Promise.all([
-      supabase.from("hr_payroll_periods").select("id,period_code,period_start,period_end,pay_date,status,notes").order("period_start", { ascending: false }),
-      supabase.from("hr_payroll_runs").select("id,payroll_period_id,run_number,status,calculated_at,approved_at,paid_at,notes").order("created_at", { ascending: false }),
+      supabase
+        .from("hr_payroll_periods")
+        .select("id,period_code,period_start,period_end,pay_date,status,notes")
+        .order("period_start", { ascending: false }),
+      supabase
+        .from("hr_payroll_runs")
+        .select("id,payroll_period_id,run_number,status,calculated_at,approved_at,paid_at,notes")
+        .order("created_at", { ascending: false }),
       supabase.rpc("get_hr_payroll_employee_directory"),
     ]);
     if (periodResult.error) throw periodResult.error;
@@ -134,26 +158,44 @@ export default function PayrollManager() {
     if (!id) {
       setItems([]);
       setSettlements([]);
+      setFinanceObligations([]);
       return;
     }
-    const [itemResult, settlementResult] = await Promise.all([
-      supabase.from("hr_payroll_items").select("*").eq("payroll_run_id", id).order("employee_id"),
+
+    const [itemResult, settlementResult, obligationRows] = await Promise.all([
+      supabase
+        .from("hr_payroll_items")
+        .select("*")
+        .eq("payroll_run_id", id)
+        .order("employee_id"),
       supabase.rpc("get_hr_payroll_finance_settlement", { p_run_id: id }),
+      getFinancePayrollObligations(),
     ]);
     if (itemResult.error) throw itemResult.error;
     if (settlementResult.error) throw settlementResult.error;
     setItems((itemResult.data ?? []) as Item[]);
     setSettlements((settlementResult.data ?? []) as FinanceSettlement[]);
+    setFinanceObligations(obligationRows.filter((row) => row.payroll_run_id === id));
   }
 
   useEffect(() => {
-    void load().catch((error) => setMessage({ variant: "error", text: error instanceof Error ? error.message : "Payroll could not be loaded." }));
+    void load().catch((error) =>
+      setMessage({
+        variant: "error",
+        text: error instanceof Error ? error.message : "Payroll could not be loaded.",
+      }),
+    );
     // Initial workspace load only; later reloads are explicit workflow actions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    void loadItems(runId).catch((error) => setMessage({ variant: "error", text: error instanceof Error ? error.message : "Payroll items could not be loaded." }));
+    void loadItems(runId).catch((error) =>
+      setMessage({
+        variant: "error",
+        text: error instanceof Error ? error.message : "Payroll items could not be loaded.",
+      }),
+    );
   }, [runId]);
 
   useEffect(() => {
@@ -187,7 +229,11 @@ export default function PayrollManager() {
     if (!periodId) return;
     const existing = runs.filter((run) => run.payroll_period_id === periodId);
     const next = Math.max(0, ...existing.map((run) => run.run_number)) + 1;
-    const { data, error } = await supabase.from("hr_payroll_runs").insert({ payroll_period_id: periodId, run_number: next, status: "draft" }).select("id").single();
+    const { data, error } = await supabase
+      .from("hr_payroll_runs")
+      .insert({ payroll_period_id: periodId, run_number: next, status: "draft" })
+      .select("id")
+      .single();
     if (error) {
       setMessage({ variant: "error", text: error.message });
       return;
@@ -203,24 +249,41 @@ export default function PayrollManager() {
     try {
       const { data, error } = await supabase.rpc("prepare_hr_payroll_run", { p_run_id: runId });
       if (error) throw error;
-      setMessage({ variant: "info", text: `${Number(data ?? 0)} employee payroll item(s) prepared. Enter and verify taxes before approval.` });
+      setMessage({
+        variant: "info",
+        text: `${Number(data ?? 0)} employee payroll item(s) prepared. Enter and verify taxes before approval.`,
+      });
       await load();
       await loadItems(runId);
     } catch (error) {
-      setMessage({ variant: "error", text: error instanceof Error ? error.message : "Payroll could not be prepared." });
+      setMessage({
+        variant: "error",
+        text: error instanceof Error ? error.message : "Payroll could not be prepared.",
+      });
     } finally {
       setBusy(false);
     }
   }
 
   async function approveRun() {
-    if (!runId || !window.confirm("Approve this payroll calculation? Actual payment is recorded separately in Finance.")) return;
-    const { error } = await supabase.rpc("set_hr_payroll_run_status", { p_run_id: runId, p_status: "approved" });
+    if (
+      !runId ||
+      !window.confirm("Approve this payroll calculation? Actual payment is recorded separately in Finance.")
+    ) {
+      return;
+    }
+    const { error } = await supabase.rpc("set_hr_payroll_run_status", {
+      p_run_id: runId,
+      p_status: "approved",
+    });
     if (error) {
       setMessage({ variant: "error", text: error.message });
       return;
     }
-    setMessage({ variant: "success", text: "Payroll approved. Record actual employee payments in Finance; settlement below updates from posted Finance transactions." });
+    setMessage({
+      variant: "success",
+      text: "Payroll approved. Record actual employee payments in Finance; settlement below updates from posted Finance transactions.",
+    });
     await load();
     await loadItems(runId);
   }
@@ -238,15 +301,18 @@ export default function PayrollManager() {
   async function saveTaxes(event: FormEvent) {
     event.preventDefault();
     if (!editing) return;
-    const { error } = await supabase.from("hr_payroll_items").update({
-      federal_income_tax: Number(fed || 0),
-      state_income_tax: Number(state || 0),
-      local_income_tax: Number(local || 0),
-      social_security_tax: Number(ss || 0),
-      medicare_tax: Number(medicare || 0),
-      employer_payroll_taxes: Number(employerTax || 0),
-      tax_calculation_source: "manual",
-    }).eq("id", editing.id);
+    const { error } = await supabase
+      .from("hr_payroll_items")
+      .update({
+        federal_income_tax: Number(fed || 0),
+        state_income_tax: Number(state || 0),
+        local_income_tax: Number(local || 0),
+        social_security_tax: Number(ss || 0),
+        medicare_tax: Number(medicare || 0),
+        employer_payroll_taxes: Number(employerTax || 0),
+        tax_calculation_source: "manual",
+      })
+      .eq("id", editing.id);
     if (error) {
       setMessage({ variant: "error", text: error.message });
       return;
@@ -256,53 +322,187 @@ export default function PayrollManager() {
     await loadItems(runId);
   }
 
-  const employeeMap = useMemo(() => new Map(employees.map((employee) => [employee.employee_id, employee])), [employees]);
-  const settlementMap = useMemo(() => new Map(settlements.map((settlement) => [settlement.payroll_item_id, settlement])), [settlements]);
+  function payRemaining(item: Item, settlement: FinanceSettlement) {
+    if (settlement.remaining_amount <= 0) return;
+    const params = new URLSearchParams({
+      kind: "employee_payment",
+      employeeId: item.employee_id,
+      payrollItemId: item.id,
+      amount: String(settlement.remaining_amount),
+    });
+    router.push(`/finance/transactions?${params.toString()}`);
+  }
+
+  const employeeMap = useMemo(
+    () => new Map(employees.map((employee) => [employee.employee_id, employee])),
+    [employees],
+  );
+  const settlementMap = useMemo(
+    () => new Map(settlements.map((settlement) => [settlement.payroll_item_id, settlement])),
+    [settlements],
+  );
   const selectedRun = runs.find((run) => run.id === runId);
   const selectedPeriod = periods.find((period) => period.id === periodId);
-  const periodOptions = periods.map((period) => ({ value: period.id, label: `${period.period_code} · ${period.period_start} → ${period.period_end} · Pay ${period.pay_date}` }));
-  const runOptions = runs.filter((run) => !periodId || run.payroll_period_id === periodId).map((run) => ({ value: run.id, label: `Run ${run.run_number} · ${run.status}` }));
-  const totals = useMemo(() => items.reduce((acc, item) => ({
-    gross: acc.gross + n(item.gross_pay),
-    tax: acc.tax + n(item.federal_income_tax) + n(item.state_income_tax) + n(item.local_income_tax) + n(item.social_security_tax) + n(item.medicare_tax),
-    net: acc.net + n(item.net_pay),
-    cost: acc.cost + n(item.total_employer_cost),
-  }), { gross: 0, tax: 0, net: 0, cost: 0 }), [items]);
+  const periodOptions = periods.map((period) => ({
+    value: period.id,
+    label: `${period.period_code} · ${period.period_start} → ${period.period_end} · Pay ${period.pay_date}`,
+  }));
+  const runOptions = runs
+    .filter((run) => !periodId || run.payroll_period_id === periodId)
+    .map((run) => ({ value: run.id, label: `Run ${run.run_number} · ${run.status}` }));
+  const totals = useMemo(
+    () =>
+      items.reduce(
+        (acc, item) => ({
+          gross: acc.gross + n(item.gross_pay),
+          tax:
+            acc.tax +
+            n(item.federal_income_tax) +
+            n(item.state_income_tax) +
+            n(item.local_income_tax) +
+            n(item.social_security_tax) +
+            n(item.medicare_tax),
+          net: acc.net + n(item.net_pay),
+          cost: acc.cost + n(item.total_employer_cost),
+        }),
+        { gross: 0, tax: 0, net: 0, cost: 0 },
+      ),
+    [items],
+  );
+  const financeTotals = useMemo(
+    () =>
+      financeObligations.reduce(
+        (acc, row) => ({
+          remaining: acc.remaining + n(row.remaining_amount),
+          withholding: acc.withholding + n(row.employee_withholding),
+          employerTaxes: acc.employerTaxes + n(row.employer_payroll_taxes),
+          employerBenefits: acc.employerBenefits + n(row.employer_benefit_cost),
+        }),
+        { remaining: 0, withholding: 0, employerTaxes: 0, employerBenefits: 0 },
+      ),
+    [financeObligations],
+  );
 
   return (
     <div className="space-y-6">
-      <ComponentCard title="Payroll" desc="Prepare payroll from compensation, attendance, bonus/commission, deductions, benefits and advances.">
+      <ComponentCard
+        title="Payroll"
+        desc="Prepare payroll from compensation, attendance, bonus/commission, deductions, benefits and advances."
+      >
         <div className="grid gap-4 xl:grid-cols-2">
-          <Alert variant="warning" title="Tax engine status" message="Manual verification is required. Federal, state and local withholding tables are not hard-coded yet. Do not approve payroll until tax values are verified." />
-          <Alert variant="info" title="Payment source of truth" message="Payroll approval does not move cash. Finance Paid, Remaining and payment status are derived from posted Finance employee payments." />
+          <Alert
+            variant="warning"
+            title="Tax engine status"
+            message="Manual verification is required. Federal, state and local withholding tables are not hard-coded yet. Do not approve payroll until tax values are verified."
+          />
+          <Alert
+            variant="info"
+            title="Payment source of truth"
+            message="Payroll approval does not move cash. Finance Paid, Remaining and payment status are derived from posted Finance employee payments."
+          />
         </div>
       </ComponentCard>
 
-      {message ? <Alert variant={message.variant} title={message.variant === "error" ? "Payroll error" : "Payroll updated"} message={message.text} /> : null}
+      {message ? (
+        <Alert
+          variant={message.variant}
+          title={message.variant === "error" ? "Payroll error" : "Payroll updated"}
+          message={message.text}
+        />
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <ComponentCard title="New Payroll Period" desc="Create the HR calculation period. Actual employee payment remains a Finance transaction.">
+        <ComponentCard
+          title="New Payroll Period"
+          desc="Create the HR calculation period. Actual employee payment remains a Finance transaction."
+        >
           <form onSubmit={createPeriod} className="grid gap-4 md:grid-cols-2">
-            <div className="md:col-span-2"><Field label="Period code"><Input placeholder="2026-BW-18" value={code} onChange={(event) => setCode(event.target.value)} required /></Field></div>
-            <Field label="Start"><Input type="date" value={start} onChange={(event) => setStart(event.target.value)} required /></Field>
-            <Field label="End"><Input type="date" value={end} onChange={(event) => setEnd(event.target.value)} required /></Field>
-            <div className="md:col-span-2"><Field label="Pay date"><Input type="date" value={payDate} onChange={(event) => setPayDate(event.target.value)} required /></Field></div>
-            <div className="md:col-span-2"><Button type="submit">Create Period</Button></div>
+            <div className="md:col-span-2">
+              <Field label="Period code">
+                <Input
+                  placeholder="2026-BW-18"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  required
+                />
+              </Field>
+            </div>
+            <Field label="Start">
+              <Input type="date" value={start} onChange={(event) => setStart(event.target.value)} required />
+            </Field>
+            <Field label="End">
+              <Input type="date" value={end} onChange={(event) => setEnd(event.target.value)} required />
+            </Field>
+            <div className="md:col-span-2">
+              <Field label="Pay date">
+                <Input
+                  type="date"
+                  value={payDate}
+                  onChange={(event) => setPayDate(event.target.value)}
+                  required
+                />
+              </Field>
+            </div>
+            <div className="md:col-span-2">
+              <Button type="submit">Create Period</Button>
+            </div>
           </form>
         </ComponentCard>
 
-        <ComponentCard title="Payroll Run" desc="Prepare and approve payroll calculation. Payment completion is derived from Finance, not a manual paid flag.">
+        <ComponentCard
+          title="Payroll Run"
+          desc="Prepare and approve payroll calculation. Payment completion is derived from Finance, not a manual paid flag."
+        >
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Payroll period"><Select options={periodOptions} value={periodId} allowEmpty placeholder="Select period" onChange={setPeriodId} /></Field>
-            <Field label="Run"><Select options={runOptions} value={runId} allowEmpty placeholder="Select run" onChange={setRunId} /></Field>
+            <Field label="Payroll period">
+              <Select
+                options={periodOptions}
+                value={periodId}
+                allowEmpty
+                placeholder="Select period"
+                onChange={setPeriodId}
+              />
+            </Field>
+            <Field label="Run">
+              <Select
+                options={runOptions}
+                value={runId}
+                allowEmpty
+                placeholder="Select run"
+                onChange={setRunId}
+              />
+            </Field>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => void createRun()} disabled={!periodId}>New Run</Button>
-            <Button onClick={() => void prepare()} disabled={!runId || busy || selectedRun?.status === "approved" || selectedRun?.status === "paid"}>{busy ? "Preparing..." : "Prepare / Recalculate"}</Button>
-            <Button variant="outline" onClick={() => void approveRun()} disabled={selectedRun?.status !== "calculated"}>Approve</Button>
+            <Button variant="outline" onClick={() => void createRun()} disabled={!periodId}>
+              New Run
+            </Button>
+            <Button
+              onClick={() => void prepare()}
+              disabled={!runId || busy || selectedRun?.status === "approved" || selectedRun?.status === "paid"}
+            >
+              {busy ? "Preparing..." : "Prepare / Recalculate"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void approveRun()}
+              disabled={selectedRun?.status !== "calculated"}
+            >
+              Approve
+            </Button>
           </div>
-          {selectedPeriod ? <p className="text-xs">{selectedPeriod.period_code} · {selectedPeriod.status} · Pay date {selectedPeriod.pay_date}</p> : null}
-          {selectedRun?.status === "paid" ? <Alert variant="warning" title="Legacy paid status" message="This older run is marked paid in HR. New payment truth is derived from Finance settlement below." /> : null}
+          {selectedPeriod ? (
+            <p className="text-xs">
+              {selectedPeriod.period_code} · {selectedPeriod.status} · Pay date {selectedPeriod.pay_date}
+            </p>
+          ) : null}
+          {selectedRun?.status === "paid" ? (
+            <Alert
+              variant="warning"
+              title="Legacy paid status"
+              message="This older run is marked paid in HR. New payment truth is derived from Finance settlement below."
+            />
+          ) : null}
         </ComponentCard>
       </div>
 
@@ -313,7 +513,24 @@ export default function PayrollManager() {
         <MetricCard title="Employer cost" value={money.format(totals.cost)} />
       </div>
 
-      <ComponentCard title="Payroll Items" desc="Finance Paid and Remaining are live read-only settlement projections from posted Finance employee payments.">
+      {selectedRun?.status === "approved" ? (
+        <ComponentCard
+          title="Finance Payroll Obligations"
+          desc="Read-only projection from approved HR payroll. This is planning data; only posted Finance transactions move cash."
+        >
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard title="Employee pay remaining" value={money.format(financeTotals.remaining)} />
+            <MetricCard title="Employee withholding" value={money.format(financeTotals.withholding)} />
+            <MetricCard title="Employer payroll taxes" value={money.format(financeTotals.employerTaxes)} />
+            <MetricCard title="Employer benefits" value={money.format(financeTotals.employerBenefits)} />
+          </div>
+        </ComponentCard>
+      ) : null}
+
+      <ComponentCard
+        title="Payroll Items"
+        desc="Finance Paid and Remaining are live read-only settlement projections from posted Finance employee payments."
+      >
         <TableViewport>
           <Table variant="admin" minWidth="extraWide">
             <TableHeader variant="admin">
@@ -333,50 +550,129 @@ export default function PayrollManager() {
               </TableRow>
             </TableHeader>
             <TableBody variant="admin">
-              {items.length === 0 ? <TableStateRow colSpan={12}>Create or select a run and click Prepare.</TableStateRow> : items.map((item) => {
-                const employee = employeeMap.get(item.employee_id);
-                const tax = n(item.federal_income_tax) + n(item.state_income_tax) + n(item.local_income_tax) + n(item.social_security_tax) + n(item.medicare_tax);
-                const settlement = settlementMap.get(item.id) ?? {
-                  payroll_item_id: item.id,
-                  paid_amount: 0,
-                  remaining_amount: n(item.net_pay),
-                  payment_status: "unpaid" as const,
-                  latest_payment_at: null,
-                };
-                return (
-                  <TableRow key={item.id}>
-                    <TableCell variant="admin"><div className="font-medium">{employee?.full_name || item.employee_id}</div><div className="text-xs">{employee?.employee_number}</div></TableCell>
-                    <TableCell variant="admin" className="text-right">{n(item.regular_hours).toFixed(2)} + {n(item.overtime_hours).toFixed(2)} OT</TableCell>
-                    <TableCell variant="admin" className="text-right">{money.format(n(item.gross_pay))}</TableCell>
-                    <TableCell variant="admin" className="text-right">{money.format(n(item.pre_tax_deductions))}</TableCell>
-                    <TableCell variant="admin" className="text-right">{money.format(tax)}</TableCell>
-                    <TableCell variant="admin" className="text-right">{money.format(n(item.post_tax_deductions))}</TableCell>
-                    <TableCell variant="admin" className="text-right">{money.format(n(item.advance_repayment))}</TableCell>
-                    <TableCell variant="admin" className="text-right font-semibold">{money.format(n(item.net_pay))}</TableCell>
-                    <TableCell variant="admin" className="text-right font-semibold">{money.format(n(settlement.paid_amount))}</TableCell>
-                    <TableCell variant="admin" className="text-right font-semibold">{money.format(n(settlement.remaining_amount))}</TableCell>
-                    <TableCell variant="admin"><Badge color={paymentStatusColor(settlement.payment_status)}>{settlement.payment_status}</Badge>{settlement.latest_payment_at ? <div className="mt-1 text-xs">{new Date(settlement.latest_payment_at).toLocaleDateString()}</div> : null}</TableCell>
-                    <TableCell variant="admin"><Button size="sm" variant="outline" disabled={selectedRun?.status === "approved" || selectedRun?.status === "paid"} onClick={() => beginTaxEdit(item)}>Taxes</Button></TableCell>
-                  </TableRow>
-                );
-              })}
+              {items.length === 0 ? (
+                <TableStateRow colSpan={12}>Create or select a run and click Prepare.</TableStateRow>
+              ) : (
+                items.map((item) => {
+                  const employee = employeeMap.get(item.employee_id);
+                  const tax =
+                    n(item.federal_income_tax) +
+                    n(item.state_income_tax) +
+                    n(item.local_income_tax) +
+                    n(item.social_security_tax) +
+                    n(item.medicare_tax);
+                  const settlement = settlementMap.get(item.id) ?? {
+                    payroll_item_id: item.id,
+                    paid_amount: 0,
+                    remaining_amount: n(item.net_pay),
+                    payment_status: "unpaid" as const,
+                    latest_payment_at: null,
+                  };
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell variant="admin">
+                        <div className="font-medium">{employee?.full_name || item.employee_id}</div>
+                        <div className="text-xs">{employee?.employee_number}</div>
+                      </TableCell>
+                      <TableCell variant="admin" className="text-right">
+                        {n(item.regular_hours).toFixed(2)} + {n(item.overtime_hours).toFixed(2)} OT
+                      </TableCell>
+                      <TableCell variant="admin" className="text-right">{money.format(n(item.gross_pay))}</TableCell>
+                      <TableCell variant="admin" className="text-right">{money.format(n(item.pre_tax_deductions))}</TableCell>
+                      <TableCell variant="admin" className="text-right">{money.format(tax)}</TableCell>
+                      <TableCell variant="admin" className="text-right">{money.format(n(item.post_tax_deductions))}</TableCell>
+                      <TableCell variant="admin" className="text-right">{money.format(n(item.advance_repayment))}</TableCell>
+                      <TableCell variant="admin" className="text-right font-semibold">{money.format(n(item.net_pay))}</TableCell>
+                      <TableCell variant="admin" className="text-right font-semibold">{money.format(n(settlement.paid_amount))}</TableCell>
+                      <TableCell variant="admin" className="text-right font-semibold">{money.format(n(settlement.remaining_amount))}</TableCell>
+                      <TableCell variant="admin">
+                        <Badge color={paymentStatusColor(settlement.payment_status)}>
+                          {settlement.payment_status}
+                        </Badge>
+                        {settlement.latest_payment_at ? (
+                          <div className="mt-1 text-xs">
+                            {new Date(settlement.latest_payment_at).toLocaleDateString()}
+                          </div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell variant="admin">
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={selectedRun?.status === "approved" || selectedRun?.status === "paid"}
+                            onClick={() => beginTaxEdit(item)}
+                          >
+                            Taxes
+                          </Button>
+                          {selectedRun?.status === "approved" && settlement.remaining_amount > 0 ? (
+                            <Button
+                              size="sm"
+                              onClick={() => payRemaining(item, settlement)}
+                            >
+                              Pay Remaining
+                            </Button>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </TableViewport>
       </ComponentCard>
 
       {editing ? (
-        <ComponentCard title="Manual Tax Entry" desc={employeeMap.get(editing.employee_id)?.full_name ?? editing.employee_id} headerAction={<Button size="sm" variant="outline" onClick={() => setEditing(null)}>Close</Button>}>
+        <ComponentCard
+          title="Manual Tax Entry"
+          desc={employeeMap.get(editing.employee_id)?.full_name ?? editing.employee_id}
+          headerAction={
+            <Button size="sm" variant="outline" onClick={() => setEditing(null)}>
+              Close
+            </Button>
+          }
+        >
           <form onSubmit={saveTaxes} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label="Federal income tax"><Input type="number" min="0" step={0.01} value={fed} onChange={(event) => setFed(event.target.value)} /></Field>
-              <Field label="State income tax"><Input type="number" min="0" step={0.01} value={state} onChange={(event) => setState(event.target.value)} /></Field>
-              <Field label="Local income tax"><Input type="number" min="0" step={0.01} value={local} onChange={(event) => setLocal(event.target.value)} /></Field>
-              <Field label="Social Security"><Input type="number" min="0" step={0.01} value={ss} onChange={(event) => setSs(event.target.value)} /></Field>
-              <Field label="Medicare"><Input type="number" min="0" step={0.01} value={medicare} onChange={(event) => setMedicare(event.target.value)} /></Field>
-              <Field label="Employer payroll taxes"><Input type="number" min="0" step={0.01} value={employerTax} onChange={(event) => setEmployerTax(event.target.value)} /></Field>
+              <Field label="Federal income tax">
+                <Input type="number" min="0" step={0.01} value={fed} onChange={(event) => setFed(event.target.value)} />
+              </Field>
+              <Field label="State income tax">
+                <Input type="number" min="0" step={0.01} value={state} onChange={(event) => setState(event.target.value)} />
+              </Field>
+              <Field label="Local income tax">
+                <Input type="number" min="0" step={0.01} value={local} onChange={(event) => setLocal(event.target.value)} />
+              </Field>
+              <Field label="Social Security">
+                <Input type="number" min="0" step={0.01} value={ss} onChange={(event) => setSs(event.target.value)} />
+              </Field>
+              <Field label="Medicare">
+                <Input
+                  type="number"
+                  min="0"
+                  step={0.01}
+                  value={medicare}
+                  onChange={(event) => setMedicare(event.target.value)}
+                />
+              </Field>
+              <Field label="Employer payroll taxes">
+                <Input
+                  type="number"
+                  min="0"
+                  step={0.01}
+                  value={employerTax}
+                  onChange={(event) => setEmployerTax(event.target.value)}
+                />
+              </Field>
             </div>
-            <div className="flex gap-2"><Button type="submit">Save Taxes</Button><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button></div>
+            <div className="flex gap-2">
+              <Button type="submit">Save Taxes</Button>
+              <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+                Cancel
+              </Button>
+            </div>
           </form>
         </ComponentCard>
       ) : null}
@@ -385,9 +681,18 @@ export default function PayrollManager() {
 }
 
 function MetricCard({ title, value }: { title: string; value: string }) {
-  return <ComponentCard title={title}><p className="text-xl font-semibold">{value}</p></ComponentCard>;
+  return (
+    <ComponentCard title={title}>
+      <p className="text-xl font-semibold">{value}</p>
+    </ComponentCard>
+  );
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <div><Label>{label}</Label><div className="mt-1.5">{children}</div></div>;
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="mt-1.5">{children}</div>
+    </div>
+  );
 }
