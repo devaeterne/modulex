@@ -69,6 +69,11 @@ assert.match(privacySql, /new\.is_active\s+is\s+distinct\s+from\s+old\.is_active
 assert.match(privacySql, /tg_op\s*=\s*'DELETE'[\s\S]*append-safe/i, "CUST-6 must reject hard delete of Customer document metadata");
 assert.match(privacySql, /current_setting\('modulex\.customer_document_lifecycle'\s*,\s*true\)/i, "CUST-6 sensitive lifecycle mutations must require the canonical RPC transaction guard");
 assert.match(privacySql, /set_config\('modulex\.customer_document_lifecycle'\s*,\s*'on'\s*,\s*true\)/i, "CUST-6 lifecycle RPCs must set the transaction-local document guard");
+assert.match(privacySql, /set_config\('modulex\.customer_document_lifecycle'\s*,\s*'off'\s*,\s*true\)/i, "CUST-6 lifecycle RPCs must close their transaction-local document guard after mutation");
+assert.match(privacySql, /create or replace function private\.can_staff_mutate_customer_document_object\s*\(/i, "CUST-6 must protect registered private Storage objects from direct staff mutation");
+assert.match(privacySql, /return not exists\s*\([\s\S]*from public\.customer_documents/i, "CUST-6 Storage mutation helper must allow only unregistered orphan objects");
+assert.match(privacySql, /create policy customer_documents_staff_update[\s\S]*using \(private\.can_staff_mutate_customer_document_object\(bucket_id, name\)\)[\s\S]*with check \(private\.can_staff_mutate_customer_document_object\(bucket_id, name\)\)/i, "CUST-6 registered Storage objects must not be overwritten or renamed");
+assert.match(privacySql, /create policy customer_documents_staff_delete[\s\S]*using \(private\.can_staff_mutate_customer_document_object\(bucket_id, name\)\)/i, "CUST-6 registered Storage objects must not be hard-deleted while orphan cleanup remains possible");
 assert.match(privacySql, /create or replace function public\.register_customer_document\s*\(/i, "CUST-6 forward hardening must restore the merged document registration RPC when production drift skipped the earlier migration");
 assert.match(privacySql, /create or replace function public\.set_customer_document_portal_visibility\s*\(/i, "CUST-6 forward hardening must own portal visibility mutation");
 assert.match(privacySql, /create or replace function public\.deactivate_customer_document\s*\(/i, "CUST-6 forward hardening must own document deactivation");
