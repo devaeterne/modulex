@@ -24,6 +24,7 @@ on:
       - "modulex-admin/scripts/a6-finance-vendor-payments-contract.mjs"
       - "modulex-admin/scripts/a6-finance-payment-schedule-contract.mjs"
       - "modulex-admin/scripts/a6-finance-purchasing-ap-integration-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-ap-aging-contract.mjs"
       - "modulex-admin/scripts/finance-reports-ui-contract.mjs"
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
@@ -36,6 +37,7 @@ on:
       - "modulex-admin/sql/a6-finance-payment-schedule.sql"
       - "modulex-admin/sql/a6-finance-payment-schedule-hardening.sql"
       - "modulex-admin/sql/a6-finance-purchasing-ap-integration.sql"
+      - "modulex-admin/sql/a6-finance-ap-aging.sql"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - "modulex-store/supabase/migrations/20260904150000_a6_finance_employee_payments.sql"
@@ -47,6 +49,7 @@ on:
       - "modulex-store/supabase/migrations/20260906113000_a6_finance_payment_schedule.sql"
       - "modulex-store/supabase/migrations/20260906113100_a6_finance_payment_schedule_hardening.sql"
       - "modulex-store/supabase/migrations/20260906114500_a6_finance_purchasing_ap_integration.sql"
+      - "modulex-store/supabase/migrations/20260906141000_a6_finance_ap_aging.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
   pull_request:
     paths:
@@ -71,6 +74,7 @@ on:
       - "modulex-admin/scripts/a6-finance-vendor-payments-contract.mjs"
       - "modulex-admin/scripts/a6-finance-payment-schedule-contract.mjs"
       - "modulex-admin/scripts/a6-finance-purchasing-ap-integration-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-ap-aging-contract.mjs"
       - "modulex-admin/scripts/finance-reports-ui-contract.mjs"
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
@@ -83,6 +87,7 @@ on:
       - "modulex-admin/sql/a6-finance-payment-schedule.sql"
       - "modulex-admin/sql/a6-finance-payment-schedule-hardening.sql"
       - "modulex-admin/sql/a6-finance-purchasing-ap-integration.sql"
+      - "modulex-admin/sql/a6-finance-ap-aging.sql"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - "modulex-store/supabase/migrations/20260904150000_a6_finance_employee_payments.sql"
@@ -94,6 +99,7 @@ on:
       - "modulex-store/supabase/migrations/20260906113000_a6_finance_payment_schedule.sql"
       - "modulex-store/supabase/migrations/20260906113100_a6_finance_payment_schedule_hardening.sql"
       - "modulex-store/supabase/migrations/20260906114500_a6_finance_purchasing_ap_integration.sql"
+      - "modulex-store/supabase/migrations/20260906141000_a6_finance_ap_aging.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
 
 concurrency:
@@ -123,4 +129,5 @@ jobs:
       - run: node scripts/a6-finance-vendor-payments-contract.mjs
       - run: node scripts/a6-finance-payment-schedule-contract.mjs
       - run: node scripts/a6-finance-purchasing-ap-integration-contract.mjs
+      - run: node scripts/a6-finance-ap-aging-contract.mjs
       - run: node scripts/finance-reports-ui-contract.mjs
