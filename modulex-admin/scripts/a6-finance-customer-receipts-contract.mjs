@@ -8,10 +8,14 @@ const sqlPath = "sql/a6-finance-customer-receipts.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260906193000_a6_finance_customer_receipts.sql";
 const hardeningSqlPath = "sql/a6-f5a-customer-receipts-rpc-hardening.sql";
 const hardeningMigrationPath = "../modulex-store/supabase/migrations/20260906203000_a6_f5a_customer_receipts_rpc_hardening.sql";
+const uuidAggregateFixSqlPath = "sql/a6-f5a-customer-receipts-uuid-aggregate-fix.sql";
+const uuidAggregateFixMigrationPath = "../modulex-store/supabase/migrations/20260906203600_a6_f5a_customer_receipts_uuid_aggregate_fix.sql";
 const sql = read(sqlPath);
 const migration = read(migrationPath);
 const hardeningSql = read(hardeningSqlPath);
 const hardeningMigration = read(hardeningMigrationPath);
+const uuidAggregateFixSql = read(uuidAggregateFixSqlPath);
+const uuidAggregateFixMigration = read(uuidAggregateFixMigrationPath);
 const domain = read("src/lib/finance/customer-receipts.ts");
 const manager = read("src/components/finance/FinanceCustomerReceiptsManager.tsx");
 const genericTransactions = read("src/components/finance/FinanceTransactionsManager.tsx");
@@ -22,6 +26,11 @@ expect(sql.length > 0, "A6-F5A customer receipt SQL must exist");
 expect(sql === migration, "A6-F5A Admin SQL and shared migration must stay byte-identical");
 expect(hardeningSql.length > 0, "A6-F5A authenticated RPC hardening SQL must exist");
 expect(hardeningSql === hardeningMigration, "A6-F5A RPC hardening Admin SQL and shared migration must stay byte-identical");
+expect(uuidAggregateFixSql.length > 0, "A6-F5A UUID aggregate corrective SQL must exist");
+expect(uuidAggregateFixSql === uuidAggregateFixMigration, "A6-F5A UUID aggregate Admin SQL and shared migration must stay byte-identical");
+expect(/create or replace function private\.get_customer_receipts_page\s*\(/i.test(uuidAggregateFixSql), "F5A UUID aggregate fix must replace the private receipts page function");
+expect(!/max\s*\(\s*l\.customer_id\s*\)/i.test(uuidAggregateFixSql), "F5A receipts page must not use max(uuid)");
+expect(/array_agg\s*\(\s*distinct\s+l\.customer_id\s+order\s+by\s+l\.customer_id\s*\)[\s\S]{0,120}\[1\]/i.test(uuidAggregateFixSql), "F5A receipts page must resolve Customer UUID with a UUID-safe aggregate");
 const hardenedPublicRpcs = [
   "record_customer_receipt",
   "void_customer_receipt",
