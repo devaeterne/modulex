@@ -1,12 +1,21 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-09-04
-Main baseline: `190da5745fe2b6972deabff0d11c16263cd5c0f5`
+Last reviewed: 2026-09-06
+Main baseline: `588fe02c430c518e3f3a2b8ce81ec5e0728bf08c`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current parallel Admin package: **A6-F1 Finance Core + Cash/Bank is tracked separately; Finance is a first-class domain and Project PB-5 does not modify Finance schema/runtime.**
 Current parallel Project package: **PB-5 Delivery & Installation Rollup is active in draft PR #296 on `feat/project-pb5-fulfillment-rollup`; current `main` is incorporated, production PB-5 DDL/RPC is intentionally unapplied, and Store/Portal projections remain unchanged.**
-Current Admin next action: **Preserve the active non-Project workstreams. In parallel, finish PB-5 final-head CI/review; do not apply the PB-5 Project fulfillment RPC or deploy its runtime before owner merge and the separate production DB acceptance gate.**
+Current Admin next action: **Preserve the active non-Project workstreams. In parallel, finish PB-5 final-head CI/review; Calendar V3 runtime refresh is tracked in draft PR #329 and must retain only the Hobby-safe daily maintenance cron.**
+
+## Calendar V3 runtime refresh
+
+- [~] Shift routine Company Calendar freshness from frequent cron polling to Calendar-open refresh while retaining one daily reconciliation/watch-renewal cron.
+  - `/api/admin/calendar/google/refresh` is gated by `calendar.view`, flushes due outbox work, skips the Google provider pull when `last_sync_at` is less than one minute old, and ensures the Company Calendar watch remains healthy.
+  - `/calendar` triggers the refresh once per mounted Calendar workspace and reloads its snapshot after the background refresh; Google failures do not block the Calendar UI.
+  - Project Detail continues to keep its large Calendar hidden by default, so the same refresh is triggered only when that Calendar workspace is actually shown.
+  - `vercel.json` retains only the Hobby-compatible daily Calendar reconciliation at `5 7 * * *`; no hourly/minute Calendar cron is added. Google webhooks remain the primary near-real-time inbound path.
+  - TDD RED was recorded in PR #329 before the refresh route existed; functional head verification passed Calendar V3, API timing, strict Admin UI, TypeScript, lint, and production build. Keep this row `[~]` until owner merge/deploy and signed-in production Calendar-open acceptance are complete.
 
 ## Customer read performance cleanup
 
@@ -866,6 +875,7 @@ Record material decisions here when they affect future phases.
 - [x] Vendor SKU remains sellable identity; conservative family grouping sets `base_product_code` and variant/color identity without rewriting vendor SKU.
 - [x] Vendor availability is external supply eligibility only: it never becomes Modulex on-hand inventory. Only `AVAILABLE` rows may be approved; authoritative repeated absence can become `MISSING`; vendor-driven canonical reactivation never overrides a later manual Modulex status change.
 - [x] Project fulfillment remains a projection over canonical Order/Shipment/Installation/Procurement truth; PB-5 does not create a Project delivery/installation ledger, broaden Finance operational visibility, or widen Store/Portal data.
+- [x] Calendar V3 uses Google push notifications for near-real-time inbound changes, Calendar-open refresh for user-facing freshness, and one daily Vercel reconciliation/watch-renewal job; hourly/minute Calendar cron polling is intentionally not part of the runtime model.
 
 ---
 
@@ -879,6 +889,8 @@ Keep existing non-Project workstreams in their own acceptance flows. For the Pro
 4. After explicit owner approval, apply the PB-5 RPC through the normal production migration path, verify ownership/search-path/EXECUTE grants, run role acceptance and rollback-only fulfillment scenarios, then rerun Supabase Security + Performance Advisors.
 5. Deploy Admin only after the PB-5 DB acceptance passes and complete signed-in Project Fulfillment UI acceptance.
 6. After PB-5 closes, continue with **PB-6 — Participants & Commission Ledger** while keeping actual commission payment Finance-owned.
+
+**Calendar V3 runtime next action:** owner reviews PR #329; after merge/deploy, verify that opening `/calendar` triggers one background refresh, repeated opens within the freshness window avoid an unnecessary Google provider pull, watch health remains active, and the only scheduled Calendar maintenance remains the daily `5 7 * * *` reconciliation.
 
 **Cross-roadmap coordination:** PB-5 changes no Store public/Customer Portal/Dealer Portal projection, so `modulex-store/STORE_ROADMAP.md` requires no functional status mutation. PB-5 also changes no Finance schema/runtime; Finance remains an independent canonical money-movement workstream.
 
