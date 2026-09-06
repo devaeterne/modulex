@@ -4,7 +4,9 @@ import process from "node:process";
 
 const root = process.cwd();
 const cardPath = path.join(root, "src/components/customers/CustomerCard.tsx");
+const tablePath = path.join(root, "src/components/customers/CustomersTable.tsx");
 const sqlPath = path.join(root, "sql/customer-master-mutation.sql");
+const operationsSqlPath = path.join(root, "sql/customer-operations-hardening.sql");
 const packagePath = path.join(root, "package.json");
 
 function read(filePath) {
@@ -20,12 +22,24 @@ function requireNoMatch(source, pattern, message) {
 }
 
 const card = read(cardPath);
+const table = read(tablePath);
 const sql = read(sqlPath);
+const operationsSql = read(operationsSqlPath);
 const pkg = JSON.parse(read(packagePath));
 
 requireMatch(card, /async function saveCustomerMaster\s*\(/, "Customer General save must use a dedicated customer-master mutation handler.");
 requireMatch(card, /supabase\.rpc\(\s*["']update_customer_master["']/, "Customer master handler must call update_customer_master RPC.");
 requireMatch(card, /Save General[\s\S]{0,800}saveCustomerMaster|saveCustomerMaster[\s\S]{0,800}Save General/, "Save General must route through saveCustomerMaster.");
+
+requireMatch(table, /supabase\.rpc\(\s*["']create_customer["']/, "Customer creation must use the canonical create_customer RPC.");
+requireNoMatch(table, /\.from\(\s*["']customers["']\s*\)\.insert\(/, "Customer creation must not insert directly into customers from the browser.");
+requireMatch(operationsSql, /create or replace function public\.create_customer\s*\(/i, "Customer operations SQL must define create_customer.");
+requireMatch(operationsSql, /create_customer[\s\S]{0,1800}security\s+invoker/i, "create_customer must remain SECURITY INVOKER.");
+requireMatch(operationsSql, /current_user_has_any_role\s*\(\s*array\s*\[\s*['"]super_admin['"]\s*,\s*['"]admin['"]\s*,\s*['"]sales['"]/i, "create_customer must authorize the approved Customer mutation roles.");
+requireMatch(operationsSql, /insert into public\.customers/i, "create_customer must create the customer inside the RPC transaction.");
+requireMatch(operationsSql, /insert into public\.customer_activity/i, "create_customer must write the creation activity atomically.");
+requireMatch(operationsSql, /revoke all on function public\.create_customer[\s\S]{0,500}from public/i, "create_customer must revoke PUBLIC execute.");
+requireMatch(operationsSql, /grant execute on function public\.create_customer[\s\S]{0,500}to authenticated/i, "create_customer must grant execute only to authenticated.");
 
 requireMatch(sql, /create or replace function public\.update_customer_master\s*\(/i, "Customer master SQL must define update_customer_master.");
 requireNoMatch(sql, /update_customer_master[\s\S]{0,1200}security\s+definer/i, "Customer master RPC must not use SECURITY DEFINER.");
