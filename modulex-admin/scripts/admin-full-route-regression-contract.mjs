@@ -40,7 +40,7 @@ const sidebarRoutes = [...sidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) =>
 const uniqueSidebarRoutes = [...new Set(sidebarRoutes)];
 
 expect(sidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
-expect(uniqueSidebarRoutes.length === 82, `UI-2D expects 82 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
+expect(uniqueSidebarRoutes.length === 83, `UI-2D expects 83 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
 for (const route of uniqueSidebarRoutes) {
   expect(pageRoutes.has(route), `Sidebar route is missing a page.tsx: ${route}`);
 }
@@ -60,6 +60,7 @@ for (const route of [
   "/finance/vendors",
   "/finance/bills",
   "/finance/vendor-payments",
+  "/finance/payment-schedule",
   "/settings/integrations/google-calendar",
   "/settings/general/project-participant-roles",
   "/store/cabinet-content",
