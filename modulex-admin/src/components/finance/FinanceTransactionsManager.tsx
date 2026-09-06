@@ -34,7 +34,6 @@ import {
 import { saveEmployeePaymentDraft } from "@/lib/finance/payroll";
 
 const kindOptions = [
-  { value: "customer_receipt", label: "Customer receipt" },
   { value: "employee_payment", label: "Employee payment" },
   { value: "deposit", label: "Deposit" },
   { value: "withdrawal", label: "Withdrawal" },
@@ -50,6 +49,7 @@ const statusFilterOptions = [
 
 const kindFilterOptions = [
   { value: "expense", label: "Expense" },
+  { value: "customer_receipt", label: "Customer receipt" },
   { value: "vendor_payment", label: "Vendor payment" },
   ...kindOptions,
   { value: "reversal", label: "Reversal" },
@@ -80,7 +80,7 @@ export default function FinanceTransactionsManager() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ variant: "success" | "error"; text: string } | null>(null);
 
-  const [kind, setKind] = useState<FinanceTransactionKind>("customer_receipt");
+  const [kind, setKind] = useState<FinanceTransactionKind>("deposit");
   const [sourceAccountId, setSourceAccountId] = useState("");
   const [destinationAccountId, setDestinationAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -340,7 +340,7 @@ export default function FinanceTransactionsManager() {
       {message ? <Alert variant={message.variant} title={message.variant === "success" ? "Finance updated" : "Finance error"} message={message.text} /> : null}
 
       {canManage ? (
-        <ComponentCard title="New Finance Draft" desc="Drafts are editable working records and do not affect account balances until posted.">
+        <ComponentCard title="New Finance Draft" desc="Drafts are editable working records and do not affect account balances until posted. Customer Receipts use the dedicated Invoice-allocation flow.">
           <form onSubmit={createDraft} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div><Label htmlFor="finance-kind">Transaction type</Label><Select id="finance-kind" options={kindOptions} value={kind} onChange={chooseKind} /></div>
             <div><Label htmlFor="finance-amount">Amount</Label><Input id="finance-amount" type="number" min="0.0001" step="0.0001" value={amount} onChange={(event) => setAmount(event.target.value)} required /></div>
@@ -379,7 +379,7 @@ export default function FinanceTransactionsManager() {
         </div>
       ) : null}
 
-      <ComponentCard title="Transactions" desc="Posted rows are immutable money history. Drafts can be deleted before posting; voids and reversals remain visible for audit.">
+      <ComponentCard title="Transactions" desc="Posted rows are immutable money history. Source-managed Customer Receipts remain visible here but are corrected from Customer Receipts.">
         <div className="grid gap-4 md:grid-cols-4">
           <div><Label htmlFor="finance-status-filter">Status</Label><Select id="finance-status-filter" options={statusFilterOptions} value={statusFilter} allowEmpty placeholder="All statuses" onChange={setStatusFilter} /></div>
           <div><Label htmlFor="finance-kind-filter">Type</Label><Select id="finance-kind-filter" options={kindFilterOptions} value={kindFilter} allowEmpty placeholder="All transaction types" onChange={setKindFilter} /></div>
@@ -401,7 +401,9 @@ export default function FinanceTransactionsManager() {
                   <TableCell variant="admin" className="text-right">{transaction.base_amount !== null && transaction.base_currency_code ? money(transaction.base_amount, transaction.base_currency_code) : "—"}</TableCell>
                   <TableCell variant="admin"><Badge color={statusColor(transaction.status)}>{transaction.status}</Badge></TableCell>
                   <TableCell variant="admin">
-                    {canManage ? (
+                    {transaction.transaction_kind === "customer_receipt" ? (
+                      <span className="text-xs">Use Customer Receipts</span>
+                    ) : canManage ? (
                       <div className="flex flex-wrap gap-2">
                         {transaction.status === "draft" ? <Button size="sm" onClick={() => void post(transaction)} disabled={Boolean(busyId)}>Post</Button> : null}
                         {transaction.status === "draft" ? <Button size="sm" variant="danger" onClick={() => void deleteDraft(transaction)} disabled={Boolean(busyId)}>Delete Draft</Button> : null}
