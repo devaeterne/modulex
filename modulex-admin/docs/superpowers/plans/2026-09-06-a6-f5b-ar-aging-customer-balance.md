@@ -10,6 +10,14 @@
 
 **Spec:** `modulex-admin/docs/FINANCE_DOMAIN_PLAN.md`
 
+## Execution Status — Pre-PR Verification
+
+- F5B Tasks 1–4 are implemented on `feat/a6-f5b-ar-reporting` and rebased directly onto the current F5A-hardened `main` baseline.
+- TDD RED was recorded before the implementation SQL/client/UI existed. The focused F5B contract is now wired into the normal Finance workflow.
+- Finance Core and Store Core CI passed on the rebased implementation head. Admin UI Foundation must be re-run on a normal descendant commit because the force-normalization made the push event's previous SHA unreachable for its strict changed-file symmetric-diff gate; this is a CI ancestry artifact, not a bypass.
+- Production schema dependencies were checked read-only. The F5B migration has **not** been applied to production and no deploy has been performed.
+- Task 5 is intentionally deferred from this focused implementation commit: `ADMIN_ROADMAP.md` is globally stale across multiple already-merged A6 packages and is a large operational source-of-truth file. It must be reconciled comprehensively in a controlled documentation pass rather than partially whole-file rewritten from this branch. The draft PR must call this out explicitly; F5B production acceptance must not be marked complete before that reconciliation plus post-merge migration/deploy/signed-in acceptance.
+
 ## Global Constraints
 
 - Finance Core remains the canonical money-movement ledger; do not create a parallel Customer payment table.
