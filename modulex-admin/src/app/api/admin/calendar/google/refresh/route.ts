@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export const OPEN_REFRESH_MIN_INTERVAL_MS = 60 * 1000;
+const OPEN_REFRESH_MIN_INTERVAL_MS = 60 * 1000;
 
 function isProviderSyncFresh(lastSyncAt: string | null, now = Date.now()) {
   if (!lastSyncAt) return false;
