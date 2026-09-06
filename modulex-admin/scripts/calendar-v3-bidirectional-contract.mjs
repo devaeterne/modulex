@@ -51,7 +51,7 @@ assert.match(provider, /PATCH/);
 assert.match(syncEngine, /syncToken|sync_token/);
 assert.match(syncEngine, /410|sync_token_gone/);
 assert.match(syncEngine, /calendar_sync_outbox/);
-assert.match(syncEngine, /calendar_sync_audit/);
+assert.match(syncEngine, /insertCalendarSyncAudit/);
 assert.match(eventRoute, /requirePermission\(request, "calendar\.manage"\)/);
 assert.match(webhook, /x-goog-channel-id/i);
 assert.match(webhook, /x-goog-resource-id/i);
