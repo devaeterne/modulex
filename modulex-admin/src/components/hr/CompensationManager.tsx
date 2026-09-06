@@ -1,6 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import StatTile from "@/components/common/StatTile";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Switch from "@/components/form/switch/Switch";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableStateRow,
+  TableViewport,
+} from "@/components/ui/table";
+import {
+  ADMIN_TEXT_STYLES,
+  type AdminStatusColor,
+} from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 
@@ -64,13 +87,114 @@ type Deduction = {
   is_active: boolean;
 };
 
-const inputClass =
-  "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const cardClass =
-  "rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]";
-const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+type Feedback = {
+  tone: "success" | "error";
+  title: string;
+  text: string;
+};
+
+const money = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+const payTypeOptions = [
+  { value: "salary", label: "Salary (annual)" },
+  { value: "hourly", label: "Hourly" },
+];
+
+const payFrequencyOptions = [
+  { value: "weekly", label: "Weekly" },
+  { value: "biweekly", label: "Biweekly" },
+  { value: "semimonthly", label: "Semimonthly" },
+  { value: "monthly", label: "Monthly" },
+];
+
+const variableTypeOptions = [
+  { value: "bonus", label: "Bonus" },
+  { value: "commission", label: "Commission" },
+  { value: "incentive", label: "Incentive" },
+  { value: "reimbursement", label: "Reimbursement" },
+  { value: "other", label: "Other" },
+];
+
+const deductionTypeOptions = [
+  { value: "fixed", label: "Fixed amount" },
+  { value: "percent", label: "Percentage" },
+];
+
+const taxTreatmentOptions = [
+  { value: "pre_tax", label: "Pre-tax" },
+  { value: "post_tax", label: "Post-tax" },
+];
+
+const deductionFrequencyOptions = [
+  { value: "recurring", label: "Recurring" },
+  { value: "one_time", label: "One time" },
+];
+
+function formatDateInput(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDisplayDate(value: string | null) {
+  if (!value) return "—";
+  const [datePart] = value.split("T");
+  const [year, month, day] = datePart.split("-");
+  if (!year || !month || !day) return value;
+  return `${day}.${month}.${year}`;
+}
+
+function readable(value: string) {
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function getStatusPresentation(value: string): {
+  label: string;
+  color: AdminStatusColor;
+} {
+  switch (value) {
+    case "approved":
+    case "paid":
+    case "active":
+    case "closed":
+      return { label: readable(value), color: "success" };
+    case "open":
+    case "pending":
+      return { label: readable(value), color: "warning" };
+    case "void":
+    case "inactive":
+    case "disabled":
+      return { label: readable(value), color: "light" };
+    case "rejected":
+    case "failed":
+      return { label: readable(value), color: "error" };
+    default:
+      return { label: readable(value), color: "primary" };
+  }
+}
+
+function clearEmployeeData(
+  setCompensation: (rows: Compensation[]) => void,
+  setVariablePay: (rows: VariablePay[]) => void,
+  setAdvances: (rows: Advance[]) => void,
+  setDeductions: (rows: Deduction[]) => void,
+) {
+  setCompensation([]);
+  setVariablePay([]);
+  setAdvances([]);
+  setDeductions([]);
+}
 
 export default function CompensationManager() {
+  const today = formatDateInput(new Date());
+  const dataRequestRef = useRef(0);
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeId, setEmployeeId] = useState("");
   const [compensation, setCompensation] = useState<Compensation[]>([]);
@@ -78,10 +202,12 @@ export default function CompensationManager() {
   const [advances, setAdvances] = useState<Advance[]>([]);
   const [deductions, setDeductions] = useState<Deduction[]>([]);
   const [canEdit, setCanEdit] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
   const [payType, setPayType] = useState("salary");
   const [baseRate, setBaseRate] = useState("");
   const [frequency, setFrequency] = useState("biweekly");
@@ -109,386 +235,1005 @@ export default function CompensationManager() {
   const [deductionStart, setDeductionStart] = useState(today);
 
   async function loadEmployees() {
-    const [{ profile }, { data, error }] = await Promise.all([
-      getCurrentProfile(),
-      supabase.rpc("get_hr_payroll_employee_directory"),
-    ]);
-    if (error) throw error;
+    setIsLoadingEmployees(true);
+    try {
+      const [{ profile }, { data, error }] = await Promise.all([
+        getCurrentProfile(),
+        supabase.rpc("get_hr_payroll_employee_directory"),
+      ]);
 
-    const next = (data ?? []) as Employee[];
-    setEmployees(next);
-    setCanEdit(profile?.role === "super_admin" || profile?.role === "admin" || profile?.role === "hr");
-    if (!employeeId && next[0]) setEmployeeId(next[0].employee_id);
+      setPermissionsLoaded(true);
+      setCanEdit(
+        profile?.role === "super_admin" ||
+          profile?.role === "admin" ||
+          profile?.role === "hr",
+      );
+
+      if (error) {
+        setFeedback({
+          tone: "error",
+          title: "Employees unavailable",
+          text: "Employees could not be loaded. Please try again.",
+        });
+        return;
+      }
+
+      const next = (data ?? []) as Employee[];
+      setEmployees(next);
+      if (!employeeId && next[0]) setEmployeeId(next[0].employee_id);
+    } catch {
+      setPermissionsLoaded(true);
+      setFeedback({
+        tone: "error",
+        title: "Employees unavailable",
+        text: "Employees could not be loaded. Please try again.",
+      });
+    } finally {
+      setIsLoadingEmployees(false);
+    }
   }
 
   async function loadEmployeeData(id: string) {
+    const requestId = ++dataRequestRef.current;
+    clearEmployeeData(setCompensation, setVariablePay, setAdvances, setDeductions);
+
     if (!id) {
-      setCompensation([]);
-      setVariablePay([]);
-      setAdvances([]);
-      setDeductions([]);
+      setIsLoadingData(false);
       return;
     }
 
-    const [c, v, a, d] = await Promise.all([
-      supabase
-        .from("hr_compensation_records")
-        .select("id,employee_id,pay_type,base_rate,currency_code,pay_frequency,standard_weekly_hours,overtime_eligible,overtime_multiplier,effective_from,effective_to,reason")
-        .eq("employee_id", id)
-        .order("effective_from", { ascending: false }),
-      supabase
-        .from("hr_variable_pay")
-        .select("id,employee_id,pay_type,amount,earning_date,status,description")
-        .eq("employee_id", id)
-        .order("earning_date", { ascending: false })
-        .limit(100),
-      supabase
-        .from("hr_advances")
-        .select("id,employee_id,advance_date,amount,installment_amount,balance_remaining,status,reason")
-        .eq("employee_id", id)
-        .order("advance_date", { ascending: false }),
-      supabase
-        .from("hr_deductions")
-        .select("id,employee_id,name,deduction_type,tax_treatment,amount,percentage,frequency,effective_from,effective_to,is_active")
-        .eq("employee_id", id)
-        .order("effective_from", { ascending: false }),
-    ]);
+    setIsLoadingData(true);
+    try {
+      const [c, v, a, d] = await Promise.all([
+        supabase
+          .from("hr_compensation_records")
+          .select(
+            "id,employee_id,pay_type,base_rate,currency_code,pay_frequency,standard_weekly_hours,overtime_eligible,overtime_multiplier,effective_from,effective_to,reason",
+          )
+          .eq("employee_id", id)
+          .order("effective_from", { ascending: false }),
+        supabase
+          .from("hr_variable_pay")
+          .select("id,employee_id,pay_type,amount,earning_date,status,description")
+          .eq("employee_id", id)
+          .order("earning_date", { ascending: false })
+          .limit(100),
+        supabase
+          .from("hr_advances")
+          .select(
+            "id,employee_id,advance_date,amount,installment_amount,balance_remaining,status,reason",
+          )
+          .eq("employee_id", id)
+          .order("advance_date", { ascending: false }),
+        supabase
+          .from("hr_deductions")
+          .select(
+            "id,employee_id,name,deduction_type,tax_treatment,amount,percentage,frequency,effective_from,effective_to,is_active",
+          )
+          .eq("employee_id", id)
+          .order("effective_from", { ascending: false }),
+      ]);
 
-    for (const result of [c, v, a, d]) if (result.error) throw result.error;
-    setCompensation((c.data ?? []) as Compensation[]);
-    setVariablePay((v.data ?? []) as VariablePay[]);
-    setAdvances((a.data ?? []) as Advance[]);
-    setDeductions((d.data ?? []) as Deduction[]);
+      if (requestId !== dataRequestRef.current) return;
+
+      if (c.error || v.error || a.error || d.error) {
+        setFeedback({
+          tone: "error",
+          title: "Compensation unavailable",
+          text: "Compensation data could not be loaded. Please try again.",
+        });
+        return;
+      }
+
+      setCompensation((c.data ?? []) as Compensation[]);
+      setVariablePay((v.data ?? []) as VariablePay[]);
+      setAdvances((a.data ?? []) as Advance[]);
+      setDeductions((d.data ?? []) as Deduction[]);
+    } catch {
+      if (requestId === dataRequestRef.current) {
+        setFeedback({
+          tone: "error",
+          title: "Compensation unavailable",
+          text: "Compensation data could not be loaded. Please try again.",
+        });
+      }
+    } finally {
+      if (requestId === dataRequestRef.current) setIsLoadingData(false);
+    }
   }
 
   useEffect(() => {
-    void loadEmployees().catch((e) => setMessage(e instanceof Error ? e.message : "Employees could not be loaded."));
+    void loadEmployees();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    void loadEmployeeData(employeeId).catch((e) => setMessage(e instanceof Error ? e.message : "Compensation could not be loaded."));
+    setFeedback(null);
+    void loadEmployeeData(employeeId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employeeId]);
 
   async function saveComp(event: FormEvent) {
     event.preventDefault();
-    if (!canEdit) return;
-    setBusy(true);
-    const { error } = await supabase.from("hr_compensation_records").insert({
-      employee_id: employeeId,
-      pay_type: payType,
-      base_rate: Number(baseRate),
-      currency_code: "USD",
-      pay_frequency: frequency,
-      standard_weekly_hours: Number(weeklyHours),
-      overtime_eligible: overtimeEligible,
-      overtime_multiplier: Number(otMultiplier),
-      effective_from: effectiveFrom,
-      reason: compReason.trim() || null,
-    });
-    setBusy(false);
-    if (error) return setMessage(error.message);
-    setBaseRate("");
-    setCompReason("");
-    setMessage("Compensation record added.");
-    await loadEmployeeData(employeeId);
+    if (!canEdit || !employeeId || busyAction) return;
+
+    setBusyAction("compensation");
+    setFeedback(null);
+    try {
+      const { error } = await supabase.from("hr_compensation_records").insert({
+        employee_id: employeeId,
+        pay_type: payType,
+        base_rate: Number(baseRate),
+        currency_code: "USD",
+        pay_frequency: frequency,
+        standard_weekly_hours: Number(weeklyHours),
+        overtime_eligible: overtimeEligible,
+        overtime_multiplier: Number(otMultiplier),
+        effective_from: effectiveFrom,
+        reason: compReason.trim() || null,
+      });
+
+      if (error) {
+        setFeedback({
+          tone: "error",
+          title: "Rate not saved",
+          text: "The compensation rate could not be saved. Please try again.",
+        });
+        return;
+      }
+
+      setBaseRate("");
+      setCompReason("");
+      setFeedback({
+        tone: "success",
+        title: "Rate saved",
+        text: "The compensation rate was added successfully.",
+      });
+      await loadEmployeeData(employeeId);
+    } finally {
+      setBusyAction(null);
+    }
   }
 
   async function saveVariable(event: FormEvent) {
     event.preventDefault();
-    if (!canEdit) return;
-    const { error } = await supabase.from("hr_variable_pay").insert({
-      employee_id: employeeId,
-      pay_type: variableType,
-      amount: Number(variableAmount),
-      earning_date: earningDate,
-      status: "approved",
-      description: variableDescription.trim() || null,
-    });
-    if (error) return setMessage(error.message);
-    setVariableAmount("");
-    setVariableDescription("");
-    setMessage("Variable pay added.");
-    await loadEmployeeData(employeeId);
+    if (!canEdit || !employeeId || busyAction) return;
+
+    setBusyAction("variable");
+    setFeedback(null);
+    try {
+      const { error } = await supabase.from("hr_variable_pay").insert({
+        employee_id: employeeId,
+        pay_type: variableType,
+        amount: Number(variableAmount),
+        earning_date: earningDate,
+        status: "approved",
+        description: variableDescription.trim() || null,
+      });
+
+      if (error) {
+        setFeedback({
+          tone: "error",
+          title: "Variable pay not saved",
+          text: "Variable pay could not be saved. Please try again.",
+        });
+        return;
+      }
+
+      setVariableAmount("");
+      setVariableDescription("");
+      setFeedback({
+        tone: "success",
+        title: "Variable pay saved",
+        text: "The variable pay entry was added successfully.",
+      });
+      await loadEmployeeData(employeeId);
+    } finally {
+      setBusyAction(null);
+    }
   }
 
   async function saveAdvance(event: FormEvent) {
     event.preventDefault();
-    if (!canEdit) return;
-    const amount = Number(advanceAmount);
-    const { error } = await supabase.from("hr_advances").insert({
-      employee_id: employeeId,
-      advance_date: advanceDate,
-      amount,
-      balance_remaining: amount,
-      repayment_method: "payroll",
-      installment_amount: installment ? Number(installment) : null,
-      status: "open",
-      reason: advanceReason.trim() || null,
-    });
-    if (error) return setMessage(error.message);
-    setAdvanceAmount("");
-    setInstallment("");
-    setAdvanceReason("");
-    setMessage("Employee advance added.");
-    await loadEmployeeData(employeeId);
+    if (!canEdit || !employeeId || busyAction) return;
+
+    setBusyAction("advance");
+    setFeedback(null);
+    try {
+      const amount = Number(advanceAmount);
+      const { error } = await supabase.from("hr_advances").insert({
+        employee_id: employeeId,
+        advance_date: advanceDate,
+        amount,
+        balance_remaining: amount,
+        repayment_method: "payroll",
+        installment_amount: installment ? Number(installment) : null,
+        status: "open",
+        reason: advanceReason.trim() || null,
+      });
+
+      if (error) {
+        setFeedback({
+          tone: "error",
+          title: "Advance not saved",
+          text: "The employee advance could not be saved. Please try again.",
+        });
+        return;
+      }
+
+      setAdvanceAmount("");
+      setInstallment("");
+      setAdvanceReason("");
+      setFeedback({
+        tone: "success",
+        title: "Advance saved",
+        text: "The employee advance was added successfully.",
+      });
+      await loadEmployeeData(employeeId);
+    } finally {
+      setBusyAction(null);
+    }
   }
 
   async function saveDeduction(event: FormEvent) {
     event.preventDefault();
-    if (!canEdit) return;
-    const fixed = deductionType === "fixed";
-    const { error } = await supabase.from("hr_deductions").insert({
-      employee_id: employeeId,
-      name: deductionName.trim(),
-      deduction_type: deductionType,
-      tax_treatment: taxTreatment,
-      amount: fixed ? Number(deductionValue) : null,
-      percentage: fixed ? null : Number(deductionValue),
-      frequency: deductionFrequency,
-      effective_from: deductionStart,
-      is_active: true,
-    });
-    if (error) return setMessage(error.message);
-    setDeductionName("");
-    setDeductionValue("");
-    setMessage("Deduction added.");
-    await loadEmployeeData(employeeId);
+    if (!canEdit || !employeeId || busyAction) return;
+
+    setBusyAction("deduction");
+    setFeedback(null);
+    try {
+      const fixed = deductionType === "fixed";
+      const { error } = await supabase.from("hr_deductions").insert({
+        employee_id: employeeId,
+        name: deductionName.trim(),
+        deduction_type: deductionType,
+        tax_treatment: taxTreatment,
+        amount: fixed ? Number(deductionValue) : null,
+        percentage: fixed ? null : Number(deductionValue),
+        frequency: deductionFrequency,
+        effective_from: deductionStart,
+        is_active: true,
+      });
+
+      if (error) {
+        setFeedback({
+          tone: "error",
+          title: "Deduction not saved",
+          text: "The payroll deduction could not be saved. Please try again.",
+        });
+        return;
+      }
+
+      setDeductionName("");
+      setDeductionValue("");
+      setFeedback({
+        tone: "success",
+        title: "Deduction saved",
+        text: "The payroll deduction was added successfully.",
+      });
+      await loadEmployeeData(employeeId);
+    } finally {
+      setBusyAction(null);
+    }
   }
 
   async function voidVariable(id: string) {
-    if (!canEdit) return;
-    const { error } = await supabase.from("hr_variable_pay").update({ status: "void" }).eq("id", id);
-    if (error) setMessage(error.message);
-    else await loadEmployeeData(employeeId);
+    if (!canEdit || busyAction) return;
+    setBusyAction(`variable:${id}`);
+    setFeedback(null);
+    try {
+      const { error } = await supabase
+        .from("hr_variable_pay")
+        .update({ status: "void" })
+        .eq("id", id);
+
+      if (error) {
+        setFeedback({
+          tone: "error",
+          title: "Entry not updated",
+          text: "The variable pay entry could not be voided. Please try again.",
+        });
+        return;
+      }
+
+      setFeedback({
+        tone: "success",
+        title: "Entry voided",
+        text: "The variable pay entry was voided.",
+      });
+      await loadEmployeeData(employeeId);
+    } finally {
+      setBusyAction(null);
+    }
   }
 
   async function toggleDeduction(row: Deduction) {
-    if (!canEdit) return;
-    const { error } = await supabase.from("hr_deductions").update({ is_active: !row.is_active }).eq("id", row.id);
-    if (error) setMessage(error.message);
-    else await loadEmployeeData(employeeId);
+    if (!canEdit || busyAction) return;
+    setBusyAction(`deduction:${row.id}`);
+    setFeedback(null);
+    try {
+      const { error } = await supabase
+        .from("hr_deductions")
+        .update({ is_active: !row.is_active })
+        .eq("id", row.id);
+
+      if (error) {
+        setFeedback({
+          tone: "error",
+          title: "Deduction not updated",
+          text: "The deduction status could not be changed. Please try again.",
+        });
+        return;
+      }
+
+      setFeedback({
+        tone: "success",
+        title: "Deduction updated",
+        text: row.is_active ? "The deduction was disabled." : "The deduction was enabled.",
+      });
+      await loadEmployeeData(employeeId);
+    } finally {
+      setBusyAction(null);
+    }
   }
 
   const selected = employees.find((employee) => employee.employee_id === employeeId);
   const currentComp = useMemo(
-    () => compensation.find((item) => !item.effective_to || item.effective_to >= today),
+    () =>
+      compensation.find(
+        (item) =>
+          item.effective_from <= today &&
+          (!item.effective_to || item.effective_to >= today),
+      ),
     [compensation, today],
   );
+
   const openAdvance = advances
     .filter((advance) => advance.status === "open")
     .reduce((sum, advance) => sum + Number(advance.balance_remaining), 0);
 
+  const activeDeductionCount = deductions.filter((deduction) => deduction.is_active).length;
+  const employeeOptions = employees.map((employee) => ({
+    value: employee.employee_id,
+    label: `${employee.employee_number} · ${employee.full_name}`,
+  }));
+
+  const controlsDisabled = !employeeId || Boolean(busyAction) || isLoadingData;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">Compensation</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <h1 className={`${ADMIN_TEXT_STYLES.strong} text-2xl font-semibold`}>Compensation</h1>
+        <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-sm`}>
           Manage salary/hourly rates, overtime, bonus, commission, advances and deductions.
         </p>
       </div>
 
-      {message && <div className={`${cardClass} text-sm text-gray-700 dark:text-gray-300`}>{message}</div>}
-
-      {!canEdit && (
-        <div className="rounded-2xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-800 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-300">
-          Finance access is read-only for compensation setup. Payroll processing remains available in the payroll module.
+      {feedback ? (
+        <div role={feedback.tone === "error" ? "alert" : "status"} aria-live="polite">
+          <Alert
+            variant={feedback.tone}
+            title={feedback.title}
+            message={feedback.text}
+          />
         </div>
-      )}
+      ) : null}
 
-      <div className={cardClass}>
-        <label className="block text-sm text-gray-600 dark:text-gray-300">
-          Employee
-          <select className={`${inputClass} mt-1 max-w-xl`} value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
-            <option value="">Select employee</option>
-            {employees.map((employee) => (
-              <option key={employee.employee_id} value={employee.employee_id}>
-                {employee.employee_number} · {employee.full_name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {selected && (
-          <p className="mt-2 text-sm text-gray-500">
-            {selected.position_title || "No position"} · {selected.department_name || "No department"}
-          </p>
-        )}
+      {permissionsLoaded && !canEdit ? (
+        <Alert
+          variant="warning"
+          title="Read-only compensation access"
+          message="You can review compensation details, but only HR and administrators can change compensation setup."
+        />
+      ) : null}
+
+      <ComponentCard
+        title="Employee"
+        desc="Choose an employee to review and manage compensation details."
+      >
+        <div className="max-w-2xl">
+          <Label htmlFor="compensation-employee">Employee</Label>
+          <Select
+            id="compensation-employee"
+            options={employeeOptions}
+            placeholder={isLoadingEmployees ? "Loading employees..." : "Select employee"}
+            value={employeeId}
+            onChange={setEmployeeId}
+            disabled={isLoadingEmployees || employeeOptions.length === 0}
+          />
+          {selected ? (
+            <p className={`${ADMIN_TEXT_STYLES.muted} mt-2 text-sm`}>
+              {selected.position_title || "No position"} · {selected.department_name || "No department"}
+            </p>
+          ) : null}
+        </div>
+      </ComponentCard>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <StatTile
+          label="Current base"
+          value={currentComp ? money.format(Number(currentComp.base_rate)) : "Not set"}
+          helper={
+            currentComp
+              ? `${readable(currentComp.pay_type)} · ${readable(currentComp.pay_frequency)}`
+              : "No active compensation rate"
+          }
+          tone={currentComp ? "brand" : "neutral"}
+        />
+        <StatTile
+          label="Open advances"
+          value={money.format(openAdvance)}
+          helper="Total outstanding advance balance"
+          tone={openAdvance > 0 ? "warning" : "neutral"}
+        />
+        <StatTile
+          label="Active deductions"
+          value={activeDeductionCount}
+          helper="Payroll deductions currently enabled"
+          tone={activeDeductionCount > 0 ? "brand" : "neutral"}
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className={cardClass}>
-          <p className="text-sm text-gray-500">Current base</p>
-          <p className="mt-2 text-xl font-semibold text-gray-800 dark:text-white/90">
-            {currentComp ? money.format(Number(currentComp.base_rate)) : "Not set"}
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            {currentComp ? `${currentComp.pay_type} · ${currentComp.pay_frequency}` : "Add compensation below"}
-          </p>
-        </div>
-        <div className={cardClass}>
-          <p className="text-sm text-gray-500">Open advances</p>
-          <p className="mt-2 text-xl font-semibold text-gray-800 dark:text-white/90">{money.format(openAdvance)}</p>
-        </div>
-        <div className={cardClass}>
-          <p className="text-sm text-gray-500">Active deductions</p>
-          <p className="mt-2 text-xl font-semibold text-gray-800 dark:text-white/90">
-            {deductions.filter((deduction) => deduction.is_active).length}
-          </p>
-        </div>
-      </div>
-
-      {canEdit && (
+      {canEdit ? (
         <div className="grid gap-6 xl:grid-cols-2">
-          <form onSubmit={saveComp} className={`${cardClass} space-y-3`}>
-            <h2 className="font-semibold text-gray-800 dark:text-white/90">New Compensation Rate</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <select className={inputClass} value={payType} onChange={(e) => setPayType(e.target.value)}>
-                <option value="salary">Salary (annual)</option>
-                <option value="hourly">Hourly</option>
-              </select>
-              <input className={inputClass} type="number" min="0" step="0.01" placeholder={payType === "salary" ? "Annual salary" : "Hourly rate"} value={baseRate} onChange={(e) => setBaseRate(e.target.value)} required />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <select className={inputClass} value={frequency} onChange={(e) => setFrequency(e.target.value)}>
-                <option value="weekly">Weekly</option>
-                <option value="biweekly">Biweekly</option>
-                <option value="semimonthly">Semimonthly</option>
-                <option value="monthly">Monthly</option>
-              </select>
-              <input className={inputClass} type="number" min="1" max="168" step="0.25" value={weeklyHours} onChange={(e) => setWeeklyHours(e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex h-10 items-center gap-2 text-sm">
-                <input type="checkbox" checked={overtimeEligible} onChange={(e) => setOvertimeEligible(e.target.checked)} /> Overtime eligible
-              </label>
-              <input className={inputClass} type="number" min="1" step="0.1" value={otMultiplier} onChange={(e) => setOtMultiplier(e.target.value)} />
-            </div>
-            <input className={inputClass} type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} />
-            <input className={inputClass} placeholder="Reason (hire, raise, promotion...)" value={compReason} onChange={(e) => setCompReason(e.target.value)} />
-            <button disabled={busy || !employeeId} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-50">Add Rate</button>
-          </form>
+          <ComponentCard
+            title="New Compensation Rate"
+            desc="Set a salary or hourly base rate and overtime rules."
+          >
+            <form onSubmit={saveComp} className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="comp-rate-type">Rate type</Label>
+                  <Select
+                    id="comp-rate-type"
+                    options={payTypeOptions}
+                    value={payType}
+                    onChange={setPayType}
+                    disabled={controlsDisabled}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="comp-rate-amount">Amount</Label>
+                  <Input
+                    id="comp-rate-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder={payType === "salary" ? "Annual salary" : "Hourly rate"}
+                    value={baseRate}
+                    onChange={(event) => setBaseRate(event.target.value)}
+                    disabled={controlsDisabled}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="comp-pay-frequency">Pay frequency</Label>
+                  <Select
+                    id="comp-pay-frequency"
+                    options={payFrequencyOptions}
+                    value={frequency}
+                    onChange={setFrequency}
+                    disabled={controlsDisabled}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="comp-weekly-hours">Hours / week</Label>
+                  <Input
+                    id="comp-weekly-hours"
+                    type="number"
+                    min="1"
+                    max="168"
+                    step="0.25"
+                    value={weeklyHours}
+                    onChange={(event) => setWeeklyHours(event.target.value)}
+                    disabled={controlsDisabled}
+                  />
+                </div>
+              </div>
 
-          <form onSubmit={saveVariable} className={`${cardClass} space-y-3`}>
-            <h2 className="font-semibold text-gray-800 dark:text-white/90">Bonus / Commission / Incentive</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <select className={inputClass} value={variableType} onChange={(e) => setVariableType(e.target.value)}>
-                <option value="bonus">Bonus</option>
-                <option value="commission">Commission</option>
-                <option value="incentive">Incentive</option>
-                <option value="reimbursement">Reimbursement</option>
-                <option value="other">Other</option>
-              </select>
-              <input className={inputClass} type="number" min="0" step="0.01" placeholder="Amount" value={variableAmount} onChange={(e) => setVariableAmount(e.target.value)} required />
-            </div>
-            <input className={inputClass} type="date" value={earningDate} onChange={(e) => setEarningDate(e.target.value)} />
-            <input className={inputClass} placeholder="Description" value={variableDescription} onChange={(e) => setVariableDescription(e.target.value)} />
-            <button disabled={!employeeId} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-50">Add Variable Pay</button>
-          </form>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className={`${ADMIN_TEXT_STYLES.strong} mb-2 text-sm font-medium`}>
+                    Overtime eligible
+                  </p>
+                  <Switch
+                    id="comp-overtime-eligible"
+                    label={overtimeEligible ? "Eligible for overtime" : "Not eligible for overtime"}
+                    checked={overtimeEligible}
+                    onChange={setOvertimeEligible}
+                    disabled={controlsDisabled}
+                  />
+                  <p className={`${ADMIN_TEXT_STYLES.muted} mt-1.5 text-xs`}>
+                    Controls whether overtime pay applies to this rate.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="comp-overtime-multiplier">Overtime multiplier</Label>
+                  <Input
+                    id="comp-overtime-multiplier"
+                    type="number"
+                    min="1"
+                    step="0.1"
+                    value={otMultiplier}
+                    onChange={(event) => setOtMultiplier(event.target.value)}
+                    disabled={controlsDisabled || !overtimeEligible}
+                  />
+                </div>
+              </div>
 
-          <form onSubmit={saveAdvance} className={`${cardClass} space-y-3`}>
-            <h2 className="font-semibold text-gray-800 dark:text-white/90">Employee Advance</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <input className={inputClass} type="number" min="0.01" step="0.01" placeholder="Advance amount" value={advanceAmount} onChange={(e) => setAdvanceAmount(e.target.value)} required />
-              <input className={inputClass} type="date" value={advanceDate} onChange={(e) => setAdvanceDate(e.target.value)} />
-            </div>
-            <input className={inputClass} type="number" min="0.01" step="0.01" placeholder="Payroll installment (optional)" value={installment} onChange={(e) => setInstallment(e.target.value)} />
-            <input className={inputClass} placeholder="Reason" value={advanceReason} onChange={(e) => setAdvanceReason(e.target.value)} />
-            <button disabled={!employeeId} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-50">Add Advance</button>
-          </form>
+              <div>
+                <Label htmlFor="comp-effective-date">Effective date</Label>
+                <Input
+                  id="comp-effective-date"
+                  type="date"
+                  value={effectiveFrom}
+                  onChange={(event) => setEffectiveFrom(event.target.value)}
+                  disabled={controlsDisabled}
+                  required
+                />
+              </div>
 
-          <form onSubmit={saveDeduction} className={`${cardClass} space-y-3`}>
-            <h2 className="font-semibold text-gray-800 dark:text-white/90">Payroll Deduction</h2>
-            <input className={inputClass} placeholder="Deduction name" value={deductionName} onChange={(e) => setDeductionName(e.target.value)} required />
-            <div className="grid grid-cols-2 gap-3">
-              <select className={inputClass} value={deductionType} onChange={(e) => setDeductionType(e.target.value)}>
-                <option value="fixed">Fixed amount</option>
-                <option value="percent">Percentage</option>
-              </select>
-              <input className={inputClass} type="number" min="0" step="0.01" placeholder={deductionType === "fixed" ? "Amount" : "Percent"} value={deductionValue} onChange={(e) => setDeductionValue(e.target.value)} required />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <select className={inputClass} value={taxTreatment} onChange={(e) => setTaxTreatment(e.target.value)}>
-                <option value="pre_tax">Pre-tax</option>
-                <option value="post_tax">Post-tax</option>
-              </select>
-              <select className={inputClass} value={deductionFrequency} onChange={(e) => setDeductionFrequency(e.target.value)}>
-                <option value="recurring">Recurring</option>
-                <option value="one_time">One time</option>
-              </select>
-            </div>
-            <input className={inputClass} type="date" value={deductionStart} onChange={(e) => setDeductionStart(e.target.value)} />
-            <button disabled={!employeeId} className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-50">Add Deduction</button>
-          </form>
+              <div>
+                <Label htmlFor="comp-reason">Reason</Label>
+                <TextArea
+                  id="comp-reason"
+                  rows={3}
+                  maxLength={200}
+                  placeholder="Reason (hire, raise, promotion...)"
+                  value={compReason}
+                  onChange={setCompReason}
+                  disabled={controlsDisabled}
+                  hint={`${compReason.length}/200`}
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full sm:w-auto"
+                disabled={controlsDisabled || !baseRate}
+              >
+                {busyAction === "compensation" ? "Saving rate..." : "Add Compensation Rate"}
+              </Button>
+            </form>
+          </ComponentCard>
+
+          <ComponentCard
+            title="Bonus / Commission / Incentive"
+            desc="Record approved variable earnings for this employee."
+          >
+            <form onSubmit={saveVariable} className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="variable-type">Type</Label>
+                  <Select
+                    id="variable-type"
+                    options={variableTypeOptions}
+                    value={variableType}
+                    onChange={setVariableType}
+                    disabled={controlsDisabled}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="variable-amount">Amount</Label>
+                  <Input
+                    id="variable-amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Amount"
+                    value={variableAmount}
+                    onChange={(event) => setVariableAmount(event.target.value)}
+                    disabled={controlsDisabled}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="variable-date">Effective date</Label>
+                <Input
+                  id="variable-date"
+                  type="date"
+                  value={earningDate}
+                  onChange={(event) => setEarningDate(event.target.value)}
+                  disabled={controlsDisabled}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="variable-description">Description (optional)</Label>
+                <TextArea
+                  id="variable-description"
+                  rows={4}
+                  maxLength={200}
+                  placeholder="Describe the bonus, commission or incentive..."
+                  value={variableDescription}
+                  onChange={setVariableDescription}
+                  disabled={controlsDisabled}
+                  hint={`${variableDescription.length}/200`}
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full sm:w-auto"
+                disabled={controlsDisabled || !variableAmount}
+              >
+                {busyAction === "variable" ? "Saving variable pay..." : "Add Variable Pay"}
+              </Button>
+            </form>
+          </ComponentCard>
+
+          <ComponentCard
+            title="Employee Advance"
+            desc="Record an advance that will be repaid through payroll."
+          >
+            <form onSubmit={saveAdvance} className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="advance-amount">Advance amount</Label>
+                  <Input
+                    id="advance-amount"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="Amount"
+                    value={advanceAmount}
+                    onChange={(event) => setAdvanceAmount(event.target.value)}
+                    disabled={controlsDisabled}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="advance-date">Effective date</Label>
+                  <Input
+                    id="advance-date"
+                    type="date"
+                    value={advanceDate}
+                    onChange={(event) => setAdvanceDate(event.target.value)}
+                    disabled={controlsDisabled}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="advance-installment">Payroll installment (optional)</Label>
+                <Input
+                  id="advance-installment"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="Installment per payroll"
+                  value={installment}
+                  onChange={(event) => setInstallment(event.target.value)}
+                  disabled={controlsDisabled}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="advance-reason">Reason</Label>
+                <TextArea
+                  id="advance-reason"
+                  rows={3}
+                  maxLength={200}
+                  placeholder="Reason for advance..."
+                  value={advanceReason}
+                  onChange={setAdvanceReason}
+                  disabled={controlsDisabled}
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full sm:w-auto"
+                disabled={controlsDisabled || !advanceAmount}
+              >
+                {busyAction === "advance" ? "Saving advance..." : "Add Advance"}
+              </Button>
+            </form>
+          </ComponentCard>
+
+          <ComponentCard
+            title="Payroll Deduction"
+            desc="Add and configure a payroll deduction for this employee."
+          >
+            <form onSubmit={saveDeduction} className="space-y-5">
+              <div>
+                <Label htmlFor="deduction-name">Deduction name</Label>
+                <Input
+                  id="deduction-name"
+                  placeholder="Enter deduction name"
+                  value={deductionName}
+                  onChange={(event) => setDeductionName(event.target.value)}
+                  disabled={controlsDisabled}
+                  required
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="deduction-type">Amount type</Label>
+                  <Select
+                    id="deduction-type"
+                    options={deductionTypeOptions}
+                    value={deductionType}
+                    onChange={setDeductionType}
+                    disabled={controlsDisabled}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="deduction-value">Amount</Label>
+                  <Input
+                    id="deduction-value"
+                    type="number"
+                    min="0"
+                    max={deductionType === "percent" ? "100" : undefined}
+                    step="0.01"
+                    placeholder={deductionType === "fixed" ? "Amount" : "Percent"}
+                    value={deductionValue}
+                    onChange={(event) => setDeductionValue(event.target.value)}
+                    disabled={controlsDisabled}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="deduction-tax">Tax treatment</Label>
+                  <Select
+                    id="deduction-tax"
+                    options={taxTreatmentOptions}
+                    value={taxTreatment}
+                    onChange={setTaxTreatment}
+                    disabled={controlsDisabled}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="deduction-recurrence">Recurrence</Label>
+                  <Select
+                    id="deduction-recurrence"
+                    options={deductionFrequencyOptions}
+                    value={deductionFrequency}
+                    onChange={setDeductionFrequency}
+                    disabled={controlsDisabled}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="deduction-effective-date">Effective date</Label>
+                <Input
+                  id="deduction-effective-date"
+                  type="date"
+                  value={deductionStart}
+                  onChange={(event) => setDeductionStart(event.target.value)}
+                  disabled={controlsDisabled}
+                  required
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full sm:w-auto"
+                disabled={controlsDisabled || !deductionName.trim() || !deductionValue}
+              >
+                {busyAction === "deduction" ? "Saving deduction..." : "Add Deduction"}
+              </Button>
+            </form>
+          </ComponentCard>
         </div>
-      )}
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <div className={cardClass}>
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">Compensation History</h2>
-          <div className="mt-4 space-y-2">
-            {compensation.map((item) => (
-              <div key={item.id} className="rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/[0.03]">
-                <div className="flex justify-between gap-3">
-                  <b>{money.format(Number(item.base_rate))}</b>
-                  <span className="text-gray-500">{item.effective_from}{item.effective_to ? ` → ${item.effective_to}` : " → current"}</span>
-                </div>
-                <p className="mt-1 text-gray-500">{item.pay_type} · {item.pay_frequency} · {Number(item.standard_weekly_hours)}h/week{item.overtime_eligible ? ` · OT x${Number(item.overtime_multiplier)}` : ""}</p>
-              </div>
-            ))}
-            {compensation.length === 0 && <p className="mt-4 text-sm text-gray-500">No compensation history.</p>}
-          </div>
-        </div>
-
-        <div className={cardClass}>
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">Variable Pay</h2>
-          <div className="mt-4 space-y-2">
-            {variablePay.map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/[0.03]">
-                <div>
-                  <b className="capitalize">{item.pay_type}</b> · {money.format(Number(item.amount))}
-                  <p className="text-xs text-gray-500">{item.earning_date} · {item.status}{item.description ? ` · ${item.description}` : ""}</p>
-                </div>
-                {canEdit && item.status !== "paid" && item.status !== "void" ? (
-                  <button onClick={() => void voidVariable(item.id)} className="text-xs text-error-600">Void</button>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className={cardClass}>
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">Advances</h2>
-          <div className="mt-4 space-y-2">
-            {advances.map((item) => (
-              <div key={item.id} className="rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/[0.03]">
-                <div className="flex justify-between">
-                  <b>{money.format(Number(item.amount))}</b>
-                  <span className="capitalize text-gray-500">{item.status}</span>
-                </div>
-                <p className="mt-1 text-xs text-gray-500">Balance {money.format(Number(item.balance_remaining))}{item.installment_amount ? ` · ${money.format(Number(item.installment_amount))}/payroll` : ""}{item.reason ? ` · ${item.reason}` : ""}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className={cardClass}>
-          <h2 className="font-semibold text-gray-800 dark:text-white/90">Deductions</h2>
-          <div className="mt-4 space-y-2">
-            {deductions.map((item) => (
-              <div key={item.id} className="flex items-center justify-between rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/[0.03]">
-                <div>
-                  <b>{item.name}</b>
-                  <p className="text-xs text-gray-500">{item.deduction_type === "fixed" ? money.format(Number(item.amount || 0)) : `${Number(item.percentage || 0)}%`} · {item.tax_treatment.replace("_", "-")} · {item.frequency}</p>
-                </div>
-                {canEdit ? (
-                  <button onClick={() => void toggleDeduction(item)} className="text-xs font-medium text-brand-600">{item.is_active ? "Disable" : "Enable"}</button>
+        <ComponentCard
+          title="Compensation History"
+          desc="Base compensation rates ordered by effective date."
+        >
+          <TableViewport>
+            <Table variant="admin" className="min-w-[680px]">
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell isHeader variant="admin">Effective</TableCell>
+                  <TableCell isHeader variant="admin">Type</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Rate</TableCell>
+                  <TableCell isHeader variant="admin">Details</TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody variant="admin" aria-busy={isLoadingData}>
+                {isLoadingData ? (
+                  <TableStateRow colSpan={4}>Loading compensation...</TableStateRow>
+                ) : compensation.length === 0 ? (
+                  <TableStateRow colSpan={4}>No compensation history yet.</TableStateRow>
                 ) : (
-                  <span className="text-xs text-gray-500">{item.is_active ? "Active" : "Inactive"}</span>
+                  compensation.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell variant="admin" className="whitespace-nowrap">
+                        <span className={ADMIN_TEXT_STYLES.strong}>{formatDisplayDate(item.effective_from)}</span>
+                        <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 text-xs`}>
+                          {item.effective_to ? `to ${formatDisplayDate(item.effective_to)}` : "Current end date"}
+                        </p>
+                      </TableCell>
+                      <TableCell variant="admin">
+                        <span className={ADMIN_TEXT_STYLES.strong}>{readable(item.pay_type)}</span>
+                        <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 text-xs`}>{readable(item.pay_frequency)}</p>
+                      </TableCell>
+                      <TableCell variant="admin" className="whitespace-nowrap text-right font-semibold tabular-nums">
+                        {money.format(Number(item.base_rate))}
+                      </TableCell>
+                      <TableCell variant="admin">
+                        <span>{Number(item.standard_weekly_hours)}h / week</span>
+                        {item.overtime_eligible ? (
+                          <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 text-xs`}>OT ×{Number(item.overtime_multiplier)}</p>
+                        ) : null}
+                        {item.reason ? (
+                          <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 max-w-[260px] truncate text-xs`} title={item.reason}>{item.reason}</p>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
-              </div>
-            ))}
-          </div>
-        </div>
+              </TableBody>
+            </Table>
+          </TableViewport>
+        </ComponentCard>
+
+        <ComponentCard
+          title="Variable Pay"
+          desc="Bonuses, commissions, incentives and other variable earnings."
+        >
+          <TableViewport>
+            <Table variant="admin" className="min-w-[720px]">
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell isHeader variant="admin">Date</TableCell>
+                  <TableCell isHeader variant="admin">Type</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Amount</TableCell>
+                  <TableCell isHeader variant="admin">Status</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Actions</TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody variant="admin" aria-busy={isLoadingData}>
+                {isLoadingData ? (
+                  <TableStateRow colSpan={5}>Loading compensation...</TableStateRow>
+                ) : variablePay.length === 0 ? (
+                  <TableStateRow colSpan={5}>No variable pay entries yet.</TableStateRow>
+                ) : (
+                  variablePay.map((item) => {
+                    const status = getStatusPresentation(item.status);
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell variant="admin" className="whitespace-nowrap">{formatDisplayDate(item.earning_date)}</TableCell>
+                        <TableCell variant="admin">
+                          <span className={ADMIN_TEXT_STYLES.strong}>{readable(item.pay_type)}</span>
+                          {item.description ? (
+                            <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 max-w-[220px] truncate text-xs`} title={item.description}>{item.description}</p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell variant="admin" className="whitespace-nowrap text-right font-semibold tabular-nums">{money.format(Number(item.amount))}</TableCell>
+                        <TableCell variant="admin"><Badge size="sm" color={status.color}>{status.label}</Badge></TableCell>
+                        <TableCell variant="admin" className="text-right">
+                          {canEdit && item.status !== "paid" && item.status !== "void" ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => void voidVariable(item.id)}
+                              disabled={Boolean(busyAction)}
+                            >
+                              {busyAction === `variable:${item.id}` ? "Voiding..." : "Void"}
+                            </Button>
+                          ) : (
+                            <span className={`${ADMIN_TEXT_STYLES.muted} text-xs`}>—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableViewport>
+        </ComponentCard>
+
+        <ComponentCard
+          title="Advances"
+          desc="Outstanding and historical employee advances."
+        >
+          <TableViewport>
+            <Table variant="admin" className="min-w-[680px]">
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell isHeader variant="admin">Date</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Amount</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Balance</TableCell>
+                  <TableCell isHeader variant="admin">Repayment</TableCell>
+                  <TableCell isHeader variant="admin">Status</TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody variant="admin" aria-busy={isLoadingData}>
+                {isLoadingData ? (
+                  <TableStateRow colSpan={5}>Loading compensation...</TableStateRow>
+                ) : advances.length === 0 ? (
+                  <TableStateRow colSpan={5}>No advances yet.</TableStateRow>
+                ) : (
+                  advances.map((item) => {
+                    const status = getStatusPresentation(item.status);
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell variant="admin" className="whitespace-nowrap">{formatDisplayDate(item.advance_date)}</TableCell>
+                        <TableCell variant="admin" className="whitespace-nowrap text-right font-semibold tabular-nums">{money.format(Number(item.amount))}</TableCell>
+                        <TableCell variant="admin" className="whitespace-nowrap text-right tabular-nums">{money.format(Number(item.balance_remaining))}</TableCell>
+                        <TableCell variant="admin">
+                          {item.installment_amount ? `${money.format(Number(item.installment_amount))} / payroll` : "Flexible"}
+                          {item.reason ? (
+                            <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 max-w-[220px] truncate text-xs`} title={item.reason}>{item.reason}</p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell variant="admin"><Badge size="sm" color={status.color}>{status.label}</Badge></TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableViewport>
+        </ComponentCard>
+
+        <ComponentCard
+          title="Deductions"
+          desc="Payroll deductions and their current status."
+        >
+          <TableViewport>
+            <Table variant="admin" className="min-w-[720px]">
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell isHeader variant="admin">Name</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Amount</TableCell>
+                  <TableCell isHeader variant="admin">Recurrence</TableCell>
+                  <TableCell isHeader variant="admin">Status</TableCell>
+                  <TableCell isHeader variant="admin" className="text-right">Actions</TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody variant="admin" aria-busy={isLoadingData}>
+                {isLoadingData ? (
+                  <TableStateRow colSpan={5}>Loading compensation...</TableStateRow>
+                ) : deductions.length === 0 ? (
+                  <TableStateRow colSpan={5}>No deductions yet.</TableStateRow>
+                ) : (
+                  deductions.map((item) => {
+                    const status = getStatusPresentation(item.is_active ? "active" : "inactive");
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell variant="admin">
+                          <span className={ADMIN_TEXT_STYLES.strong}>{item.name}</span>
+                          <p className={`${ADMIN_TEXT_STYLES.muted} mt-0.5 text-xs`}>{readable(item.tax_treatment)}</p>
+                        </TableCell>
+                        <TableCell variant="admin" className="whitespace-nowrap text-right font-semibold tabular-nums">
+                          {item.deduction_type === "fixed" ? money.format(Number(item.amount || 0)) : `${Number(item.percentage || 0)}%`}
+                        </TableCell>
+                        <TableCell variant="admin">{readable(item.frequency)}</TableCell>
+                        <TableCell variant="admin"><Badge size="sm" color={status.color}>{status.label}</Badge></TableCell>
+                        <TableCell variant="admin" className="text-right">
+                          {canEdit ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => void toggleDeduction(item)}
+                              disabled={Boolean(busyAction)}
+                            >
+                              {busyAction === `deduction:${item.id}` ? "Updating..." : item.is_active ? "Disable" : "Enable"}
+                            </Button>
+                          ) : (
+                            <span className={`${ADMIN_TEXT_STYLES.muted} text-xs`}>—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableViewport>
+        </ComponentCard>
       </div>
     </div>
   );

@@ -1,0 +1,11 @@
+/*
+ * Scoped contrast corrections for third-party widgets whose upstream/default
+ * styles do not inherit Modulex Admin light/dark text tokens reliably.
+ */
+.custom-calendar .fc-h-event {
+  color: var(--color-gray-700);
+}
+
+.dark .custom-calendar .fc-h-event {
+  color: var(--color-gray-300);
+}
