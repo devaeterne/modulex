@@ -339,7 +339,7 @@ export default function AdminCalendarWorkspace({
           eventResize={(info) => void persistMovedEvent(info.event, info.revert)}
           eventContent={(info) => {
             const record = info.event.extendedProps.record as SnapshotEvent | undefined;
-            return <div className="min-w-0"><p className="truncate text-xs font-medium">{info.event.title}</p>{record?.sync_status && record.sync_status !== "synced" ? <p className="truncate text-[10px]">{record.sync_status}</p> : null}</div>;
+            return <div className="min-w-0"><p className="truncate text-xs font-medium">{info.event.title}</p>{record?.sync_status && record.sync_status !== "synced" ? <p className="truncate text-xs">{record.sync_status}</p> : null}</div>;
           }}
         />
       </ComponentCard>
