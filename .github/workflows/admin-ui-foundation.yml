@@ -55,6 +55,8 @@ jobs:
         run: npm run smoke:google-calendar
       - name: Admin Calendar scheduling core contract
         run: npm run smoke:admin-calendar
+      - name: Calendar V3 bidirectional contract
+        run: npm run smoke:calendar-v3
       - name: Admin UI strict self-test
         run: npm run smoke:admin-ui-strict:self-test
       - name: Admin UI strict changed-file gate

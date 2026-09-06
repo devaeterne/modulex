@@ -1,0 +1,65 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const source = (p) => readFile(path.join(root, p), "utf8");
+
+const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconcile, workspace, projectTab] = await Promise.all([
+  source("sql/calendar-v3-bidirectional.sql"),
+  source("../modulex-store/supabase/migrations/20260906113000_calendar_v3_bidirectional.sql"),
+  source("src/lib/google-calendar/config.ts"),
+  source("src/lib/google-calendar/google-calendar.ts"),
+  source("src/lib/google-calendar/bidirectional-sync.ts"),
+  source("src/app/api/admin/calendar/events/route.ts"),
+  source("src/app/api/admin/calendar/google/webhook/route.ts"),
+  source("src/app/api/admin/calendar/google/reconcile/route.ts"),
+  source("src/components/calendar/AdminCalendarWorkspace.tsx"),
+  source("src/components/customers/project-detail/ProjectCalendarTab.tsx"),
+]);
+
+assert.equal(sql.trim(), migration.trim(), "Calendar V3 canonical SQL and migration must remain byte-identical.");
+for (const token of [
+  "calendar_events",
+  "calendar_provider_event_links",
+  "calendar_sync_outbox",
+  "calendar_sync_jobs",
+  "calendar_watch_channels",
+  "calendar_sync_audit",
+  "calendar_business_event_extensions",
+  "company_shared",
+]) assert.match(sql, new RegExp(token));
+assert.match(sql, /kind in \([^)]*company/i);
+assert.match(sql, /binding_mode[\s\S]*company_shared/i);
+assert.match(sql, /company_admin_calendar_id uuid/i);
+assert.match(sql, /company_provider_binding_id uuid/i);
+assert.match(sql, /create unique index[\s\S]*admin_calendars[\s\S]*kind = 'company'/i);
+assert.match(sql, /calendar_events[\s\S]*project_id uuid/i);
+assert.match(sql, /calendar_provider_event_links[\s\S]*provider_event_id text not null/i);
+assert.match(sql, /calendar_sync_outbox[\s\S]*source_type/i);
+assert.match(sql, /calendar_watch_channels[\s\S]*resource_id/i);
+assert.match(sql, /calendar_sync_audit/i);
+assert.match(sql, /apply_google_business_schedule_change/i);
+assert.match(sql, /modulex\.calendar_sync_origin/i);
+assert.match(sql, /alter table public\.calendar_events enable row level security/i);
+assert.match(sql, /revoke all on public\.calendar_events from anon, authenticated/i);
+assert.match(config, /https:\/\/www\.googleapis\.com\/auth\/calendar\.events/);
+assert.doesNotMatch(config, /GOOGLE_CALENDAR_IMPORT_SCOPES[\s\S]*calendar\.events\.owned/);
+assert.match(provider, /events\/watch|watchGoogleCalendarEvents/);
+assert.match(provider, /PATCH/);
+assert.match(syncEngine, /syncToken|sync_token/);
+assert.match(syncEngine, /410|sync_token_gone/);
+assert.match(syncEngine, /calendar_sync_outbox/);
+assert.match(syncEngine, /insertCalendarSyncAudit/);
+assert.match(eventRoute, /requirePermission\(request, "calendar\.manage"\)/);
+assert.match(webhook, /x-goog-channel-id/i);
+assert.match(webhook, /x-goog-resource-id/i);
+assert.match(reconcile, /CRON_SECRET|cron/i);
+assert.match(workspace, /@fullcalendar\/interaction/);
+assert.match(workspace, /eventDrop|eventResize|selectable/);
+assert.match(projectTab, /Show Calendar/);
+assert.match(projectTab, /Upcoming Calendar Events/);
+assert.doesNotMatch(projectTab, /Google Calendar Name/);
+assert.doesNotMatch(projectTab, /Create Calendar/);
+console.log("PASS: Calendar V3 bidirectional contract");

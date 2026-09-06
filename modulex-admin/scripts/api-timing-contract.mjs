@@ -76,9 +76,15 @@ const routeFiles = await findRouteFiles(apiRoot);
 const routeInventory = routeFiles.map((file) => relative(adminRoot, file).replaceAll("\\", "/")).sort();
 
 const expectedInventory = [
+  "src/app/api/admin/calendar/business-events/route.ts",
+  "src/app/api/admin/calendar/company-binding/route.ts",
+  "src/app/api/admin/calendar/events/[eventId]/route.ts",
+  "src/app/api/admin/calendar/events/route.ts",
   "src/app/api/admin/calendar/google/discovery/route.ts",
   "src/app/api/admin/calendar/google/import/route.ts",
+  "src/app/api/admin/calendar/google/reconcile/route.ts",
   "src/app/api/admin/calendar/google/sync/route.ts",
+  "src/app/api/admin/calendar/google/webhook/route.ts",
   "src/app/api/admin/calendar/route.ts",
   "src/app/api/admin/dealer-portal/route.ts",
   "src/app/api/admin/email-notifications/process/route.ts",
@@ -107,7 +113,7 @@ const expectedInventory = [
   "src/app/api/vendor-catalog/vendors/route.ts",
 ].sort();
 
-assert.equal(routeInventory.length, 29, `Expected 29 API route files, found ${routeInventory.length}`);
+assert.equal(routeInventory.length, 35, `Expected 35 API route files, found ${routeInventory.length}`);
 assert.deepEqual(routeInventory, expectedInventory, "API route inventory changed; review timing coverage");
 
 const uninstrumented = [];
