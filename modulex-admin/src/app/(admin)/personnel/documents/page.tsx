@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import DocumentsManager from "@/components/hr/DocumentsManager";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function DocumentsPage() {
-  return <DocumentsManager />;
+  return (
+    <div>
+      <PageBreadcrumb pageTitle="Employee Documents" />
+      <DocumentsManager />
+    </div>
+  );
 }
