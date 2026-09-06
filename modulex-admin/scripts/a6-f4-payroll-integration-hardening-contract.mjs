@@ -67,6 +67,11 @@ assert.match(
   /grant\s+execute\s+on\s+function\s+public\.save_employee_payment_draft[\s\S]*to\s+authenticated/i,
   "Atomic employee payment draft RPC must be authenticated-only",
 );
+assert.match(
+  sql,
+  /private\.create_finance_transaction_draft\(\s*'employee_payment',\s*p_source_account_id,\s*null,\s*null,\s*null,\s*p_amount,/i,
+  "Atomic Employee Payment draft must pass destination, category and payment-method NULLs before amount",
+);
 assert.ok(
   !/create\s+table\s+(?:if\s+not\s+exists\s+)?public\.(?:finance_payroll|payroll_ledger|employee_payment_ledger)/i.test(sql),
   "F4 must not create a duplicate payroll/payment ledger",
