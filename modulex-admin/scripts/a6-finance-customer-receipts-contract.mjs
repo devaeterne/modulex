@@ -1,0 +1,49 @@
+import fs from "node:fs";
+import path from "node:path";
+const root = process.cwd();
+const read = (file) => fs.existsSync(path.join(root, file)) ? fs.readFileSync(path.join(root, file), "utf8") : "";
+const expect = (ok, message) => { if (!ok) throw new Error(message); };
+
+const sqlPath = "sql/a6-finance-customer-receipts.sql";
+const migrationPath = "../modulex-store/supabase/migrations/20260906193000_a6_finance_customer_receipts.sql";
+const sql = read(sqlPath);
+const migration = read(migrationPath);
+const domain = read("src/lib/finance/customer-receipts.ts");
+const manager = read("src/components/finance/FinanceCustomerReceiptsManager.tsx");
+const genericTransactions = read("src/components/finance/FinanceTransactionsManager.tsx");
+const route = read("src/app/(admin)/finance/customer-receipts/page.tsx");
+const sidebar = read("src/layout/AppSidebar.tsx");
+
+expect(sql.length > 0, "A6-F5A customer receipt SQL must exist");
+expect(sql === migration, "A6-F5A Admin SQL and shared migration must stay byte-identical");
+expect(/create or replace function private\.record_customer_receipt\s*\(/i.test(sql), "F5A must define a private atomic customer receipt mutation");
+expect(/'customer_receipt'/i.test(sql), "F5A must reuse Finance Core customer_receipt transactions");
+expect(/private\.create_finance_transaction_draft/i.test(sql), "F5A receipt creation must reuse Finance Core draft/idempotency primitives");
+expect(/private\.set_finance_transaction_links/i.test(sql), "F5A receipt creation must use canonical Finance attribution links");
+expect(/private\.post_finance_transaction/i.test(sql), "F5A receipt creation must post through canonical Finance Core");
+expect(/source_document_type[^;]{0,220}customer_invoice/i.test(sql), "Invoice allocations must use finance_transaction_links source-document attribution");
+expect(/customer_id/i.test(sql) && /order_id/i.test(sql) && /project_id/i.test(sql), "Customer receipt allocations must preserve Customer/Order/Project context where applicable");
+expect(/sync_customer_invoice_payment_from_finance/i.test(sql), "F5A must derive Invoice paid/status from posted Finance receipt allocations");
+expect(/transaction_kind\s*=\s*'reversal'|reversal_of_transaction_id/i.test(sql), "Invoice reconciliation must account for posted Finance reversals");
+expect(/source_document_type\s*=\s*'customer_invoice'[\s\S]{0,700}tx\.status\s*=\s*'posted'/i.test(sql), "Invoice reconciliation must count posted Finance receipt/reversal allocations only");
+expect(/ledger_managed\s*=\s*true/i.test(sql), "Finance-managed invoices must be explicitly ledger-managed");
+expect(/customer_project_payment_transactions/i.test(sql), "F5A must preserve and bridge existing Project payment history rather than replacing it");
+expect(!/delete\s+from\s+public\.customer_project_payment_transactions/i.test(sql), "F5A must not delete live Project payment history");
+expect(/customer_project_payment_finance_links/i.test(sql), "F5A must provide an explicit reconciliation bridge instead of fabricating historical Finance rows");
+expect(/guard_customer_receipt_flow/i.test(sql), "Generic Finance writes must not bypass the canonical Customer Receipt flow");
+expect(/void_customer_receipt/i.test(sql) && /reverse_customer_receipt/i.test(sql), "Customer Receipt corrections must use dedicated audited Finance flows");
+expect(/revoke all on function public\.record_customer_receipt/i.test(sql), "F5A public receipt RPC must revoke PUBLIC execute");
+expect(/grant execute on function public\.record_customer_receipt[\s\S]{0,700}to authenticated/i.test(sql), "F5A public receipt RPC must grant authenticated execute explicitly");
+
+expect(domain.includes('supabase.rpc("record_customer_receipt"'), "Finance customer receipt domain must use the canonical receipt RPC");
+expect(domain.includes("parseDbDecimal"), "Customer receipt domain must preserve numeric(18,4) precision");
+expect(domain.includes('supabase.rpc("void_customer_receipt"') && domain.includes('supabase.rpc("reverse_customer_receipt"'), "Customer receipt domain must use dedicated correction RPCs");
+expect(manager.includes("FinanceCustomerReceiptsManager"), "F5A must expose a dedicated Customer Receipts manager");
+expect(manager.includes("Invoice allocations"), "Customer Receipts UI must make Invoice allocations explicit");
+expect(route.includes("FinanceCustomerReceiptsManager"), "F5A must expose a Finance customer-receipts route");
+expect(sidebar.includes('path: "/finance/customer-receipts"'), "Finance sidebar must expose Customer Receipts");
+const createKindBlock = genericTransactions.match(/const kindOptions = \[([\s\S]*?)\];/)?.[1] ?? "";
+expect(!createKindBlock.includes('value: "customer_receipt"'), "Generic Finance Transactions must not create source-less Customer Receipts");
+expect(genericTransactions.includes('value: "customer_receipt"'), "Generic Finance history filters must still recognize Customer Receipts");
+
+console.log("A6-F5A Customer Receipts contract: PASS");
