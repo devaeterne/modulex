@@ -227,7 +227,7 @@ async function findRecurringMasterLink(bindingId: string, recurringEventId: stri
 }
 
 async function applyNormalGoogleChange(bindingId: string, link: Awaited<ReturnType<typeof getProviderEventLinkByProviderEventId>>, event: GoogleCalendarEventResource, requestUrl?: string) {
-  let resolvedLink = link;
+  const resolvedLink = link;
   let recurringParentId: string | null = null;
   if (!resolvedLink && event.recurringEventId) {
     let masterLink = await findRecurringMasterLink(bindingId, event.recurringEventId);
