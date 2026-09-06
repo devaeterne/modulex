@@ -1,6 +1,6 @@
 # Modulex Finance Domain — Locked Architecture & Delivery Plan
 
-Status: **LOCKED FOR A6 IMPLEMENTATION — F0/F1/F2/F3 COMPLETE; F4 SOURCE COMPLETE / PRODUCTION ACCEPTANCE PENDING**
+Status: **LOCKED FOR A6 IMPLEMENTATION — F0/F1/F2/F3/F4 COMPLETE; F5 NEXT**
 Date: 2026-09-06
 Scope: `modulex-admin` operational finance
 
@@ -227,28 +227,33 @@ Delivered through staged F3 packages:
 
 **Exit:** Vendor liabilities and partial/full payments reconcile through Finance while optional Project/Order attribution remains contextual.
 
-### A6-F4 — Payroll Finance Integration — **SOURCE COMPLETE / OWNER MERGE + PRODUCTION ACCEPTANCE PENDING**
+### A6-F4 — Payroll Finance Integration — **COMPLETE / PRODUCTION VERIFIED 2026-09-06**
 
-Existing F4 foundation already connected Finance Employee Payments to HR Payroll Items and reconciled partial/full/reversal settlement. The closeout package adds the missing integrity and usability boundary:
+F4 connects HR-owned Payroll obligations and Employee source records to Finance-owned money movement without introducing a duplicate payroll ledger.
+
+Delivered and production-verified:
 
 - HR remains payroll-calculation/source truth; Finance remains employee money-movement truth.
-- Canonical Employee Payment HR source vocabulary is fail-closed to `hr_payroll_item`, `hr_variable_pay`, and `hr_advance`.
+- Canonical Employee Payment HR source vocabulary fails closed to `hr_payroll_item`, `hr_variable_pay`, and `hr_advance`.
 - Direct Variable Pay payment validates Employee/status/amount/currency, settles the remaining source in full, marks the HR source paid, and restores eligibility safely on Finance correction when no Payroll settlement effect owns that state.
-- A Variable Pay source already directly settled in posted Finance is excluded from future Payroll preparation, closing the observed double-payment path.
-- Direct Advance Finance linkage validates the advance disbursement without treating cash disbursement as payroll repayment.
+- Variable Pay already directly settled in posted Finance is excluded from future Payroll preparation, closing the observed double-payment path.
+- Direct Advance Finance linkage validates cash disbursement without treating that disbursement as payroll repayment.
 - Payroll preparation fails closed when supported monetary source currencies differ from company base currency.
 - HR run status remains calculation/workflow state; Finance derives `unpaid` / `partial` / `paid` settlement state.
 - Approved Payroll Items are exposed to Finance as read-only obligations including employee withholding, deductions, advance repayment, employer payroll taxes, employer benefits and total employer cost; no duplicate payroll/liability ledger is created.
 - Employee Payment draft + Employee/Payroll source link are saved atomically by one Finance RPC.
 - Approved Payroll rows expose `Pay Remaining`, which hands Employee, Payroll Item and current remaining amount to the Finance transaction form while leaving account selection and explicit posting under Finance control.
+- Production migration `20260906175226` applied the F4 hardening package; corrective migration `20260906183539` fixed the atomic draft call to the canonical 10-argument Finance Core signature without rewriting migration history.
+- Controlled production acceptance exercised Payroll prepare/approve, partial settlement, full settlement, Variable Pay + Advance reconciliation, reversal, re-settlement, void, direct Variable Pay payment/reversal, negative source/Employee/overpayment/currency cases, and orphan-draft prevention inside a transaction that ended with `ROLLBACK`.
+- Post-rollback residue is zero for acceptance Payroll Periods, Finance transactions and temporary direct Variable Pay sources.
+- Production ACL/search-path checks and fresh Security/Performance Advisors contain no F4-specific blocking finding.
+- Admin production deployment is `READY` on the F4 application bundle; the corrective PR changed only SQL migration/contract/workflow artifacts, so its runtime correction is database-owned and already live.
 
-Detailed source/production acceptance contract: `docs/acceptance/a6-f4-payroll-finance-integration.md`.
+Detailed production evidence: `docs/acceptance/a6-f4-payroll-finance-integration.md`.
 
-**Source exit:** F4 contracts, Finance regression, UI/typecheck/lint/build must be GREEN on the current PR head.
+**Exit:** Payroll obligations remain HR-owned, actual Employee Payments remain Finance-owned, settlement state is Finance-derived, direct-source double-payment paths fail closed, and partial/full/reversal/void behavior is production-verified with no acceptance residue.
 
-**Production exit:** after owner merge/deploy, apply the exact merged migration, execute controlled partial/full/reversal Payroll acceptance, verify direct Variable Pay/reversal behavior, validate negative cases and Security/Performance Advisors, and leave no acceptance residue. F4 must not be called production-complete before this evidence exists.
-
-### A6-F5 — Sales / Accounts Receivable integration — **NEXT AFTER F4 PRODUCTION CLOSEOUT**
+### A6-F5 — Sales / Accounts Receivable integration — **NEXT**
 
 - Preserve existing customer invoices and Project payment requirement/allocation behavior.
 - Introduce/complete standalone customer payment transaction flow through Finance Core.
