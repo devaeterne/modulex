@@ -540,8 +540,8 @@ export default function AttendanceManager() {
                               <Button
                                 type="button"
                                 size="sm"
-                                variant="ghost"
-                                className="min-h-11 px-3 py-2 text-error-600 hover:bg-error-50 hover:text-error-700 dark:text-error-400 dark:hover:bg-error-500/10 dark:hover:text-error-300"
+                                variant="outline"
+                                className="min-h-11 px-3 py-2"
                                 onClick={() => setDeleteCandidateId(row.id)}
                               >
                                 Delete
