@@ -35,7 +35,6 @@ import {
 
 const kindOptions = [
   { value: "customer_receipt", label: "Customer receipt" },
-  { value: "vendor_payment", label: "Vendor payment" },
   { value: "employee_payment", label: "Employee payment" },
   { value: "deposit", label: "Deposit" },
   { value: "withdrawal", label: "Withdrawal" },
@@ -51,6 +50,7 @@ const statusFilterOptions = [
 
 const kindFilterOptions = [
   { value: "expense", label: "Expense" },
+  { value: "vendor_payment", label: "Vendor payment" },
   ...kindOptions,
   { value: "reversal", label: "Reversal" },
 ];
