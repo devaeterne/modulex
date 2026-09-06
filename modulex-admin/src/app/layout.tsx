@@ -17,7 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${outfit.className} dark:bg-gray-900`}>
+      <body
+        className={`${outfit.className} text-gray-700 dark:bg-gray-900 dark:text-gray-300 print:bg-white print:text-gray-900`}
+      >
         <GlobalInputValidation />
         <ThemeProvider>
           <SidebarProvider>{children}</SidebarProvider>

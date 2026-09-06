@@ -38,6 +38,32 @@ expect(
   "Shared Admin text tokens must expose body, strong, and muted theme-aware text roles",
 );
 
+const globals = read("src/app/globals.css");
+const rootLayout = read("src/app/layout.tsx");
+const bodyBlock = globals.match(/body\s*\{([^}]*)\}/m)?.[1] ?? "";
+const adminHasRootForeground =
+  (bodyBlock.includes("text-gray-700") && bodyBlock.includes("dark:text-gray-300")) ||
+  (/\<body[^>]*className=/.test(rootLayout) &&
+    rootLayout.includes("text-gray-700") &&
+    rootLayout.includes("dark:text-gray-300"));
+expect(
+  adminHasRootForeground,
+  "Admin root must provide a theme-aware default foreground so unstyled text cannot fall back to black in dark mode",
+);
+
+const storeLightTheme = read("../modulex-store/src/css/style.css");
+const storeDarkTheme = read("../modulex-store/src/css/dark-mode.css");
+const storeBodyBlock = storeLightTheme.match(/body\s*\{([^}]*)\}/m)?.[1] ?? "";
+const storeDarkBodyBlock = storeDarkTheme.match(/body\.dark\s*\{([^}]*)\}/m)?.[1] ?? "";
+expect(
+  storeBodyBlock.includes("color: var(--dark)"),
+  "Store light theme must keep a root foreground color",
+);
+expect(
+  storeDarkBodyBlock.includes("--text-primary") || /body\.dark\s*\{[\s\S]*?color:\s*var\(--text-primary\)/m.test(storeDarkTheme),
+  "Store dark theme must keep a root foreground color",
+);
+
 const button = read("src/components/ui/button/Button.tsx");
 expect(button.includes("ADMIN_BUTTON_VARIANTS"), "Button must consume shared semantic button tokens");
 expect(button.includes("AdminButtonVariant"), "Button variant typing must derive from shared semantic tokens");
