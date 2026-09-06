@@ -34,6 +34,46 @@ import type {
 const tabs = ["General", "Contacts", "Pricing", "Addresses", "Commercial", "Notes & Documents", "Activity"] as const;
 type Tab = (typeof tabs)[number];
 
+type ContactForm = {
+  first_name: string;
+  last_name: string;
+  job_title: string;
+  department: string;
+  email: string;
+  phone: string;
+  mobile: string;
+  is_primary: boolean;
+  is_billing_contact: boolean;
+  is_shipping_contact: boolean;
+  is_order_contact: boolean;
+};
+
+type AddressForm = {
+  address_name: string;
+  company_name: string;
+  contact_name: string;
+  address_line_1: string;
+  address_line_2: string;
+  postal_code: string;
+  city: string;
+  state_region: string;
+  country_code: string;
+  phone: string;
+  address_type: "billing" | "shipping" | "both";
+  is_default_billing: boolean;
+  is_default_shipping: boolean;
+};
+
+const emptyContactForm = (): ContactForm => ({
+  first_name: "", last_name: "", job_title: "", department: "", email: "", phone: "", mobile: "",
+  is_primary: false, is_billing_contact: false, is_shipping_contact: false, is_order_contact: false,
+});
+const emptyAddressForm = (): AddressForm => ({
+  address_name: "", company_name: "", contact_name: "", address_line_1: "", address_line_2: "", postal_code: "",
+  city: "", state_region: "", country_code: "", phone: "", address_type: "shipping",
+  is_default_billing: false, is_default_shipping: false,
+});
+
 function statusColor(status: CustomerStatus): "success" | "error" | "warning" | "light" {
   if (status === "active") return "success";
   if (status === "blocked") return "error";
@@ -41,7 +81,7 @@ function statusColor(status: CustomerStatus): "success" | "error" | "warning" | 
   return "light";
 }
 function titleCase(value: string) { return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()); }
-function dateTime(value: string | null | undefined) { return value ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—"; }
+function dateTime(value: string | null | undefined) { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—"; }
 function optionalNumber(value: string | number | null | undefined) {
   if (value === null || value === undefined || String(value).trim() === "") return null;
   const number = Number(value);
@@ -68,9 +108,11 @@ export default function CustomerCard() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
 
-  const [contactForm, setContactForm] = useState({ first_name: "", last_name: "", job_title: "", department: "", email: "", phone: "", mobile: "", is_primary: false, is_billing_contact: false, is_shipping_contact: false, is_order_contact: false });
-  const [addressForm, setAddressForm] = useState({ address_name: "", company_name: "", contact_name: "", address_line_1: "", address_line_2: "", postal_code: "", city: "", state_region: "", country_code: "", phone: "", address_type: "shipping" as "billing" | "shipping" | "both", is_default_billing: false, is_default_shipping: false });
+  const [contactForm, setContactForm] = useState<ContactForm>(emptyContactForm);
+  const [addressForm, setAddressForm] = useState<AddressForm>(emptyAddressForm);
   const [noteForm, setNoteForm] = useState({ note: "", category: "", is_pinned: false });
 
   const typeMap = useMemo(() => new Map(customerTypes.map((item) => [item.id, item.name])), [customerTypes]);
@@ -89,22 +131,16 @@ export default function CustomerCard() {
     setIsLoading(true);
     setErrorMessage(null);
     const [customerResult, typesResult, groupsResult, profilesResult, termsResult, contactsResult, addressesResult, commercialResult, notesResult, documentsResult, activityResult] = await Promise.all([
-      loadCustomerRecord(customerId).then(
-        (data) => ({ data, error: null }),
-        (error: Error) => ({ data: null, error })
-      ),
+      loadCustomerRecord(customerId).then((data) => ({ data, error: null }), (error: Error) => ({ data: null, error })),
       supabase.from("customer_types").select("id, system_key, name, sort_order, is_active").eq("is_active", true).order("sort_order"),
       supabase.from("price_groups").select("id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only").eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
       supabase.from("profiles").select("id, full_name, email, role, is_active").eq("is_active", true).order("full_name"),
       supabase.from("payment_terms").select("id, system_key, name, days, sort_order, is_active").eq("is_active", true).order("sort_order"),
-      supabase.from("customer_contacts").select("*").eq("customer_id", customerId).order("is_primary", { ascending: false }).order("created_at"),
-      supabase.from("customer_addresses").select("*").eq("customer_id", customerId).order("is_default_shipping", { ascending: false }).order("address_name"),
+      supabase.from("customer_contacts").select("*").eq("customer_id", customerId).eq("is_active", true).order("is_primary", { ascending: false }).order("created_at"),
+      supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("is_default_shipping", { ascending: false }).order("address_name"),
       supabase.from("customer_commercial_settings").select("*").eq("customer_id", customerId).maybeSingle(),
       supabase.from("customer_notes").select("*").eq("customer_id", customerId).order("is_pinned", { ascending: false }).order("created_at", { ascending: false }),
-      loadCustomerDocuments(customerId).then(
-        (data) => ({ data, error: null }),
-        (error: Error) => ({ data: null, error })
-      ),
+      loadCustomerDocuments(customerId).then((data) => ({ data, error: null }), (error: Error) => ({ data: null, error })),
       supabase.from("customer_activity").select("*").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(100),
     ]);
     const firstError = customerResult.error || typesResult.error || groupsResult.error || profilesResult.error || termsResult.error || contactsResult.error || addressesResult.error || commercialResult.error || notesResult.error || documentsResult.error || activityResult.error;
@@ -208,21 +244,93 @@ export default function CustomerCard() {
     setIsSaving(false);
   }
 
-  async function addContact() {
+  function editContact(contact: CustomerContact) {
+    setEditingContactId(contact.id);
+    setContactForm({
+      first_name: contact.first_name,
+      last_name: contact.last_name ?? "",
+      job_title: contact.job_title ?? "",
+      department: contact.department ?? "",
+      email: contact.email ?? "",
+      phone: contact.phone ?? "",
+      mobile: contact.mobile ?? "",
+      is_primary: contact.is_primary,
+      is_billing_contact: contact.is_billing_contact,
+      is_shipping_contact: contact.is_shipping_contact,
+      is_order_contact: contact.is_order_contact,
+    });
+  }
+
+  function cancelContactEdit() { setEditingContactId(null); setContactForm(emptyContactForm()); }
+
+  async function saveContact() {
     if (!contactForm.first_name.trim()) return setErrorMessage("First name is required.");
     clearMessages(); setIsSaving(true);
-    if (contactForm.is_primary) await supabase.from("customer_contacts").update({ is_primary: false }).eq("customer_id", customerId).eq("is_primary", true);
-    const { error } = await supabase.from("customer_contacts").insert({ customer_id: customerId, ...contactForm, first_name: contactForm.first_name.trim(), last_name: contactForm.last_name.trim() || null, job_title: contactForm.job_title.trim() || null, department: contactForm.department.trim() || null, email: contactForm.email.trim() || null, phone: contactForm.phone.trim() || null, mobile: contactForm.mobile.trim() || null });
-    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
-    setContactForm({ first_name: "", last_name: "", job_title: "", department: "", email: "", phone: "", mobile: "", is_primary: false, is_billing_contact: false, is_shipping_contact: false, is_order_contact: false });
-    await logActivity("contact_added", "Contact added"); await loadData(); setSuccessMessage("Contact added."); setIsSaving(false);
+    const params = {
+      p_customer_id: customerId,
+      p_first_name: contactForm.first_name.trim(),
+      p_last_name: contactForm.last_name.trim() || null,
+      p_job_title: contactForm.job_title.trim() || null,
+      p_department: contactForm.department.trim() || null,
+      p_email: contactForm.email.trim() || null,
+      p_phone: contactForm.phone.trim() || null,
+      p_mobile: contactForm.mobile.trim() || null,
+      p_is_primary: contactForm.is_primary,
+      p_is_billing_contact: contactForm.is_billing_contact,
+      p_is_shipping_contact: contactForm.is_shipping_contact,
+      p_is_order_contact: contactForm.is_order_contact,
+    };
+    const result = editingContactId
+      ? await supabase.rpc("update_customer_contact", { ...params, p_contact_id: editingContactId })
+      : await supabase.rpc("create_customer_contact", params);
+    if (result.error) { setErrorMessage(result.error.message); setIsSaving(false); return; }
+    cancelContactEdit();
+    await loadData();
+    setSuccessMessage(editingContactId ? "Contact updated." : "Contact added.");
+    setIsSaving(false);
   }
-  async function removeContact(id: string) { if (!confirm("Remove this contact?")) return; const { error } = await supabase.from("customer_contacts").delete().eq("id", id); if (error) return setErrorMessage(error.message); await logActivity("contact_removed", "Contact removed"); await loadData(); }
 
-  async function addAddress() {
+  async function setPrimaryContact(contactId: string) {
+    clearMessages(); setIsSaving(true);
+    const { error } = await supabase.rpc("set_customer_contact_primary", { p_customer_id: customerId, p_contact_id: contactId });
+    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
+    await loadData(); setSuccessMessage("Primary contact updated."); setIsSaving(false);
+  }
+
+  async function removeContact(id: string) {
+    if (!confirm("Deactivate this contact? Historical references will be preserved.")) return;
+    clearMessages(); setIsSaving(true);
+    const { error } = await supabase.rpc("deactivate_customer_contact", { p_customer_id: customerId, p_contact_id: id });
+    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
+    if (editingContactId === id) cancelContactEdit();
+    await loadData(); setSuccessMessage("Contact deactivated."); setIsSaving(false);
+  }
+
+  function editAddress(address: CustomerAddress) {
+    setEditingAddressId(address.id);
+    setAddressForm({
+      address_name: address.address_name,
+      company_name: address.company_name ?? "",
+      contact_name: address.contact_name ?? "",
+      address_line_1: address.address_line_1,
+      address_line_2: address.address_line_2 ?? "",
+      postal_code: address.postal_code ?? "",
+      city: address.city,
+      state_region: address.state_region ?? "",
+      country_code: address.country_code,
+      phone: address.phone ?? "",
+      address_type: address.address_type,
+      is_default_billing: address.is_default_billing,
+      is_default_shipping: address.is_default_shipping,
+    });
+  }
+
+  function cancelAddressEdit() { setEditingAddressId(null); setAddressForm(emptyAddressForm()); }
+
+  async function saveAddress() {
     if (!addressForm.address_name.trim() || !addressForm.address_line_1.trim() || !addressForm.city.trim() || addressForm.country_code.trim().length !== 2) return setErrorMessage("Address name, address line, city and 2-letter country code are required.");
     clearMessages(); setIsSaving(true);
-    const { error } = await supabase.rpc("create_customer_address", {
+    const params = {
       p_customer_id: customerId,
       p_address_name: addressForm.address_name.trim(),
       p_company_name: addressForm.company_name.trim() || null,
@@ -237,28 +345,33 @@ export default function CustomerCard() {
       p_address_type: addressForm.address_type,
       p_is_default_billing: addressForm.is_default_billing,
       p_is_default_shipping: addressForm.is_default_shipping,
-    });
-    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
-    setAddressForm({ address_name: "", company_name: "", contact_name: "", address_line_1: "", address_line_2: "", postal_code: "", city: "", state_region: "", country_code: "", phone: "", address_type: "shipping", is_default_billing: false, is_default_shipping: false });
-    await loadData(); setSuccessMessage("Address added."); setIsSaving(false);
+    };
+    const result = editingAddressId
+      ? await supabase.rpc("update_customer_address", { ...params, p_address_id: editingAddressId })
+      : await supabase.rpc("create_customer_address", params);
+    if (result.error) { setErrorMessage(result.error.message); setIsSaving(false); return; }
+    cancelAddressEdit();
+    await loadData(); setSuccessMessage(editingAddressId ? "Address updated." : "Address added."); setIsSaving(false);
   }
 
   async function setAddressDefault(addressId: string, defaultKind: "billing" | "shipping") {
     if (!canEdit) return;
     clearMessages(); setIsSaving(true);
-    const { error } = await supabase.rpc("set_customer_address_default", {
-      p_customer_id: customerId,
-      p_address_id: addressId,
-      p_default_kind: defaultKind,
-    });
+    const { error } = await supabase.rpc("set_customer_address_default", { p_customer_id: customerId, p_address_id: addressId, p_default_kind: defaultKind });
     if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
     await loadData();
     setSuccessMessage(defaultKind === "billing" ? "Default billing address updated." : "Default shipping address updated.");
     setIsSaving(false);
   }
 
-  async function removeAddress(id: string) { if (!confirm("Remove this address?")) return; const { error } = await supabase.from("customer_addresses").delete().eq("id", id); if (error) return setErrorMessage(error.message); await logActivity("address_removed", "Address removed"); await loadData(); }
-
+  async function removeAddress(id: string) {
+    if (!confirm("Deactivate this address? Historical order snapshots will be preserved.")) return;
+    clearMessages(); setIsSaving(true);
+    const { error } = await supabase.rpc("deactivate_customer_address", { p_customer_id: customerId, p_address_id: id });
+    if (error) { setErrorMessage(error.message); setIsSaving(false); return; }
+    if (editingAddressId === id) cancelAddressEdit();
+    await loadData(); setSuccessMessage("Address deactivated."); setIsSaving(false);
+  }
 
   async function addNote() {
     if (!noteForm.note.trim()) return setErrorMessage("Note cannot be empty.");
@@ -300,11 +413,11 @@ export default function CustomerCard() {
       <Field label="Sales Representative"><Select value={customer.sales_rep_id ?? ""} disabled={!canEdit} onChange={(value) => setCustomer({ ...customer, sales_rep_id: value || null })} options={profiles.filter((item) => ["super_admin", "admin", "sales"].includes(item.role)).map((item) => ({ value: item.id, label: item.full_name || item.email || "" }))} placeholder="Unassigned" allowEmpty /></Field>
     </div>{canEdit && <div className="mt-5 flex justify-end"><Button disabled={isSaving || !customer.name.trim()} onClick={() => void saveCustomerMaster()}>{isSaving ? "Saving..." : "Save General"}</Button></div>}</Section>}
 
-    {activeTab === "Contacts" && <Section title="Contacts" description="People associated with this customer account."><div className="grid gap-3 lg:grid-cols-2">{contacts.map((contact) => <Card key={contact.id}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{contact.first_name} {contact.last_name}</h3>{contact.is_primary && <Badge>Primary</Badge>}</div><p className="mt-1 text-sm">{[contact.job_title, contact.department].filter(Boolean).join(" • ") || "No role"}</p><p className="mt-3 text-sm">{contact.email || "—"}</p><p className="text-sm">{contact.mobile || contact.phone || "—"}</p><div className="mt-3 flex flex-wrap gap-1">{contact.is_billing_contact && <Badge>Billing</Badge>}{contact.is_shipping_contact && <Badge>Shipping</Badge>}{contact.is_order_contact && <Badge>Orders</Badge>}</div></div>{canEdit && <Button onClick={() => void removeContact(contact.id)} variant="danger">Remove</Button>}</div></Card>)}</div>{canEdit && <div className="mt-5 border p-4"><h3 className="mb-4 text-sm font-semibold">Add Contact</h3><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{(["first_name", "last_name", "job_title", "department", "email", "phone", "mobile"] as const).map((key) => <Field key={key} label={titleCase(key)}><Input value={contactForm[key]} onChange={(e) => setContactForm({ ...contactForm, [key]: e.target.value })} /></Field>)}</div><div className="mt-4 flex flex-wrap gap-4"><Check label="Primary" checked={contactForm.is_primary} onChange={(v) => setContactForm({ ...contactForm, is_primary: v })} /><Check label="Billing" checked={contactForm.is_billing_contact} onChange={(v) => setContactForm({ ...contactForm, is_billing_contact: v })} /><Check label="Shipping" checked={contactForm.is_shipping_contact} onChange={(v) => setContactForm({ ...contactForm, is_shipping_contact: v })} /><Check label="Orders" checked={contactForm.is_order_contact} onChange={(v) => setContactForm({ ...contactForm, is_order_contact: v })} /></div><div className="mt-4 flex justify-end"><Button onClick={() => void addContact()} disabled={isSaving}>Add Contact</Button></div></div>}</Section>}
+    {activeTab === "Contacts" && <Section title="Contacts" description="People associated with this customer account. Deactivation preserves historical references."><div className="grid gap-3 lg:grid-cols-2">{contacts.map((contact) => <Card key={contact.id}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{contact.first_name} {contact.last_name}</h3>{contact.is_primary && <Badge>Primary</Badge>}</div><p className="mt-1 text-sm">{[contact.job_title, contact.department].filter(Boolean).join(" • ") || "No role"}</p><p className="mt-3 text-sm">{contact.email || "—"}</p><p className="text-sm">{contact.mobile || contact.phone || "—"}</p><div className="mt-3 flex flex-wrap gap-1">{contact.is_billing_contact && <Badge>Billing</Badge>}{contact.is_shipping_contact && <Badge>Shipping</Badge>}{contact.is_order_contact && <Badge>Orders</Badge>}</div></div>{canEdit && <div className="flex flex-wrap justify-end gap-2">{!contact.is_primary && <Button disabled={isSaving} onClick={() => void setPrimaryContact(contact.id)} variant="outline">Set Primary</Button>}<Button disabled={isSaving} onClick={() => editContact(contact)} variant="outline">Edit</Button><Button disabled={isSaving} onClick={() => void removeContact(contact.id)} variant="danger">Deactivate</Button></div>}</div></Card>)}</div>{canEdit && <div className="mt-5 border p-4"><h3 className="mb-4 text-sm font-semibold">{editingContactId ? "Edit Contact" : "Add Contact"}</h3><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{(["first_name", "last_name", "job_title", "department", "email", "phone", "mobile"] as const).map((key) => <Field key={key} label={titleCase(key)}><Input value={contactForm[key]} onChange={(e) => setContactForm({ ...contactForm, [key]: e.target.value })} /></Field>)}</div><div className="mt-4 flex flex-wrap gap-4"><Check label="Primary" checked={contactForm.is_primary} onChange={(v) => setContactForm({ ...contactForm, is_primary: v })} /><Check label="Billing" checked={contactForm.is_billing_contact} onChange={(v) => setContactForm({ ...contactForm, is_billing_contact: v })} /><Check label="Shipping" checked={contactForm.is_shipping_contact} onChange={(v) => setContactForm({ ...contactForm, is_shipping_contact: v })} /><Check label="Orders" checked={contactForm.is_order_contact} onChange={(v) => setContactForm({ ...contactForm, is_order_contact: v })} /></div><div className="mt-4 flex justify-end gap-2">{editingContactId && <Button onClick={cancelContactEdit} variant="outline">Cancel</Button>}<Button onClick={() => void saveContact()} disabled={isSaving}>{editingContactId ? "Save Contact" : "Add Contact"}</Button></div></div>}</Section>}
 
     {activeTab === "Pricing" && <Section title="Pricing" description="Customer-specific price group assignment."><div className="grid gap-4 md:grid-cols-2"><Field label="Default Price Group"><Select value={customer.price_group_id ?? ""} disabled={!canEdit} onChange={(value) => setCustomer({ ...customer, price_group_id: value || null })} options={priceGroups.map((item) => ({ value: item.id, label: `${item.name}${item.is_base_price ? " (Base)" : ""}${item.requires_approval ? " · Approval" : ""}` }))} placeholder="No price group" allowEmpty /></Field><Field label="Currency"><Input value={customer.currency_code} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, currency_code: e.target.value.toUpperCase() })} /></Field></div><Alert variant="info" title="Pricing assignment" message="Store pricing resolves from the assigned order-eligible price group. For Sales users, changing the default price group is submitted to Admin approval; internal Cost pricing cannot be assigned." />{canEdit && <div className="mt-5 flex justify-end"><Button onClick={() => void savePricing()} disabled={isSaving}>{isSaving ? "Saving..." : "Save Pricing"}</Button></div>}</Section>}
 
-    {activeTab === "Addresses" && <Section title="Billing & Shipping Addresses" description="Multiple operational addresses with atomic billing and shipping defaults.">
+    {activeTab === "Addresses" && <Section title="Billing & Shipping Addresses" description="Multiple operational addresses with atomic billing and shipping defaults. Deactivation preserves order snapshots.">
       <div className="grid gap-3 lg:grid-cols-2">
         {addresses.map((address) => <Card key={address.id}>
           <div className="flex items-start justify-between gap-3">
@@ -319,16 +432,17 @@ export default function CustomerCard() {
               <p className="text-sm">{[address.postal_code, address.city, address.state_region, address.country_code].filter(Boolean).join(", ")}</p>
               <p className="mt-2 text-xs">{address.contact_name || address.phone || ""}</p>
             </div>
-            {canEdit && <div className="flex max-w-[220px] flex-wrap justify-end gap-2">
+            {canEdit && <div className="flex max-w-[260px] flex-wrap justify-end gap-2">
               {!address.is_default_billing && address.address_type !== "shipping" && <Button disabled={isSaving} onClick={() => void setAddressDefault(address.id, "billing")} variant="outline">Set Billing Default</Button>}
               {!address.is_default_shipping && address.address_type !== "billing" && <Button disabled={isSaving} onClick={() => void setAddressDefault(address.id, "shipping")} variant="outline">Set Shipping Default</Button>}
-              <Button disabled={isSaving} onClick={() => void removeAddress(address.id)} variant="danger">Remove</Button>
+              <Button disabled={isSaving} onClick={() => editAddress(address)} variant="outline">Edit</Button>
+              <Button disabled={isSaving} onClick={() => void removeAddress(address.id)} variant="danger">Deactivate</Button>
             </div>}
           </div>
         </Card>)}
       </div>
       {canEdit && <div className="mt-5 border p-4">
-        <h3 className="mb-4 text-sm font-semibold">Add Address</h3>
+        <h3 className="mb-4 text-sm font-semibold">{editingAddressId ? "Edit Address" : "Add Address"}</h3>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {(["address_name", "company_name", "contact_name", "address_line_1", "address_line_2", "postal_code", "city", "state_region", "country_code", "phone"] as const).map((key) => <Field key={key} label={titleCase(key)}><Input value={addressForm[key]} maxLength={key === "country_code" ? 2 : undefined} onChange={(e) => setAddressForm({ ...addressForm, [key]: key === "country_code" ? e.target.value.toUpperCase() : e.target.value })} /></Field>)}
           <Field label="Address Type"><Select value={addressForm.address_type} onChange={(value) => { const addressType = value as "billing" | "shipping" | "both"; setAddressForm({ ...addressForm, address_type: addressType, is_default_billing: addressType === "shipping" ? false : addressForm.is_default_billing, is_default_shipping: addressType === "billing" ? false : addressForm.is_default_shipping }); }} options={[{ value: "billing", label: "Billing" }, { value: "shipping", label: "Shipping" }, { value: "both", label: "Both" }]} /></Field>
@@ -337,13 +451,13 @@ export default function CustomerCard() {
           {addressForm.address_type !== "shipping" && <Check label="Default Billing" checked={addressForm.is_default_billing} onChange={(v) => setAddressForm({ ...addressForm, is_default_billing: v })} />}
           {addressForm.address_type !== "billing" && <Check label="Default Shipping" checked={addressForm.is_default_shipping} onChange={(v) => setAddressForm({ ...addressForm, is_default_shipping: v })} />}
         </div>
-        <div className="mt-4 flex justify-end"><Button onClick={() => void addAddress()} disabled={isSaving}>Add Address</Button></div>
+        <div className="mt-4 flex justify-end gap-2">{editingAddressId && <Button onClick={cancelAddressEdit} variant="outline">Cancel</Button>}<Button onClick={() => void saveAddress()} disabled={isSaving}>{editingAddressId ? "Save Address" : "Add Address"}</Button></div>
       </div>}
     </Section>}
 
     {activeTab === "Commercial" && commercial && <Section title="Commercial" description="Payment terms, limits and order controls. Protected changes made by Sales require Admin approval."><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><Field label="Payment Terms"><Select value={commercial.payment_term_id ?? ""} disabled={!canEdit} onChange={(value) => setCommercial({ ...commercial, payment_term_id: value || null })} options={paymentTerms.map((item) => ({ value: item.id, label: item.name }))} placeholder="None" allowEmpty /></Field><Field label="Credit Limit"><Input type="number" min="0" step="0.01" value={commercial.credit_limit ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, credit_limit: e.target.value || null })} /></Field><Field label="Minimum Order"><Input type="number" min="0" step="0.01" value={commercial.minimum_order_amount ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, minimum_order_amount: e.target.value || null })} /></Field><Field label="Tax Exemption Number"><Input value={commercial.tax_exemption_number ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, tax_exemption_number: e.target.value || null })} /></Field><Field label="Credit Hold Reason"><Input value={commercial.credit_hold_reason ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, credit_hold_reason: e.target.value || null })} /></Field></div><div className="mt-4 flex gap-5"><Check label="Tax Exempt" checked={commercial.tax_exempt} disabled={!canEdit} onChange={(v) => setCommercial({ ...commercial, tax_exempt: v })} /><Check label="Credit Hold" checked={commercial.credit_hold} disabled={!canEdit} onChange={(v) => setCommercial({ ...commercial, credit_hold: v })} /></div><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Discount Notes"><TextArea value={commercial.discount_notes ?? ""} disabled={!canEdit} onChange={(value) => setCommercial({ ...commercial, discount_notes: value || null })} /></Field><Field label="Order Notes"><TextArea value={commercial.order_notes ?? ""} disabled={!canEdit} onChange={(value) => setCommercial({ ...commercial, order_notes: value || null })} /></Field></div>{canEdit && <div className="mt-5 flex justify-end"><Button onClick={() => void saveCommercial()} disabled={isSaving}>{isSaving ? "Saving..." : "Save Commercial"}</Button></div>}</Section>}
 
-    {activeTab === "Notes & Documents" && <Section title="Notes & Documents" description="Internal customer notes and document metadata."><div className="grid gap-6 xl:grid-cols-2"><div><h3 className="mb-3 text-sm font-semibold">Notes</h3><div className="space-y-3">{notes.map((note) => <Card key={note.id}><div className="flex items-start justify-between gap-3"><div>{note.is_pinned && <Badge>Pinned</Badge>}<p className="mt-2 whitespace-pre-wrap text-sm">{note.note}</p><p className="mt-2 text-xs">{note.category || "General"} • {dateTime(note.created_at)}</p></div>{canEdit && <Button onClick={() => void removeNote(note.id)} variant="danger">Remove</Button>}</div></Card>)}</div>{canEdit && <div className="mt-4 border p-4"><Field label="New Note"><TextArea value={noteForm.note} onChange={(value) => setNoteForm({ ...noteForm, note: value })} /></Field><div className="mt-3 grid gap-3 md:grid-cols-2"><Field label="Category"><Input value={noteForm.category} onChange={(e) => setNoteForm({ ...noteForm, category: e.target.value })} /></Field><div className="flex items-end pb-2"><Check label="Pin note" checked={noteForm.is_pinned} onChange={(v) => setNoteForm({ ...noteForm, is_pinned: v })} /></div></div><div className="mt-3 flex justify-end"><Button onClick={() => void addNote()}>Add Note</Button></div></div>}</div><div><h3 className="mb-3 text-sm font-semibold">Documents</h3><div className="space-y-3">{documents.length === 0 ? <div className="border border-dashed p-6 text-center text-sm">No documents uploaded yet.</div> : documents.map((document) => <Card key={document.id}><p className="font-medium">{document.file_name}</p><p className="mt-1 text-xs">{document.document_type || "Document"} • {dateTime(document.created_at)}</p><p className="mt-2 break-all text-xs">{document.storage_path}</p></Card>)}</div><div className="mt-4 border p-4 text-xs leading-5">Document metadata is ready. File upload will be connected after the <strong>customer-documents</strong> Supabase Storage bucket and its policies are confirmed during integration testing.</div></div></div></Section>}
+    {activeTab === "Notes & Documents" && <Section title="Notes & Documents" description="Internal customer notes and document metadata."><div className="grid gap-6 xl:grid-cols-2"><div><h3 className="mb-3 text-sm font-semibold">Notes</h3><div className="space-y-3">{notes.map((note) => <Card key={note.id}><div className="flex items-start justify-between gap-3"><div>{note.is_pinned && <Badge>Pinned</Badge>}<p className="mt-2 whitespace-pre-wrap text-sm">{note.note}</p><p className="mt-2 text-xs">{note.category || "General"} • {dateTime(note.created_at)}</p></div>{canEdit && <Button onClick={() => void removeNote(note.id)} variant="danger">Remove</Button>}</div></Card>)}</div>{canEdit && <div className="mt-4 border p-4"><Field label="New Note"><TextArea value={noteForm.note} onChange={(value) => setNoteForm({ ...noteForm, note: value })} /></Field><div className="mt-3 grid gap-3 md:grid-cols-2"><Field label="Category"><Input value={noteForm.category} onChange={(e) => setNoteForm({ ...noteForm, category: e.target.value })} /></Field><div className="flex items-end pb-2"><Check label="Pin note" checked={noteForm.is_pinned} onChange={(v) => setNoteForm({ ...noteForm, is_pinned: v })} /></div></div><div className="mt-3 flex justify-end"><Button onClick={() => void addNote()}>Add Note</Button></div></div>}</div><div><h3 className="mb-3 text-sm font-semibold">Documents</h3><div className="space-y-3">{documents.length === 0 ? <div className="border border-dashed p-6 text-center text-sm">No documents uploaded yet.</div> : documents.map((document) => <Card key={document.id}><p className="font-medium">{document.file_name}</p><p className="mt-1 text-xs">{document.document_type || "Document"} • {dateTime(document.created_at)}</p><p className="mt-2 break-all text-xs">{document.storage_path}</p></Card>)}</div><div className="mt-4 border p-4 text-xs leading-5">Document metadata is managed by the dedicated Customer Documents panel on this page.</div></div></div></Section>}
 
     {activeTab === "Activity" && <Section title="Activity" description="Append-only customer activity timeline."><div className="space-y-3">{activities.length === 0 ? <p className="py-8 text-center text-sm">No activity yet.</p> : activities.map((activity) => <div key={activity.id} className="relative border p-4"><div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-medium">{activity.title}</p>{activity.description && <p className="mt-1 text-sm">{activity.description}</p>}<p className="mt-2 text-xs">{titleCase(activity.activity_type)}{activity.actor_user_id ? ` • ${profileMap.get(activity.actor_user_id) ?? "User"}` : ""}</p></div><span className="text-xs">{dateTime(activity.created_at)}</span></div></div>)}</div></Section>}
   </div>;
