@@ -14,6 +14,8 @@ import { loadCustomerDocuments } from "@/lib/customers/read-dedup";
 import type { CustomerDocument } from "@/lib/customers/types";
 
 const bucket = "customer-documents";
+const signedAccessSeconds = 60;
+
 function safeFileName(name: string) {
   const cleaned = name.trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-");
   return cleaned || "document";
@@ -26,7 +28,7 @@ export default function CustomerDocumentsPanel({ customerId }: { customerId: str
   const [file, setFile] = useState<File | null>(null);
   const [documentType, setDocumentType] = useState("");
   const [description, setDescription] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,7 +59,7 @@ export default function CustomerDocumentsPanel({ customerId }: { customerId: str
     event.preventDefault();
     if (!canUpload || !file) return;
 
-    setBusy(true);
+    setBusyId("upload");
     setError(null);
     setMessage(null);
     const storagePath = `${customerId}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
@@ -68,27 +70,26 @@ export default function CustomerDocumentsPanel({ customerId }: { customerId: str
     });
     if (uploadError) {
       setError(uploadError.message);
-      setBusy(false);
+      setBusyId(null);
       return;
     }
 
-    const { error: metadataError } = await supabase.from("customer_documents").insert({
-      customer_id: customerId,
-      document_type: documentType.trim() || null,
-      file_name: file.name,
-      storage_bucket: bucket,
-      storage_path: storagePath,
-      mime_type: file.type || null,
-      file_size_bytes: file.size,
-      description: description.trim() || null,
-      is_active: true,
-      portal_visible: false,
+    // portal_visible: false is enforced by register_customer_document and cannot be
+    // promoted by the upload call itself.
+    const { error: metadataError } = await supabase.rpc("register_customer_document", {
+      p_customer_id: customerId,
+      p_file_name: file.name,
+      p_storage_path: storagePath,
+      p_document_type: documentType.trim() || null,
+      p_mime_type: file.type || null,
+      p_file_size_bytes: file.size,
+      p_description: description.trim() || null,
     });
 
     if (metadataError) {
       await supabase.storage.from(bucket).remove([storagePath]);
       setError(metadataError.message);
-      setBusy(false);
+      setBusyId(null);
       return;
     }
 
@@ -99,73 +100,145 @@ export default function CustomerDocumentsPanel({ customerId }: { customerId: str
     if (input) input.value = "";
     await loadDocuments();
     setMessage("Document uploaded. Dealer Portal visibility is off by default.");
-    setBusy(false);
+    setBusyId(null);
   }
 
   async function setPortalVisibility(documentId: string, visible: boolean) {
     if (!canManagePortal) return;
-    setBusy(true);
+    setBusyId(documentId);
     setError(null);
     setMessage(null);
-    const { error: updateError } = await supabase
-      .from("customer_documents")
-      .update({ portal_visible: visible })
-      .eq("id", documentId)
-      .eq("customer_id", customerId);
+    const { error: updateError } = await supabase.rpc("set_customer_document_portal_visibility", {
+      p_customer_id: customerId,
+      p_document_id: documentId,
+      p_visible: visible,
+    });
     if (updateError) {
       setError(updateError.message);
-      setBusy(false);
+      setBusyId(null);
       return;
     }
     await loadDocuments();
     setMessage(visible ? "Document is visible to Dealer Portal." : "Document is hidden from Dealer Portal.");
-    setBusy(false);
+    setBusyId(null);
+  }
+
+  async function openSignedDocument(item: CustomerDocument, download: boolean) {
+    setBusyId(item.id);
+    setError(null);
+    setMessage(null);
+    const { data, error: signedUrlError } = await supabase.storage
+      .from(item.storage_bucket || bucket)
+      .createSignedUrl(
+        item.storage_path,
+        signedAccessSeconds,
+        download ? { download: item.file_name } : undefined
+      );
+
+    if (signedUrlError || !data?.signedUrl) {
+      setError(signedUrlError?.message || "Unable to create private document access link.");
+      setBusyId(null);
+      return;
+    }
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    setBusyId(null);
+  }
+
+  async function deactivateDocument(item: CustomerDocument) {
+    if (!canUpload || !confirm(`Deactivate ${item.file_name}? The private file will be retained for history.`)) return;
+    setBusyId(item.id);
+    setError(null);
+    setMessage(null);
+    const { error: deactivateError } = await supabase.rpc("deactivate_customer_document", {
+      p_customer_id: customerId,
+      p_document_id: item.id,
+    });
+    if (deactivateError) {
+      setError(deactivateError.message);
+      setBusyId(null);
+      return;
+    }
+    await loadDocuments();
+    setMessage("Document deactivated. The private file was retained for audit/history.");
+    setBusyId(null);
   }
 
   return (
     <div className="mb-5">
-    <ComponentCard title="Customer Documents" desc="Files are stored in the private customer-documents bucket. Dealer visibility must be enabled explicitly by an Admin.">
-      {error ? <Alert variant="error" title="Document action failed" message={error} /> : null}
-      {message ? <Alert variant="success" title="Documents updated" message={message} /> : null}
+      <ComponentCard
+        title="Customer Documents"
+        desc="Files stay private. Access uses a short-lived signed link and Dealer visibility must be enabled explicitly by an Admin."
+      >
+        {error ? <Alert variant="error" title="Document action failed" message={error} /> : null}
+        {message ? <Alert variant="success" title="Documents updated" message={message} /> : null}
 
-      {canUpload ? (
-        <form onSubmit={uploadDocument} className="mb-6 grid gap-3 md:grid-cols-2">
-          <div>
-            <Label htmlFor="customer-document-file">File</Label>
-            <Input id="customer-document-file" type="file" required disabled={busy} onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-          </div>
-          <div>
-            <Label htmlFor="customer-document-type">Document type</Label>
-            <Input id="customer-document-type" value={documentType} disabled={busy} onChange={(event) => setDocumentType(event.target.value)} placeholder="Specification, agreement, drawing…" />
-          </div>
-          <div className="md:col-span-2">
-            <Label htmlFor="customer-document-description">Description</Label>
-            <Input id="customer-document-description" value={description} disabled={busy} onChange={(event) => setDescription(event.target.value)} />
-          </div>
-          <div className="md:col-span-2 flex justify-end">
-            <Button type="submit" disabled={busy || !file}>{busy ? "Uploading…" : "Upload document"}</Button>
-          </div>
-        </form>
-      ) : null}
-
-      <div className="space-y-3">
-        {documents.length === 0 ? <Alert variant="info" title="No documents" message="No active documents." /> : documents.map((item) => (
-          <div key={item.id} className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        {canUpload ? (
+          <form onSubmit={uploadDocument} className="mb-6 grid gap-3 md:grid-cols-2">
             <div>
-              <p className="font-medium">{item.file_name}</p>
-              <FormHint>{item.document_type || "Document"}{item.description ? ` · ${item.description}` : ""}</FormHint>
-              <FormHint>Dealer Portal: {item.portal_visible ? "Visible" : "Hidden"}</FormHint>
+              <Label htmlFor="customer-document-file">File</Label>
+              <Input
+                id="customer-document-file"
+                type="file"
+                required
+                disabled={busyId !== null}
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
             </div>
-            <Checkbox
+            <div>
+              <Label htmlFor="customer-document-type">Document type</Label>
+              <Input
+                id="customer-document-type"
+                value={documentType}
+                disabled={busyId !== null}
+                onChange={(event) => setDocumentType(event.target.value)}
+                placeholder="Specification, agreement, drawing…"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label htmlFor="customer-document-description">Description</Label>
+              <Input
+                id="customer-document-description"
+                value={description}
+                disabled={busyId !== null}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+            </div>
+            <div className="md:col-span-2 flex justify-end">
+              <Button type="submit" disabled={busyId !== null || !file}>
+                {busyId === "upload" ? "Uploading…" : "Upload document"}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+
+        <div className="space-y-3">
+          {documents.length === 0 ? (
+            <Alert variant="info" title="No documents" message="No active documents." />
+          ) : documents.map((item) => (
+            <ComponentCard
+              key={item.id}
+              title={item.file_name}
+              desc={`${item.document_type || "Document"}${item.description ? ` · ${item.description}` : ""}`}
+              headerAction={
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void openSignedDocument(item, false)}>Preview</Button>
+                  <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void openSignedDocument(item, true)}>Download</Button>
+                  {canUpload ? <Button size="sm" variant="danger" disabled={busyId !== null} onClick={() => void deactivateDocument(item)}>Deactivate</Button> : null}
+                </div>
+              }
+            >
+              <FormHint>Dealer Portal: {item.portal_visible ? "Visible" : "Hidden"}</FormHint>
+              <Checkbox
                 label="Visible to Dealer Portal"
                 checked={item.portal_visible}
-                disabled={!canManagePortal || busy}
+                disabled={!canManagePortal || busyId !== null}
                 onChange={(checked) => void setPortalVisibility(item.id, checked)}
               />
-          </div>
-        ))}
-      </div>
-    </ComponentCard>
+            </ComponentCard>
+          ))}
+        </div>
+      </ComponentCard>
     </div>
   );
 }
