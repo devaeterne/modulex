@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import StatTile from "@/components/common/StatTile";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
+import TextArea from "@/components/form/input/TextArea";
+import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import {
@@ -13,9 +20,6 @@ import {
   TableViewport,
 } from "@/components/ui/table";
 import {
-  ADMIN_FIELD_BASE,
-  ADMIN_FIELD_STATES,
-  ADMIN_SURFACE_CARD,
   ADMIN_TEXT_STYLES,
   type AdminStatusColor,
 } from "@/components/ui/theme/adminTheme";
@@ -46,11 +50,17 @@ type Feedback = {
   text: string;
 };
 
-const statuses = ["present", "late", "absent", "no_show", "partial", "leave", "holiday", "remote", "off"] as const;
-const inputClass = `${ADMIN_FIELD_BASE} ${ADMIN_FIELD_STATES.default}`;
-const textareaClass = `${inputClass} h-auto min-h-24 py-3`;
-const cardClass = `${ADMIN_SURFACE_CARD} p-5`;
-const labelClass = `block text-sm font-medium ${ADMIN_TEXT_STYLES.body}`;
+const statuses = [
+  "present",
+  "late",
+  "absent",
+  "no_show",
+  "partial",
+  "leave",
+  "holiday",
+  "remote",
+  "off",
+] as const;
 
 function formatDateInput(value: Date) {
   const year = value.getFullYear();
@@ -76,7 +86,10 @@ function formatWorkDate(value: string) {
   return `${day}.${month}.${year}`;
 }
 
-function getStatusPresentation(value: string): { label: string; color: AdminStatusColor } {
+function getStatusPresentation(value: string): {
+  label: string;
+  color: AdminStatusColor;
+} {
   switch (value) {
     case "present":
       return { label: "Present", color: "success" };
@@ -98,7 +111,9 @@ function getStatusPresentation(value: string): { label: string; color: AdminStat
       return { label: "Off", color: "light" };
     default:
       return {
-        label: value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        label: value
+          .replaceAll("_", " ")
+          .replace(/\b\w/g, (letter) => letter.toUpperCase()),
         color: "light",
       };
   }
@@ -112,7 +127,8 @@ export default function AttendanceManager() {
   const [endDate, setEndDate] = useState(initial.end);
   const [employeeId, setEmployeeId] = useState("");
   const [workDate, setWorkDate] = useState(formatDateInput(new Date()));
-  const [status, setStatus] = useState<(typeof statuses)[number]>("present");
+  const [status, setStatus] =
+    useState<(typeof statuses)[number]>("present");
   const [regularHours, setRegularHours] = useState("8");
   const [overtimeHours, setOvertimeHours] = useState("0");
   const [breakMinutes, setBreakMinutes] = useState("0");
@@ -123,7 +139,9 @@ export default function AttendanceManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(
+    null,
+  );
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function load() {
@@ -139,7 +157,9 @@ export default function AttendanceManager() {
           .order("last_name"),
         supabase
           .from("hr_attendance_records")
-          .select("id,employee_id,work_date,clock_in,clock_out,break_minutes,regular_hours,overtime_hours,status,notes")
+          .select(
+            "id,employee_id,work_date,clock_in,clock_out,break_minutes,regular_hours,overtime_hours,status,notes",
+          )
           .gte("work_date", startDate)
           .lte("work_date", endDate)
           .order("work_date", { ascending: false }),
@@ -189,7 +209,10 @@ export default function AttendanceManager() {
         .upsert(payload, { onConflict: "employee_id,work_date" });
 
       if (error) {
-        setFeedback({ tone: "error", text: "Attendance could not be saved. Please try again." });
+        setFeedback({
+          tone: "error",
+          text: "Attendance could not be saved. Please try again.",
+        });
         return;
       }
 
@@ -208,9 +231,15 @@ export default function AttendanceManager() {
     setFeedback(null);
 
     try {
-      const { error } = await supabase.from("hr_attendance_records").delete().eq("id", id);
+      const { error } = await supabase
+        .from("hr_attendance_records")
+        .delete()
+        .eq("id", id);
       if (error) {
-        setFeedback({ tone: "error", text: "Attendance record could not be deleted. Please try again." });
+        setFeedback({
+          tone: "error",
+          text: "Attendance record could not be deleted. Please try again.",
+        });
         return;
       }
 
@@ -235,328 +264,419 @@ export default function AttendanceManager() {
   );
 
   const existingRecord = useMemo(
-    () => records.find((row) => row.employee_id === employeeId && row.work_date === workDate),
+    () =>
+      records.find(
+        (row) =>
+          row.employee_id === employeeId && row.work_date === workDate,
+      ),
     [employeeId, records, workDate],
   );
 
   const metrics = useMemo(() => {
-    const absent = records.filter((row) => row.status === "absent" || row.status === "no_show").length;
+    const absent = records.filter(
+      (row) => row.status === "absent" || row.status === "no_show",
+    ).length;
     const late = records.filter((row) => row.status === "late").length;
-    const overtime = records.reduce((sum, row) => sum + Number(row.overtime_hours || 0), 0);
-    const hours = records.reduce((sum, row) => sum + Number(row.regular_hours || 0), 0);
+    const overtime = records.reduce(
+      (sum, row) => sum + Number(row.overtime_hours || 0),
+      0,
+    );
+    const hours = records.reduce(
+      (sum, row) => sum + Number(row.regular_hours || 0),
+      0,
+    );
     return { absent, late, overtime, hours };
   }, [records]);
 
-  const metricCards = [
-    ["Regular hours", metrics.hours.toFixed(2)],
-    ["Overtime hours", metrics.overtime.toFixed(2)],
-    ["Late records", String(metrics.late)],
-    ["Absent / no-show", String(metrics.absent)],
-  ] as const;
+  const employeeOptions = employees.map((employee) => ({
+    value: employee.id,
+    label: displayName(employee),
+  }));
+  const statusOptions = statuses.map((item) => ({
+    value: item,
+    label: getStatusPresentation(item).label,
+  }));
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-800 dark:text-white/90">Attendance & Absence</h1>
-        <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>
+        <h1 className={`${ADMIN_TEXT_STYLES.strong} text-2xl font-semibold`}>
+          Attendance & Absence
+        </h1>
+        <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-sm`}>
           Track daily attendance, absences, lateness, regular hours and overtime.
         </p>
       </div>
 
       {feedback ? (
-        <div
-          role={feedback.tone === "error" ? "alert" : "status"}
-          aria-live="polite"
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            feedback.tone === "error"
-              ? "border-error-200 bg-error-50 text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300"
-              : "border-success-200 bg-success-50 text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-300"
-          }`}
-        >
-          {feedback.text}
+        <div role={feedback.tone === "error" ? "alert" : "status"} aria-live="polite">
+          <Alert
+            variant={feedback.tone}
+            title={feedback.tone === "error" ? "Attendance action failed" : "Attendance updated"}
+            message={feedback.text}
+          />
         </div>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metricCards.map(([label, value]) => (
-          <div key={label} className={cardClass}>
-            <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>{label}</p>
-            <p className={`mt-2 text-2xl font-semibold tabular-nums ${ADMIN_TEXT_STYLES.strong}`}>
-              {isLoading ? "—" : value}
-            </p>
-          </div>
-        ))}
+        <StatTile
+          label="Regular hours"
+          value={isLoading ? "—" : metrics.hours.toFixed(2)}
+        />
+        <StatTile
+          label="Overtime hours"
+          value={isLoading ? "—" : metrics.overtime.toFixed(2)}
+        />
+        <StatTile
+          label="Late records"
+          value={isLoading ? "—" : String(metrics.late)}
+          tone={metrics.late > 0 ? "warning" : "neutral"}
+        />
+        <StatTile
+          label="Absent / no-show"
+          value={isLoading ? "—" : String(metrics.absent)}
+          tone={metrics.absent > 0 ? "warning" : "neutral"}
+        />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <form onSubmit={save} className={`${cardClass} space-y-4`} aria-busy={busy}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className={`font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Add / Update Day</h2>
-              <p className={`mt-1 text-xs leading-5 ${ADMIN_TEXT_STYLES.muted}`}>
-                Employee and work date identify the attendance day.
-              </p>
-            </div>
-            {existingRecord ? (
-              <Badge color="warning" size="sm">Update existing day</Badge>
-            ) : (
-              <Badge color="primary" size="sm">New day</Badge>
-            )}
-          </div>
-
-          <label className={labelClass}>
-            Employee
-            <select
-              className={`${inputClass} mt-1.5`}
-              value={employeeId}
-              onChange={(event) => setEmployeeId(event.target.value)}
-              required
-              disabled={busy || employees.length === 0}
-            >
-              <option value="">Select employee</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>{displayName(employee)}</option>
-              ))}
-            </select>
-          </label>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className={labelClass}>
-              Work date
-              <input
-                className={`${inputClass} mt-1.5`}
-                type="date"
-                value={workDate}
-                onChange={(event) => setWorkDate(event.target.value)}
-                required
-                disabled={busy}
-              />
-            </label>
-            <label className={labelClass}>
-              Status
-              <select
-                className={`${inputClass} mt-1.5`}
-                value={status}
-                onChange={(event) => setStatus(event.target.value as (typeof statuses)[number])}
-                disabled={busy}
-              >
-                {statuses.map((item) => (
-                  <option key={item} value={item}>{getStatusPresentation(item).label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <label className={labelClass}>
-              Regular hours
-              <input
-                className={`${inputClass} mt-1.5 px-3`}
-                type="number"
-                min="0"
-                step="0.25"
-                value={regularHours}
-                onChange={(event) => setRegularHours(event.target.value)}
-                disabled={busy}
-              />
-            </label>
-            <label className={labelClass}>
-              Overtime hours
-              <input
-                className={`${inputClass} mt-1.5 px-3`}
-                type="number"
-                min="0"
-                step="0.25"
-                value={overtimeHours}
-                onChange={(event) => setOvertimeHours(event.target.value)}
-                disabled={busy}
-              />
-            </label>
-            <label className={labelClass}>
-              Break (min)
-              <input
-                className={`${inputClass} mt-1.5 px-3`}
-                type="number"
-                min="0"
-                value={breakMinutes}
-                onChange={(event) => setBreakMinutes(event.target.value)}
-                disabled={busy}
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-3">
-            <label className={labelClass}>
-              Clock in
-              <input
-                className={`${inputClass} mt-1.5`}
-                type="datetime-local"
-                value={clockIn}
-                onChange={(event) => setClockIn(event.target.value)}
-                disabled={busy}
-              />
-            </label>
-            <label className={labelClass}>
-              Clock out
-              <input
-                className={`${inputClass} mt-1.5`}
-                type="datetime-local"
-                value={clockOut}
-                onChange={(event) => setClockOut(event.target.value)}
-                disabled={busy}
-              />
-            </label>
-          </div>
-
-          <label className={labelClass}>
-            Notes
-            <textarea
-              className={`${textareaClass} mt-1.5`}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              disabled={busy}
-              placeholder="Optional note about this attendance day"
-            />
-          </label>
-
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={busy || employees.length === 0 || !employeeId || !workDate}
+        <form onSubmit={save} className="min-w-0" aria-busy={busy}>
+          <ComponentCard
+            title="Add / Update Day"
+            desc="Employee and work date identify the attendance day."
+            headerAction={
+              existingRecord ? (
+                <Badge color="warning" size="sm">
+                  Update existing day
+                </Badge>
+              ) : null
+            }
           >
-            {busy ? "Saving…" : existingRecord ? "Update Attendance" : "Save Attendance"}
-          </Button>
+            <div>
+              <Label htmlFor="attendance-employee">Employee</Label>
+              <Select
+                id="attendance-employee"
+                options={employeeOptions}
+                value={employeeId}
+                onChange={setEmployeeId}
+                placeholder="Select employee"
+                required
+                disabled={busy || employees.length === 0}
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+              <div>
+                <Label htmlFor="attendance-work-date">Work date</Label>
+                <Input
+                  id="attendance-work-date"
+                  type="date"
+                  value={workDate}
+                  onChange={(event) => setWorkDate(event.target.value)}
+                  required
+                  disabled={busy}
+                />
+              </div>
+              <div>
+                <Label htmlFor="attendance-status">Status</Label>
+                <Select
+                  id="attendance-status"
+                  options={statusOptions}
+                  value={status}
+                  onChange={(value) =>
+                    setStatus(value as (typeof statuses)[number])
+                  }
+                  disabled={busy}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
+              <div>
+                <Label htmlFor="attendance-regular-hours">Regular hours</Label>
+                <Input
+                  id="attendance-regular-hours"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={regularHours}
+                  onChange={(event) => setRegularHours(event.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <div>
+                <Label htmlFor="attendance-overtime-hours">Overtime hours</Label>
+                <Input
+                  id="attendance-overtime-hours"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={overtimeHours}
+                  onChange={(event) => setOvertimeHours(event.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <div>
+                <Label htmlFor="attendance-break-minutes">Break (min)</Label>
+                <Input
+                  id="attendance-break-minutes"
+                  type="number"
+                  min="0"
+                  value={breakMinutes}
+                  onChange={(event) => setBreakMinutes(event.target.value)}
+                  disabled={busy}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <div>
+                <Label htmlFor="attendance-clock-in">Clock in</Label>
+                <Input
+                  id="attendance-clock-in"
+                  type="datetime-local"
+                  value={clockIn}
+                  onChange={(event) => setClockIn(event.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <div>
+                <Label htmlFor="attendance-clock-out">Clock out</Label>
+                <Input
+                  id="attendance-clock-out"
+                  type="datetime-local"
+                  value={clockOut}
+                  onChange={(event) => setClockOut(event.target.value)}
+                  disabled={busy}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="attendance-notes">Notes</Label>
+              <TextArea
+                id="attendance-notes"
+                rows={4}
+                value={notes}
+                onChange={setNotes}
+                disabled={busy}
+                placeholder="Optional note about this attendance day"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={
+                busy || employees.length === 0 || !employeeId || !workDate
+              }
+            >
+              {busy
+                ? "Saving…"
+                : existingRecord
+                  ? "Update Attendance"
+                  : "Save Attendance"}
+            </Button>
+          </ComponentCard>
         </form>
 
-        <section className={`${ADMIN_SURFACE_CARD} min-w-0`} aria-label="Attendance records">
-          <div className="flex flex-col gap-4 border-b border-gray-200 p-4 dark:border-gray-800 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <label className={`${labelClass} sm:w-40`}>
-                From
-                <input
-                  className={`${inputClass} mt-1.5`}
+        <ComponentCard
+          title="Attendance records"
+          desc="Filter the active period and review daily attendance details."
+          className="min-w-0"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:max-w-sm">
+              <div>
+                <Label htmlFor="attendance-filter-from">From</Label>
+                <Input
+                  id="attendance-filter-from"
                   type="date"
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
                 />
-              </label>
-              <label className={`${labelClass} sm:w-40`}>
-                To
-                <input
-                  className={`${inputClass} mt-1.5`}
+              </div>
+              <div>
+                <Label htmlFor="attendance-filter-to">To</Label>
+                <Input
+                  id="attendance-filter-to"
                   type="date"
                   value={endDate}
                   onChange={(event) => setEndDate(event.target.value)}
                 />
-              </label>
+              </div>
             </div>
 
             <div className="flex items-center justify-between gap-3 sm:justify-end">
-              <span className={`whitespace-nowrap text-sm ${ADMIN_TEXT_STYLES.muted}`}>
+              <span className={`${ADMIN_TEXT_STYLES.muted} whitespace-nowrap text-sm`}>
                 {records.length} record{records.length === 1 ? "" : "s"}
               </span>
-              <Button type="button" size="sm" variant="outline" onClick={clearFilters}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={clearFilters}
+              >
                 Clear filters
               </Button>
             </div>
           </div>
 
-          <div className="p-4">
-            <TableViewport>
-              <Table variant="admin" minWidth="medium">
-                <TableHeader variant="admin">
-                  <TableRow>
-                    <TableCell isHeader variant="admin" className="w-36 whitespace-nowrap text-left">Date</TableCell>
-                    <TableCell isHeader variant="admin" className="min-w-64 text-left">Employee</TableCell>
-                    <TableCell isHeader variant="admin" className="w-36 text-left">Status</TableCell>
-                    <TableCell isHeader variant="admin" className="w-28 text-right">Regular</TableCell>
-                    <TableCell isHeader variant="admin" className="w-24 text-right">OT</TableCell>
-                    <TableCell isHeader variant="admin" className="w-56 text-right">Actions</TableCell>
-                  </TableRow>
-                </TableHeader>
-                <TableBody variant="admin" aria-busy={isLoading}>
-                  {isLoading ? (
-                    <TableStateRow colSpan={6}>Loading attendance records…</TableStateRow>
-                  ) : loadError ? (
-                    <TableStateRow colSpan={6}>
-                      <div className="flex flex-col items-center gap-3">
-                        <span>{loadError}</span>
-                        <Button type="button" size="sm" variant="outline" onClick={() => void load()}>
-                          Try again
-                        </Button>
-                      </div>
-                    </TableStateRow>
-                  ) : records.length === 0 ? (
-                    <TableStateRow colSpan={6}>No attendance records in this range.</TableStateRow>
-                  ) : (
-                    records.map((row) => {
-                      const employee = employeeMap.get(row.employee_id);
-                      const presentation = getStatusPresentation(row.status);
-                      const isConfirmingDelete = deleteCandidateId === row.id;
-                      const isDeleting = deletingId === row.id;
+          <TableViewport>
+            <Table variant="admin" minWidth="medium">
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell
+                    isHeader
+                    variant="admin"
+                    className="w-36 whitespace-nowrap text-left"
+                  >
+                    Date
+                  </TableCell>
+                  <TableCell
+                    isHeader
+                    variant="admin"
+                    className="min-w-64 text-left"
+                  >
+                    Employee
+                  </TableCell>
+                  <TableCell
+                    isHeader
+                    variant="admin"
+                    className="w-36 text-left"
+                  >
+                    Status
+                  </TableCell>
+                  <TableCell
+                    isHeader
+                    variant="admin"
+                    className="w-28 text-right"
+                  >
+                    Regular
+                  </TableCell>
+                  <TableCell
+                    isHeader
+                    variant="admin"
+                    className="w-24 text-right"
+                  >
+                    OT
+                  </TableCell>
+                  <TableCell
+                    isHeader
+                    variant="admin"
+                    className="w-56 text-right"
+                  >
+                    Actions
+                  </TableCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody variant="admin" aria-busy={isLoading}>
+                {isLoading ? (
+                  <TableStateRow colSpan={6}>
+                    Loading attendance records…
+                  </TableStateRow>
+                ) : loadError ? (
+                  <TableStateRow colSpan={6}>
+                    <div className="flex flex-col items-center gap-3">
+                      <span>{loadError}</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void load()}
+                      >
+                        Try again
+                      </Button>
+                    </div>
+                  </TableStateRow>
+                ) : records.length === 0 ? (
+                  <TableStateRow colSpan={6}>
+                    No attendance records in this range.
+                  </TableStateRow>
+                ) : (
+                  records.map((row) => {
+                    const employee = employeeMap.get(row.employee_id);
+                    const presentation = getStatusPresentation(row.status);
+                    const isConfirmingDelete = deleteCandidateId === row.id;
+                    const isDeleting = deletingId === row.id;
 
-                      return (
-                        <TableRow key={row.id} className="transition-colors hover:bg-gray-50/80 dark:hover:bg-white/[0.02]">
-                          <TableCell variant="admin" className="whitespace-nowrap font-medium text-gray-800 dark:text-white/90">
-                            {formatWorkDate(row.work_date)}
-                          </TableCell>
-                          <TableCell variant="admin" className="min-w-64 font-medium text-gray-800 dark:text-white/90">
-                            {employee ? displayName(employee) : "Unknown employee"}
-                          </TableCell>
-                          <TableCell variant="admin">
-                            <Badge color={presentation.color} size="sm">{presentation.label}</Badge>
-                          </TableCell>
-                          <TableCell variant="admin" className="text-right tabular-nums">
-                            {Number(row.regular_hours).toFixed(2)}
-                          </TableCell>
-                          <TableCell variant="admin" className="text-right tabular-nums">
-                            {Number(row.overtime_hours).toFixed(2)}
-                          </TableCell>
-                          <TableCell variant="admin" className="text-right">
-                            {isConfirmingDelete ? (
-                              <div className="flex items-center justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="min-h-11 px-3 py-2"
-                                  onClick={() => setDeleteCandidateId(null)}
-                                  disabled={isDeleting}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="danger"
-                                  className="min-h-11 px-3 py-2"
-                                  onClick={() => void confirmDelete(row.id)}
-                                  disabled={isDeleting}
-                                >
-                                  {isDeleting ? "Deleting…" : "Confirm delete"}
-                                </Button>
-                              </div>
-                            ) : (
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell
+                          variant="admin"
+                          className={`${ADMIN_TEXT_STYLES.strong} whitespace-nowrap font-medium`}
+                        >
+                          {formatWorkDate(row.work_date)}
+                        </TableCell>
+                        <TableCell
+                          variant="admin"
+                          className={`${ADMIN_TEXT_STYLES.strong} min-w-64 font-medium`}
+                        >
+                          {employee
+                            ? displayName(employee)
+                            : "Unknown employee"}
+                        </TableCell>
+                        <TableCell variant="admin">
+                          <Badge color={presentation.color} size="sm">
+                            {presentation.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell
+                          variant="admin"
+                          className="text-right tabular-nums"
+                        >
+                          {Number(row.regular_hours).toFixed(2)}
+                        </TableCell>
+                        <TableCell
+                          variant="admin"
+                          className="text-right tabular-nums"
+                        >
+                          {Number(row.overtime_hours).toFixed(2)}
+                        </TableCell>
+                        <TableCell variant="admin" className="text-right">
+                          {isConfirmingDelete ? (
+                            <div className="flex items-center justify-end gap-2">
                               <Button
                                 type="button"
                                 size="sm"
-                                variant="outline"
+                                variant="ghost"
                                 className="min-h-11 px-3 py-2"
-                                onClick={() => setDeleteCandidateId(row.id)}
+                                onClick={() => setDeleteCandidateId(null)}
+                                disabled={isDeleting}
                               >
-                                Delete
+                                Cancel
                               </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </TableViewport>
-          </div>
-        </section>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="danger"
+                                className="min-h-11 px-3 py-2"
+                                onClick={() => void confirmDelete(row.id)}
+                                disabled={isDeleting}
+                              >
+                                {isDeleting ? "Deleting…" : "Confirm delete"}
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="min-h-11 px-3 py-2"
+                              onClick={() => setDeleteCandidateId(row.id)}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableViewport>
+        </ComponentCard>
       </div>
     </div>
   );
