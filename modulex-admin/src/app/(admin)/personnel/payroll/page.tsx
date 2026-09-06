@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import PayrollManager from "@/components/hr/PayrollManager";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function PayrollPage() {
-  return <PayrollManager />;
+  return (
+    <div>
+      <PageBreadcrumb pageTitle="Payroll" />
+      <PayrollManager />
+    </div>
+  );
 }
