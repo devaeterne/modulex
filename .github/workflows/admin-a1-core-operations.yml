@@ -5,13 +5,18 @@ on:
     paths:
       - "modulex-admin/src/app/(admin)/customers/**/orders/**"
       - "modulex-admin/src/components/customers/CustomerOrder*.tsx"
+      - "modulex-admin/src/components/customers/CustomerInvoice*.tsx"
       - "modulex-admin/src/components/customers/CustomerShipmentDetailRBAC.tsx"
       - "modulex-admin/src/components/customers/CustomerInstallationDetail.tsx"
+      - "modulex-admin/src/lib/customers/order-domain.ts"
+      - "modulex-admin/src/lib/customers/project-domain.ts"
       - "modulex-admin/src/lib/auth/permissions.ts"
       - "modulex-admin/scripts/a1-*.mjs"
       - "modulex-admin/scripts/order-*.mjs"
+      - "modulex-admin/scripts/val3-*.mjs"
       - "modulex-admin/scripts/store-portal-admin-contract.mjs"
       - "modulex-admin/sql/a1-*.sql"
+      - "modulex-admin/sql/customer-*.sql"
       - "modulex-store/scripts/store-portal-contract.mjs"
       - "modulex-store/scripts/portal-experience-contract.mjs"
       - "modulex-store/supabase/migrations/*order*.sql"
@@ -21,13 +26,18 @@ on:
     paths:
       - "modulex-admin/src/app/(admin)/customers/**/orders/**"
       - "modulex-admin/src/components/customers/CustomerOrder*.tsx"
+      - "modulex-admin/src/components/customers/CustomerInvoice*.tsx"
       - "modulex-admin/src/components/customers/CustomerShipmentDetailRBAC.tsx"
       - "modulex-admin/src/components/customers/CustomerInstallationDetail.tsx"
+      - "modulex-admin/src/lib/customers/order-domain.ts"
+      - "modulex-admin/src/lib/customers/project-domain.ts"
       - "modulex-admin/src/lib/auth/permissions.ts"
       - "modulex-admin/scripts/a1-*.mjs"
       - "modulex-admin/scripts/order-*.mjs"
+      - "modulex-admin/scripts/val3-*.mjs"
       - "modulex-admin/scripts/store-portal-admin-contract.mjs"
       - "modulex-admin/sql/a1-*.sql"
+      - "modulex-admin/sql/customer-*.sql"
       - "modulex-store/scripts/store-portal-contract.mjs"
       - "modulex-store/scripts/portal-experience-contract.mjs"
       - "modulex-store/supabase/migrations/*order*.sql"
@@ -56,6 +66,7 @@ jobs:
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
       - run: npm run smoke:a1-core-operations
+      - run: node scripts/val3-customers-orders-invoices-contract.mjs
       - run: npm run smoke:order-domain
       - run: npm run smoke:order-lifecycle
       - run: node scripts/order-status-action-guidance-contract.mjs
