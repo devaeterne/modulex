@@ -12,7 +12,7 @@ import {
   stopWatchChannelRecord,
 } from "@/lib/google-calendar/v3-repository";
 
-const RENEW_BEFORE_MS = 24 * 60 * 60 * 1000;
+const RENEW_BEFORE_MS = 48 * 60 * 60 * 1000;
 const REQUESTED_TTL_MS = 6 * 24 * 60 * 60 * 1000;
 
 function tokenHash(token: string) {
