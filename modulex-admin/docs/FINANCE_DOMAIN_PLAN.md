@@ -1,6 +1,6 @@
 # Modulex Finance Domain — Locked Architecture & Delivery Plan
 
-Status: **LOCKED FOR A6 IMPLEMENTATION — F0/F1/F2/F3/F4 COMPLETE; F5 NEXT**
+Status: **LOCKED FOR A6 IMPLEMENTATION — F0/F1/F2/F3/F4/F5A COMPLETE; F5B NEXT**
 Date: 2026-09-06
 Scope: `modulex-admin` operational finance
 
@@ -10,6 +10,7 @@ Supporting architecture and acceptance evidence:
 - `docs/superpowers/plans/2026-09-04-a6-f0-finance-baseline-contract.md`
 - `docs/superpowers/plans/2026-09-06-a6-f4-payroll-finance-closeout.md`
 - `docs/acceptance/a6-f4-payroll-finance-integration.md`
+- `docs/acceptance/a6-f5a-customer-receipts.md`
 
 ## 1. Locked ownership rule
 
@@ -253,16 +254,47 @@ Detailed production evidence: `docs/acceptance/a6-f4-payroll-finance-integration
 
 **Exit:** Payroll obligations remain HR-owned, actual Employee Payments remain Finance-owned, settlement state is Finance-derived, direct-source double-payment paths fail closed, and partial/full/reversal/void behavior is production-verified with no acceptance residue.
 
-### A6-F5 — Sales / Accounts Receivable integration — **NEXT**
+### A6-F5 — Sales / Accounts Receivable integration — **IN PROGRESS**
 
-- Preserve existing customer invoices and Project payment requirement/allocation behavior.
-- Introduce/complete standalone customer payment transaction flow through Finance Core.
-- Reconcile invoice paid/status from authoritative Finance allocations/postings rather than parallel manual truth.
-- Preserve live Project-payment IDs/history while introducing Finance linkage/reconciliation.
-- Retire/narrow the Project-payment posted-edit/hard-delete compatibility exception only through an explicit reviewed migration.
-- Add AR aging, customer balance and payment history.
+#### A6-F5A — Customer Receipts / AR Bridge — **COMPLETE / PRODUCTION VERIFIED 2026-09-06**
 
-**Exit:** customer payment may reference invoice/order/project when applicable; Project-specific payment workflows still function and reconcile to Finance.
+Delivered and production-verified:
+
+- Customer Receipts reuse canonical `finance_transactions(transaction_kind='customer_receipt')`; no second customer-payment ledger was introduced.
+- Invoice allocation uses `finance_transaction_links` and preserves Customer / Order / Project attribution.
+- Customer Invoice `paid_amount` / status is Finance-derived from posted Customer Receipt allocations and Finance reversals while preserving unbridged Project-payment history.
+- Existing Project customer-payment IDs/history remain intact; explicit `customer_project_payment_finance_links` reconciliation prevents the same cash event from being counted twice.
+- Once a Project payment is bridged to Finance, conflicting Project-side source/allocation mutation and reversal paths fail closed; correction moves through canonical Customer Receipt void/reversal behavior.
+- Public F5A wrappers use authenticated `SECURITY DEFINER` + pinned empty `search_path`, while private role-checked cores remain revoked from browser roles.
+- Production migration `20260906202606` installed Customer Receipts; `20260906203738` hardened the public RPC bridge; `20260906205554` repaired the UUID aggregate used by the Customer Receipts list projection.
+- Controlled production acceptance exercised partial settlement, full settlement, exact idempotent retry, overpayment / wrong-Customer / wrong-currency failures, void, re-settlement, Project-payment bridge, no-double-counting proof, Project-side immutability and Finance reversal inside an explicit transaction ending with `ROLLBACK`.
+- Post-rollback acceptance residue is zero for Finance receipts, Project payment transactions, Project payment requirements and bridge rows; the temporary Invoice fixture returned to its original draft / zero-paid state.
+- Fresh Security/Performance Advisors contain no F5A-specific blocking finding; the bridge `created_by` unindexed-FK INFO is deferred to F7 performance hardening.
+- Admin production is `READY` on current `main` commit `e2c04c92ec901f190fc3db8a9209b0b88b730e47`; `/finance/customer-receipts` resolves HTTP 200 with the expected Customer Receipts bundle and authentication boundary.
+
+Detailed production evidence: `docs/acceptance/a6-f5a-customer-receipts.md`.
+
+**Exit:** Customer Receipt cash movement is Finance-owned, Invoice settlement is Finance-derived, Project payment history reconciles without duplicate cash truth, bridged source history is protected from conflicting correction, and production acceptance is GREEN with zero residue.
+
+#### A6-F5B — AR Aging / Customer Balance — **NEXT**
+
+- Add Finance-derived AR aging buckets (`Current`, `1–30`, `31–60`, `61–90`, `90+`).
+- Add Customer outstanding balance / open Invoice / overdue Invoice / partial-payment projections.
+- Add Customer payment history built from canonical Customer Receipts and corrections.
+- Add search, filter and server pagination suitable for Finance operations.
+- Reuse Invoice and Finance allocation truth; do not introduce a parallel AR balance ledger.
+
+**Exit:** Finance can answer what each Customer owes, how old the receivable is, and which canonical receipts/corrections explain the balance.
+
+#### A6-F5C — Project Payment Reconciliation Hardening — **AFTER F5B**
+
+- Preserve existing Project payment IDs and historical source records.
+- Narrow the remaining Project-payment posted-edit / hard-delete compatibility exception through an explicit reviewed migration.
+- Keep Finance-bridged Project payment source/allocation history immutable.
+- Route corrections for Finance-reconciled cash events through canonical Finance void/reversal.
+- Reconcile historical compatibility behavior without fabricating Finance transactions or destructively rewriting source history.
+
+**Exit:** Project-specific payment workflows remain operational, but reconciled cash truth and correction ownership are unambiguously Finance-owned.
 
 ### A6-F6 — Reporting & Project financial projection
 
@@ -292,7 +324,7 @@ Detailed production evidence: `docs/acceptance/a6-f4-payroll-finance-integration
 
 Required sequence remains:
 
-`F0 contract/baseline → F1 Finance Core → F2 Expenses → F3 AP → F4 Payroll integration → F5 AR integration → F6 Reporting → F7 hardening`
+`F0 contract/baseline → F1 Finance Core → F2 Expenses → F3 AP → F4 Payroll integration → F5A Customer Receipts → F5B AR Aging/Customer Balance → F5C Project-payment hardening → F6 Reporting → F7 hardening`
 
 Do not rewrite existing Project payment or HR payroll as the Finance ledger. Integrate source domains into the neutral Finance Core incrementally.
 
