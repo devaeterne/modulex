@@ -7,6 +7,10 @@
     {
       "path": "/api/vendor-catalog/sync",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/admin/calendar/google/reconcile",
+      "schedule": "5 * * * *"
     }
   ]
 }
