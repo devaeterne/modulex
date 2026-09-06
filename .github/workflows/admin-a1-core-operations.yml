@@ -14,6 +14,7 @@ on:
       - "modulex-admin/scripts/a1-*.mjs"
       - "modulex-admin/scripts/order-*.mjs"
       - "modulex-admin/scripts/val3-*.mjs"
+      - "modulex-admin/scripts/dealer-portal-admin-contract.mjs"
       - "modulex-admin/scripts/store-portal-admin-contract.mjs"
       - "modulex-admin/sql/a1-*.sql"
       - "modulex-admin/sql/customer-*.sql"
@@ -21,6 +22,7 @@ on:
       - "modulex-store/scripts/portal-experience-contract.mjs"
       - "modulex-store/supabase/migrations/*order*.sql"
       - "modulex-store/supabase/migrations/*fulfillment*.sql"
+      - "modulex-store/supabase/migrations/*customer*document*.sql"
       - ".github/workflows/admin-a1-core-operations.yml"
   pull_request:
     paths:
@@ -35,6 +37,7 @@ on:
       - "modulex-admin/scripts/a1-*.mjs"
       - "modulex-admin/scripts/order-*.mjs"
       - "modulex-admin/scripts/val3-*.mjs"
+      - "modulex-admin/scripts/dealer-portal-admin-contract.mjs"
       - "modulex-admin/scripts/store-portal-admin-contract.mjs"
       - "modulex-admin/sql/a1-*.sql"
       - "modulex-admin/sql/customer-*.sql"
@@ -42,6 +45,7 @@ on:
       - "modulex-store/scripts/portal-experience-contract.mjs"
       - "modulex-store/supabase/migrations/*order*.sql"
       - "modulex-store/supabase/migrations/*fulfillment*.sql"
+      - "modulex-store/supabase/migrations/*customer*document*.sql"
       - ".github/workflows/admin-a1-core-operations.yml"
 
 concurrency:
@@ -70,6 +74,7 @@ jobs:
       - run: npm run smoke:order-domain
       - run: npm run smoke:order-lifecycle
       - run: node scripts/order-status-action-guidance-contract.mjs
+      - run: npm run smoke:dealer-portal-admin
       - run: npm run smoke:store-portal-admin
 
   store-portal-boundary-verification:
