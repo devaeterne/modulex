@@ -18,17 +18,21 @@ const confirmationPatchPath = "sql/a1-order-confirmation-validation.sql";
 const legacyCompatibilityPath = "sql/a1-order-legacy-progression-compatibility.sql";
 const fulfillmentCompatibilityPath = "sql/a1-fulfillment-order-status-compatibility.sql";
 const productLifecyclePath = "sql/a1-order-product-lifecycle-compatibility.sql";
+const customerOperationsPath = "sql/customer-operations-hardening.sql";
 assert.equal(exists(sqlPath), true, "A1 core operations hardening SQL contract must exist");
 assert.equal(exists(confirmationPatchPath), true, "A1 order confirmation validation patch must exist");
 assert.equal(exists(legacyCompatibilityPath), true, "A1 legacy order progression compatibility patch must exist");
 assert.equal(exists(fulfillmentCompatibilityPath), true, "A1 fulfillment/order compatibility patch must exist");
 assert.equal(exists(productLifecyclePath), true, "A1 order product lifecycle compatibility patch must exist");
+assert.equal(exists(customerOperationsPath), true, "Customer operations hardening SQL contract must exist");
 
 const sql = read(sqlPath);
 const confirmationPatch = read(confirmationPatchPath);
 const legacyCompatibility = read(legacyCompatibilityPath);
 const fulfillmentCompatibility = read(fulfillmentCompatibilityPath);
 const productLifecycle = read(productLifecyclePath);
+const customerOperations = read(customerOperationsPath);
+const customersTable = read("src/components/customers/CustomersTable.tsx");
 const shipmentDetail = read("src/components/customers/CustomerShipmentDetailRBAC.tsx");
 const installationDetail = read("src/components/customers/CustomerInstallationDetail.tsx");
 const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
@@ -38,6 +42,14 @@ const orderEditActions = read("src/components/customers/CustomerOrderEditActions
 const permissions = read("src/lib/auth/permissions.ts");
 const storePortalContract = read("../modulex-store/scripts/store-portal-contract.mjs");
 const portalExperienceContract = read("../modulex-store/scripts/portal-experience-contract.mjs");
+
+// Customer master creation: one DB-authoritative mutation, one atomic activity write.
+assert.match(customersTable, /supabase\.rpc\(\s*["']create_customer["']/, "Customer creation must use the canonical create_customer RPC");
+assert.doesNotMatch(customersTable, /\.from\(\s*["']customers["']\s*\)\.insert\(/, "Customer creation must not insert directly from the browser");
+assert.match(customerOperations, /create or replace function public\.create_customer\s*\(/i, "Customer operations hardening must define create_customer");
+assert.match(customerOperations, /create_customer[\s\S]{0,2200}security\s+invoker/i, "create_customer must preserve caller RLS with SECURITY INVOKER");
+assert.match(customerOperations, /insert into public\.customers/i, "create_customer must write the customer inside the RPC transaction");
+assert.match(customerOperations, /insert into public\.customer_activity/i, "create_customer must write customer activity atomically");
 
 // Orders: server-authoritative validation and explicit lifecycle policy.
 assert.match(sql, /customer_order_status_transition_allowed/i, "order transition helper must exist");
