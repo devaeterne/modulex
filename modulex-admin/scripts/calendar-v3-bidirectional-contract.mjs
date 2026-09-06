@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = (p) => readFile(path.join(root, p), "utf8");
 
-const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconcile, workspace, projectTab, vercelConfig, watchChannels] = await Promise.all([
+const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconcile, refresh, workspace, projectTab, vercelConfig, watchChannels] = await Promise.all([
   source("sql/calendar-v3-bidirectional.sql"),
   source("../modulex-store/supabase/migrations/20260906113000_calendar_v3_bidirectional.sql"),
   source("src/lib/google-calendar/config.ts"),
@@ -15,6 +15,7 @@ const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconc
   source("src/app/api/admin/calendar/events/route.ts"),
   source("src/app/api/admin/calendar/google/webhook/route.ts"),
   source("src/app/api/admin/calendar/google/reconcile/route.ts"),
+  source("src/app/api/admin/calendar/google/refresh/route.ts"),
   source("src/components/calendar/AdminCalendarWorkspace.tsx"),
   source("src/components/customers/project-detail/ProjectCalendarTab.tsx"),
   source("vercel.json"),
@@ -58,6 +59,17 @@ assert.match(eventRoute, /requirePermission\(request, "calendar\.manage"\)/);
 assert.match(webhook, /x-goog-channel-id/i);
 assert.match(webhook, /x-goog-resource-id/i);
 assert.match(reconcile, /CRON_SECRET|cron/i);
+
+assert.match(refresh, /requirePermission\(request, "calendar\.view"\)/);
+assert.match(refresh, /getCompanyCalendarBinding/);
+assert.match(refresh, /last_sync_at/);
+assert.match(refresh, /OPEN_REFRESH_MIN_INTERVAL_MS/);
+assert.match(refresh, /flushCalendarOutboxBatch/);
+assert.match(refresh, /syncCompanyCalendarFromGoogle/);
+assert.match(refresh, /ensureCompanyCalendarWatch/);
+assert.match(workspace, /\/api\/admin\/calendar\/google\/refresh/);
+assert.match(workspace, /autoRefreshStartedRef/);
+
 assert.match(workspace, /@fullcalendar\/interaction/);
 assert.match(workspace, /eventDrop|eventResize|selectable/);
 assert.match(projectTab, /Show Calendar/);

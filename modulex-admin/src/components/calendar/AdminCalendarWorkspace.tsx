@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -127,6 +127,7 @@ export default function AdminCalendarWorkspace({
   const [discovery, setDiscovery] = useState<DiscoveryItem[]>([]);
   const [bindingCalendarId, setBindingCalendarId] = useState("");
   const [bindingOwnerId, setBindingOwnerId] = useState("");
+  const autoRefreshStartedRef = useRef(false);
 
   const queryProjectId = projectId ?? selectedProjectId;
 
@@ -158,6 +159,22 @@ export default function AdminCalendarWorkspace({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (autoRefreshStartedRef.current || !companyStatus?.binding?.sync_enabled) return;
+    autoRefreshStartedRef.current = true;
+    void (async () => {
+      try {
+        await authenticatedFetch("/api/admin/calendar/google/refresh", {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        await load();
+      } catch {
+        // Calendar opening must stay usable if background Google refresh is temporarily unavailable.
+      }
+    })();
+  }, [companyStatus?.binding?.sync_enabled, load]);
 
   const ownerOptions = useMemo(() => (snapshot?.owners ?? []).map((item) => ({ value: item.id, label: item.label })), [snapshot?.owners]);
   const projectOptions = useMemo(() => (snapshot?.projects ?? []).map((item) => ({ value: item.id, label: `${item.project_number} — ${item.name}` })), [snapshot?.projects]);
