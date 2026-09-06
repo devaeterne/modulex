@@ -15,10 +15,12 @@ const functionBlock = (source, qualifiedName) => {
 const adminSqlPath = "sql/a6-finance-ap-aging.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260906141000_a6_finance_ap_aging.sql";
 const vendorBillsSqlPath = "sql/a6-finance-vendor-bills.sql";
-for (const file of [adminSqlPath, migrationPath, vendorBillsSqlPath]) expect(exists(file), `Missing A6-F3F dependency/artifact: ${file}`);
+const paymentScheduleSqlPath = "sql/a6-finance-payment-schedule.sql";
+for (const file of [adminSqlPath, migrationPath, vendorBillsSqlPath, paymentScheduleSqlPath]) expect(exists(file), `Missing A6-F3F dependency/artifact: ${file}`);
 const sql = read(adminSqlPath);
 const migration = read(migrationPath);
 const vendorBillsSql = read(vendorBillsSqlPath);
+const paymentScheduleSql = read(paymentScheduleSqlPath);
 expect(sql === migration, "A6-F3F Admin SQL and migration must stay byte-identical");
 
 expect(!/create\s+table/i.test(sql), "F3F is projection-only and must not create a second AP balance ledger");
@@ -39,7 +41,6 @@ for (const rpc of ["get_ap_aging_page", "get_ap_aging_summary"]) {
 
 for (const source of [
   "vendor_invoices",
-  "vendor_payment_schedules",
   "finance_transactions",
   "finance_payment_instruments",
   "finance_transaction_links",
@@ -47,6 +48,7 @@ for (const source of [
 expect(/vendor_invoice_paid_amount/i.test(sql), "F3F must reuse canonical paid amount calculation");
 expect(/vendor_invoice_paid_amount[\s\S]*vendor_invoice_payment_allocations/i.test(vendorBillsSql) || /vendor_invoice_payment_allocations[\s\S]*vendor_invoice_paid_amount/i.test(vendorBillsSql), "Canonical Vendor Bill paid helper must remain derived from vendor_invoice_payment_allocations");
 expect(/vendor_invoice_planned_amount/i.test(sql), "F3F must reuse the canonical planned-payment helper rather than treating schedules as actual payments");
+expect(/vendor_invoice_planned_amount[\s\S]*vendor_payment_schedules/i.test(paymentScheduleSql) || /vendor_payment_schedules[\s\S]*vendor_invoice_planned_amount/i.test(paymentScheduleSql), "Canonical planned-payment helper must remain derived from vendor_payment_schedules");
 expect(/finance_base_currency/i.test(sql), "F3F main-currency totals must use the canonical Finance base currency");
 expect(/base_amount/i.test(sql) && /total_amount/i.test(sql), "F3F outstanding base projection must derive from stored bill FX/base snapshot");
 expect(/i\.status\s*=\s*'open'/i.test(sql), "AP Aging must include only open Vendor Bills");
