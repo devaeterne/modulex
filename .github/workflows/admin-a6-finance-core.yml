@@ -28,6 +28,7 @@ on:
       - "modulex-admin/scripts/a6-finance-purchasing-ap-integration-contract.mjs"
       - "modulex-admin/scripts/a6-finance-ap-aging-contract.mjs"
       - "modulex-admin/scripts/a6-finance-customer-receipts-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-ar-aging-contract.mjs"
       - "modulex-admin/scripts/finance-reports-ui-contract.mjs"
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
@@ -45,6 +46,7 @@ on:
       - "modulex-admin/sql/a6-finance-purchasing-ap-integration.sql"
       - "modulex-admin/sql/a6-finance-ap-aging.sql"
       - "modulex-admin/sql/a6-finance-customer-receipts.sql"
+      - "modulex-admin/sql/a6-finance-ar-aging.sql"
       - "modulex-admin/docs/acceptance/a6-f4-payroll-finance-integration.md"
       - "modulex-admin/docs/FINANCE_DOMAIN_PLAN.md"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
@@ -63,6 +65,7 @@ on:
       - "modulex-store/supabase/migrations/20260906114500_a6_finance_purchasing_ap_integration.sql"
       - "modulex-store/supabase/migrations/20260906141000_a6_finance_ap_aging.sql"
       - "modulex-store/supabase/migrations/20260906193000_a6_finance_customer_receipts.sql"
+      - "modulex-store/supabase/migrations/20260906214500_a6_finance_ar_aging.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
   pull_request:
     paths:
@@ -91,6 +94,7 @@ on:
       - "modulex-admin/scripts/a6-finance-purchasing-ap-integration-contract.mjs"
       - "modulex-admin/scripts/a6-finance-ap-aging-contract.mjs"
       - "modulex-admin/scripts/a6-finance-customer-receipts-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-ar-aging-contract.mjs"
       - "modulex-admin/scripts/finance-reports-ui-contract.mjs"
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
@@ -108,6 +112,7 @@ on:
       - "modulex-admin/sql/a6-finance-purchasing-ap-integration.sql"
       - "modulex-admin/sql/a6-finance-ap-aging.sql"
       - "modulex-admin/sql/a6-finance-customer-receipts.sql"
+      - "modulex-admin/sql/a6-finance-ar-aging.sql"
       - "modulex-admin/docs/acceptance/a6-f4-payroll-finance-integration.md"
       - "modulex-admin/docs/FINANCE_DOMAIN_PLAN.md"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
@@ -126,6 +131,7 @@ on:
       - "modulex-store/supabase/migrations/20260906114500_a6_finance_purchasing_ap_integration.sql"
       - "modulex-store/supabase/migrations/20260906141000_a6_finance_ap_aging.sql"
       - "modulex-store/supabase/migrations/20260906193000_a6_finance_customer_receipts.sql"
+      - "modulex-store/supabase/migrations/20260906214500_a6_finance_ar_aging.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
 
 concurrency:
@@ -158,4 +164,5 @@ jobs:
       - run: node scripts/a6-finance-purchasing-ap-integration-contract.mjs
       - run: node scripts/a6-finance-ap-aging-contract.mjs
       - run: node scripts/a6-finance-customer-receipts-contract.mjs
+      - run: node scripts/a6-finance-ar-aging-contract.mjs
       - run: node scripts/finance-reports-ui-contract.mjs
