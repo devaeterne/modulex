@@ -71,7 +71,7 @@ assert(
   "Projects create UI must derive projects.manage from the current user's full role set"
 );
 assert(
-  /\{canManageProjects\s*\?\s*\(\s*<ComponentCard title="Create Project"/.test(projectsWorkspace),
+  /\{canManageProjects\s*\?\s*\(\s*<ComponentCard\s+title="Create Project"/.test(projectsWorkspace),
   "Projects create UI must be hidden from projects.view-only users"
 );
 assert(

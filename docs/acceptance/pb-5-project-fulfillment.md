@@ -6,6 +6,7 @@ Current main incorporated: `190da5745fe2b6972deabff0d11c16263cd5c0f5`
 Final verified implementation head before this documentation-only closeout: `0d77c2c60acdbe53bc26b6613c0b886e66875d65`
 Draft PR: #296
 Production Supabase: `bzjoeernnmvuhzyvbowc`
+Status: COMPLETE / PRODUCTION VERIFIED
 
 ## Scope
 
@@ -153,34 +154,15 @@ Production schema inspection confirmed:
 
 All production queries used for this validation were read-only.
 
-## Supabase Advisor review
+## Production closeout — 2026-09-07
 
-Fresh Security and Performance Advisor scans were run on 2026-09-04 after final implementation verification.
+This supersedes the pre-merge production-boundary notes above.
 
-Because the PB-5 SQL/RPC has intentionally **not** been installed in production, there is no PB-5 production function for the Advisors to flag and no PB-5-specific Advisor finding was observed.
+- PR #296 is merged and production migration history contains `20260904125157 — customer_project_fulfillment_summary`.
+- Admin and Sales reads succeeded; a denied identity returned SQLSTATE `42501`.
+- Real production truth verified multiple Shipments, canonical Installation truth and cancelled-order inactive history.
+- Rollback fixtures verified Customer Pickup and partial delivery using valid Shipment transitions.
+- All acceptance mutations rolled back with zero residue.
+- Fresh Advisors show no PB-5-specific blocking finding; unrelated project-wide findings remain separate.
 
-Existing unrelated project-wide findings remain, including Store/Finance/support/auth SECURITY DEFINER or policy warnings and existing unindexed-FK / unused-index / permissive-policy performance backlog. PB-5 does not broaden scope to remediate those findings.
-
-## Production mutation status
-
-No PB-5 DDL, RPC, migration, data mutation or deployment was applied to production during implementation.
-
-`modulex-admin/sql/project-pb5-fulfillment-rollup.sql` is repository-only until the Project owner merges the PR and explicitly starts the separate production DB acceptance stage.
-
-## Post-merge DB acceptance plan
-
-After explicit owner approval:
-
-1. apply `project-pb5-fulfillment-rollup.sql` through the normal migration path;
-2. verify function ownership/search path and EXECUTE grants;
-3. run role acceptance for Admin, Sales and a denied non-fulfillment Project viewer;
-4. run rollback-only scenario coverage for multiple Shipments, partial delivery, Customer Pickup, multiple Installations and cancelled Order exclusion;
-5. rerun Security and Performance Advisors;
-6. deploy Admin only after DB acceptance passes;
-7. complete signed-in Project Fulfillment UI acceptance against the installed RPC.
-
-## Package boundary
-
-PB-5 does not modify Store/Portal projections and does not introduce Project-owned Finance tables, migrations or money-movement behavior.
-
-Next Project package after owner merge, DB acceptance and Admin deployment: **PB-6 — Participants & Commission Ledger**.
+**PB-5 status: COMPLETE / PRODUCTION VERIFIED.**
