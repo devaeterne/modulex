@@ -12,6 +12,48 @@ create unique index if not exists project_commission_events_event_sequence_uq
 create index if not exists project_commission_events_obligation_sequence_idx
   on public.project_commission_events(obligation_id, event_sequence desc);
 
+-- PB-6-owned foreign-key covering indexes observed as missing by the production
+-- Performance Advisor during closeout. Partial/created-at indexes do not cover
+-- these FK column prefixes for referential checks.
+create index if not exists project_commission_events_created_by_idx
+  on public.project_commission_events(created_by);
+
+create index if not exists project_commission_obligations_participant_project_idx
+  on public.project_commission_obligations(participant_id, project_id);
+
+create index if not exists project_commission_obligations_created_by_idx
+  on public.project_commission_obligations(created_by);
+
+create index if not exists project_commission_obligations_order_idx
+  on public.project_commission_obligations(order_id);
+
+create index if not exists project_commission_obligations_category_idx
+  on public.project_commission_obligations(product_category_id);
+
+create index if not exists project_commission_obligations_product_idx
+  on public.project_commission_obligations(product_id);
+
+create index if not exists project_participant_roles_created_by_idx
+  on public.project_participant_roles(created_by);
+
+create index if not exists project_participants_created_by_idx
+  on public.project_participants(created_by);
+
+create index if not exists project_participants_contact_idx
+  on public.project_participants(customer_contact_id);
+
+create index if not exists project_participants_employee_idx
+  on public.project_participants(employee_id);
+
+create index if not exists project_participants_profile_idx
+  on public.project_participants(profile_id);
+
+create index if not exists project_participants_role_idx
+  on public.project_participants(role_id);
+
+create index if not exists project_participants_updated_by_idx
+  on public.project_participants(updated_by);
+
 create or replace function private.current_project_commission_status(p_obligation_id uuid)
 returns text
 language sql
