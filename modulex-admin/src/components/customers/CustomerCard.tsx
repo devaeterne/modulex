@@ -16,6 +16,18 @@ import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { loadCustomerDocuments, loadCustomerRecord } from "@/lib/customers/read-dedup";
+import {
+  isValidCountryCode,
+  isValidCurrencyCode,
+  isValidEmail,
+  isValidHttpUrl,
+  isValidPhone,
+  normalizeCountryCode,
+  normalizeCurrencyCode,
+  normalizeEmail,
+  parseDbDecimal,
+  sanitizePhoneInput,
+} from "@/lib/validation";
 import type {
   Customer,
   CustomerActivity,
@@ -64,6 +76,11 @@ type AddressForm = {
   is_default_shipping: boolean;
 };
 
+type CustomerMasterFieldErrors = Partial<Record<"name" | "email" | "phone" | "website" | "country_code" | "currency_code", string>>;
+type ContactFieldErrors = Partial<Record<keyof Pick<ContactForm, "first_name" | "last_name" | "job_title" | "department" | "email" | "phone" | "mobile">, string>>;
+type AddressFieldErrors = Partial<Record<keyof Pick<AddressForm, "address_name" | "company_name" | "contact_name" | "address_line_1" | "address_line_2" | "postal_code" | "city" | "state_region" | "country_code" | "phone">, string>>;
+type CommercialFieldErrors = Partial<Record<"credit_limit" | "minimum_order_amount", string>>;
+
 const emptyContactForm = (): ContactForm => ({
   first_name: "", last_name: "", job_title: "", department: "", email: "", phone: "", mobile: "",
   is_primary: false, is_billing_contact: false, is_shipping_contact: false, is_order_contact: false,
@@ -82,10 +99,10 @@ function statusColor(status: CustomerStatus): "success" | "error" | "warning" | 
 }
 function titleCase(value: string) { return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()); }
 function dateTime(value: string | null | undefined) { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—"; }
-function optionalNumber(value: string | number | null | undefined) {
-  if (value === null || value === undefined || String(value).trim() === "") return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+
+function focusFirstInvalid<T extends string>(errors: Partial<Record<T, string>>, order: readonly T[], prefix: string) {
+  const firstInvalid = order.find((field) => Boolean(errors[field]));
+  if (firstInvalid) document.getElementById(`${prefix}-${firstInvalid}`)?.focus();
 }
 
 export default function CustomerCard() {
@@ -114,6 +131,10 @@ export default function CustomerCard() {
   const [contactForm, setContactForm] = useState<ContactForm>(emptyContactForm);
   const [addressForm, setAddressForm] = useState<AddressForm>(emptyAddressForm);
   const [noteForm, setNoteForm] = useState({ note: "", category: "", is_pinned: false });
+  const [customerMasterFieldErrors, setCustomerMasterFieldErrors] = useState<CustomerMasterFieldErrors>({});
+  const [contactFieldErrors, setContactFieldErrors] = useState<ContactFieldErrors>({});
+  const [addressFieldErrors, setAddressFieldErrors] = useState<AddressFieldErrors>({});
+  const [commercialFieldErrors, setCommercialFieldErrors] = useState<CommercialFieldErrors>({});
 
   const typeMap = useMemo(() => new Map(customerTypes.map((item) => [item.id, item.name])), [customerTypes]);
   const groupMap = useMemo(() => new Map(priceGroups.map((item) => [item.id, item.name])), [priceGroups]);
@@ -169,10 +190,30 @@ export default function CustomerCard() {
   }, [customerId]);
 
   function clearMessages() { setErrorMessage(null); setSuccessMessage(null); }
+  function clearMasterError(field: keyof CustomerMasterFieldErrors) { setCustomerMasterFieldErrors((current) => ({ ...current, [field]: undefined })); }
+  function clearContactError(field: keyof ContactFieldErrors) { setContactFieldErrors((current) => ({ ...current, [field]: undefined })); }
+  function clearAddressError(field: keyof AddressFieldErrors) { setAddressFieldErrors((current) => ({ ...current, [field]: undefined })); }
+  function clearCommercialError(field: keyof CommercialFieldErrors) { setCommercialFieldErrors((current) => ({ ...current, [field]: undefined })); }
 
   async function saveCustomerMaster() {
     if (!customer || !canEdit) return;
-    clearMessages(); setIsSaving(true);
+    clearMessages();
+    const errors: CustomerMasterFieldErrors = {};
+    if (!customer.name.trim()) errors.name = "Customer name is required.";
+    if (!isValidEmail(customer.email)) errors.email = "Enter a valid customer email address.";
+    if (!isValidPhone(customer.phone)) errors.phone = "Phone must contain 7 to 15 digits and cannot contain letters.";
+    if (!isValidHttpUrl(customer.website)) errors.website = "Enter a valid http or https URL.";
+    if (!isValidCountryCode(customer.country_code)) errors.country_code = "Country code must be a 2-letter ISO code.";
+    if (!customer.currency_code?.trim()) errors.currency_code = "Currency is required.";
+    else if (!isValidCurrencyCode(customer.currency_code)) errors.currency_code = "Currency must be a 3-letter ISO code.";
+    if (Object.keys(errors).length) {
+      setCustomerMasterFieldErrors(errors);
+      setErrorMessage("Correct the highlighted customer fields.");
+      focusFirstInvalid(errors, ["name", "email", "phone", "website", "country_code", "currency_code"], "customer-master");
+      return;
+    }
+    setCustomerMasterFieldErrors({});
+    setIsSaving(true);
     const { data, error } = await supabase.rpc("update_customer_master", {
       p_customer_id: customer.id,
       p_name: customer.name.trim(),
@@ -181,12 +222,12 @@ export default function CustomerCard() {
       p_status: customer.status,
       p_tax_number: customer.tax_number,
       p_registration_number: customer.registration_number,
-      p_email: customer.email,
-      p_phone: customer.phone,
-      p_website: customer.website,
-      p_country_code: customer.country_code,
+      p_email: normalizeEmail(customer.email ?? "") || null,
+      p_phone: customer.phone?.trim() || null,
+      p_website: customer.website?.trim() || null,
+      p_country_code: normalizeCountryCode(customer.country_code ?? "") || null,
       p_language_code: customer.language_code,
-      p_currency_code: customer.currency_code,
+      p_currency_code: normalizeCurrencyCode(customer.currency_code),
       p_sales_rep_id: customer.sales_rep_id,
       p_customer_since: customer.customer_since,
     });
@@ -200,9 +241,20 @@ export default function CustomerCard() {
 
   async function savePricing() {
     if (!customer || !canEdit) return;
-    clearMessages(); setIsSaving(true);
+    clearMessages();
+    const currency = normalizeCurrencyCode(customer.currency_code);
+    if (!customer.currency_code.trim() || !isValidCurrencyCode(customer.currency_code)) {
+      const errors: CustomerMasterFieldErrors = { currency_code: customer.currency_code.trim() ? "Currency must be a 3-letter ISO code." : "Currency is required." };
+      setCustomerMasterFieldErrors(errors);
+      setErrorMessage(errors.currency_code ?? "Enter a valid currency.");
+      const firstInvalid = "currency_code";
+      document.getElementById(`customer-pricing-${firstInvalid}`)?.focus();
+      return;
+    }
+    setCustomerMasterFieldErrors({});
+    setIsSaving(true);
     const desiredPriceGroupId = customer.price_group_id;
-    const { error: currencyError } = await supabase.from("customers").update({ currency_code: customer.currency_code }).eq("id", customer.id);
+    const { error: currencyError } = await supabase.from("customers").update({ currency_code: currency }).eq("id", customer.id);
     if (currencyError) { setErrorMessage(currencyError.message); setIsSaving(false); return; }
     const { data, error } = await supabase.rpc("request_customer_price_group_change", { p_customer_id: customer.id, p_price_group_id: desiredPriceGroupId });
     if (error) { setErrorMessage(error.message); setIsSaving(false); await loadData(); return; }
@@ -219,12 +271,25 @@ export default function CustomerCard() {
 
   async function saveCommercial() {
     if (!commercial || !canEdit) return;
-    clearMessages(); setIsSaving(true);
+    clearMessages();
+    const creditLimit = parseDbDecimal(commercial.credit_limit, { precision: 18, scale: 4, min: 0 });
+    const minimumOrder = parseDbDecimal(commercial.minimum_order_amount, { precision: 18, scale: 4, min: 0 });
+    const errors: CommercialFieldErrors = {};
+    if (creditLimit.error) errors.credit_limit = creditLimit.error;
+    if (minimumOrder.error) errors.minimum_order_amount = minimumOrder.error;
+    if (Object.keys(errors).length) {
+      setCommercialFieldErrors(errors);
+      setErrorMessage("Correct the highlighted commercial fields.");
+      focusFirstInvalid(errors, ["credit_limit", "minimum_order_amount"], "customer-commercial");
+      return;
+    }
+    setCommercialFieldErrors({});
+    setIsSaving(true);
     const { data, error } = await supabase.rpc("save_customer_commercial_settings", {
       p_customer_id: customerId,
       p_payment_term_id: commercial.payment_term_id,
-      p_credit_limit: optionalNumber(commercial.credit_limit),
-      p_minimum_order_amount: optionalNumber(commercial.minimum_order_amount),
+      p_credit_limit: creditLimit.value,
+      p_minimum_order_amount: minimumOrder.value,
       p_tax_exempt: commercial.tax_exempt,
       p_tax_exemption_number: commercial.tax_exemption_number?.trim() || null,
       p_credit_hold: commercial.credit_hold,
@@ -246,6 +311,7 @@ export default function CustomerCard() {
 
   function editContact(contact: CustomerContact) {
     setEditingContactId(contact.id);
+    setContactFieldErrors({});
     setContactForm({
       first_name: contact.first_name,
       last_name: contact.last_name ?? "",
@@ -261,18 +327,30 @@ export default function CustomerCard() {
     });
   }
 
-  function cancelContactEdit() { setEditingContactId(null); setContactForm(emptyContactForm()); }
+  function cancelContactEdit() { setEditingContactId(null); setContactForm(emptyContactForm()); setContactFieldErrors({}); }
 
   async function saveContact() {
-    if (!contactForm.first_name.trim()) return setErrorMessage("First name is required.");
-    clearMessages(); setIsSaving(true);
+    clearMessages();
+    const errors: ContactFieldErrors = {};
+    if (!contactForm.first_name.trim()) errors.first_name = "First name is required.";
+    if (!isValidEmail(contactForm.email)) errors.email = "Enter a valid contact email address.";
+    if (!isValidPhone(contactForm.phone)) errors.phone = "Phone must contain 7 to 15 digits and cannot contain letters.";
+    if (!isValidPhone(contactForm.mobile)) errors.mobile = "Mobile must contain 7 to 15 digits and cannot contain letters.";
+    if (Object.keys(errors).length) {
+      setContactFieldErrors(errors);
+      setErrorMessage("Correct the highlighted contact fields.");
+      focusFirstInvalid(errors, ["first_name", "email", "phone", "mobile"], "customer-contact");
+      return;
+    }
+    setContactFieldErrors({});
+    setIsSaving(true);
     const params = {
       p_customer_id: customerId,
       p_first_name: contactForm.first_name.trim(),
       p_last_name: contactForm.last_name.trim() || null,
       p_job_title: contactForm.job_title.trim() || null,
       p_department: contactForm.department.trim() || null,
-      p_email: contactForm.email.trim() || null,
+      p_email: normalizeEmail(contactForm.email) || null,
       p_phone: contactForm.phone.trim() || null,
       p_mobile: contactForm.mobile.trim() || null,
       p_is_primary: contactForm.is_primary,
@@ -280,13 +358,14 @@ export default function CustomerCard() {
       p_is_shipping_contact: contactForm.is_shipping_contact,
       p_is_order_contact: contactForm.is_order_contact,
     };
+    const wasEditing = Boolean(editingContactId);
     const result = editingContactId
       ? await supabase.rpc("update_customer_contact", { ...params, p_contact_id: editingContactId })
       : await supabase.rpc("create_customer_contact", params);
     if (result.error) { setErrorMessage(result.error.message); setIsSaving(false); return; }
     cancelContactEdit();
     await loadData();
-    setSuccessMessage(editingContactId ? "Contact updated." : "Contact added.");
+    setSuccessMessage(wasEditing ? "Contact updated." : "Contact added.");
     setIsSaving(false);
   }
 
@@ -308,6 +387,7 @@ export default function CustomerCard() {
 
   function editAddress(address: CustomerAddress) {
     setEditingAddressId(address.id);
+    setAddressFieldErrors({});
     setAddressForm({
       address_name: address.address_name,
       company_name: address.company_name ?? "",
@@ -325,11 +405,25 @@ export default function CustomerCard() {
     });
   }
 
-  function cancelAddressEdit() { setEditingAddressId(null); setAddressForm(emptyAddressForm()); }
+  function cancelAddressEdit() { setEditingAddressId(null); setAddressForm(emptyAddressForm()); setAddressFieldErrors({}); }
 
   async function saveAddress() {
-    if (!addressForm.address_name.trim() || !addressForm.address_line_1.trim() || !addressForm.city.trim() || addressForm.country_code.trim().length !== 2) return setErrorMessage("Address name, address line, city and 2-letter country code are required.");
-    clearMessages(); setIsSaving(true);
+    clearMessages();
+    const errors: AddressFieldErrors = {};
+    if (!addressForm.address_name.trim()) errors.address_name = "Address name is required.";
+    if (!addressForm.address_line_1.trim()) errors.address_line_1 = "Address line 1 is required.";
+    if (!addressForm.city.trim()) errors.city = "City is required.";
+    if (!addressForm.country_code.trim()) errors.country_code = "Country code is required.";
+    else if (!isValidCountryCode(addressForm.country_code)) errors.country_code = "Country code must be a 2-letter ISO code.";
+    if (!isValidPhone(addressForm.phone)) errors.phone = "Phone must contain 7 to 15 digits and cannot contain letters.";
+    if (Object.keys(errors).length) {
+      setAddressFieldErrors(errors);
+      setErrorMessage("Correct the highlighted address fields.");
+      focusFirstInvalid(errors, ["address_name", "address_line_1", "city", "country_code", "phone"], "customer-address");
+      return;
+    }
+    setAddressFieldErrors({});
+    setIsSaving(true);
     const params = {
       p_customer_id: customerId,
       p_address_name: addressForm.address_name.trim(),
@@ -340,18 +434,19 @@ export default function CustomerCard() {
       p_postal_code: addressForm.postal_code.trim() || null,
       p_city: addressForm.city.trim(),
       p_state_region: addressForm.state_region.trim() || null,
-      p_country_code: addressForm.country_code.trim().toUpperCase(),
+      p_country_code: normalizeCountryCode(addressForm.country_code),
       p_phone: addressForm.phone.trim() || null,
       p_address_type: addressForm.address_type,
       p_is_default_billing: addressForm.is_default_billing,
       p_is_default_shipping: addressForm.is_default_shipping,
     };
+    const wasEditing = Boolean(editingAddressId);
     const result = editingAddressId
       ? await supabase.rpc("update_customer_address", { ...params, p_address_id: editingAddressId })
       : await supabase.rpc("create_customer_address", params);
     if (result.error) { setErrorMessage(result.error.message); setIsSaving(false); return; }
     cancelAddressEdit();
-    await loadData(); setSuccessMessage(editingAddressId ? "Address updated." : "Address added."); setIsSaving(false);
+    await loadData(); setSuccessMessage(wasEditing ? "Address updated." : "Address added."); setIsSaving(false);
   }
 
   async function setAddressDefault(addressId: string, defaultKind: "billing" | "shipping") {
@@ -397,65 +492,42 @@ export default function CustomerCard() {
 
     {activeTab === "General" && <Section title="General Information" description="Core customer identity and account status."><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <Field label="Customer Code"><Input value={customer.customer_code} disabled /></Field>
-      <Field label="Company / Customer Name"><Input value={customer.name} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} /></Field>
+      <Field label="Company / Customer Name"><Input id="customer-master-name" value={customer.name} disabled={!canEdit} error={Boolean(customerMasterFieldErrors.name)} hint={customerMasterFieldErrors.name} onChange={(e) => { clearMasterError("name"); setCustomer({ ...customer, name: e.target.value }); }} /></Field>
       <Field label="Legal Name"><Input value={customer.legal_name ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, legal_name: e.target.value || null })} /></Field>
       <Field label="Customer Type"><Select value={customer.customer_type_id ?? ""} disabled={!canEdit} onChange={(value) => setCustomer({ ...customer, customer_type_id: value || null })} options={customerTypes.map((item) => ({ value: item.id, label: item.name }))} placeholder="None" allowEmpty /></Field>
       <Field label="Status"><Select value={customer.status} disabled={!canEdit} onChange={(value) => setCustomer({ ...customer, status: value as CustomerStatus })} options={(["active", "prospect", "inactive", "blocked"] as CustomerStatus[]).map((value) => ({ value, label: titleCase(value) }))} /></Field>
       <Field label="Customer Since"><Input type="date" value={customer.customer_since ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, customer_since: e.target.value || null })} /></Field>
       <Field label="Tax / VAT Number"><Input value={customer.tax_number ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, tax_number: e.target.value || null })} /></Field>
       <Field label="Registration Number"><Input value={customer.registration_number ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, registration_number: e.target.value || null })} /></Field>
-      <Field label="Country Code"><Input maxLength={2} value={customer.country_code ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, country_code: e.target.value.toUpperCase() || null })} /></Field>
-      <Field label="Primary Email"><Input type="email" value={customer.email ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, email: e.target.value || null })} /></Field>
-      <Field label="Primary Phone"><Input value={customer.phone ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, phone: e.target.value || null })} /></Field>
-      <Field label="Website"><Input value={customer.website ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, website: e.target.value || null })} /></Field>
+      <Field label="Country Code"><Input id="customer-master-country_code" maxLength={2} value={customer.country_code ?? ""} disabled={!canEdit} error={Boolean(customerMasterFieldErrors.country_code)} hint={customerMasterFieldErrors.country_code} onChange={(e) => { clearMasterError("country_code"); setCustomer({ ...customer, country_code: normalizeCountryCode(e.target.value) || null }); }} /></Field>
+      <Field label="Primary Email"><Input id="customer-master-email" type="email" value={customer.email ?? ""} disabled={!canEdit} error={Boolean(customerMasterFieldErrors.email)} hint={customerMasterFieldErrors.email} onChange={(e) => { clearMasterError("email"); setCustomer({ ...customer, email: e.target.value || null }); }} /></Field>
+      <Field label="Primary Phone"><Input id="customer-master-phone" type="tel" value={customer.phone ?? ""} disabled={!canEdit} error={Boolean(customerMasterFieldErrors.phone)} hint={customerMasterFieldErrors.phone} onChange={(e) => { clearMasterError("phone"); setCustomer({ ...customer, phone: sanitizePhoneInput(e.target.value) || null }); }} /></Field>
+      <Field label="Website"><Input id="customer-master-website" type="url" value={customer.website ?? ""} disabled={!canEdit} error={Boolean(customerMasterFieldErrors.website)} hint={customerMasterFieldErrors.website} onChange={(e) => { clearMasterError("website"); setCustomer({ ...customer, website: e.target.value || null }); }} /></Field>
       <Field label="Language"><Input value={customer.language_code} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, language_code: e.target.value })} /></Field>
-      <Field label="Currency"><Input maxLength={3} value={customer.currency_code} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, currency_code: e.target.value.toUpperCase() })} /></Field>
+      <Field label="Currency"><Input id="customer-master-currency_code" maxLength={3} value={customer.currency_code} disabled={!canEdit} error={Boolean(customerMasterFieldErrors.currency_code)} hint={customerMasterFieldErrors.currency_code} onChange={(e) => { clearMasterError("currency_code"); setCustomer({ ...customer, currency_code: normalizeCurrencyCode(e.target.value) }); }} /></Field>
       <Field label="Sales Representative"><Select value={customer.sales_rep_id ?? ""} disabled={!canEdit} onChange={(value) => setCustomer({ ...customer, sales_rep_id: value || null })} options={profiles.filter((item) => ["super_admin", "admin", "sales"].includes(item.role)).map((item) => ({ value: item.id, label: item.full_name || item.email || "" }))} placeholder="Unassigned" allowEmpty /></Field>
-    </div>{canEdit && <div className="mt-5 flex justify-end"><Button disabled={isSaving || !customer.name.trim()} onClick={() => void saveCustomerMaster()}>{isSaving ? "Saving..." : "Save General"}</Button></div>}</Section>}
+    </div>{canEdit && <div className="mt-5 flex justify-end"><Button disabled={isSaving} onClick={() => void saveCustomerMaster()}>{isSaving ? "Saving..." : "Save General"}</Button></div>}</Section>}
 
-    {activeTab === "Contacts" && <Section title="Contacts" description="People associated with this customer account. Deactivation preserves historical references."><div className="grid gap-3 lg:grid-cols-2">{contacts.map((contact) => <Card key={contact.id}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{contact.first_name} {contact.last_name}</h3>{contact.is_primary && <Badge>Primary</Badge>}</div><p className="mt-1 text-sm">{[contact.job_title, contact.department].filter(Boolean).join(" • ") || "No role"}</p><p className="mt-3 text-sm">{contact.email || "—"}</p><p className="text-sm">{contact.mobile || contact.phone || "—"}</p><div className="mt-3 flex flex-wrap gap-1">{contact.is_billing_contact && <Badge>Billing</Badge>}{contact.is_shipping_contact && <Badge>Shipping</Badge>}{contact.is_order_contact && <Badge>Orders</Badge>}</div></div>{canEdit && <div className="flex flex-wrap justify-end gap-2">{!contact.is_primary && <Button disabled={isSaving} onClick={() => void setPrimaryContact(contact.id)} variant="outline">Set Primary</Button>}<Button disabled={isSaving} onClick={() => editContact(contact)} variant="outline">Edit</Button><Button disabled={isSaving} onClick={() => void removeContact(contact.id)} variant="danger">Deactivate</Button></div>}</div></Card>)}</div>{canEdit && <div className="mt-5 border p-4"><h3 className="mb-4 text-sm font-semibold">{editingContactId ? "Edit Contact" : "Add Contact"}</h3><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{(["first_name", "last_name", "job_title", "department", "email", "phone", "mobile"] as const).map((key) => <Field key={key} label={titleCase(key)}><Input value={contactForm[key]} onChange={(e) => setContactForm({ ...contactForm, [key]: e.target.value })} /></Field>)}</div><div className="mt-4 flex flex-wrap gap-4"><Check label="Primary" checked={contactForm.is_primary} onChange={(v) => setContactForm({ ...contactForm, is_primary: v })} /><Check label="Billing" checked={contactForm.is_billing_contact} onChange={(v) => setContactForm({ ...contactForm, is_billing_contact: v })} /><Check label="Shipping" checked={contactForm.is_shipping_contact} onChange={(v) => setContactForm({ ...contactForm, is_shipping_contact: v })} /><Check label="Orders" checked={contactForm.is_order_contact} onChange={(v) => setContactForm({ ...contactForm, is_order_contact: v })} /></div><div className="mt-4 flex justify-end gap-2">{editingContactId && <Button onClick={cancelContactEdit} variant="outline">Cancel</Button>}<Button onClick={() => void saveContact()} disabled={isSaving}>{editingContactId ? "Save Contact" : "Add Contact"}</Button></div></div>}</Section>}
+    {activeTab === "Contacts" && <Section title="Contacts" description="People associated with this customer account. Deactivation preserves historical references."><div className="grid gap-3 lg:grid-cols-2">{contacts.map((contact) => <Card key={contact.id}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{contact.first_name} {contact.last_name}</h3>{contact.is_primary && <Badge>Primary</Badge>}</div><p className="mt-1 text-sm">{[contact.job_title, contact.department].filter(Boolean).join(" • ") || "No role"}</p><p className="mt-3 text-sm">{contact.email || "—"}</p><p className="text-sm">{contact.mobile || contact.phone || "—"}</p><div className="mt-3 flex flex-wrap gap-1">{contact.is_billing_contact && <Badge>Billing</Badge>}{contact.is_shipping_contact && <Badge>Shipping</Badge>}{contact.is_order_contact && <Badge>Orders</Badge>}</div></div>{canEdit && <div className="flex flex-wrap justify-end gap-2">{!contact.is_primary && <Button disabled={isSaving} onClick={() => void setPrimaryContact(contact.id)} variant="outline">Set Primary</Button>}<Button disabled={isSaving} onClick={() => editContact(contact)} variant="outline">Edit</Button><Button disabled={isSaving} onClick={() => void removeContact(contact.id)} variant="danger">Deactivate</Button></div>}</div></Card>)}</div>{canEdit && <div className="mt-5 border p-4"><h3 className="mb-4 text-sm font-semibold">{editingContactId ? "Edit Contact" : "Add Contact"}</h3><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{(["first_name", "last_name", "job_title", "department", "email", "phone", "mobile"] as const).map((key) => <Field key={key} label={titleCase(key)}><Input id={`customer-contact-${key}`} type={key === "email" ? "email" : key === "phone" || key === "mobile" ? "tel" : "text"} value={contactForm[key]} error={Boolean(contactFieldErrors[key])} hint={contactFieldErrors[key]} onChange={(e) => { clearContactError(key); setContactForm({ ...contactForm, [key]: key === "phone" || key === "mobile" ? sanitizePhoneInput(e.target.value) : e.target.value }); }} /></Field>)}</div><div className="mt-4 flex flex-wrap gap-4"><Check label="Primary" checked={contactForm.is_primary} onChange={(v) => setContactForm({ ...contactForm, is_primary: v })} /><Check label="Billing" checked={contactForm.is_billing_contact} onChange={(v) => setContactForm({ ...contactForm, is_billing_contact: v })} /><Check label="Shipping" checked={contactForm.is_shipping_contact} onChange={(v) => setContactForm({ ...contactForm, is_shipping_contact: v })} /><Check label="Orders" checked={contactForm.is_order_contact} onChange={(v) => setContactForm({ ...contactForm, is_order_contact: v })} /></div><div className="mt-4 flex justify-end gap-2">{editingContactId && <Button onClick={cancelContactEdit} variant="outline">Cancel</Button>}<Button onClick={() => void saveContact()} disabled={isSaving}>{editingContactId ? "Save Contact" : "Add Contact"}</Button></div></div>}</Section>}
 
-    {activeTab === "Pricing" && <Section title="Pricing" description="Customer-specific price group assignment."><div className="grid gap-4 md:grid-cols-2"><Field label="Default Price Group"><Select value={customer.price_group_id ?? ""} disabled={!canEdit} onChange={(value) => setCustomer({ ...customer, price_group_id: value || null })} options={priceGroups.map((item) => ({ value: item.id, label: `${item.name}${item.is_base_price ? " (Base)" : ""}${item.requires_approval ? " · Approval" : ""}` }))} placeholder="No price group" allowEmpty /></Field><Field label="Currency"><Input value={customer.currency_code} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, currency_code: e.target.value.toUpperCase() })} /></Field></div><Alert variant="info" title="Pricing assignment" message="Store pricing resolves from the assigned order-eligible price group. For Sales users, changing the default price group is submitted to Admin approval; internal Cost pricing cannot be assigned." />{canEdit && <div className="mt-5 flex justify-end"><Button onClick={() => void savePricing()} disabled={isSaving}>{isSaving ? "Saving..." : "Save Pricing"}</Button></div>}</Section>}
+    {activeTab === "Pricing" && <Section title="Pricing" description="Customer-specific price group assignment."><div className="grid gap-4 md:grid-cols-2"><Field label="Default Price Group"><Select value={customer.price_group_id ?? ""} disabled={!canEdit} onChange={(value) => setCustomer({ ...customer, price_group_id: value || null })} options={priceGroups.map((item) => ({ value: item.id, label: `${item.name}${item.is_base_price ? " (Base)" : ""}${item.requires_approval ? " · Approval" : ""}` }))} placeholder="No price group" allowEmpty /></Field><Field label="Currency"><Input id="customer-pricing-currency_code" maxLength={3} value={customer.currency_code} disabled={!canEdit} error={Boolean(customerMasterFieldErrors.currency_code)} hint={customerMasterFieldErrors.currency_code} onChange={(e) => { clearMasterError("currency_code"); setCustomer({ ...customer, currency_code: normalizeCurrencyCode(e.target.value) }); }} /></Field></div><Alert variant="info" title="Pricing assignment" message="Store pricing resolves from the assigned order-eligible price group. For Sales users, changing the default price group is submitted to Admin approval; internal Cost pricing cannot be assigned." />{canEdit && <div className="mt-5 flex justify-end"><Button onClick={() => void savePricing()} disabled={isSaving}>{isSaving ? "Saving..." : "Save Pricing"}</Button></div>}</Section>}
 
     {activeTab === "Addresses" && <Section title="Billing & Shipping Addresses" description="Multiple operational addresses with atomic billing and shipping defaults. Deactivation preserves order snapshots.">
       <div className="grid gap-3 lg:grid-cols-2">
-        {addresses.map((address) => <Card key={address.id}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-semibold">{address.address_name}</h3>
-                <Badge>{titleCase(address.address_type)}</Badge>
-                {address.is_default_billing && <Badge>Default Billing</Badge>}
-                {address.is_default_shipping && <Badge>Default Shipping</Badge>}
-              </div>
-              <p className="mt-3 text-sm">{address.address_line_1}{address.address_line_2 ? `, ${address.address_line_2}` : ""}</p>
-              <p className="text-sm">{[address.postal_code, address.city, address.state_region, address.country_code].filter(Boolean).join(", ")}</p>
-              <p className="mt-2 text-xs">{address.contact_name || address.phone || ""}</p>
-            </div>
-            {canEdit && <div className="flex max-w-[260px] flex-wrap justify-end gap-2">
-              {!address.is_default_billing && address.address_type !== "shipping" && <Button disabled={isSaving} onClick={() => void setAddressDefault(address.id, "billing")} variant="outline">Set Billing Default</Button>}
-              {!address.is_default_shipping && address.address_type !== "billing" && <Button disabled={isSaving} onClick={() => void setAddressDefault(address.id, "shipping")} variant="outline">Set Shipping Default</Button>}
-              <Button disabled={isSaving} onClick={() => editAddress(address)} variant="outline">Edit</Button>
-              <Button disabled={isSaving} onClick={() => void removeAddress(address.id)} variant="danger">Deactivate</Button>
-            </div>}
-          </div>
-        </Card>)}
+        {addresses.map((address) => <Card key={address.id}><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">{address.address_name}</h3><Badge>{titleCase(address.address_type)}</Badge>{address.is_default_billing && <Badge>Default Billing</Badge>}{address.is_default_shipping && <Badge>Default Shipping</Badge>}</div><p className="mt-3 text-sm">{address.address_line_1}{address.address_line_2 ? `, ${address.address_line_2}` : ""}</p><p className="text-sm">{[address.postal_code, address.city, address.state_region, address.country_code].filter(Boolean).join(", ")}</p><p className="mt-2 text-xs">{address.contact_name || address.phone || ""}</p></div>{canEdit && <div className="flex max-w-[260px] flex-wrap justify-end gap-2">{!address.is_default_billing && address.address_type !== "shipping" && <Button disabled={isSaving} onClick={() => void setAddressDefault(address.id, "billing")} variant="outline">Set Billing Default</Button>}{!address.is_default_shipping && address.address_type !== "billing" && <Button disabled={isSaving} onClick={() => void setAddressDefault(address.id, "shipping")} variant="outline">Set Shipping Default</Button>}<Button disabled={isSaving} onClick={() => editAddress(address)} variant="outline">Edit</Button><Button disabled={isSaving} onClick={() => void removeAddress(address.id)} variant="danger">Deactivate</Button></div>}</div></Card>)}
       </div>
       {canEdit && <div className="mt-5 border p-4">
         <h3 className="mb-4 text-sm font-semibold">{editingAddressId ? "Edit Address" : "Add Address"}</h3>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {(["address_name", "company_name", "contact_name", "address_line_1", "address_line_2", "postal_code", "city", "state_region", "country_code", "phone"] as const).map((key) => <Field key={key} label={titleCase(key)}><Input value={addressForm[key]} maxLength={key === "country_code" ? 2 : undefined} onChange={(e) => setAddressForm({ ...addressForm, [key]: key === "country_code" ? e.target.value.toUpperCase() : e.target.value })} /></Field>)}
+          {(["address_name", "company_name", "contact_name", "address_line_1", "address_line_2", "postal_code", "city", "state_region", "country_code", "phone"] as const).map((key) => <Field key={key} label={titleCase(key)}><Input id={`customer-address-${key}`} type={key === "phone" ? "tel" : "text"} value={addressForm[key]} maxLength={key === "country_code" ? 2 : undefined} error={Boolean(addressFieldErrors[key])} hint={addressFieldErrors[key]} onChange={(e) => { clearAddressError(key); setAddressForm({ ...addressForm, [key]: key === "country_code" ? normalizeCountryCode(e.target.value) : key === "phone" ? sanitizePhoneInput(e.target.value) : e.target.value }); }} /></Field>)}
           <Field label="Address Type"><Select value={addressForm.address_type} onChange={(value) => { const addressType = value as "billing" | "shipping" | "both"; setAddressForm({ ...addressForm, address_type: addressType, is_default_billing: addressType === "shipping" ? false : addressForm.is_default_billing, is_default_shipping: addressType === "billing" ? false : addressForm.is_default_shipping }); }} options={[{ value: "billing", label: "Billing" }, { value: "shipping", label: "Shipping" }, { value: "both", label: "Both" }]} /></Field>
         </div>
-        <div className="mt-4 flex gap-4">
-          {addressForm.address_type !== "shipping" && <Check label="Default Billing" checked={addressForm.is_default_billing} onChange={(v) => setAddressForm({ ...addressForm, is_default_billing: v })} />}
-          {addressForm.address_type !== "billing" && <Check label="Default Shipping" checked={addressForm.is_default_shipping} onChange={(v) => setAddressForm({ ...addressForm, is_default_shipping: v })} />}
-        </div>
+        <div className="mt-4 flex gap-4">{addressForm.address_type !== "shipping" && <Check label="Default Billing" checked={addressForm.is_default_billing} onChange={(v) => setAddressForm({ ...addressForm, is_default_billing: v })} />}{addressForm.address_type !== "billing" && <Check label="Default Shipping" checked={addressForm.is_default_shipping} onChange={(v) => setAddressForm({ ...addressForm, is_default_shipping: v })} />}</div>
         <div className="mt-4 flex justify-end gap-2">{editingAddressId && <Button onClick={cancelAddressEdit} variant="outline">Cancel</Button>}<Button onClick={() => void saveAddress()} disabled={isSaving}>{editingAddressId ? "Save Address" : "Add Address"}</Button></div>
       </div>}
     </Section>}
 
-    {activeTab === "Commercial" && commercial && <Section title="Commercial" description="Payment terms, limits and order controls. Protected changes made by Sales require Admin approval."><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><Field label="Payment Terms"><Select value={commercial.payment_term_id ?? ""} disabled={!canEdit} onChange={(value) => setCommercial({ ...commercial, payment_term_id: value || null })} options={paymentTerms.map((item) => ({ value: item.id, label: item.name }))} placeholder="None" allowEmpty /></Field><Field label="Credit Limit"><Input type="number" min="0" step="0.01" value={commercial.credit_limit ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, credit_limit: e.target.value || null })} /></Field><Field label="Minimum Order"><Input type="number" min="0" step="0.01" value={commercial.minimum_order_amount ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, minimum_order_amount: e.target.value || null })} /></Field><Field label="Tax Exemption Number"><Input value={commercial.tax_exemption_number ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, tax_exemption_number: e.target.value || null })} /></Field><Field label="Credit Hold Reason"><Input value={commercial.credit_hold_reason ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, credit_hold_reason: e.target.value || null })} /></Field></div><div className="mt-4 flex gap-5"><Check label="Tax Exempt" checked={commercial.tax_exempt} disabled={!canEdit} onChange={(v) => setCommercial({ ...commercial, tax_exempt: v })} /><Check label="Credit Hold" checked={commercial.credit_hold} disabled={!canEdit} onChange={(v) => setCommercial({ ...commercial, credit_hold: v })} /></div><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Discount Notes"><TextArea value={commercial.discount_notes ?? ""} disabled={!canEdit} onChange={(value) => setCommercial({ ...commercial, discount_notes: value || null })} /></Field><Field label="Order Notes"><TextArea value={commercial.order_notes ?? ""} disabled={!canEdit} onChange={(value) => setCommercial({ ...commercial, order_notes: value || null })} /></Field></div>{canEdit && <div className="mt-5 flex justify-end"><Button onClick={() => void saveCommercial()} disabled={isSaving}>{isSaving ? "Saving..." : "Save Commercial"}</Button></div>}</Section>}
+    {activeTab === "Commercial" && commercial && <Section title="Commercial" description="Payment terms, limits and order controls. Protected changes made by Sales require Admin approval."><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"><Field label="Payment Terms"><Select value={commercial.payment_term_id ?? ""} disabled={!canEdit} onChange={(value) => setCommercial({ ...commercial, payment_term_id: value || null })} options={paymentTerms.map((item) => ({ value: item.id, label: item.name }))} placeholder="None" allowEmpty /></Field><Field label="Credit Limit"><Input id="customer-commercial-credit_limit" type="number" min="0" step="0.0001" value={commercial.credit_limit ?? ""} disabled={!canEdit} error={Boolean(commercialFieldErrors.credit_limit)} hint={commercialFieldErrors.credit_limit} onChange={(e) => { clearCommercialError("credit_limit"); setCommercial({ ...commercial, credit_limit: e.target.value || null }); }} /></Field><Field label="Minimum Order"><Input id="customer-commercial-minimum_order_amount" type="number" min="0" step="0.0001" value={commercial.minimum_order_amount ?? ""} disabled={!canEdit} error={Boolean(commercialFieldErrors.minimum_order_amount)} hint={commercialFieldErrors.minimum_order_amount} onChange={(e) => { clearCommercialError("minimum_order_amount"); setCommercial({ ...commercial, minimum_order_amount: e.target.value || null }); }} /></Field><Field label="Tax Exemption Number"><Input value={commercial.tax_exemption_number ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, tax_exemption_number: e.target.value || null })} /></Field><Field label="Credit Hold Reason"><Input value={commercial.credit_hold_reason ?? ""} disabled={!canEdit} onChange={(e) => setCommercial({ ...commercial, credit_hold_reason: e.target.value || null })} /></Field></div><div className="mt-4 flex gap-5"><Check label="Tax Exempt" checked={commercial.tax_exempt} disabled={!canEdit} onChange={(v) => setCommercial({ ...commercial, tax_exempt: v })} /><Check label="Credit Hold" checked={commercial.credit_hold} disabled={!canEdit} onChange={(v) => setCommercial({ ...commercial, credit_hold: v })} /></div><div className="mt-4 grid gap-4 md:grid-cols-2"><Field label="Discount Notes"><TextArea value={commercial.discount_notes ?? ""} disabled={!canEdit} onChange={(value) => setCommercial({ ...commercial, discount_notes: value || null })} /></Field><Field label="Order Notes"><TextArea value={commercial.order_notes ?? ""} disabled={!canEdit} onChange={(value) => setCommercial({ ...commercial, order_notes: value || null })} /></Field></div>{canEdit && <div className="mt-5 flex justify-end"><Button onClick={() => void saveCommercial()} disabled={isSaving}>{isSaving ? "Saving..." : "Save Commercial"}</Button></div>}</Section>}
 
     {activeTab === "Notes & Documents" && <Section title="Notes & Documents" description="Internal customer notes and document metadata."><div className="grid gap-6 xl:grid-cols-2"><div><h3 className="mb-3 text-sm font-semibold">Notes</h3><div className="space-y-3">{notes.map((note) => <Card key={note.id}><div className="flex items-start justify-between gap-3"><div>{note.is_pinned && <Badge>Pinned</Badge>}<p className="mt-2 whitespace-pre-wrap text-sm">{note.note}</p><p className="mt-2 text-xs">{note.category || "General"} • {dateTime(note.created_at)}</p></div>{canEdit && <Button onClick={() => void removeNote(note.id)} variant="danger">Remove</Button>}</div></Card>)}</div>{canEdit && <div className="mt-4 border p-4"><Field label="New Note"><TextArea value={noteForm.note} onChange={(value) => setNoteForm({ ...noteForm, note: value })} /></Field><div className="mt-3 grid gap-3 md:grid-cols-2"><Field label="Category"><Input value={noteForm.category} onChange={(e) => setNoteForm({ ...noteForm, category: e.target.value })} /></Field><div className="flex items-end pb-2"><Check label="Pin note" checked={noteForm.is_pinned} onChange={(v) => setNoteForm({ ...noteForm, is_pinned: v })} /></div></div><div className="mt-3 flex justify-end"><Button onClick={() => void addNote()}>Add Note</Button></div></div>}</div><div><h3 className="mb-3 text-sm font-semibold">Documents</h3><div className="space-y-3">{documents.length === 0 ? <div className="border border-dashed p-6 text-center text-sm">No documents uploaded yet.</div> : documents.map((document) => <Card key={document.id}><p className="font-medium">{document.file_name}</p><p className="mt-1 text-xs">{document.document_type || "Document"} • {dateTime(document.created_at)}</p><p className="mt-2 break-all text-xs">{document.storage_path}</p></Card>)}</div><div className="mt-4 border p-4 text-xs leading-5">Document metadata is managed by the dedicated Customer Documents panel on this page.</div></div></div></Section>}
 

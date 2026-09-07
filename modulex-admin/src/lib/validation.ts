@@ -56,6 +56,14 @@ function canonicalParts(value: string): string {
   return `${integer === "-0" ? "0" : integer}${trimmedFraction ? `.${trimmedFraction}` : ""}`;
 }
 
+function alignDecimalParts(left: DecimalParts, right: DecimalParts) {
+  const scale = Math.max(left.scale, right.scale);
+  return {
+    left: left.coefficient * BigInt(10) ** BigInt(scale - left.scale),
+    right: right.coefficient * BigInt(10) ** BigInt(scale - right.scale),
+  };
+}
+
 export function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
@@ -182,6 +190,22 @@ export function canonicalizeDbDecimal(
 ) {
   const parsed = parseDbDecimal(value, contract);
   return parsed.error || parsed.value === null ? "" : canonicalParts(parsed.value);
+}
+
+/** Exact DB-decimal comparison. Returns null if either side is invalid. */
+export function compareDbDecimal(
+  left: string | number | null | undefined,
+  right: string | number | null | undefined,
+  contract: DecimalValidation
+): -1 | 0 | 1 | null {
+  const parsedLeft = parseDbDecimal(left, contract);
+  const parsedRight = parseDbDecimal(right, contract);
+  if (parsedLeft.error || parsedRight.error || parsedLeft.value === null || parsedRight.value === null) return null;
+
+  const aligned = alignDecimalParts(decimalParts(parsedLeft.value), decimalParts(parsedRight.value));
+  if (aligned.left < aligned.right) return -1;
+  if (aligned.left > aligned.right) return 1;
+  return 0;
 }
 
 /** Exact, string-based bulk arithmetic for DB numeric mutations. */

@@ -25,9 +25,17 @@ import {
   type OrderPriceRow,
   type OrderTaxRule,
 } from "@/lib/customers/order-domain";
+import {
+  ORDER_MONEY_DECIMAL,
+  ORDER_QUANTITY_DECIMAL,
+  parseOrderMoney,
+  parseOrderPercent,
+  parseOrderQuantity,
+} from "@/lib/customers/order-validation";
 import { createProjectCustomerOrder } from "@/lib/customers/project-domain";
 import type { Customer, CustomerAddress, OrderFulfillmentType, OrderPricingModel, PaymentMethod, PriceGroupLookup } from "@/lib/customers/types";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
+import { calculateDbDecimalBulk, compareDbDecimal } from "@/lib/validation";
 
 type Product = OrderPickerProduct;
 type PriceRow = OrderPriceRow;
@@ -50,6 +58,23 @@ type ValidatedOrderItem = {
   lineNote?: string;
 };
 
+type ValidatedHeader = {
+  taxRate: string;
+  orderDiscountAmount: string;
+  paymentCommissionPercent: string;
+};
+
+type ItemFieldErrors = Partial<Record<"quantity" | "discount_percent" | "unit_price" | "line_note", string>>;
+type FieldErrors = {
+  priceGroupId?: string;
+  paymentMethodId?: string;
+  paymentCommissionPercent?: string;
+  shippingAddressId?: string;
+  orderDiscount?: string;
+  taxRate?: string;
+  items?: Record<number, ItemFieldErrors>;
+};
+
 function money(value: number, currency = "USD") {
   try {
     return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Number.isFinite(value) ? value : 0);
@@ -68,13 +93,7 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 function Field({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div>
-      <Label>{label}</Label>
-      {children}
-      {hint ? <FormHint>{hint}</FormHint> : null}
-    </div>
-  );
+  return <div><Label>{label}</Label>{children}{hint ? <FormHint>{hint}</FormHint> : null}</div>;
 }
 
 export default function NewCustomerOrder({ projectId = null }: { projectId?: string | null }) {
@@ -104,6 +123,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
   const [orderDiscount, setOrderDiscount] = useState("0");
   const [initialStatus, setInitialStatus] = useState<"draft" | "confirmed">("draft");
   const [items, setItems] = useState<DraftItem[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [countertopDraftOrderId, setCountertopDraftOrderId] = useState<string | null>(null);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
@@ -139,7 +159,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
         setPriceGroupId(defaultGroup?.id || "");
         setFulfillmentType(defaultGroup?.system_key === "pickup_level" ? "pickup" : "delivery");
         setPaymentMethodId(defaultMethod?.id || "");
-        setPaymentCommissionPercent(String(Number(defaultMethod?.commission_percent ?? 0)));
+        setPaymentCommissionPercent(String(defaultMethod?.commission_percent ?? 0));
         setBillingAddressId(loadedAddresses.find((address) => address.is_default_billing)?.id || "");
         setShippingAddressId(loadedAddresses.find((address) => address.is_default_shipping)?.id || "");
       } catch (error) {
@@ -154,7 +174,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
 
   useEffect(() => {
     const rule = taxRules.find((item) => item.fulfillment_type === fulfillmentType && item.is_active && item.tax_rate !== null);
-    if (rule) setTaxRate(String(Number(rule.tax_rate)));
+    if (rule) setTaxRate(String(rule.tax_rate));
   }, [fulfillmentType, taxRules]);
 
   useEffect(() => {
@@ -195,9 +215,10 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     () => products.find((product) => product.status === "active" && product.sku === "SERVICE" && product.product_type_code === "SERVICE" && product.pricing_model === "manual_service") ?? null,
     [products],
   );
-  const defaultCommissionPercent = Number(selectedPaymentMethod?.commission_percent ?? 0);
-  const appliedCommissionPercent = Math.min(100, Math.max(0, Number(paymentCommissionPercent || 0)));
-  const commissionOverridden = Math.abs(appliedCommissionPercent - defaultCommissionPercent) > 0.0001;
+  const defaultCommissionValue = String(selectedPaymentMethod?.commission_percent ?? 0);
+  const defaultCommissionPercent = Number(defaultCommissionValue);
+  const appliedCommissionPercent = Number(paymentCommissionPercent || 0);
+  const commissionOverridden = Number.isFinite(appliedCommissionPercent) && Math.abs(appliedCommissionPercent - defaultCommissionPercent) > 0.0001;
   const canManageCountertop = role !== null && hasPermission(role, "orders.manage");
   const isMutating = isSaving || isStartingCountertop;
   const currency = customer?.currency_code || "USD";
@@ -214,11 +235,40 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     const taxable = Math.max(0, subtotal - orderDiscountNumber);
     const tax = taxable * Math.max(0, Number(taxRate || 0)) / 100;
     const orderTotal = taxable + tax;
-    const paymentCommission = orderTotal * appliedCommissionPercent / 100;
+    const previewCommissionPercent = Math.min(100, Math.max(0, Number(paymentCommissionPercent || 0)));
+    const paymentCommission = orderTotal * previewCommissionPercent / 100;
     return { subtotal, tax, orderTotal, paymentCommission, grandTotal: orderTotal + paymentCommission };
-  }, [items, priceMap, orderDiscount, taxRate, appliedCommissionPercent]);
+  }, [items, priceMap, orderDiscount, taxRate, paymentCommissionPercent]);
+
+  function clearHeaderError(field: Exclude<keyof FieldErrors, "items">) {
+    setFieldErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  function clearItemError(index: number, field: keyof ItemFieldErrors) {
+    setFieldErrors((current) => ({
+      ...current,
+      items: current.items ? { ...current.items, [index]: { ...current.items[index], [field]: undefined } } : undefined,
+    }));
+  }
+
+  function focusFirstInvalid(errors: FieldErrors) {
+    const firstInvalid = [
+      errors.priceGroupId ? "new-order-price-group" : null,
+      errors.paymentMethodId ? "new-order-payment-method" : null,
+      errors.paymentCommissionPercent ? "new-order-payment-commission" : null,
+      errors.shippingAddressId ? "new-order-shipping-address" : null,
+      errors.orderDiscount ? "new-order-discount" : null,
+      errors.taxRate ? "new-order-tax-rate" : null,
+      ...Object.entries(errors.items ?? {}).flatMap(([index, itemErrors]) => [
+        itemErrors.quantity ? `new-order-item-${index}-quantity` : null,
+        itemErrors.discount_percent ? `new-order-item-${index}-discount` : null,
+      ]),
+    ].find((value): value is string => Boolean(value));
+    if (firstInvalid) document.getElementById(firstInvalid)?.focus();
+  }
 
   function handlePriceGroupChange(groupId: string) {
+    clearHeaderError("priceGroupId");
     setPriceGroupId(groupId);
     const group = priceGroups.find((item) => item.id === groupId);
     if (group?.system_key === "pickup_level") setFulfillmentType("pickup");
@@ -226,9 +276,11 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
   }
 
   function handlePaymentMethodChange(methodId: string) {
+    clearHeaderError("paymentMethodId");
+    clearHeaderError("paymentCommissionPercent");
     setPaymentMethodId(methodId);
     const method = paymentMethods.find((item) => item.id === methodId);
-    setPaymentCommissionPercent(String(Number(method?.commission_percent ?? 0)));
+    setPaymentCommissionPercent(String(method?.commission_percent ?? 0));
   }
 
   function updateItem(index: number, values: Partial<DraftItem>) {
@@ -239,7 +291,11 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     setItems((current) => {
       const existingIndex = current.findIndex((item) => item.product_id === product.id && item.pricing_model === "price_group");
       if (existingIndex >= 0) {
-        return current.map((item, index) => index === existingIndex ? { ...item, quantity: String(Number(item.quantity || 0) + 1) } : item);
+        return current.map((item, index) => {
+          if (index !== existingIndex) return item;
+          const nextQuantity = calculateDbDecimalBulk(item.quantity, "1", "current_amount", ORDER_QUANTITY_DECIMAL);
+          return nextQuantity.error || nextQuantity.value === null ? item : { ...item, quantity: nextQuantity.value };
+        });
       }
       return [...current, { product_id: product.id, quantity: "1", discount_percent: "0", pricing_model: product.pricing_model }];
     });
@@ -256,58 +312,108 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
 
   function addServiceLine(value: { lineNote: string; unitPrice: number }) {
     if (!serviceProduct) return;
+    const parsedPrice = parseOrderMoney(String(value.unitPrice));
+    if (parsedPrice.error || parsedPrice.value === null) {
+      setErrorMessage(parsedPrice.error ?? "Service price is invalid.");
+      return;
+    }
     setItems((current) => [...current, {
       product_id: serviceProduct.id,
       quantity: "1",
       discount_percent: "0",
       pricing_model: "manual_service",
-      unit_price: String(value.unitPrice),
+      unit_price: parsedPrice.value,
       line_note: value.lineNote,
     }]);
     setIsServiceModalOpen(false);
   }
 
-  function validateHeader() {
+  function validateHeader(): ValidatedHeader | null {
     setErrorMessage(null);
-    if (!customer || !priceGroupId) return setErrorMessage("Customer and price group are required."), false;
-    if (!paymentMethodId) return setErrorMessage("Payment method is required."), false;
-    if (appliedCommissionPercent < 0 || appliedCommissionPercent > 100) return setErrorMessage("Payment commission must be between 0 and 100%."), false;
-    if (isLoadingPrices) return setErrorMessage("Prices are still loading."), false;
-    return true;
+    const errors: FieldErrors = {};
+    if (!customer || !priceGroupId) errors.priceGroupId = "Customer and price group are required.";
+    if (!paymentMethodId) errors.paymentMethodId = "Payment method is required.";
+    if (fulfillmentType !== "pickup" && !shippingAddressId) errors.shippingAddressId = "Shipping address is required for delivery.";
+
+    const commission = parseOrderPercent(paymentCommissionPercent);
+    const discount = parseOrderMoney(orderDiscount);
+    const tax = parseOrderPercent(taxRate);
+    if (commission.error || commission.value === null) errors.paymentCommissionPercent = commission.error ?? "Enter a valid payment commission.";
+    if (discount.error || discount.value === null) errors.orderDiscount = discount.error ?? "Enter a valid order discount.";
+    if (tax.error || tax.value === null) errors.taxRate = tax.error ?? "Enter a valid tax rate.";
+    if (isLoadingPrices) {
+      setErrorMessage("Prices are still loading.");
+      return null;
+    }
+    if (Object.keys(errors).length) {
+      setFieldErrors((current) => ({ ...current, ...errors }));
+      setErrorMessage("Correct the highlighted order fields.");
+      focusFirstInvalid(errors);
+      return null;
+    }
+    setFieldErrors((current) => ({ ...current, priceGroupId: undefined, paymentMethodId: undefined, paymentCommissionPercent: undefined, shippingAddressId: undefined, orderDiscount: undefined, taxRate: undefined }));
+    return {
+      taxRate: tax.value!,
+      orderDiscountAmount: discount.value!,
+      paymentCommissionPercent: commission.value!,
+    };
   }
 
   function validateItems(allowEmpty: boolean): ValidatedOrderItem[] | null {
-    const validItems = items.filter((item) => item.product_id && Number(item.quantity) > 0);
-    if (!allowEmpty && validItems.length === 0) return setErrorMessage("Choose at least one valid product or service line."), null;
-    if (validItems.length !== items.length) return setErrorMessage("Every selected line needs a valid quantity."), null;
-
-    for (const item of validItems) {
-      const product = productMap.get(item.product_id);
-      if (!product) return setErrorMessage("A selected product could not be resolved."), null;
-      if (product.pricing_model === "countertop_material_band") return setErrorMessage("Stone products must be configured through the Countertop action."), null;
-      if (product.pricing_model === "none") return setErrorMessage("No Commercial Pricing products cannot be added to customer orders."), null;
-      if (product.pricing_model === "manual_service") {
-        const servicePrice = Number(item.unit_price);
-        if (item.quantity !== "1") return setErrorMessage("Service quantity must remain fixed at 1."), null;
-        if (!item.line_note?.trim()) return setErrorMessage("Service detail is required."), null;
-        if (!Number.isFinite(servicePrice) || servicePrice < 0) return setErrorMessage("Service price must be a nonnegative number."), null;
-      } else if (!priceMap.has(item.product_id)) {
-        return setErrorMessage(`No current price exists for ${product.sku} in this price group.`), null;
-      }
-      const discount = Number(item.discount_percent || 0);
-      if (discount < 0 || discount > 100) return setErrorMessage("Line discount must be between 0 and 100%."), null;
+    if (!allowEmpty && items.length === 0) {
+      setErrorMessage("Choose at least one valid product or service line.");
+      return null;
     }
 
-    return validItems.map((item) => ({
-      productId: item.product_id,
-      quantity: item.quantity,
-      discountPercent: item.discount_percent,
-      pricingModel: item.pricing_model,
-      ...(item.pricing_model === "manual_service" ? { unitPrice: item.unit_price, lineNote: item.line_note } : {}),
-    }));
+    const itemErrors: Record<number, ItemFieldErrors> = {};
+    const validated: ValidatedOrderItem[] = [];
+    let blockingMessage: string | null = null;
+
+    items.forEach((item, index) => {
+      const errors: ItemFieldErrors = {};
+      const product = productMap.get(item.product_id);
+      const quantity = parseOrderQuantity(item.quantity);
+      const discount = parseOrderPercent(item.discount_percent);
+      if (quantity.error || quantity.value === null) errors.quantity = quantity.error ?? "Enter a valid quantity.";
+      if (discount.error || discount.value === null) errors.discount_percent = discount.error ?? "Enter a valid line discount.";
+      if (!product) blockingMessage ??= "A selected product could not be resolved.";
+      else if (product.pricing_model === "countertop_material_band") blockingMessage ??= "Stone products must be configured through the Countertop action.";
+      else if (product.pricing_model === "none") blockingMessage ??= "No Commercial Pricing products cannot be added to customer orders.";
+      else if (product.pricing_model === "price_group" && !priceMap.has(item.product_id)) blockingMessage ??= `No current price exists for ${product.sku} in this price group.`;
+
+      let unitPrice: string | undefined;
+      if (product?.pricing_model === "manual_service") {
+        if (quantity.value !== null && compareDbDecimal(quantity.value, "1", ORDER_QUANTITY_DECIMAL) !== 0) errors.quantity = "Service quantity must remain fixed at 1.";
+        if (!item.line_note?.trim()) errors.line_note = "Service detail is required.";
+        const parsedPrice = parseOrderMoney(item.unit_price);
+        if (parsedPrice.error || parsedPrice.value === null) errors.unit_price = parsedPrice.error ?? "Enter a valid service price.";
+        else unitPrice = parsedPrice.value;
+      }
+
+      if (Object.keys(errors).length) itemErrors[index] = errors;
+      if (!blockingMessage && Object.keys(errors).length === 0 && product && quantity.value !== null && discount.value !== null) {
+        validated.push({
+          productId: item.product_id,
+          quantity: quantity.value,
+          discountPercent: discount.value,
+          pricingModel: item.pricing_model,
+          ...(product.pricing_model === "manual_service" ? { unitPrice, lineNote: item.line_note?.trim() } : {}),
+        });
+      }
+    });
+
+    if (blockingMessage || Object.keys(itemErrors).length) {
+      const errors: FieldErrors = { items: itemErrors };
+      setFieldErrors((current) => ({ ...current, items: itemErrors }));
+      setErrorMessage(blockingMessage ?? "Correct the highlighted order lines.");
+      focusFirstInvalid(errors);
+      return null;
+    }
+    setFieldErrors((current) => ({ ...current, items: {} }));
+    return validated;
   }
 
-  async function createOrder(validItems: ValidatedOrderItem[], status: "draft" | "confirmed") {
+  async function createOrder(validItems: ValidatedOrderItem[], header: ValidatedHeader, status: "draft" | "confirmed") {
     if (!customer) throw new Error("Customer is required.");
 
     const sharedInput = {
@@ -319,28 +425,26 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
       customerReference: reference,
       customerNotes,
       internalNotes,
-      taxRate,
-      orderDiscountAmount: orderDiscount,
+      taxRate: header.taxRate,
+      orderDiscountAmount: header.orderDiscountAmount,
       paymentMethodId,
-      paymentCommissionPercent: appliedCommissionPercent,
+      paymentCommissionPercent: header.paymentCommissionPercent,
       initialStatus: status,
       fulfillmentType,
     };
 
-    if (projectId) {
-      return createProjectCustomerOrder({ projectId, ...sharedInput });
-    }
-
+    if (projectId) return createProjectCustomerOrder({ projectId, ...sharedInput });
     return createCustomerOrder({ customerId: customer.id, ...sharedInput });
   }
 
   async function saveOrder() {
-    if (!validateHeader()) return;
+    const header = validateHeader();
+    if (!header) return;
     const validItems = validateItems(false);
     if (!validItems) return;
     setIsSaving(true);
     try {
-      const orderId = await createOrder(validItems, initialStatus);
+      const orderId = await createOrder(validItems, header, initialStatus);
       router.push(`/customers/${customer?.id}/orders/${orderId}`);
     } catch (error) {
       setErrorMessage(errorMessage(error, "Unable to create order."));
@@ -350,14 +454,18 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
 
   async function startCountertop() {
     if (!canManageCountertop) return setErrorMessage("You do not have permission to manage customer orders.");
-    if (!validateHeader()) return;
+    const header = validateHeader();
+    if (!header) return;
     const validItems = validateItems(true);
     if (!validItems) return;
-    if (validItems.length === 0 && Number(orderDiscount || 0) > 0) return setErrorMessage("Configure the Countertop first, then apply an order discount from the saved Draft.");
+    if (validItems.length === 0 && compareDbDecimal(header.orderDiscountAmount, "0", ORDER_MONEY_DECIMAL) === 1) {
+      setErrorMessage("Configure the Countertop first, then apply an order discount from the saved Draft.");
+      return;
+    }
 
     setIsStartingCountertop(true);
     try {
-      const orderId = await createOrder(validItems, "draft");
+      const orderId = await createOrder(validItems, header, "draft");
       setCountertopDraftOrderId(orderId);
       setIsStartingCountertop(false);
     } catch (error) {
@@ -371,18 +479,13 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
 
   if (countertopDraftOrderId) {
     const editHref = `/customers/${customer.id}/orders/${countertopDraftOrderId}/edit`;
-    return (
-      <div className="space-y-5">
-        <Alert variant="info" title="Draft saved" message="Order information is saved. Configure the Countertop below; closing or completing this step returns to the saved Draft." />
-        <CountertopConfigurator orderId={countertopDraftOrderId} onAttached={() => router.push(editHref)} onClose={() => router.push(editHref)} />
-      </div>
-    );
+    return <div className="space-y-5"><Alert variant="info" title="Draft saved" message="Order information is saved. Configure the Countertop below; closing or completing this step returns to the saved Draft." /><CountertopConfigurator orderId={countertopDraftOrderId} onAttached={() => router.push(editHref)} onClose={() => router.push(editHref)} /></div>;
   }
 
   const fulfillmentHint = selectedTaxRule?.is_active && selectedTaxRule.tax_rate !== null
     ? `Configured tax rule: ${Number(selectedTaxRule.tax_rate).toFixed(3)}%`
     : "No active tax rule configured for this fulfillment type.";
-  const commissionHint = `Default: ${defaultCommissionPercent.toFixed(2)}%${commissionOverridden ? ` · Override: ${appliedCommissionPercent.toFixed(2)}%` : ""}`;
+  const commissionHint = `Default: ${defaultCommissionPercent.toFixed(2)}%${commissionOverridden ? ` · Override: ${Number(paymentCommissionPercent || 0).toFixed(2)}%` : ""}`;
 
   return (
     <div className="space-y-5">
@@ -390,37 +493,23 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
       {projectId ? <Alert variant="info" title="Project Order" message="This Order will be created inside the selected Project." /> : null}
       {selectedPriceGroup?.requires_approval ? <Alert variant="warning" title="Approval required" message={`${selectedPriceGroup.name} is a restricted price level. Sales orders using it require Admin approval before confirmation.`} /> : null}
 
-      <ComponentCard
-        title="Order Information"
-        desc={`${customer.name} · ${customer.customer_code} — choose the commercial, fulfillment and payment context for this order.`}
-        headerAction={<Button variant="outline" onClick={() => router.push(projectId ? `/projects/${projectId}` : `/customers/${customer.id}/orders`)}>{projectId ? "Back to Project" : "Back to Orders"}</Button>}
-      >
+      <ComponentCard title="Order Information" desc={`${customer.name} · ${customer.customer_code} — choose the commercial, fulfillment and payment context for this order.`} headerAction={<Button variant="outline" onClick={() => router.push(projectId ? `/projects/${projectId}` : `/customers/${customer.id}/orders`)}>{projectId ? "Back to Project" : "Back to Orders"}</Button>}>
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-          <Field label="Price Group" hint={isLoadingPrices ? "Loading prices…" : undefined}><Select options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} /></Field>
-          <Field label="Fulfillment Type" hint={fulfillmentHint}><Select options={[{ value: "pickup", label: "Customer Pickup" }, { value: "delivery", label: "Delivery" }, { value: "delivery_installation", label: "Delivery + Installation" }]} value={fulfillmentType} onChange={(value) => setFulfillmentType(value as OrderFulfillmentType)} /></Field>
-          <Field label="Payment Method"><Select options={paymentMethods.map((method) => ({ value: method.id, label: `${method.name}${Number(method.commission_percent) > 0 ? ` (+${Number(method.commission_percent).toFixed(2)}%)` : ""}` }))} value={paymentMethodId} onChange={handlePaymentMethodChange} /></Field>
-          <Field label="Applied Commission (%)" hint={commissionHint}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input type="number" min="0" max="100" step="0.01" value={paymentCommissionPercent} onChange={(event) => setPaymentCommissionPercent(event.target.value)} /></div><Button size="sm" variant="outline" onClick={() => setPaymentCommissionPercent(String(defaultCommissionPercent))}>Use Default</Button></div></Field>
+          <Field label="Price Group" hint={fieldErrors.priceGroupId ?? (isLoadingPrices ? "Loading prices…" : undefined)}><Select id="new-order-price-group" error={Boolean(fieldErrors.priceGroupId)} options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} /></Field>
+          <Field label="Fulfillment Type" hint={fulfillmentHint}><Select options={[{ value: "pickup", label: "Customer Pickup" }, { value: "delivery", label: "Delivery" }, { value: "delivery_installation", label: "Delivery + Installation" }]} value={fulfillmentType} onChange={(value) => { setFulfillmentType(value as OrderFulfillmentType); if (value === "pickup") clearHeaderError("shippingAddressId"); }} /></Field>
+          <Field label="Payment Method" hint={fieldErrors.paymentMethodId}><Select id="new-order-payment-method" error={Boolean(fieldErrors.paymentMethodId)} options={paymentMethods.map((method) => ({ value: method.id, label: `${method.name}${Number(method.commission_percent) > 0 ? ` (+${Number(method.commission_percent).toFixed(2)}%)` : ""}` }))} value={paymentMethodId} onChange={handlePaymentMethodChange} /></Field>
+          <Field label="Applied Commission (%)" hint={commissionHint}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input id="new-order-payment-commission" type="number" min="0" max="100" step="0.001" value={paymentCommissionPercent} error={Boolean(fieldErrors.paymentCommissionPercent)} hint={fieldErrors.paymentCommissionPercent} onChange={(event) => { clearHeaderError("paymentCommissionPercent"); setPaymentCommissionPercent(event.target.value); }} /></div><Button size="sm" variant="outline" onClick={() => { clearHeaderError("paymentCommissionPercent"); setPaymentCommissionPercent(defaultCommissionValue); }}>Use Default</Button></div></Field>
           <Field label="Initial Status"><Select options={[{ value: "draft", label: "Draft" }, { value: "confirmed", label: "Confirmed" }]} value={initialStatus} onChange={(value) => setInitialStatus(value as "draft" | "confirmed")} /></Field>
           <Field label="Expected Delivery"><Input type="date" value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} /></Field>
           <Field label="Customer Reference"><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="PO / reference" /></Field>
           <Field label="Billing Address"><Select options={addresses.filter((address) => ["billing", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={billingAddressId} placeholder="None" allowEmpty onChange={setBillingAddressId} /></Field>
-          <Field label="Shipping Address"><Select options={addresses.filter((address) => ["shipping", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={shippingAddressId} placeholder="None" allowEmpty onChange={setShippingAddressId} /></Field>
-          <Field label={`Order Discount (${currency})`}><Input inputMode="decimal" value={orderDiscount} onChange={(event) => setOrderDiscount(event.target.value)} /></Field>
-          <Field label="Tax Rate (%)"><Input inputMode="decimal" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} /></Field>
+          <Field label="Shipping Address" hint={fieldErrors.shippingAddressId}><Select id="new-order-shipping-address" error={Boolean(fieldErrors.shippingAddressId)} options={addresses.filter((address) => ["shipping", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={shippingAddressId} placeholder="None" allowEmpty onChange={(value) => { clearHeaderError("shippingAddressId"); setShippingAddressId(value); }} /></Field>
+          <Field label={`Order Discount (${currency})`}><Input id="new-order-discount" inputMode="decimal" value={orderDiscount} error={Boolean(fieldErrors.orderDiscount)} hint={fieldErrors.orderDiscount} onChange={(event) => { clearHeaderError("orderDiscount"); setOrderDiscount(event.target.value); }} /></Field>
+          <Field label="Tax Rate (%)"><Input id="new-order-tax-rate" inputMode="decimal" value={taxRate} error={Boolean(fieldErrors.taxRate)} hint={fieldErrors.taxRate} onChange={(event) => { clearHeaderError("taxRate"); setTaxRate(event.target.value); }} /></Field>
         </div>
       </ComponentCard>
 
-      <ComponentCard
-        title="Products"
-        desc="Cabinet products use server Price Group pricing. Countertop and Service use their dedicated order-entry routes."
-        headerAction={(
-          <div className="flex flex-wrap justify-end gap-2">
-            {canManageCountertop ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || isLoadingPrices} onClick={startCountertop}>{isStartingCountertop ? "Preparing Draft…" : "Countertop"}</Button> : null}
-            <Button size="sm" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={() => setIsProductPickerOpen(true)}>Cabinet</Button>
-            <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={openService}>Service</Button>
-          </div>
-        )}
-      >
+      <ComponentCard title="Products" desc="Cabinet products use server Price Group pricing. Countertop and Service use their dedicated order-entry routes." headerAction={<div className="flex flex-wrap justify-end gap-2">{canManageCountertop ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || isLoadingPrices} onClick={startCountertop}>{isStartingCountertop ? "Preparing Draft…" : "Countertop"}</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={() => setIsProductPickerOpen(true)}>Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={openService}>Service</Button></div>}>
         <TableViewport>
           <Table variant="admin" minWidth="standard">
             <TableHeader variant="admin"><TableRow>{["Product", "Qty", "Unit Price", "Discount %", "Line Total", ""].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader>
@@ -430,12 +519,13 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
                 const isService = item.pricing_model === "manual_service";
                 const price = isService ? Number(item.unit_price ?? 0) : priceMap.get(item.product_id) ?? 0;
                 const total = Number(item.quantity || 0) * price * (1 - Number(item.discount_percent || 0) / 100);
+                const itemError = fieldErrors.items?.[index];
                 return (
                   <TableRow key={`${item.product_id}-${index}`}>
-                    <TableCell variant="admin" className="min-w-[320px]"><div className="font-semibold">{product?.sku ?? "Unknown product"}</div><FormHint>{product?.name ?? item.product_id}</FormHint><ServiceLineDetails lineNote={item.line_note} /></TableCell>
-                    <TableCell variant="admin" className="w-28">{isService ? <FormHint>1 · fixed</FormHint> : <Input ariaLabel={`${product?.sku ?? "Product"} quantity`} inputMode="decimal" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} />}</TableCell>
+                    <TableCell variant="admin" className="min-w-[320px]"><div className="font-semibold">{product?.sku ?? "Unknown product"}</div><FormHint>{product?.name ?? item.product_id}</FormHint><ServiceLineDetails lineNote={item.line_note} />{itemError?.unit_price ? <FormHint>{itemError.unit_price}</FormHint> : null}{itemError?.line_note ? <FormHint>{itemError.line_note}</FormHint> : null}</TableCell>
+                    <TableCell variant="admin" className="w-28">{isService ? <FormHint>1 · fixed</FormHint> : <Input id={`new-order-item-${index}-quantity`} ariaLabel={`${product?.sku ?? "Product"} quantity`} inputMode="decimal" value={item.quantity} error={Boolean(itemError?.quantity)} hint={itemError?.quantity} onChange={(event) => { clearItemError(index, "quantity"); updateItem(index, { quantity: event.target.value }); }} />}</TableCell>
                     <TableCell variant="admin">{isService || priceMap.has(item.product_id) ? money(price, currency) : "No price"}</TableCell>
-                    <TableCell variant="admin" className="w-32"><Input ariaLabel={`${product?.sku ?? "Product"} discount percent`} inputMode="decimal" value={item.discount_percent} onChange={(event) => updateItem(index, { discount_percent: event.target.value })} /></TableCell>
+                    <TableCell variant="admin" className="w-32"><Input id={`new-order-item-${index}-discount`} ariaLabel={`${product?.sku ?? "Product"} discount percent`} inputMode="decimal" value={item.discount_percent} error={Boolean(itemError?.discount_percent)} hint={itemError?.discount_percent} onChange={(event) => { clearItemError(index, "discount_percent"); updateItem(index, { discount_percent: event.target.value }); }} /></TableCell>
                     <TableCell variant="admin" className="font-semibold">{money(total, currency)}</TableCell>
                     <TableCell variant="admin" className="text-right"><Button size="sm" variant="danger" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button></TableCell>
                   </TableRow>
@@ -448,27 +538,11 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="xl:col-span-8"><ComponentCard title="Notes" desc="Customer-facing and internal context for this order."><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes"><TextArea rows={5} value={customerNotes} onChange={setCustomerNotes} /></Field><Field label="Internal Notes"><TextArea rows={5} value={internalNotes} onChange={setInternalNotes} /></Field></div></ComponentCard></div>
-        <div className="xl:col-span-4"><ComponentCard title="Order Total" desc="Preview; the server remains authoritative when the order is saved."><div className="space-y-3"><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Order Total" value={money(preview.orderTotal, currency)} />{preview.paymentCommission > 0 ? <SummaryRow label={`${selectedPaymentMethod?.name || "Payment"} Commission (${appliedCommissionPercent.toFixed(2)}%)`} value={money(preview.paymentCommission, currency)} /> : null}<SummaryRow label="Grand Total" value={money(preview.grandTotal, currency)} strong divider />{commissionOverridden ? <Alert variant="warning" title="Commission override" message={`Payment commission is overridden from ${defaultCommissionPercent.toFixed(2)}% to ${appliedCommissionPercent.toFixed(2)}% for this order only.`} /> : null}<Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button></div></ComponentCard></div>
+        <div className="xl:col-span-4"><ComponentCard title="Order Total" desc="Preview; the server remains authoritative when the order is saved."><div className="space-y-3"><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Order Total" value={money(preview.orderTotal, currency)} />{preview.paymentCommission > 0 ? <SummaryRow label={`${selectedPaymentMethod?.name || "Payment"} Commission (${Number(paymentCommissionPercent || 0).toFixed(2)}%)`} value={money(preview.paymentCommission, currency)} /> : null}<SummaryRow label="Grand Total" value={money(preview.grandTotal, currency)} strong divider />{commissionOverridden ? <Alert variant="warning" title="Commission override" message={`Payment commission is overridden from ${defaultCommissionPercent.toFixed(2)}% to ${Number(paymentCommissionPercent || 0).toFixed(2)}% for this order only.`} /> : null}<Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button></div></ComponentCard></div>
       </div>
 
-      <OrderProductPicker
-        isOpen={isProductPickerOpen}
-        onClose={() => setIsProductPickerOpen(false)}
-        products={products}
-        selectedQuantities={selectedQuantities}
-        priceMap={priceMap}
-        onAdd={addProduct}
-        currencyCode={currency}
-        disableWithoutPrice
-        excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]}
-      />
-
-      <ManualServiceLineModal
-        isOpen={isServiceModalOpen}
-        currencyCode={currency}
-        onClose={() => setIsServiceModalOpen(false)}
-        onSubmit={addServiceLine}
-      />
+      <OrderProductPicker isOpen={isProductPickerOpen} onClose={() => setIsProductPickerOpen(false)} products={products} selectedQuantities={selectedQuantities} priceMap={priceMap} onAdd={addProduct} currencyCode={currency} disableWithoutPrice excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]} />
+      <ManualServiceLineModal isOpen={isServiceModalOpen} currencyCode={currency} onClose={() => setIsServiceModalOpen(false)} onSubmit={addServiceLine} />
     </div>
   );
 }

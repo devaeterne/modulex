@@ -528,7 +528,7 @@ A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality
   - Authenticated super-admin rollback acceptance exercised the canonical `set_product_price` boundary with `0.0001`; the active row preserved the exact four-decimal value inside the transaction and returned to its original `0.0000` after rollback, leaving no production business-data mutation.
   - `set_product_price`, `set_product_prices_bulk`, and `set_product_costs_bulk` remain SECURITY INVOKER, authenticated-executable, and anon/PUBLIC-denied. `/products`, `/pricing/products`, and `/pricing/cost-margin` return production HTTP 200 with the expected Modulex bundles, and no runtime errors were found for those routes in the inspected 24-hour window.
   - Fresh Security + Performance Advisor scans show no VAL-2-specific blocker; existing unrelated project-wide advisor backlog remains separate. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
-- [ ] VAL-3 — Customers / Orders / Invoices.
+- [~] VAL-3 — Customers / Orders / Invoices.
 - [x] VAL-4 — Inventory + Warehouses + Stock Operations.
   - PR #224 is merged and included in the deployed Admin lineage. Production schema confirms inventory on-hand/reserved quantities are `numeric(12,2)`, while warehouse code/name/type constraints match the client-side validation contract.
   - Authenticated super-admin rollback acceptance exercised `stock_in_idempotent` with quantity `0.01`; the transaction created one idempotent movement and adjusted inventory by exactly `0.01`, then rollback restored the original quantity and left zero acceptance movement rows.

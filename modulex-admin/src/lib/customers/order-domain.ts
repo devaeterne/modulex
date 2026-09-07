@@ -2,6 +2,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
 import { loadCustomerOrderRecord as loadSharedCustomerOrderRecord } from "@/lib/customers/read-dedup";
+import { requireOrderMoney, requireOrderPercent, requireOrderQuantity } from "@/lib/customers/order-validation";
 import type {
   CountertopLineSummary,
   CountertopOrderContext,
@@ -379,10 +380,6 @@ function nullableId(value: string | null | undefined) {
   return value || null;
 }
 
-function numeric(value: string | number | null | undefined) {
-  return Number(value ?? 0);
-}
-
 async function requireEditorProfile(action: "create" | "edit") {
   const { profile, error } = await getCurrentProfile();
   if (error) throw error;
@@ -437,7 +434,6 @@ export async function loadCreateOrderContext(customerId: string): Promise<Create
 
 export async function loadEditOrderContext(customerId: string, orderId: string): Promise<EditOrderContext> {
   const profile = await requireEditorProfile("edit");
-
   const [customerResult, orderResult, itemsResult, addressesResult, groupsResult, methodsResult, products, taxRulesResult] = await Promise.all([
     supabase.from("customers").select("*").eq("id", customerId).single(),
     supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
@@ -534,15 +530,15 @@ export async function loadOrderPrices(priceGroupId: string, currencyCode: string
 function serializeCreateOrderItem(item: CreateOrderItemInput) {
   const base = {
     product_id: item.productId,
-    quantity: numeric(item.quantity),
-    discount_percent: numeric(item.discountPercent),
+    quantity: requireOrderQuantity(item.quantity, "Order line quantity"),
+    discount_percent: requireOrderPercent(item.discountPercent, "Order line discount"),
   };
 
   if (item.pricingModel !== "manual_service") return base;
 
   return {
     ...base,
-    unit_price: numeric(item.unitPrice),
+    unit_price: requireOrderMoney(item.unitPrice, "Service unit price"),
     line_note: nullableText(item.lineNote),
   };
 }
@@ -551,9 +547,9 @@ function serializeUpdateOrderItem(item: UpdateOrderItemInput) {
   return {
     ...(item.id ? { id: item.id } : {}),
     product_id: item.productId,
-    quantity: numeric(item.quantity),
-    unit_price: numeric(item.unitPrice),
-    discount_percent: numeric(item.discountPercent),
+    quantity: requireOrderQuantity(item.quantity, "Order line quantity"),
+    unit_price: requireOrderMoney(item.unitPrice, "Order line unit price"),
+    discount_percent: requireOrderPercent(item.discountPercent, "Order line discount"),
     ...(item.pricingModel === "manual_service" ? { line_note: nullableText(item.lineNote) } : {}),
   };
 }
@@ -569,10 +565,10 @@ export async function createCustomerOrder(input: CreateCustomerOrderInput): Prom
     p_customer_reference: nullableText(input.customerReference),
     p_customer_notes: nullableText(input.customerNotes),
     p_internal_notes: nullableText(input.internalNotes),
-    p_tax_rate: numeric(input.taxRate),
-    p_order_discount_amount: numeric(input.orderDiscountAmount),
+    p_tax_rate: requireOrderPercent(input.taxRate, "Order tax rate"),
+    p_order_discount_amount: requireOrderMoney(input.orderDiscountAmount, "Order discount amount"),
     p_payment_method_id: input.paymentMethodId,
-    p_payment_commission_percent: numeric(input.paymentCommissionPercent),
+    p_payment_commission_percent: requireOrderPercent(input.paymentCommissionPercent, "Payment commission"),
     p_initial_status: input.initialStatus,
     p_fulfillment_type: input.fulfillmentType,
   });
@@ -592,10 +588,10 @@ export async function updateCustomerOrder(input: UpdateCustomerOrderInput): Prom
     p_customer_reference: nullableText(input.customerReference),
     p_customer_notes: nullableText(input.customerNotes),
     p_internal_notes: nullableText(input.internalNotes),
-    p_tax_rate: numeric(input.taxRate),
-    p_order_discount_amount: numeric(input.orderDiscountAmount),
+    p_tax_rate: requireOrderPercent(input.taxRate, "Order tax rate"),
+    p_order_discount_amount: requireOrderMoney(input.orderDiscountAmount, "Order discount amount"),
     p_payment_method_id: input.paymentMethodId,
-    p_payment_commission_percent: numeric(input.paymentCommissionPercent),
+    p_payment_commission_percent: requireOrderPercent(input.paymentCommissionPercent, "Payment commission"),
     p_revision_reason: nullableText(input.revisionReason),
     p_fulfillment_type: input.fulfillmentType,
   });

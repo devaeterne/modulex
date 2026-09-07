@@ -91,7 +91,7 @@ assert(revisionMigration.indexOf("Configured countertop lines cannot be removed 
 assert(revisionMigration.includes("delete from public.customer_order_items i") && revisionMigration.includes("not (i.id = any(v_retained_ids))"), "ordinary omitted lines must be deleted using the validated retained-id set");
 assert(revisionMigration.includes("set line_no = line_no + v_line_offset") && revisionMigration.includes("set line_no=v_line_no"), "retained rows must be temporarily reindexed before final line assignment");
 assert(orderDomain.includes("...(item.id ? { id: item.id } : {})"), "order domain must pass existing item identity to the revision RPC");
-assert(editOrder.includes("type DraftItem = { id?: string") && editOrder.includes("id: item.id"), "edit order UI must retain existing item identity internally");
+assert(/type DraftItem\s*=\s*\{\s*id\?:\s*string/.test(editOrder) && editOrder.includes("id: item.id"), "edit order UI must retain existing item identity internally");
 assert(revisionMigration.includes("function private.update_customer_order(") && !revisionMigration.includes("function public.update_customer_order("), "stable revision core must be private and must not add a public 14-argument overload");
 assert(orderDomain.includes("p_fulfillment_type") && orderEditingSql.includes("function private.update_customer_order(") && !orderEditingSql.includes("function public.update_customer_order("), "public fulfillment-aware API and private 14-argument core boundaries must remain distinct");
 assert(lifecycleSql.includes("p_fulfillment_type text") && lifecycleSql.includes("customer_order_revision_mode") && lifecycleSql.includes("create_approval_request"), "fulfillment/lifecycle/approval wrapper must remain intact");

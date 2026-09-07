@@ -54,6 +54,7 @@ type CreateCustomerResult = {
   customer: Customer;
   price_group_result: "unchanged" | "saved" | "approval_requested";
 };
+type CreateCustomerFieldErrors = Partial<Record<"name" | "email" | "phone" | "country_code", string>>;
 
 function statusColor(status: CustomerStatus): "success" | "error" | "warning" | "light" {
   if (status === "active") return "success";
@@ -115,6 +116,7 @@ export default function CustomersTable() {
     price_group_id: "",
     sales_rep_id: "",
   });
+  const [createFieldErrors, setCreateFieldErrors] = useState<CreateCustomerFieldErrors>({});
 
   const typeMap = useMemo(() => new Map(customerTypes.map((item) => [item.id, item.name])), [customerTypes]);
   const groupMap = useMemo(() => new Map(priceGroups.map((item) => [item.id, item.name])), [priceGroups]);
@@ -338,16 +340,34 @@ export default function CustomersTable() {
       price_group_id: "",
       sales_rep_id: "",
     });
+    setCreateFieldErrors({});
+  }
+
+  function clearCreateFieldError(field: keyof CreateCustomerFieldErrors) {
+    setCreateFieldErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  function focusCreateCustomerError(errors: CreateCustomerFieldErrors) {
+    const firstInvalid = (["name", "email", "phone", "country_code"] as const).find((field) => Boolean(errors[field]));
+    if (firstInvalid) document.getElementById(`new-customer-${firstInvalid}`)?.focus();
   }
 
   async function createCustomer() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    if (!newCustomer.name.trim()) return setErrorMessage("Customer name is required.");
-    if (!isValidEmail(newCustomer.email)) return setErrorMessage("Enter a valid customer email address.");
-    if (!isValidPhone(newCustomer.phone)) return setErrorMessage("Customer phone must contain 7 to 15 digits and cannot contain letters.");
-    if (!isValidCountryCode(newCustomer.country_code)) return setErrorMessage("Country code must be a 2-letter ISO code.");
+    const errors: CreateCustomerFieldErrors = {};
+    if (!newCustomer.name.trim()) errors.name = "Customer name is required.";
+    if (!isValidEmail(newCustomer.email)) errors.email = "Enter a valid customer email address.";
+    if (!isValidPhone(newCustomer.phone)) errors.phone = "Customer phone must contain 7 to 15 digits and cannot contain letters.";
+    if (!isValidCountryCode(newCustomer.country_code)) errors.country_code = "Country code must be a 2-letter ISO code.";
+    if (Object.keys(errors).length) {
+      setCreateFieldErrors(errors);
+      setErrorMessage("Correct the highlighted customer fields.");
+      focusCreateCustomerError(errors);
+      return;
+    }
+    setCreateFieldErrors({});
 
     setIsSaving(true);
     const { data, error } = await supabase.rpc("create_customer", {
@@ -500,13 +520,13 @@ export default function CustomersTable() {
       <Modal isOpen={createOpen} onClose={() => { if (!isSaving) setCreateOpen(false); }} ariaLabel="New Customer" className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <ComponentCard title="New Customer" desc="Create the customer master record. More details can be added from the customer card.">
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Company / Customer Name" required><Input value={newCustomer.name} onChange={(event) => setNewCustomer((current) => ({ ...current, name: event.target.value }))} /></Field>
+            <Field label="Company / Customer Name" required><Input id="new-customer-name" value={newCustomer.name} error={Boolean(createFieldErrors.name)} hint={createFieldErrors.name} onChange={(event) => { clearCreateFieldError("name"); setNewCustomer((current) => ({ ...current, name: event.target.value })); }} /></Field>
             <Field label="Legal Name"><Input value={newCustomer.legal_name} onChange={(event) => setNewCustomer((current) => ({ ...current, legal_name: event.target.value }))} /></Field>
             <Field label="Customer Type"><Select value={newCustomer.customer_type_id} onChange={(value) => setNewCustomer((current) => ({ ...current, customer_type_id: value }))} options={customerTypes.map((item) => ({ value: item.id, label: item.name }))} placeholder="Default (Company)" allowEmpty /></Field>
             <Field label="Status"><Select value={newCustomer.status} onChange={(value) => setNewCustomer((current) => ({ ...current, status: value as CustomerStatus }))} options={CUSTOMER_STATUSES.map((value) => ({ value, label: titleCase(value) }))} /></Field>
-            <Field label="Email"><Input type="email" value={newCustomer.email} onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))} /></Field>
-            <Field label="Phone"><Input type="tel" inputMode="tel" maxLength={24} value={newCustomer.phone} onChange={(event) => setNewCustomer((current) => ({ ...current, phone: sanitizePhoneInput(event.target.value) }))} placeholder="+1 (202) 555-0123" /></Field>
-            <Field label="Country Code"><Input maxLength={2} placeholder="US" value={newCustomer.country_code} onChange={(event) => setNewCustomer((current) => ({ ...current, country_code: normalizeCountryCode(event.target.value) }))} /></Field>
+            <Field label="Email"><Input id="new-customer-email" type="email" value={newCustomer.email} error={Boolean(createFieldErrors.email)} hint={createFieldErrors.email} onChange={(event) => { clearCreateFieldError("email"); setNewCustomer((current) => ({ ...current, email: event.target.value })); }} /></Field>
+            <Field label="Phone"><Input id="new-customer-phone" type="tel" inputMode="tel" maxLength={24} value={newCustomer.phone} error={Boolean(createFieldErrors.phone)} hint={createFieldErrors.phone} onChange={(event) => { clearCreateFieldError("phone"); setNewCustomer((current) => ({ ...current, phone: sanitizePhoneInput(event.target.value) })); }} placeholder="+1 (202) 555-0123" /></Field>
+            <Field label="Country Code"><Input id="new-customer-country_code" maxLength={2} placeholder="US" value={newCustomer.country_code} error={Boolean(createFieldErrors.country_code)} hint={createFieldErrors.country_code} onChange={(event) => { clearCreateFieldError("country_code"); setNewCustomer((current) => ({ ...current, country_code: normalizeCountryCode(event.target.value) })); }} /></Field>
             <Field label="Price Group"><Select value={newCustomer.price_group_id} onChange={(value) => setNewCustomer((current) => ({ ...current, price_group_id: value }))} options={priceGroups.map((item) => ({ value: item.id, label: `${item.name}${item.requires_approval ? " · Approval" : ""}` }))} placeholder="Default (List / Base)" allowEmpty /></Field>
             <Field label="Sales Representative"><Select value={newCustomer.sales_rep_id} onChange={(value) => setNewCustomer((current) => ({ ...current, sales_rep_id: value }))} options={profiles.map((item) => ({ value: item.id, label: item.full_name || item.email || "" }))} placeholder="Unassigned" allowEmpty /></Field>
           </div>
