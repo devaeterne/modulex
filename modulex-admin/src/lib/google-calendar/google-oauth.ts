@@ -97,7 +97,7 @@ export function createGoogleAuthorizationUrl(input: {
   url.searchParams.set("scope", GOOGLE_CALENDAR_SCOPES.join(" "));
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("include_granted_scopes", "true");
-  url.searchParams.set("prompt", "consent");
+  url.searchParams.set("prompt", "consent select_account");
   url.searchParams.set("state", input.state);
   if (input.loginHint?.trim()) url.searchParams.set("login_hint", input.loginHint.trim());
   return url.toString();
