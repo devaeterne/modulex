@@ -71,5 +71,7 @@ jobs:
         run: node scripts/project-pb6-commission-event-ordering-contract.mjs
       - name: Project PB-7 Change Orders contract
         run: node scripts/project-pb7-change-orders-contract.mjs
+      - name: Project Proposal Core contract
+        run: node scripts/project-proposal-core-contract.mjs
       - name: Countertop Sink fallback contract
         run: node scripts/countertop-sink-fallback-contract.mjs
