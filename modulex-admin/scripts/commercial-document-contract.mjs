@@ -50,9 +50,10 @@ if (exists("src/components/documents/CommercialDocument.tsx")) {
   expect(component.includes("primary_logo_on_light_url"), "A4 renderer must use the primary on-light logo slot");
   expect(component.includes("secondary_logo_on_light_url"), "A4 renderer must use the secondary on-light logo slot");
   expect(component.includes("whitespace-pre-line"), "CommercialDocument must preserve multi-line Countertop detail text");
-  expect(component.includes("commercial-document-secondary-logo"), "CommercialDocument must give Logo 2 a dedicated normalized visual box");
-  expect(component.includes("commercial-document-secondary-logo flex h-24"), "A4 preview must enlarge the Logo 2 visual box");
-  expect(component.includes("max-h-24 max-w-[188px]"), "A4 preview must enlarge Logo 2 by about 25 percent without stretching it");
+  expect(component.includes("centerLogo = secondaryLogo || primaryLogo"), "A4 preview must place Logo 2 in the center slot and preserve a one-logo fallback");
+  expect(component.includes("rightLogo = secondaryLogo ? primaryLogo : null"), "A4 preview must move Logo 1 to the right only when Logo 2 exists");
+  expect(component.includes("commercial-document-secondary-logo flex h-24"), "A4 preview must keep Logo 2 in a dedicated enlarged visual box");
+  expect(component.includes("max-h-24 max-w-[188px] origin-center scale-[1.18]"), "A4 preview must make the centered Logo 2 slightly larger without stretching it");
 }
 
 const adminTheme = read("src/components/ui/theme/adminTheme.ts");
@@ -96,8 +97,9 @@ if (exists("src/lib/documents/pdf.ts")) {
   expect(pdf.includes("secondary_logo_on_light_url"), "PDF must use the secondary on-light logo slot");
   expect(pdf.includes("detailRows"), "PDF renderer must preserve multiple wrapped Countertop detail rows");
   expect(pdf.includes("rowHeight"), "PDF pagination must account for variable commercial line height");
-  expect(pdf.includes("SECONDARY_LOGO_BOX"), "PDF must use a dedicated normalized Logo 2 box");
-  expect(pdf.includes("SECONDARY_LOGO_BOX = { x: 378, y: 738, maxWidth: 175, maxHeight: 78 }"), "Downloaded PDF must enlarge Logo 2 by about 25 percent while keeping it inside the A4 header");
+  expect(pdf.includes("SECONDARY_CENTER_LOGO_BOX = { x: 215, y: 741, maxWidth: 160, maxHeight: 70 }"), "Downloaded PDF must center and enlarge Logo 2");
+  expect(pdf.includes("PRIMARY_RIGHT_LOGO_BOX = { x: 397, y: 751, maxWidth: 140, maxHeight: 50 }"), "Downloaded PDF must move Logo 1 to the right at its normal visual scale");
+  expect(pdf.includes("if (secondary)"), "Downloaded PDF must preserve the one-logo fallback while swapping two-logo layouts");
 }
 
 const canonicalSqlPath = "sql/commercial-document-branding.sql";
