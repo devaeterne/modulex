@@ -11,6 +11,7 @@ on:
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
       - "modulex-store/supabase/migrations/*calendar*.sql"
+      - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
       - ".github/workflows/**"
   push:
     paths:
@@ -22,6 +23,7 @@ on:
       - "modulex-store/supabase/migrations/*countertop*.sql"
       - "modulex-store/supabase/migrations/*manual_service*.sql"
       - "modulex-store/supabase/migrations/*calendar*.sql"
+      - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
       - ".github/workflows/**"
 
 concurrency:
@@ -79,6 +81,8 @@ jobs:
         run: node scripts/commercial-document-contract.mjs
       - name: Customers UI contract
         run: node scripts/customers-ui-contract.mjs
+      - name: CUST-7 VAL-3 Customer lifecycle migration contract
+        run: npm run smoke:val-3-customers-orders-invoices
       - name: Dashboard shell contract
         run: node scripts/dashboard-shell-ui-contract.mjs
       - name: General settings UI contract
