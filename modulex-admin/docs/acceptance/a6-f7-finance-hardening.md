@@ -15,7 +15,7 @@ Canonical artifacts:
 - Existing CI owner: `.github/workflows/admin-a6-finance-core.yml`
 - Draft PR: `#349 — chore(finance): harden A6 F7 production boundaries`
 
-The Admin SQL and Store migration mirror must remain byte-identical. The migration is intentionally index-only and must not rewrite Finance business data or alter RLS/RPC/RBAC behavior.
+The Admin SQL and Store migration mirror must remain byte-identical. The migration is deliberately narrow: covering indexes for Finance-owned / Finance-integration foreign keys plus one targeted execute revoke on an internal private trigger helper. It contains no Finance business-data rewrite/backfill and does not widen RLS/RPC/RBAC behavior.
 
 ## Pre-merge baseline
 
@@ -23,7 +23,8 @@ The Admin SQL and Store migration mirror must remain byte-identical. The migrati
 - The initial F7 RED head was `e4fc1f4806e2ea1864a905379bdc4f5928c43692`.
 - Admin A6 Finance Core run `#322` kept F1–F6 contracts GREEN and failed only on `Missing A6-F7 artifact: sql/a6-finance-f7-hardening.sql`.
 - Production Performance Advisor was read before implementation. F7 only addresses Finance-owned / Finance-integration `unindexed_foreign_keys` findings with covering indexes; unrelated project-wide findings and `unused_index` INFO findings are not treated as permission to delete indexes.
-- Production Security Advisor flags reviewed public `SECURITY DEFINER` wrappers. This is classified against the locked architecture: direct execution remains authenticated-only and authorization remains inside private role-checked Finance cores with pinned empty `search_path`. F7 must not weaken that boundary merely to silence a generic linter warning.
+- Production Security Advisor flags reviewed public `SECURITY DEFINER` wrappers. These remain intentional: public execution is authenticated-only and authorization remains inside private role-checked Finance cores with pinned empty `search_path`.
+- A direct production ACL/catalog audit found one real private-helper deviation: `private.guard_allocated_vendor_payment_void()` retained default EXECUTE for PUBLIC/anon/authenticated while the other reviewed Finance private cores were browser-inaccessible. F7 closes only that exposure with `REVOKE ALL ... FROM public, anon, authenticated`; no public wrapper grant or function body is rewritten.
 
 ## RLS/RPC/RBAC hardening contract
 
@@ -36,7 +37,7 @@ Production acceptance must verify:
 - unauthenticated/anon Finance reads and writes fail closed;
 - `finance.view` can execute read projections but cannot gain `finance.manage` mutations;
 - Finance mutation wrappers remain authenticated-only;
-- private Finance cores remain non-executable by browser roles;
+- private Finance cores, including `private.guard_allocated_vendor_payment_void()`, are non-executable by browser roles;
 - reviewed `SECURITY DEFINER` wrappers retain pinned empty `search_path`;
 - source-domain permissions (HR, Project, Customer, Vendor) are not broadened by Finance hardening.
 
@@ -80,13 +81,14 @@ Read-only reconciliation and rollback-only behavioral acceptance must cover:
 Before production migration after owner merge:
 
 - verify the target foreign-key columns still lack covering indexes and that no parallel migration has added equivalent indexes;
-- verify current production schema contains every target table/column;
-- verify the migration remains index-only and contains no DML/backfill;
+- verify current production schema contains every target table/column/function;
+- verify the migration contains only the reviewed indexes and targeted private-helper revoke, with no business DML/backfill, public GRANT, or function rewrite;
 - compare Admin SQL and Store migration mirror byte-for-byte.
 
 After migration:
 
 - confirm every F7 covering index exists;
+- confirm `private.guard_allocated_vendor_payment_void()` is no longer executable by PUBLIC/anon/authenticated;
 - rerun Performance Advisor and classify only F7/Finance findings;
 - rerun Security Advisor and confirm no new Finance authorization finding was introduced;
 - run the reconciliation queries and ensure no orphan, over-allocation or bridge double-count result appears.
