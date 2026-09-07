@@ -23,6 +23,8 @@ import {
   type FinancePayrollObligation,
 } from "@/lib/finance/payroll";
 import { supabase } from "@/lib/supabase/client";
+import { formatTimestampDate } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 type Period = {
   id: string;
@@ -428,17 +430,16 @@ export default function PayrollManager() {
               </Field>
             </div>
             <Field label="Start">
-              <Input type="date" value={start} onChange={(event) => setStart(event.target.value)} required />
+              <DateInput value={start} onChange={(event) => setStart(event)} required />
             </Field>
             <Field label="End">
-              <Input type="date" value={end} onChange={(event) => setEnd(event.target.value)} required />
+              <DateInput value={end} onChange={(event) => setEnd(event)} required />
             </Field>
             <div className="md:col-span-2">
               <Field label="Pay date">
-                <Input
-                  type="date"
+                <DateInput
                   value={payDate}
-                  onChange={(event) => setPayDate(event.target.value)}
+                  onChange={(event) => setPayDate(event)}
                   required
                 />
               </Field>
@@ -591,7 +592,7 @@ export default function PayrollManager() {
                         </Badge>
                         {settlement.latest_payment_at ? (
                           <div className="mt-1 text-xs">
-                            {new Date(settlement.latest_payment_at).toLocaleDateString()}
+                            {formatTimestampDate(settlement.latest_payment_at)}
                           </div>
                         ) : null}
                       </TableCell>

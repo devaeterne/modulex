@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
 import type { Customer, CustomerInvoice, CustomerInvoiceStatus } from "@/lib/customers/types";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 const INVOICE_STATUSES: CustomerInvoiceStatus[] = [
@@ -32,7 +33,7 @@ function money(value: string | number | null | undefined, currency = "USD") {
 
 function date(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
+  return formatTimestampDate(value);
 }
 
 function titleCase(value: string) {

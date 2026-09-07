@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/table";
 import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
+import { formatTimestampDate } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 type Employee = {
   id: string;
@@ -112,7 +114,7 @@ function formatDate(value: string) {
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
+    : formatTimestampDate(date);
 }
 
 function formatStatus(value: string) {
@@ -876,21 +878,19 @@ export default function LeaveManager() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="leave-request-from">From</Label>
-              <Input
+              <DateInput
                 id="leave-request-from"
-                type="date"
                 value={startDate}
-                onChange={(event) => setStartDate(event.target.value)}
+                onChange={(event) => setStartDate(event)}
                 required
               />
             </div>
             <div>
               <Label htmlFor="leave-request-to">To</Label>
-              <Input
+              <DateInput
                 id="leave-request-to"
-                type="date"
                 value={endDate}
-                onChange={(event) => setEndDate(event.target.value)}
+                onChange={(event) => setEndDate(event)}
                 required
               />
             </div>

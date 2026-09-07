@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import type { LeadAssignee, StoreLead, StoreLeadStatus, StoreLeadType } from "@/lib/store/leads";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
 
@@ -30,7 +31,7 @@ function typeLabel(type: StoreLeadType) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 export default function StoreLeadsTable() {

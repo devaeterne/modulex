@@ -37,6 +37,7 @@ import {
   type ProjectChangeOrderListItem,
   type ProjectChangeOrderSummary,
 } from "@/lib/customers/project-change-orders-domain";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 export type ProjectChangeOrderOrder = {
   id: string;
@@ -131,7 +132,7 @@ function money(value: number | null, currency: string | null) {
 
 function displayDateTime(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function numericOrNull(value: string) {

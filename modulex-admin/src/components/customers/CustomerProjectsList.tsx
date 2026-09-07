@@ -27,6 +27,8 @@ import {
 import { loadCustomerRecord } from "@/lib/customers/read-dedup";
 import type { Customer } from "@/lib/customers/types";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { formatTimestampDate } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
 
@@ -45,7 +47,7 @@ function statusColor(status: ProjectStatus): "primary" | "success" | "warning" |
 
 function displayDate(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+  return formatTimestampDate(value);
 }
 
 export default function CustomerProjectsList({ customerId }: { customerId: string }) {
@@ -151,11 +153,10 @@ export default function CustomerProjectsList({ customerId }: { customerId: strin
             </div>
             <div>
               <Label htmlFor="customer-project-target-date">Target date</Label>
-              <Input
+              <DateInput
                 id="customer-project-target-date"
-                type="date"
                 value={targetDate}
-                onChange={(event) => setTargetDate(event.target.value)}
+                onChange={(event) => setTargetDate(event)}
               />
             </div>
           </div>

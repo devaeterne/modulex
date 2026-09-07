@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import type { CustomerOrderStatus } from "@/lib/customers/types";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 type DashboardStats = {
   total_customers: number;
@@ -48,9 +49,7 @@ const moneyFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-});
+const dateFormatter = { format: (value: string | Date) => formatTimestampDate(value) };
 
 function money(value: string | number | null | undefined) {
   const number = Number(value ?? 0);

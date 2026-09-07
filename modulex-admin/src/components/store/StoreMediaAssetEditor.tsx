@@ -13,6 +13,7 @@ import {
   type StoreMediaAttribution,
   type StoreMediaCabinetRelevance,
 } from "@/lib/store/mediaLibrary";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 const inputClass =
   "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs outline-none transition focus:border-brand-300 focus:ring-3 focus:ring-brand-500/10 disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:disabled:bg-gray-800";
@@ -150,7 +151,7 @@ export default function StoreMediaAssetEditor({
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Media asset</p>
             <h2 className="mt-1 text-xl font-semibold text-gray-800 dark:text-white/90">{asset.title}</h2>
-            <p className="mt-1 text-sm text-gray-500">Status: {asset.status} · updated {new Date(asset.updated_at).toLocaleString()}</p>
+            <p className="mt-1 text-sm text-gray-500">Status: {asset.status} · updated {formatDateTime(asset.updated_at)}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {asset.status === "approved" ? <button type="button" className={primaryButton} disabled={!canEdit || busy} onClick={() => void handleLifecycle("publish")}>Publish</button> : null}

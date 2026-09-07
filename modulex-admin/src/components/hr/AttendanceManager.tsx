@@ -24,6 +24,7 @@ import {
   type AdminStatusColor,
 } from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
+import DateInput from "@/components/form/DateInput";
 
 type Employee = {
   id: string;
@@ -368,11 +369,10 @@ export default function AttendanceManager() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               <div>
                 <Label htmlFor="attendance-work-date">Work date</Label>
-                <Input
+                <DateInput
                   id="attendance-work-date"
-                  type="date"
                   value={workDate}
-                  onChange={(event) => setWorkDate(event.target.value)}
+                  onChange={(event) => setWorkDate(event)}
                   required
                   disabled={busy}
                 />
@@ -489,20 +489,18 @@ export default function AttendanceManager() {
             <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:max-w-sm">
               <div>
                 <Label htmlFor="attendance-filter-from">From</Label>
-                <Input
+                <DateInput
                   id="attendance-filter-from"
-                  type="date"
                   value={startDate}
-                  onChange={(event) => setStartDate(event.target.value)}
+                  onChange={(event) => setStartDate(event)}
                 />
               </div>
               <div>
                 <Label htmlFor="attendance-filter-to">To</Label>
-                <Input
+                <DateInput
                   id="attendance-filter-to"
-                  type="date"
                   value={endDate}
-                  onChange={(event) => setEndDate(event.target.value)}
+                  onChange={(event) => setEndDate(event)}
                 />
               </div>
             </div>

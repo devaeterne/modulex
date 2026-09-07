@@ -14,6 +14,7 @@ import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type RequestStatus = "open" | "in_progress" | "completed";
 type RequestCategory = "bug" | "development" | "operations" | "other";
@@ -55,10 +56,7 @@ const statusBadgeColors: Record<RequestStatus, "primary" | "warning" | "success"
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function reportRequestError(context: string, error: unknown) {

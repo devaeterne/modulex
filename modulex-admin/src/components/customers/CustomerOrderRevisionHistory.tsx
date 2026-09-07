@@ -8,13 +8,14 @@ import Button from "@/components/ui/button/Button";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import type { CustomerOrderRevision } from "@/lib/customers/types";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type RevisionActor = { full_name: string | null; email: string | null };
 type RevisionRow = CustomerOrderRevision & { actor: RevisionActor | RevisionActor[] | null };
 type DisplayRevision = CustomerOrderRevision & { actor: RevisionActor | null };
 
 function dateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function normalizeActor(actor: RevisionRow["actor"]): RevisionActor | null {

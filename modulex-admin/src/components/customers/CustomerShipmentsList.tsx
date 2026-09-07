@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
 import type { CustomerShipment, CustomerShipmentStatus } from "@/lib/customers/shipment-types";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 type ShipmentRow = CustomerShipment & {
   customer_name?: string | null;
@@ -34,7 +35,7 @@ function titleCase(value: string) {
 
 function date(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
+  return formatTimestampDate(value);
 }
 
 function statusClass(status: CustomerShipmentStatus) {

@@ -11,6 +11,7 @@ import type {
   CustomerShipmentItem,
   CustomerShipmentStatus,
 } from "@/lib/customers/shipment-types";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type StockLocation = {
   product_id: string;
@@ -41,10 +42,7 @@ function dateTime(value: string | null) {
     return "—";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function statusClass(status: CustomerShipmentStatus) {

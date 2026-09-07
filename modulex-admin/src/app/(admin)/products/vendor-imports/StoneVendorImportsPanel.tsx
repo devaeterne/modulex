@@ -19,6 +19,7 @@ import {
   TableViewport,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type ReviewStatus = "PENDING" | "APPROVED" | "IGNORED";
 type ChangeState = "NEW" | "UPDATED" | "UNCHANGED";
@@ -772,7 +773,7 @@ export default function StoneVendorImportsPanel() {
                     <TableCell variant="admin"><span className="block text-sm">{locations.join(", ") || "—"}</span>{lots.length ? <span className="mt-1 block text-xs opacity-70">Lot {lots.join(", ")}</span> : null}</TableCell>
                     <TableCell variant="admin" className="max-w-sm"><a href={item.product_url} target="_blank" rel="noreferrer" className="font-medium underline underline-offset-4 transition-opacity hover:opacity-75">{item.title}</a><span className="mt-1 block font-mono text-xs opacity-70">{item.sku ?? item.external_id}</span></TableCell>
                     <TableCell variant="admin"><div className="flex flex-col gap-1 text-xs">{item.canonical_product_id ? <a href={`/products/${item.canonical_product_id}/edit`} className="underline underline-offset-4 transition-opacity hover:opacity-75">Edit Product</a> : <span>Not linked</span>}<a href={item.product_url} target="_blank" rel="noreferrer" className="underline underline-offset-4 transition-opacity hover:opacity-75">Vendor source</a></div></TableCell>
-                    <TableCell variant="admin" className="whitespace-nowrap text-xs">{new Date(item.last_seen_at).toLocaleString()}</TableCell>
+                    <TableCell variant="admin" className="whitespace-nowrap text-xs">{formatDateTime(item.last_seen_at)}</TableCell>
                     <TableCell variant="admin"><div className="flex flex-wrap justify-end gap-2">
                       {reviewStatus !== "APPROVED" ? <Button size="sm" disabled={updatingId === item.id || !individuallyApprovable || bulkApproving} onClick={() => void setStatus(item.id, "APPROVED")}>{updatingId === item.id ? "Approving…" : "Approve Stone"}</Button> : null}
                       {reviewStatus !== "IGNORED" ? <Button size="sm" variant="outline" disabled={updatingId === item.id || bulkApproving} onClick={() => void setStatus(item.id, "IGNORED")}>Ignore</Button> : null}

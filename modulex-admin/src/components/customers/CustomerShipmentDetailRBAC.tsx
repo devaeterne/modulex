@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
 import type { CustomerShipment, CustomerShipmentItem, CustomerShipmentStatus } from "@/lib/customers/shipment-types";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type StockLocation = {
   product_id: string;
@@ -36,7 +37,7 @@ function titleCase(value: string) {
 
 function dateTime(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function statusClass(status: CustomerShipmentStatus) {

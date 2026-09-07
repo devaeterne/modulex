@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { downloadCsv } from "@/lib/reports/csv";
+import { formatDateTime } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 type MovementRow = {
   movement_id: string;
@@ -51,7 +53,7 @@ function formatNumber(value: number | string | null | undefined) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function movementLabel(value: string) {
@@ -220,8 +222,8 @@ export default function MovementReport() {
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search reference, SKU, user..." className={`${controlClass} xl:col-span-2`} />
             <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={controlClass}><option value="all">All Types</option>{MOVEMENT_TYPES.map((type) => <option key={type} value={type}>{movementLabel(type)}</option>)}</select>
             <select value={warehouseFilter} onChange={(event) => setWarehouseFilter(event.target.value)} className={controlClass}><option value="all">All Warehouses</option>{warehouses.map((option) => <option key={option.filter_key} value={option.filter_key}>{option.filter_label}</option>)}</select>
-            <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} aria-label="Date from" className={controlClass} />
-            <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} aria-label="Date to" className={controlClass} />
+            <DateInput value={dateFrom} onChange={(event) => setDateFrom(event)} aria-label="Date from" className={controlClass} />
+            <DateInput value={dateTo} onChange={(event) => setDateTo(event)} aria-label="Date to" className={controlClass} />
           </div>
           <div className="mt-3 flex justify-end"><button type="button" onClick={clearFilters} className="text-sm font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">Clear filters</button></div>
         </div>

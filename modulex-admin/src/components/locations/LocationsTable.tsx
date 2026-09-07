@@ -21,6 +21,7 @@ import QRPreview from "@/components/qr/QRPreview";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type WarehouseType = "sellable" | "non_sellable";
 
@@ -92,9 +93,7 @@ function formatNumber(value: number | string | null | undefined) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(
-    new Date(value),
-  );
+  return formatDateTime(value);
 }
 
 export default function LocationsTable({ zoneId, warehouseId }: LocationsTableProps) {

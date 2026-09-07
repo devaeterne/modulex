@@ -24,6 +24,7 @@ import {
   type StoreFaqEntry,
   type StoreProcessStep,
 } from "@/lib/store/cabinetContent";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 const SOURCE_PAGE = "https://granitecenterva.com/kitchen-cabinet-sale/";
 const PROCESS_ATTRIBUTION_OPTIONS = [
@@ -278,7 +279,7 @@ function ProcessRow({
   return (
     <ComponentCard
       title={step.title || "Process step"}
-      desc={`Updated ${new Date(step.updated_at).toLocaleString()}`}
+      desc={`Updated ${formatDateTime(step.updated_at)}`}
       headerAction={<StatusBadge status={step.status} />}
     >
       <ProcessFields value={draft} onChange={setDraft} disabled={disabled} prefix={`process-${step.id}`} />
@@ -340,7 +341,7 @@ function FaqRow({
   return (
     <ComponentCard
       title={faq.question || "FAQ entry"}
-      desc={`Updated ${new Date(faq.updated_at).toLocaleString()}`}
+      desc={`Updated ${formatDateTime(faq.updated_at)}`}
       headerAction={<StatusBadge status={faq.status} />}
     >
       <FaqFields value={draft} onChange={setDraft} disabled={disabled} prefix={`faq-${faq.id}`} />

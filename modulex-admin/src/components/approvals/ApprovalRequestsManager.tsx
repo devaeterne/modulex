@@ -11,6 +11,7 @@ import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type ApprovalStatus = "pending" | "approved" | "rejected" | "cancelled";
 type ApprovalBadgeColor = "success" | "error" | "warning" | "light";
@@ -42,10 +43,7 @@ function titleCase(value: string) {
 
 function dateTime(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function statusColor(status: ApprovalStatus): ApprovalBadgeColor {

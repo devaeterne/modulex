@@ -24,6 +24,7 @@ import {
   type CompanyExpenseDraftInput,
   type CompanyExpenseStatus,
 } from "@/lib/finance/expenses";
+import DateInput from "@/components/form/DateInput";
 
 const statusOptions = [
   { value: "draft", label: "Draft" },
@@ -305,7 +306,7 @@ export default function FinanceExpensesManager() {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div>
                 <Label htmlFor="expense-date">Expense date</Label>
-                <Input id="expense-date" type="date" value={expenseDate} onChange={(event) => setExpenseDate(event.target.value)} required />
+                <DateInput id="expense-date" value={expenseDate} onChange={(event) => setExpenseDate(event)} required />
               </div>
               <div>
                 <Label htmlFor="expense-category">Category</Label>
@@ -380,11 +381,11 @@ export default function FinanceExpensesManager() {
             </div>
             <div>
               <Label htmlFor="expense-filter-from">From</Label>
-              <Input id="expense-filter-from" type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+              <DateInput id="expense-filter-from" value={fromDate} onChange={(event) => setFromDate(event)} />
             </div>
             <div>
               <Label htmlFor="expense-filter-to">To</Label>
-              <Input id="expense-filter-to" type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+              <DateInput id="expense-filter-to" value={toDate} onChange={(event) => setToDate(event)} />
             </div>
             <div>
               <Label htmlFor="expense-filter-search">Search</Label>

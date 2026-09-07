@@ -31,6 +31,8 @@ import {
   type FinanceProjectActualsRow,
   type FinanceReportingSummary,
 } from "@/lib/finance/reports";
+import { formatTimestampDate } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 const PAGE_SIZE = 20;
 
@@ -64,7 +66,7 @@ function signedMoney(value: number | null, currency: string) {
 function displayDate(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString();
+  return formatTimestampDate(parsed);
 }
 
 function Metric({ label, value, helper }: { label: string; value: string; helper?: string }) {
@@ -214,20 +216,18 @@ export default function FinanceReportsWorkspace() {
         <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
           <div>
             <Label htmlFor="finance-report-from">From</Label>
-            <Input
+            <DateInput
               id="finance-report-from"
-              type="date"
               value={from}
-              onChange={(event) => setFrom(event.target.value)}
+              onChange={(event) => setFrom(event)}
             />
           </div>
           <div>
             <Label htmlFor="finance-report-to">To</Label>
-            <Input
+            <DateInput
               id="finance-report-to"
-              type="date"
               value={to}
-              onChange={(event) => setTo(event.target.value)}
+              onChange={(event) => setTo(event)}
             />
           </div>
           <Button onClick={applyFilters} disabled={loading}>Refresh Reports</Button>

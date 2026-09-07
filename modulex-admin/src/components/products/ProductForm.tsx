@@ -12,6 +12,7 @@ import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { parseDbDecimal } from "@/lib/validation";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type ProductStatus = "active" | "inactive" | "archived";
 
@@ -895,7 +896,7 @@ export default function ProductForm({ mode, productId }: ProductFormProps) {
                   <dt className="text-sm font-medium text-gray-700 dark:text-gray-400">Generated At</dt>
                   <dd className="text-sm text-gray-500 dark:text-gray-400">
                     {values.qr_generated_at
-                      ? new Date(values.qr_generated_at).toLocaleString("en-US")
+                      ? formatDateTime(values.qr_generated_at)
                       : "—"}
                   </dd>
                 </div>

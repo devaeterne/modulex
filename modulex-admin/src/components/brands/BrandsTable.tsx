@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 type BrandStatus = "active" | "inactive";
 
@@ -322,9 +323,7 @@ export default function BrandsTable() {
                         </td>
 
                         <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(brand.updated_at).toLocaleDateString(
-                            "en-US"
-                          )}
+                          {formatTimestampDate(brand.updated_at)}
                         </td>
 
                         <td className="px-5 py-4">

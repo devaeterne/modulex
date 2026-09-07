@@ -42,6 +42,8 @@ import type {
   PriceGroupLookup,
   ProfileLookup,
 } from "@/lib/customers/types";
+import { formatDateTime } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 const tabs = ["General", "Contacts", "Pricing", "Addresses", "Commercial", "Notes & Documents", "Activity"] as const;
 type Tab = (typeof tabs)[number];
@@ -98,7 +100,7 @@ function statusColor(status: CustomerStatus): "success" | "error" | "warning" | 
   return "light";
 }
 function titleCase(value: string) { return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()); }
-function dateTime(value: string | null | undefined) { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "—"; }
+function dateTime(value: string | null | undefined) { return value ? formatDateTime(value) : "—"; }
 
 function focusFirstInvalid<T extends string>(errors: Partial<Record<T, string>>, order: readonly T[], prefix: string) {
   const firstInvalid = order.find((field) => Boolean(errors[field]));
@@ -496,7 +498,7 @@ export default function CustomerCard() {
       <Field label="Legal Name"><Input value={customer.legal_name ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, legal_name: e.target.value || null })} /></Field>
       <Field label="Customer Type"><Select value={customer.customer_type_id ?? ""} disabled={!canEdit} onChange={(value) => setCustomer({ ...customer, customer_type_id: value || null })} options={customerTypes.map((item) => ({ value: item.id, label: item.name }))} placeholder="None" allowEmpty /></Field>
       <Field label="Status"><Select value={customer.status} disabled={!canEdit} onChange={(value) => setCustomer({ ...customer, status: value as CustomerStatus })} options={(["active", "prospect", "inactive", "blocked"] as CustomerStatus[]).map((value) => ({ value, label: titleCase(value) }))} /></Field>
-      <Field label="Customer Since"><Input type="date" value={customer.customer_since ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, customer_since: e.target.value || null })} /></Field>
+      <Field label="Customer Since"><DateInput value={customer.customer_since ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, customer_since: e || null })} /></Field>
       <Field label="Tax / VAT Number"><Input value={customer.tax_number ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, tax_number: e.target.value || null })} /></Field>
       <Field label="Registration Number"><Input value={customer.registration_number ?? ""} disabled={!canEdit} onChange={(e) => setCustomer({ ...customer, registration_number: e.target.value || null })} /></Field>
       <Field label="Country Code"><Input id="customer-master-country_code" maxLength={2} value={customer.country_code ?? ""} disabled={!canEdit} error={Boolean(customerMasterFieldErrors.country_code)} hint={customerMasterFieldErrors.country_code} onChange={(e) => { clearMasterError("country_code"); setCustomer({ ...customer, country_code: normalizeCountryCode(e.target.value) || null }); }} /></Field>

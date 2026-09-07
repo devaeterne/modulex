@@ -15,6 +15,7 @@ import { authenticatedFetch } from "@/lib/auth/authenticated-fetch";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import type { UserRole } from "@/lib/supabase/profile";
 import { isValidEmail, isValidPhone, normalizeEmail, sanitizePhoneInput } from "@/lib/validation";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type UserRow = {
   id: string;
@@ -48,7 +49,7 @@ const emptyForm: UserForm = { fullName: "", email: "", phone: "", roles: ["wareh
 
 function formatDate(value: string | null) {
   if (!value) return "Never";
-  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 function effectiveRoles(user: UserRow) { return user.roles?.length ? user.roles : [user.role]; }
 function actorRoles(actor: Actor | null) { return actor ? (actor.roles?.length ? actor.roles : [actor.role]) : []; }

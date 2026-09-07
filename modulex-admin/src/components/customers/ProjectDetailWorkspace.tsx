@@ -37,6 +37,8 @@ import {
   type CustomerProject,
   type ProjectStatus,
 } from "@/lib/customers/project-domain";
+import { formatDateTime, formatTimestampDate } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 type StandaloneOrder = { id: string; order_number: string; status: string; order_date: string; grand_total: number | string };
 type ProfileOption = { id: string; full_name: string | null; email: string | null; role: string; is_active: boolean };
@@ -87,12 +89,12 @@ function orderBadgeColor(status: string): BadgeColor {
 
 function displayDate(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+  return formatTimestampDate(value);
 }
 
 function displayDateTime(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function dateInputValue(value: string | null | undefined) {
@@ -439,11 +441,11 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
                 </div>
                 <div>
                   <Label htmlFor="project-detail-start-date">Start date</Label>
-                  <Input id="project-detail-start-date" type="date" value={editStartDate} onChange={(event) => setEditStartDate(event.target.value)} />
+                  <DateInput id="project-detail-start-date" value={editStartDate} onChange={(event) => setEditStartDate(event)} />
                 </div>
                 <div>
                   <Label htmlFor="project-detail-target-date">Target date</Label>
-                  <Input id="project-detail-target-date" type="date" value={editTargetDate} onChange={(event) => setEditTargetDate(event.target.value)} />
+                  <DateInput id="project-detail-target-date" value={editTargetDate} onChange={(event) => setEditTargetDate(event)} />
                 </div>
               </div>
               <div className="flex justify-end">

@@ -15,6 +15,8 @@ import { getVendorBillDetail, type VendorBillDetail } from "@/lib/finance/vendor
 import { getVendorPaymentsPage, type VendorPaymentListItem } from "@/lib/finance/vendorPayments";
 import { getPaymentSchedulesPage, type PaymentScheduleListItem } from "@/lib/finance/paymentSchedule";
 import { getVendorsPage, type VendorListItem } from "@/lib/finance/vendors";
+import { formatTimestampDate } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 const pageSize = 50;
 
@@ -53,7 +55,7 @@ function amount(value: number, currency: string) {
 
 function dateLabel(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
+  return formatTimestampDate(`${value.slice(0, 10)}T12:00:00`);
 }
 
 function bucketColor(bucket: ApAgingBucket) {
@@ -173,7 +175,7 @@ export default function FinanceApAgingManager() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div>
             <Label htmlFor="ap-aging-as-of">As of date</Label>
-            <Input id="ap-aging-as-of" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
+            <DateInput id="ap-aging-as-of" value={asOf} onChange={(event) => setAsOf(event)} />
           </div>
           <div>
             <Label htmlFor="ap-aging-vendor">Vendor</Label>

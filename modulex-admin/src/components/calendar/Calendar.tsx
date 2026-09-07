@@ -12,6 +12,7 @@ import {
 } from "@fullcalendar/core";
 import { useModal } from "@/hooks/useModal";
 import { Modal } from "@/components/ui/modal";
+import DateInput from "@/components/form/DateInput";
 
 interface CalendarEvent extends EventInput {
   extendedProps: {
@@ -220,11 +221,10 @@ const Calendar: React.FC = () => {
                 Enter Start Date
               </label>
               <div className="relative">
-                <input
+                <DateInput
                   id="event-start-date"
-                  type="date"
                   value={eventStartDate}
-                  onChange={(e) => setEventStartDate(e.target.value)}
+                  onChange={(e) => setEventStartDate(e)}
                   className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                 />
               </div>
@@ -235,11 +235,10 @@ const Calendar: React.FC = () => {
                 Enter End Date
               </label>
               <div className="relative">
-                <input
+                <DateInput
                   id="event-end-date"
-                  type="date"
                   value={eventEndDate}
-                  onChange={(e) => setEventEndDate(e.target.value)}
+                  onChange={(e) => setEventEndDate(e)}
                   className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
                 />
               </div>

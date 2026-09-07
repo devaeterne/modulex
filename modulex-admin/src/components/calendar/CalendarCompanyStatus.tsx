@@ -4,6 +4,7 @@ import ComponentCard from "@/components/common/ComponentCard";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 export type CalendarCompanyBindingStatus = {
   binding: {
@@ -27,7 +28,7 @@ function displayDate(value: string | null) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return formatDateTime(date);
 }
 
 export default function CalendarCompanyStatus({

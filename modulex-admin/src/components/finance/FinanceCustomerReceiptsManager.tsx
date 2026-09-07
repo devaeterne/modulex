@@ -23,6 +23,7 @@ import {
   type CustomerReceiptReferenceData,
   type CustomerReceiptRow,
 } from "@/lib/finance/customer-receipts";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 function localDateTimeValue() {
   const now = new Date();
@@ -260,7 +261,7 @@ export default function FinanceCustomerReceiptsManager() {
             <TableBody variant="admin">
               {receipts.length === 0 ? <TableStateRow colSpan={8}>No Customer Receipts match this view.</TableStateRow> : receipts.map((receipt) => (
                 <TableRow key={receipt.transaction_id}>
-                  <TableCell variant="admin">{new Date(receipt.transaction_at).toLocaleString()}</TableCell>
+                  <TableCell variant="admin">{formatDateTime(receipt.transaction_at)}</TableCell>
                   <TableCell variant="admin"><div className="font-medium">{receipt.customer_name || "Unknown Customer"}</div><div className="text-xs">{receipt.customer_code || "—"}</div></TableCell>
                   <TableCell variant="admin">{receipt.destination_account_name || "—"}</TableCell>
                   <TableCell variant="admin">{receipt.reference_no || "—"}</TableCell>

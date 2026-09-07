@@ -20,6 +20,7 @@ import {
   TableViewport,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type ReviewStatus = "PENDING" | "APPROVED" | "IGNORED";
 type ChangeState = "NEW" | "UPDATED" | "UNCHANGED";
@@ -1700,7 +1701,7 @@ export default function VendorImportsPage() {
                         </div>
                       </TableCell>
                       <TableCell variant="admin" className="whitespace-nowrap text-xs">
-                        {new Date(item.last_seen_at).toLocaleString()}
+                        {formatDateTime(item.last_seen_at)}
                       </TableCell>
                       <TableCell variant="admin">
                         <div className="flex flex-wrap justify-end gap-2">

@@ -21,6 +21,7 @@ import {
   type StoreReviewAttribution,
   type StoreReviewInput,
 } from "@/lib/store/reviews";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 const PARENT_SOURCE = "Granite & Cabinet Center";
 const PARENT_SOURCE_URL = "https://granitecenterva.com/testimonials/";
@@ -120,7 +121,7 @@ function ReviewRow({ review, disabled, run }: { review: StoreReview; disabled: b
     await run(() => saveStoreReview(review.id, toInput(draft)));
   }
 
-  return <ComponentCard title={review.reviewer_name || "Review excerpt"} desc={`Updated ${new Date(review.updated_at).toLocaleString()}`} headerAction={<Badge color={review.status === "published" ? "success" : "light"}>{review.status === "published" ? "Published" : "Draft"}</Badge>}>
+  return <ComponentCard title={review.reviewer_name || "Review excerpt"} desc={`Updated ${formatDateTime(review.updated_at)}`} headerAction={<Badge color={review.status === "published" ? "success" : "light"}>{review.status === "published" ? "Published" : "Draft"}</Badge>}>
     <ReviewFields value={draft} onChange={(next) => { setDraft(next); setErrors({}); }} disabled={disabled} prefix={prefix} errors={errors} />
     <div className="flex flex-wrap justify-end gap-2"><Button size="sm" variant="outline" disabled={disabled} onClick={() => void save()}>Save as draft</Button><Button size="sm" variant={review.status === "published" ? "outline" : "primary"} disabled={disabled} onClick={() => void run(() => setStoreReviewPublished(review.id, review.status !== "published"))}>{review.status === "published" ? "Unpublish" : "Publish"}</Button><Button size="sm" variant="danger" disabled={disabled} onClick={() => void run(() => deleteStoreReview(review.id))}>Delete</Button></div>
   </ComponentCard>;

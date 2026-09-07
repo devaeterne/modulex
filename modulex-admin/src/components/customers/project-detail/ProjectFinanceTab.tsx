@@ -33,6 +33,8 @@ import {
   type ProjectCollectionState,
   type ProjectPaymentStatus,
 } from "@/lib/customers/project-payment-status";
+import { formatTimestampDate } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 type OrderTotalReference = {
   currencyCode: string;
@@ -410,7 +412,7 @@ export default function ProjectFinanceTab({ projectId, canManageProjectPayments,
             <div><Label htmlFor="requirement-name">Plan name</Label><Input id="requirement-name" value={requirementName} onChange={(event) => setRequirementName(event.target.value)} /></div>
             <div><Label htmlFor="requirement-amount">Amount</Label><Input id="requirement-amount" type="number" min="0" step="0.01" value={requirementAmount} onChange={(event) => setRequirementAmount(event.target.value)} /></div>
             <div><Label htmlFor="requirement-currency">Currency</Label><Input id="requirement-currency" value={requirementCurrency} maxLength={3} onChange={(event) => setRequirementCurrency(event.target.value.toUpperCase())} /></div>
-            <div><Label htmlFor="requirement-due">Due date</Label><Input id="requirement-due" type="date" value={requirementDueDate} onChange={(event) => setRequirementDueDate(event.target.value)} /></div>
+            <div><Label htmlFor="requirement-due">Due date</Label><DateInput id="requirement-due" value={requirementDueDate} onChange={(event) => setRequirementDueDate(event)} /></div>
           </div>
           <div className="flex flex-wrap justify-end gap-3">
             <Button variant="outline" disabled={saving} onClick={() => setShowAddPlan(false)}>Cancel</Button>
@@ -465,5 +467,5 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function displayDate(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+  return formatTimestampDate(value);
 }

@@ -9,6 +9,7 @@ import type { CountertopLineSummary, Customer, CustomerInvoice, CustomerInvoiceI
 import type { CommercialDocument as CommercialDocumentModel } from "@/lib/documents/types";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettings } from "@/lib/settings/types";
 import { supabase } from "@/lib/supabase/client";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 function money(value: string | number | null | undefined, currency: string, locale: string) {
   const amount = Number(value ?? 0);
@@ -22,9 +23,9 @@ function money(value: string | number | null | undefined, currency: string, loca
 function date(value: string | null | undefined, locale: string, timezone: string) {
   if (!value) return "—";
   try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: timezone }).format(new Date(value));
+    return formatTimestampDate(value, { timeZone: timezone });
   } catch {
-    return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
+    return formatTimestampDate(value);
   }
 }
 
