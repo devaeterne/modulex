@@ -1,11 +1,11 @@
 # A6-F7 — Finance Hardening & Production Acceptance
 
-Status: **IMPLEMENTATION / PRE-MERGE VERIFICATION**
+Status: **COMPLETE / PRODUCTION VERIFIED 2026-09-07**
 Date: 2026-09-07
 
 ## Scope
 
-A6-F7 is the closing hardening package for the locked A6 operational Finance architecture. It does not introduce a new ledger, change Finance ownership, or widen source-domain permissions.
+A6-F7 closes the locked A6 operational Finance delivery sequence without introducing another ledger, changing Finance ownership, or widening source-domain permissions.
 
 Canonical artifacts:
 
@@ -13,113 +13,153 @@ Canonical artifacts:
 - Store migration mirror: `modulex-store/supabase/migrations/20260907123000_a6_finance_f7_hardening.sql`
 - Contract: `modulex-admin/scripts/a6-finance-f7-hardening-contract.mjs`
 - Existing CI owner: `.github/workflows/admin-a6-finance-core.yml`
-- Draft PR: `#349 — chore(finance): harden A6 F7 production boundaries`
+- Implementation PR: `#349 — chore(finance): harden A6 F7 production boundaries`
+- Merge SHA: `c9dcebc552d61b79ed4609e670a9df2dda58b78c`
+- Production migration: `20260907114208 — a6_finance_f7_hardening`
 
-The Admin SQL and Store migration mirror must remain byte-identical. The migration is deliberately narrow: covering indexes for Finance-owned / Finance-integration foreign keys plus one targeted execute revoke on an internal private trigger helper. It contains no Finance business-data rewrite/backfill and does not widen RLS/RPC/RBAC behavior.
+The Admin SQL and Store migration mirror are byte-identical. The migration is deliberately narrow: covering indexes for Finance-owned / Finance-integration foreign keys plus one targeted execute revoke on an internal private trigger helper. It contains no Finance business-data rewrite/backfill, public GRANT widening, or function-body rewrite.
 
-## Pre-merge baseline
+## TDD / pre-merge evidence
 
-- Execution-time baseline was refreshed to current `main` `bd0f2afe765681415c6e34fe0c342457819c8bf6` after parallel VAL-3 PR #348 merged.
-- The initial F7 RED head was `e4fc1f4806e2ea1864a905379bdc4f5928c43692`.
-- Admin A6 Finance Core run `#322` kept F1–F6 contracts GREEN and failed only on `Missing A6-F7 artifact: sql/a6-finance-f7-hardening.sql`.
-- Production Performance Advisor was read before implementation. F7 only addresses Finance-owned / Finance-integration `unindexed_foreign_keys` findings with covering indexes; unrelated project-wide findings and `unused_index` INFO findings are not treated as permission to delete indexes.
-- Production Security Advisor flags reviewed public `SECURITY DEFINER` wrappers. These remain intentional: public execution is authenticated-only and authorization remains inside private role-checked Finance cores with pinned empty `search_path`.
-- A direct production ACL/catalog audit found one real private-helper deviation: `private.guard_allocated_vendor_payment_void()` retained default EXECUTE for PUBLIC/anon/authenticated while the other reviewed Finance private cores were browser-inaccessible. F7 closes only that exposure with `REVOKE ALL ... FROM public, anon, authenticated`; no public wrapper grant or function body is rewritten.
+- F7 was rebased onto execution-time current `main` after parallel VAL-3 work merged.
+- Initial F7 RED head: `e4fc1f4806e2ea1864a905379bdc4f5928c43692`.
+- Admin A6 Finance Core run `#322` kept F1–F6 contracts GREEN and failed only on the intentionally missing F7 implementation artifact.
+- The existing Finance workflow was extended; no parallel workflow wrapper was introduced.
+- Production Performance Advisor was inspected before implementation. The package targeted 24 Finance-owned / Finance-integration `unindexed_foreign_keys` findings only; unrelated project-wide debt and `unused_index` INFO findings were not treated as permission to delete indexes.
+- Production ACL/catalog inspection found one real deviation: `private.guard_allocated_vendor_payment_void()` retained default EXECUTE for PUBLIC/anon/authenticated. The F7 migration revokes exactly that browser exposure.
 
-## RLS/RPC/RBAC hardening contract
+## Production migration acceptance
 
-F7 preserves the existing authorization chain:
+Immediately before migration:
+
+- target covering indexes: **24**;
+- already present: **0**;
+- missing: **24**;
+- `private.guard_allocated_vendor_payment_void()` executable by PUBLIC/anon/authenticated: **yes / yes / yes**.
+
+After applying `20260907114208 — a6_finance_f7_hardening`:
+
+- target covering indexes present: **24/24**;
+- missing target indexes: **0**;
+- private trigger helper executable by PUBLIC/anon/authenticated: **no / no / no**;
+- no F7 business-data backfill or rewrite occurred.
+
+## RLS / RPC / RBAC acceptance
+
+A production authenticated-role catalog and behavioral pass verified:
+
+- reviewed Finance private cores executable by browser roles: **0**;
+- reviewed public Finance wrappers executable by PUBLIC/anon: **0**;
+- reviewed public Finance wrappers missing authenticated EXECUTE: **0**;
+- reviewed SECURITY DEFINER public Finance wrappers with an invalid/unpinned empty `search_path`: **0**;
+- a real Finance-authorized application profile can execute Finance reads and canonical mutations;
+- a real active Sales-only application profile is rejected with `42501` for both Finance read and Finance mutation boundaries;
+- source-domain permissions were not widened by F7.
+
+This re-confirms the locked chain:
 
 `Admin permission -> public authenticated wrapper -> private role-checked core -> RLS/grants/lifecycle guards -> audit`
 
-Production acceptance must verify:
+## Idempotency, posting and correction acceptance
 
-- unauthenticated/anon Finance reads and writes fail closed;
-- `finance.view` can execute read projections but cannot gain `finance.manage` mutations;
-- Finance mutation wrappers remain authenticated-only;
-- private Finance cores, including `private.guard_allocated_vendor_payment_void()`, are non-executable by browser roles;
-- reviewed `SECURITY DEFINER` wrappers retain pinned empty `search_path`;
-- source-domain permissions (HR, Project, Customer, Vendor) are not broadened by Finance hardening.
+A Finance-authorized production application role exercised the canonical Finance Core inside an explicit transaction ending in `ROLLBACK`:
 
-## Idempotency and concurrency
+1. created a temporary USD deposit draft;
+2. exact same-key / same-fingerprint retry returned the original transaction ID;
+3. same-key / different-fingerprint retry failed closed;
+4. posting produced the canonical base-currency snapshot;
+5. posted draft-edit and draft-delete paths failed closed;
+6. reversal created a new posted `reversal` transaction linked through `reversal_of_transaction_id`;
+7. reversal swapped the original account side and preserved amount/base-amount semantics;
+8. final Finance transaction and idempotency residue: **0 / 0**.
 
-The canonical Finance Core already serializes same-key retries with `pg_advisory_xact_lock` and enforces unique `(operation, idempotency_key)` ownership. F7 keeps this contract and adds final acceptance coverage rather than introducing another idempotency table.
+Production structural concurrency verification additionally confirmed:
 
-Post-merge rollback-only acceptance must prove:
+- `private.finance_idempotency_existing(...)` still contains `pg_advisory_xact_lock`;
+- `finance_idempotency_requests` still owns a unique `(operation, idempotency_key)` constraint.
 
-- exact same-key/same-fingerprint retry returns the original result;
-- same-key/different-fingerprint retry fails closed;
-- concurrent/same-key behavior cannot create duplicate Finance movement;
-- Vendor Payment, Customer Receipt and Employee Payment paths continue to converge on canonical Finance idempotency/transaction ownership;
-- failed domain validation does not leave orphan draft/idempotency state.
+F3/F4/F5 production acceptance remains authoritative for Vendor Payment, Employee/Payroll Payment and Customer Receipt domain-specific retries/reconciliation; F7 did not manufacture replacement source-domain fixtures merely to duplicate those already accepted behaviors.
 
-## Append-safe correction and FX snapshot
+## FX snapshot acceptance
 
-Post-merge acceptance must re-prove:
+A Finance-authorized production application role created a temporary EUR Finance account and EUR deposit inside an explicit transaction ending in `ROLLBACK`.
 
-- posted Finance history cannot be silently edited or hard-deleted;
-- permitted void remains lifecycle-guarded;
-- reversal is append-safe, links back through `reversal_of_transaction_id`, and offsets cash/reporting/allocation effect;
-- historical reporting uses stored `base_currency_code`, `base_amount` and FX snapshot fields;
-- foreign-currency rows without an authoritative historical snapshot fail closed where the source document cannot supply one;
-- no current FX rate is invented for historical reconciliation.
+The transaction was posted with an explicit manual EUR→USD rate of `1.25` and production stored:
 
-## Allocation reconciliation
+- transaction amount: `EUR 10.00`;
+- base currency: `USD`;
+- stored FX rate: `1.25`;
+- stored base amount: `USD 12.50`;
+- stored source: `manual:F7 acceptance manual rate`.
 
-Read-only reconciliation and rollback-only behavioral acceptance must cover:
+After rollback:
 
-- no Finance link allocation total exceeds its source transaction amount;
-- Project/Order/Customer/Vendor/Employee attribution remains contextual and never becomes universal ownership;
-- Customer Receipt -> Invoice settlement reconciles to AR without double counting bridged Project payments;
-- Vendor Payment allocations reconcile to AP and reversals;
-- Payroll/Employee Payment settlement effects reconcile to Finance transactions;
-- Project Finance actuals consume explicit Finance allocations only;
-- reversal attribution offsets the original allocation deterministically.
+- temporary EUR account residue: **0**;
+- temporary F7 Finance transaction residue: **0**;
+- existing posted foreign-currency Finance rows missing a required stored snapshot: **0**.
 
-## Migration / reconciliation gate
+No current FX rate was substituted for historical reporting.
 
-Before production migration after owner merge:
+## Allocation / reconciliation acceptance
 
-- verify the target foreign-key columns still lack covering indexes and that no parallel migration has added equivalent indexes;
-- verify current production schema contains every target table/column/function;
-- verify the migration contains only the reviewed indexes and targeted private-helper revoke, with no business DML/backfill, public GRANT, or function rewrite;
-- compare Admin SQL and Store migration mirror byte-for-byte.
+Read-only production reconciliation returned:
 
-After migration:
+- Finance transactions whose link allocation total exceeds source amount: **0**;
+- broken Finance transaction links: **0**;
+- broken reversal linkage: **0**;
+- Project/Order/Customer context mismatches on Finance links: **0**;
+- reversal attribution mismatches: **0**;
+- Project-payment bridge broken/duplicate rows: **0**;
+- Vendor allocation broken/currency-mismatch/out-of-bounds rows: **0**;
+- Payroll settlement orphan/invalid-state rows: **0**.
 
-- confirm every F7 covering index exists;
-- confirm `private.guard_allocated_vendor_payment_void()` is no longer executable by PUBLIC/anon/authenticated;
-- rerun Performance Advisor and classify only F7/Finance findings;
-- rerun Security Advisor and confirm no new Finance authorization finding was introduced;
-- run the reconciliation queries and ensure no orphan, over-allocation or bridge double-count result appears.
+At this final F7 scan, the bridge, Vendor payment-allocation and Payroll settlement-state/effect tables had no active production rows to reconcile. Their behavior is therefore not re-invented from empty data; the already completed F3/F4/F5 rollback acceptance remains the behavioral evidence for those domain paths.
 
-## Signed-in Admin production acceptance
+## Security / Performance Advisors
 
-After owner merge and production migration, signed-in Admin acceptance must cover at least:
+Fresh post-migration Advisors were reviewed.
 
-- Finance Overview;
-- Transactions / Cash & Bank;
-- Expenses;
-- Vendor/AP surfaces and AP Aging;
-- Customer Receipts and AR Aging;
-- Finance Reports;
-- Project Finance actuals under `finance.view`;
-- permission-denied behavior for a user without Finance access.
+### Performance Advisor
 
-The final acceptance record must capture deployment SHA, production migration version, smoke outcomes, Security Advisor classification, Performance Advisor classification, and reconciliation results.
+- the 24 F7 target `unindexed_foreign_keys` findings are closed;
+- the newly created F7 indexes can immediately appear as `unused_index` INFO because production has not yet accumulated workload against them; that is expected and is **not** a removal signal;
+- remaining unindexed-FK / policy / unused-index findings belong to unrelated project domains and remain separate backlog.
+
+### Security Advisor
+
+- F7 introduced no new Finance authorization blocker;
+- the reviewed public Finance SECURITY DEFINER wrappers remain an intentional authenticated-only bridge to private role-checked cores with pinned empty `search_path`;
+- direct catalog verification confirms no reviewed Finance public wrapper is executable by PUBLIC/anon and no reviewed Finance private core is browser-executable after F7.
+
+## Admin production smoke
+
+PR #349 changes SQL/docs/CI only, so it does not require a new Admin application bundle. Vercel production remains `READY` on the existing current runtime lineage while the F7 database hardening is live.
+
+Fresh production route smoke returned HTTP `200` with the expected Modulex title/bundle and session boundary for:
+
+- `/finance` — Finance Overview;
+- `/finance/transactions` — Finance Transactions;
+- `/finance/expenses` — Finance Expenses;
+- `/finance/bills` — Vendor Bills;
+- `/finance/customer-receipts` — Customer Receipts;
+- `/finance/ap-aging` — AP Aging;
+- `/finance/ar-aging` — AR Aging;
+- `/finance/reports` — Finance Reports.
+
+Production runtime logs contained **0 Finance error/fatal entries** in the inspected two-hour window.
+
+F7 does not add or alter Admin UI behavior. The signed-in browser behavior of F1–F6 remains covered by those phases' production acceptance; F7 re-verifies the production application-role/RPC boundary and deployed route/session bundles rather than claiming a new UI workflow that does not exist.
 
 ## ROLLBACK discipline
 
-Any production behavioral fixture used for idempotency, concurrency, append-safe reversal, FX snapshot, allocation reconciliation, AR/AP, Payroll or Project bridge verification must run inside an explicit transaction ending in `ROLLBACK`. Residue counts must be checked after rollback. Read-only production checks are preferred where mutation is unnecessary.
+All F7 production behavioral fixtures were transaction-scoped and ended in explicit `ROLLBACK`. Final acceptance checks found:
 
-## Pre-merge exit criteria
+- F7 Finance transaction residue: **0**;
+- F7 idempotency residue: **0**;
+- F7 temporary Finance account residue: **0**.
 
-- F1–F6 contracts GREEN on the exact F7 head;
-- F7 contract GREEN;
-- CI workflow architecture contract GREEN after modifying the existing Finance workflow;
-- F7 Admin SQL and Store migration mirror byte-identical;
-- F6 production closeout documentation corrected;
-- Finance plan and Admin roadmap show F7 active, not complete;
-- no F7 production migration applied before owner merge.
+## Exit
 
-F7 must remain in progress until the separate post-merge production acceptance above is complete.
+**A6-F7 is COMPLETE / PRODUCTION VERIFIED.**
+
+The A6 F0→F7 operational Finance foundation is closed. Future Finance work must be proposed as a new explicitly scoped package and must preserve the neutral Finance Core, append-safe correction, stored FX snapshots, contextual allocation model, and existing source-domain ownership boundaries rather than reopening or duplicating the ledger.
