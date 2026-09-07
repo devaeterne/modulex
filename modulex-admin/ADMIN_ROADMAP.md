@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-07
-Main baseline: `bd0f2afe765681415c6e34fe0c342457819c8bf6`
+Main baseline: `ab23762e3558204a24b2400fb6603391f1322eb1`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current parallel Admin package: **A6 Finance F0→F7 is complete and production-verified; there is no active Finance delivery package. Future Finance work requires a new explicitly scoped package.**
@@ -20,17 +20,25 @@ Current Admin next action: **Preserve the active non-Finance workstreams. The A6
   - Fresh Security/Performance Advisor review found no F7-specific blocking finding; unrelated project-wide advisor debt remains separate.
   - Live Finance route/session-boundary smoke is healthy. Detailed evidence: `docs/acceptance/a6-f7-finance-hardening.md`.
 
+## Customer domain final closeout
+
+- [x] **CUST-7 — Customer lifecycle / VAL-3.** Customer create/edit validation, Contact/Address lifecycle, role-aware mutation boundaries, audit behavior, rollback-only production acceptance and zero-residue checks are closed.
+- [x] **CUST-8 — Customer read performance.** Server-side list/search/filter/pagination, bounded Customer detail reads and production browser timing evidence are accepted. The current production dataset is small, so scale safety remains enforced by the server-side query/pagination contracts rather than a synthetic large-dataset claim.
+- [x] **CUST-9 — Customer UI standardization/accessibility.** Shared Admin UI migration, Customer accessibility-gap fixes, permanent production acceptance harness contract, signed-in Customer route evidence and owner acceptance are closed.
+- [x] **CUST-10 — Customer AR/Finance boundary.** AR aging, Customer balances/receipts and Finance-owned settlement semantics are production-verified without introducing a duplicate Customer ledger.
+- [x] **CUST-11 — Final Customer acceptance.** Project owner explicitly authorized final Customer domain closeout on 2026-09-07. Detailed evidence: `docs/acceptance/cust-7-val3-customers-orders-invoices.md`.
+
 ## Customer read performance cleanup
 
-- [~] Deduplicate Customers summary, Customer Detail, and Order Detail initial reads without adding persistent client caching or changing mutation behavior.
+- [x] Deduplicate Customers summary, Customer Detail, and Order Detail initial reads without adding persistent client caching or changing mutation behavior.
   - Main baseline: `7411c20d7d02bd6432d6c61196b34405429f11e1`.
   - Customers summary reuses `get_customer_dashboard` with zero recent-row limits while preserving the directory's exact filtered count and server-side range.
   - Customer and order detail consumers share only concurrent in-flight reads; settled requests are removed immediately so mutation-driven reloads cannot reuse stale data.
-  - Keep this package `[~]` until the draft PR contracts, full Admin verification, and a post-deploy authenticated production browser re-audit confirm the duplicate calls are removed.
+  - Production browser acceptance captured a healthy signed-in Customers surface and representative Customer request timing; the project owner accepted the final manual gate as part of CUST-8/CUST-11 closeout.
 
 ## Admin UI standardization program
 
-- [~] Migrate the five legacy Customer feature components to canonical shared Admin primitives without changing customer/order queries, authorization, mutations, routes, or data-loading behavior; local strict and regression verification is complete, with production deployment/acceptance still pending.
+- [x] Migrate the five legacy Customer feature components to canonical shared Admin primitives without changing customer/order queries, authorization, mutations, routes, or data-loading behavior; strict/regression verification, merged production-acceptance coverage, signed-in Customer route evidence and owner acceptance are complete.
 - [x] Standardize the production Dashboard with shared TailAdmin cards, alerts, buttons, and admin table primitives without changing KPI/RPC, retry, or role-filtering behavior.
   - `smoke:dashboard-ui` is wired into the normal Admin smoke chain; Dashboard UI, Admin UI, production-surface, RBAC, TypeScript, lint, production build, and diff-check passed locally.
 
@@ -176,14 +184,14 @@ These rules are mandatory for all future Modulex Admin work:
   - Existing Modulex dashboard KPIs and recent stock movements are sourced from production RPCs (`get_dashboard_kpis`, `get_recent_inventory_movements`); no invented metric values were found.
   - Dashboard Quick Actions now resolve the active profile and reuse `canAccessPath()` so unauthorized/dead shortcuts fail closed while KPI loading remains independent.
   - TDD evidence: Actions run `33253263982` failed on the missing profile/route guard before implementation; targeted GREEN run `33253331280` passed the expanded production-surface contract.
-  - Full package verification: `33253394213` passed production-surface, RBAC, secondary CMS, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, production build, and diff-check.
+  - Full package verification: `33253394213` passed production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, production build, and diff-check.
 
 - [x] Audit placeholder links, sample text, fake metrics, dead buttons, and development-only controls across Admin.
   - Retained production shell/auth/profile/settings/roles surfaces were reviewed in this bounded A0.1 pass; no additional fake dashboard metrics or dead actions were found in scope. Personnel, Finance, Approvals, and Training remain explicit A6 classification work rather than being silently removed here.
   - Removed the explicit `/error-404` TailAdmin template route, rebranded the global Next.js 404 as Modulex Admin, and removed the `info@dasoft.me` sign-in prefill in favor of an empty production login field.
   - `smoke:production-surface` now prevents the explicit template 404 route, TailAdmin branding in the global 404, and the known developer-account prefill from returning.
   - TDD evidence: Actions run `33254287380` failed on the still-present explicit TailAdmin 404 route before implementation; targeted GREEN run `33254350807` passed after the bounded fixes.
-  - Full package verification: Actions run `33254494898` passed production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint (0 errors / 35 existing warnings), Next.js production build, and diff-check.
+  - Full package verification: `33254494898` passed production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint (0 errors / 35 existing warnings), Next.js production build, and diff-check.
 
 - [x] Add an Admin production-surface contract test.
   - `scripts/admin-production-surface-contract.mjs` blocks the known demo route files and `/api-test` navigation, protects the intentional `/profile` surface, and guards the production 404/login shell against known template/developer residue.
@@ -533,7 +541,8 @@ A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality
   - Authenticated super-admin rollback acceptance exercised the canonical `set_product_price` boundary with `0.0001`; the active row preserved the exact four-decimal value inside the transaction and returned to its original `0.0000` after rollback, leaving no production business-data mutation.
   - `set_product_price`, `set_product_prices_bulk`, and `set_product_costs_bulk` remain SECURITY INVOKER, authenticated-executable, and anon/PUBLIC-denied. `/products`, `/pricing/products`, and `/pricing/cost-margin` return production HTTP 200 with the expected Modulex bundles, and no runtime errors were found for those routes in the inspected 24-hour window.
   - Fresh Security + Performance Advisor scans show no VAL-2-specific blocker; existing unrelated project-wide advisor backlog remains separate. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
-- [~] VAL-3 — Customers / Orders / Invoices.
+- [x] VAL-3 — Customers / Orders / Invoices.
+  - Customer domain CUST-7→CUST-11 final acceptance is closed on 2026-09-07. Production lifecycle/RBAC/zero-residue checks, exact-decimal validation contracts, Customer read/UI acceptance, AR/Finance boundary review, merged #358 acceptance coverage and explicit project-owner sign-off are recorded in `docs/acceptance/cust-7-val3-customers-orders-invoices.md`.
 - [x] VAL-4 — Inventory + Warehouses + Stock Operations.
   - PR #224 is merged and included in the deployed Admin lineage. Production schema confirms inventory on-hand/reserved quantities are `numeric(12,2)`, while warehouse code/name/type constraints match the client-side validation contract.
   - Authenticated super-admin rollback acceptance exercised `stock_in_idempotent` with quantity `0.01`; the transaction created one idempotent movement and adjusted inventory by exactly `0.01`, then rollback restored the original quantity and left zero acceptance movement rows.
@@ -728,6 +737,7 @@ The existing `/finance/payroll` and `/finance/compensation` surfaces remain HR-b
   - A6-F1 Finance contracts protect the neutral Finance ownership model, migration mirrors, account/transaction lifecycle, FX/base-currency snapshots, draft-only hard-delete, posted immutability, attribution/allocation reconciliation, RBAC and locked public-RPC/private-core mutation boundaries.
   - F7 aggregate Finance hardening contract preserves F1–F6 behavior while additionally requiring the targeted private-helper execute revoke and Advisor-supported covering-index mirror.
   - PB-5 Project fulfillment contract protects canonical Order/Shipment/Installation/PB-3B procurement rollup semantics, Customer Pickup separation, cancelled-history treatment and no Store/Finance leakage; it runs inside the consolidated `Admin Project Base` workflow.
+  - Customer closeout coverage protects Customer production-route visibility, Customer UI contract/accessibility helpers, lifecycle migration parity and the existing Customers/RBAC/build gates without introducing a standalone workflow.
 - [ ] Document what each smoke suite protects.
 
 ## A7.2 Supabase security/performance
@@ -837,6 +847,7 @@ Keep this section current so future planning does not rediscover completed work.
 - [x] A3.3 pricing production acceptance is complete: the pricing hardening migration is applied, base-group/effective-period/audit contracts pass rollback-only production probes, authenticated price mutation acceptance passes, Dealer pricing remains assigned-group/no-fallback, production pricing routes return 200, and no A3.3-specific advisor finding was introduced.
 - [x] Pricing UI v2 final production acceptance is complete: Product Type routing was re-verified under authenticated production role semantics, Stone Price Group writes fail closed, canonical Material Band writes pass rollback-only acceptance, current Product Prices/Material Bands routes are deployed and healthy, and fresh Advisors show no Pricing-specific blocker. Detailed evidence: `docs/acceptance/pricing-ui-v2-production.md`.
 - [x] VAL-2 Products & Pricing production acceptance is complete: DB numeric precision/scale matches the client contract, exact four-decimal price mutation passes authenticated rollback acceptance, relevant RPC grants remain narrow, live Product/Pricing routes are healthy, and no VAL-2-specific Advisor blocker was found. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
+- [x] VAL-3 Customer domain production acceptance is complete: CUST-7→CUST-11 lifecycle, read/performance, UI/accessibility, AR/Finance and final owner-acceptance gates are closed. Detailed evidence: `docs/acceptance/cust-7-val3-customers-orders-invoices.md`.
 - [x] VAL-4 Inventory/Warehouse production acceptance is complete: warehouse/quantity constraints match the client contract, 0.01 stock-in passes authenticated idempotent rollback acceptance with zero residue, stock RPC grants remain narrow, live warehouse/inventory routes are healthy, and no VAL-4-specific Advisor blocker was found. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
 
 ---
@@ -868,11 +879,12 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Keep existing non-Finance workstreams in their own acceptance flows. The A6 Finance F0→F7 operational foundation is complete and production-verified.
+Keep existing non-Finance workstreams in their own acceptance flows. The A6 Finance F0→F7 operational foundation is complete and production-verified. Customer CUST-7→CUST-11 is closed and must not be reopened implicitly by unrelated work.
 
 1. Do not reopen Finance F0→F7 implicitly from unrelated packages; any future Finance feature starts as a new explicitly scoped package against the locked Finance ownership model.
 2. Preserve Finance/Core regressions, authenticated-wrapper/private-core authorization, append-safe correction, stored FX snapshots and contextual allocation semantics while other roadmaps evolve.
 3. Continue the active non-Finance Project/validation/Store/Admin workstreams according to their own merge and production acceptance gates.
+4. Treat future Customer changes as new scoped packages; CUST-7→CUST-11 and VAL-3 are closed.
 
 **Cross-roadmap coordination:** F7 changes no Store public/Customer Portal/Dealer Portal projection. The Store migration directory contains only the shared Supabase deployment mirror, so `modulex-store/STORE_ROADMAP.md` requires no functional status mutation for this package.
 
