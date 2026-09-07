@@ -37,6 +37,28 @@ The fix is additive and does not rewrite commission history:
 
 A rollback-only PostgreSQL probe confirmed that adding an identity column to an existing table assigns sequence values to existing rows without firing row UPDATE triggers. Production currently has only one historical commission event, so there is no pre-existing same-timestamp ambiguity to reconcile.
 
+## PB-6 Performance Advisor closeout
+
+Fresh production Performance Advisor review during this closeout identified PB-6-owned foreign keys that did not have a full covering index. Existing indexes were inspected against the actual FK column order; partial indexes and indexes whose next column was `created_at` were not counted as covering composite FK prefixes.
+
+The same additive hardening migration therefore adds covering indexes for the remaining PB-6 FK columns on:
+
+- `project_commission_events.created_by`;
+- `project_commission_obligations(participant_id, project_id)`;
+- `project_commission_obligations.created_by`;
+- `project_commission_obligations.order_id`;
+- `project_commission_obligations.product_category_id`;
+- `project_commission_obligations.product_id`;
+- `project_participant_roles.created_by`;
+- `project_participants.created_by`;
+- `project_participants.customer_contact_id`;
+- `project_participants.employee_id`;
+- `project_participants.profile_id`;
+- `project_participants.role_id`;
+- `project_participants.updated_by`.
+
+This is index-only hardening. It does not change participant, commission, Finance payout, or RBAC semantics. Existing project-wide Advisor debt outside PB-5/PB-6 remains out of scope. Newly created indexes may initially appear as `unused_index` INFO until production traffic exercises them; that is not a reason to remove FK-covering indexes immediately after creation.
+
 ## TDD evidence
 
 RED head: `52ac721a5f8857c4cfb9d60a5f2cfdb85c519c2e`
@@ -52,6 +74,8 @@ Admin Project Base run `34131174019` / run #418:
 - PB-6 tab access + percentage basis: GREEN
 - PB-6 gross-profit commission: GREEN
 - new deterministic event-ordering contract: expected RED because the migration artifact did not yet exist
+
+The permanent GREEN contract additionally requires all PB-6-owned FK covering indexes listed above so this package cannot be closed while its known Advisor debt remains unaddressed.
 
 ## Repository artifacts
 
@@ -79,13 +103,13 @@ After merge, production acceptance must:
 
 1. apply the canonical migration;
 2. verify `event_sequence` is identity-backed and non-null for historical rows;
-3. verify event-ordering indexes;
+3. verify event-ordering indexes and PB-6 FK covering indexes;
 4. reproduce `earned -> approved -> adjustment -> approved` deterministically in one rollback-only transaction;
 5. verify offset/reversal ordering and negative-entitlement guard;
 6. verify immutable UPDATE/DELETE guards remain active;
 7. verify Admin/Finance commission management and denied roles;
 8. verify event projection ACLs and deterministic order;
-9. rerun Security and Performance Advisors;
+9. rerun Security and Performance Advisors and confirm no PB-5/PB-6-specific blocking finding remains;
 10. confirm zero acceptance residue.
 
 PB-5 production acceptance is independently GREEN; final Project Base plan/roadmap closeout will mark PB-5 and PB-6 complete only after this PB-6 migration and post-merge acceptance pass.
