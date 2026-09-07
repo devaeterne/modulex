@@ -17,6 +17,9 @@ export const GOOGLE_CALENDAR_BIDIRECTIONAL_SCOPES = [
 export const GOOGLE_CALENDAR_IMPORT_SCOPES = GOOGLE_CALENDAR_BIDIRECTIONAL_SCOPES;
 export const GOOGLE_CALENDAR_V3_SCOPES = GOOGLE_CALENDAR_BIDIRECTIONAL_SCOPES;
 
+const GOOGLE_CALENDAR_CALLBACK_PATH = "/api/admin/google-calendar/oauth/callback";
+const LEGACY_GOOGLE_CALENDAR_CALLBACK_PATH = "/api/integrations/google/calendar/callback";
+
 export type GoogleCalendarConfig = {
   clientId: string;
   clientSecret: string;
@@ -35,12 +38,22 @@ function decodeEncryptionKey(value: string): Buffer {
   return key;
 }
 
+function normalizeConfiguredRedirectUri(value: string) {
+  const legacyPath = value.endsWith(`${LEGACY_GOOGLE_CALENDAR_CALLBACK_PATH}/`)
+    ? `${LEGACY_GOOGLE_CALENDAR_CALLBACK_PATH}/`
+    : value.endsWith(LEGACY_GOOGLE_CALENDAR_CALLBACK_PATH)
+      ? LEGACY_GOOGLE_CALENDAR_CALLBACK_PATH
+      : null;
+  if (!legacyPath) return value;
+  return `${value.slice(0, -legacyPath.length)}${GOOGLE_CALENDAR_CALLBACK_PATH}`;
+}
+
 function resolveRedirectUri(requestUrl?: string) {
   const configuredRedirect = trimEnv("GOOGLE_CALENDAR_REDIRECT_URI");
-  if (configuredRedirect) return configuredRedirect;
+  if (configuredRedirect) return normalizeConfiguredRedirectUri(configuredRedirect);
   const configuredSite = trimEnv("NEXT_PUBLIC_SITE_URL");
-  if (configuredSite) return `${configuredSite.replace(/\/$/, "")}/api/admin/google-calendar/oauth/callback`;
-  if (requestUrl) return `${new URL(requestUrl).origin}/api/admin/google-calendar/oauth/callback`;
+  if (configuredSite) return `${configuredSite.replace(/\/$/, "")}${GOOGLE_CALENDAR_CALLBACK_PATH}`;
+  if (requestUrl) return `${new URL(requestUrl).origin}${GOOGLE_CALENDAR_CALLBACK_PATH}`;
   throw new Error("Google Calendar redirect URI cannot be resolved.");
 }
 
