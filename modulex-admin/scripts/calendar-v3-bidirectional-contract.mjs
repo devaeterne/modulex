@@ -82,6 +82,16 @@ assert.doesNotMatch(
   /event\.end\?\.date\s*\?\?\s*event\.start\?\.date/,
   "Provider all-day events must not collapse a missing end to the start date.",
 );
+assert.match(
+  providerReplica,
+  /parsed\.setUTCDate\(parsed\.getUTCDate\(\) \+ 1\)[\s\S]*allDayEnd:\s*providerEnd && providerEnd > allDayStart \? providerEnd : nextUtcDate\(allDayStart\)/,
+  "Provider all-day events with a missing or non-advancing end must synthesize the next UTC date as the exclusive end.",
+);
+assert.match(
+  providerReplica,
+  /const endAt = providerEnd && Number\.isFinite\(startMs\) && Number\.isFinite\(endMs\) && endMs <= startMs\s*\?\s*null\s*:\s*providerEnd/,
+  "Provider timed events whose end does not advance past start must normalize end_at to null.",
+);
 
 // Large first-time Google calendars must be pulled in bounded provider pages so a
 // manual Sync Now never depends on one Vercel request surviving the whole history.
