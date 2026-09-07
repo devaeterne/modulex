@@ -1,5 +1,6 @@
 -- Countertop Additional Services seed + customer-provided Sink snapshot semantics.
 -- Backward compatible: no column/signature changes; existing configuration JSONB is extended.
+-- Customer-provided Sink identity is project/order history only: it never becomes a priced or reserved Sink line.
 
 insert into public.countertop_services (name, pricing_method, unit_price, is_active)
 select 'Vessel Sink Cutout', 'each', 50.0000, true
