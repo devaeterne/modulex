@@ -53,6 +53,8 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
+      - name: Dry-run fail-closed Admin US date migration
+        run: node scripts/us-date-migrate.mjs
       - name: US date audit scanner self-test
         run: node ../scripts/us-date-format-audit.mjs --self-test
       - name: Inventory current date usage
