@@ -4,7 +4,6 @@ import path from "node:path";
 
 const adminRoot = process.cwd();
 const repoRoot = path.resolve(adminRoot, "..");
-const storeRoot = path.join(repoRoot, "modulex-store");
 
 function read(relativePath) {
   const absolute = path.join(repoRoot, relativePath);
@@ -48,8 +47,10 @@ assert.match(migration, /revoke execute on function public\.get_store_portal_pro
 assert.match(migration, /revoke execute on function public\.get_store_portal_project\(uuid\) from public, anon/i);
 assert.match(migration, /grant execute on function public\.get_store_portal_projects\(integer, integer\) to authenticated/i);
 assert.match(migration, /grant execute on function public\.get_store_portal_project\(uuid\) to authenticated/i);
-assert.match(migration, /revoke execute on function private\.get_store_portal_projects\(integer, integer\) from public, anon, authenticated/i);
-assert.match(migration, /revoke execute on function private\.get_store_portal_project\(uuid\) from public, anon, authenticated/i);
+assert.match(migration, /revoke execute on function private\.get_store_portal_projects\(integer, integer\) from public, anon, authenticated, service_role/i);
+assert.match(migration, /revoke execute on function private\.get_store_portal_project\(uuid\) from public, anon, authenticated, service_role/i);
+assert.match(migration, /grant execute on function private\.get_store_portal_projects\(integer, integer\) to authenticated/i);
+assert.match(migration, /grant execute on function private\.get_store_portal_project\(uuid\) to authenticated/i);
 
 const projectsDomain = read("modulex-store/src/lib/portal/projects.ts");
 assert.match(projectsDomain, /requireStorePortalContext\s*\(/, "Project domain must require portal context");
