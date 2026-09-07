@@ -60,6 +60,10 @@ assert.match(domain, /normalizeOptionalNumber/, "Proposal domain must centralize
 assert.match(domain, /return\s+null/, "Empty optional Proposal values must normalize to NULL");
 assert.doesNotMatch(domain, /Number\([^)]*\)\s*\|\|\s*0/, "Optional numeric normalization must not coerce empty values to zero");
 assert.match(domain, /PROPOSAL_[A-Z0-9_]+/, "Proposal domain must map authoritative RPC/domain errors");
+assert.match(domain, /direct_sell_amount:\s*directSellAmount/, "Domain client must map typed directSellAmount to the canonical direct_sell_amount payload");
+assert.match(domain, /pricing_group_id:\s*pricingGroupId/, "Domain client must map typed pricingGroupId to the canonical pricing_group_id payload");
+assert.match(domain, /internal_notes:\s*normalizeOptionalText\(area\.internalNotes\)/, "Domain client must map Internal Notes explicitly without leaking it into customer-facing fields");
+assert.match(domain, /sell_amount:\s*sellAmount/, "Domain client must map typed Pricing Group sellAmount to canonical sell_amount");
 
 assert.match(tab, /Loading Proposal/i, "Proposal tab must expose an explicit loading state");
 assert.match(tab, /Create Proposal/i, "Proposal tab must expose an empty-state Create Proposal action");
@@ -74,14 +78,14 @@ for (const section of ["Material", "Measurements", "Edge / Backsplash", "Sink / 
   assert.ok(areaModal.includes(section), `Area editor must expose optional section ${section}`);
 }
 assert.match(areaModal, /allowEmpty/, "Area Type and optional selectors must allow an empty value");
-assert.match(areaModal, /direct_sell_amount/, "Area editor must support direct pricing");
-assert.match(areaModal, /pricing_group_id/, "Area editor must support Pricing Group assignment");
+assert.match(areaModal, /directSellAmount/, "Area editor must support typed direct pricing");
+assert.match(areaModal, /pricingGroupId/, "Area editor must support typed Pricing Group assignment");
 assert.match(areaModal, /disabled=.*pricing|pricing.*disabled=/is, "Area editor must make direct/group pricing exclusivity visible in the UI");
-assert.match(areaModal, /internal_notes/, "Area editor must keep Internal Notes as a distinct internal-only field");
+assert.match(areaModal, /internalNotes/, "Area editor must keep Internal Notes as a distinct internal-only field");
 
-assert.match(groups, /sell_amount/, "Pricing Group UI must edit one authoritative group sell amount");
+assert.match(groups, /sellAmount/, "Pricing Group UI must edit one authoritative typed group sell amount");
 assert.match(groups, /member|Area/i, "Pricing Group UI must show Area membership without allocating the group price");
-assert.doesNotMatch(groups, /sell_amount\s*\/|\/\s*areas?\.length/i, "Pricing Group UI must never allocate group price across Areas");
+assert.doesNotMatch(groups, /sellAmount\s*\/|\/\s*areas?\.length/i, "Pricing Group UI must never allocate group price across Areas");
 
 assert.match(areaList, /Move up|Move down|Reorder/i, "Area list must support ordering without changing commercial values");
 assert.match(revisions, /Revision/i, "P2 must surface revision history read-only while lifecycle actions remain P3");
