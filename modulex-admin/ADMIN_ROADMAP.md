@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-09-07
-Main baseline: `ab23762e3558204a24b2400fb6603391f1322eb1`
+Last reviewed: 2026-09-08
+Main baseline: `2b6946b520d8cd0817600a08f4c72527a58e45e1`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current parallel Admin package: **A6 Finance F0→F7 is complete and production-verified; there is no active Finance delivery package. Future Finance work requires a new explicitly scoped package.**
