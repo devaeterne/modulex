@@ -11,8 +11,8 @@ import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableViewport } from "@/components/ui/table";
+import { authenticatedFetch } from "@/lib/auth/authenticated-fetch";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
-import { supabase } from "@/lib/supabase/client";
 import type { UserRole } from "@/lib/supabase/profile";
 import { isValidEmail, isValidPhone, normalizeEmail, sanitizePhoneInput } from "@/lib/validation";
 
@@ -31,6 +31,7 @@ type UserRow = {
 };
 
 type Actor = { id: string; role: UserRole; roles: UserRole[] };
+type UsersPayload = { users?: UserRow[]; actor?: Actor };
 type ModalMode = "create" | "edit" | "password" | null;
 type UserForm = {
   fullName: string;
@@ -73,20 +74,10 @@ export default function UsersTable() {
   const [form, setForm] = useState<UserForm>(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<UserFieldErrors>({});
 
-  async function authFetch(url: string, init?: RequestInit) {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) throw new Error("Session expired. Please sign in again.");
-    const response = await fetch(url, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(init?.headers ?? {}) } });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || "Request failed.");
-    return payload;
-  }
-
   async function loadUsers() {
     setLoading(true); setError(null);
     try {
-      const payload = await authFetch("/api/admin/users?perPage=100");
+      const payload = await authenticatedFetch<UsersPayload>("/api/admin/users?perPage=100");
       setUsers(payload.users ?? []); setActor(payload.actor ?? null);
     } catch (err) { setError(err instanceof Error ? err.message : "Users could not be loaded."); }
     finally { setLoading(false); }
@@ -150,7 +141,7 @@ export default function UsersTable() {
     if (!validated) return;
     setBusy(true); setError(null);
     try {
-      await authFetch("/api/admin/users", { method: "POST", body: JSON.stringify({ email: validated.email, full_name: validated.full_name, phone: validated.phone, roles: validated.roles, mode: form.createMode, password: form.password }) });
+      await authenticatedFetch("/api/admin/users", { method: "POST", body: JSON.stringify({ email: validated.email, full_name: validated.full_name, phone: validated.phone, roles: validated.roles, mode: form.createMode, password: form.password }) });
       closeModal(); setSuccess(form.createMode === "invite" ? "Invitation sent and user created." : "User created with temporary password."); await loadUsers();
     } catch (err) { setError(err instanceof Error ? err.message : "User could not be created."); }
     finally { setBusy(false); }
@@ -161,7 +152,7 @@ export default function UsersTable() {
     const validated = validateUserForm(false); if (!validated) return;
     setBusy(true); setError(null);
     try {
-      await authFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ user_id: selected.id, action: "update", email: validated.email, full_name: validated.full_name, phone: validated.phone, roles: validated.roles }) });
+      await authenticatedFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ user_id: selected.id, action: "update", email: validated.email, full_name: validated.full_name, phone: validated.phone, roles: validated.roles }) });
       closeModal(); setSuccess("User profile and roles updated."); await loadUsers();
     } catch (err) { setError(err instanceof Error ? err.message : "User could not be updated."); }
     finally { setBusy(false); }
@@ -173,7 +164,7 @@ export default function UsersTable() {
     setFieldErrors(next); if (next.password) { focusFirstInvalid(next); return; }
     setBusy(true); setError(null);
     try {
-      await authFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ user_id: selected.id, action: "set_password", password: form.password }) });
+      await authenticatedFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ user_id: selected.id, action: "set_password", password: form.password }) });
       closeModal(); setSuccess("Temporary password updated.");
     } catch (err) { setError(err instanceof Error ? err.message : "Password could not be updated."); }
     finally { setBusy(false); }
@@ -182,7 +173,7 @@ export default function UsersTable() {
   async function sendReset(user: UserRow) {
     if (!confirm(`Send password reset email to ${user.email}?`)) return;
     setBusy(true); setError(null);
-    try { await authFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ user_id: user.id, action: "send_reset" }) }); setSuccess("Password reset email sent."); }
+    try { await authenticatedFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ user_id: user.id, action: "send_reset" }) }); setSuccess("Password reset email sent."); }
     catch (err) { setError(err instanceof Error ? err.message : "Reset email could not be sent."); }
     finally { setBusy(false); }
   }
@@ -190,14 +181,14 @@ export default function UsersTable() {
     const next = !user.is_active;
     if (!confirm(`${next ? "Activate" : "Deactivate"} ${user.email}?`)) return;
     setBusy(true); setError(null);
-    try { await authFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ user_id: user.id, action: "set_active", is_active: next }) }); setSuccess(next ? "User activated." : "User deactivated."); await loadUsers(); }
+    try { await authenticatedFetch("/api/admin/users", { method: "PATCH", body: JSON.stringify({ user_id: user.id, action: "set_active", is_active: next }) }); setSuccess(next ? "User activated." : "User deactivated."); await loadUsers(); }
     catch (err) { setError(err instanceof Error ? err.message : "Status could not be changed."); }
     finally { setBusy(false); }
   }
   async function deleteUser(user: UserRow) {
     if (!confirm(`Permanently delete ${user.email}?\n\nThis cannot be undone.`)) return;
     setBusy(true); setError(null);
-    try { await authFetch(`/api/admin/users?user_id=${encodeURIComponent(user.id)}`, { method: "DELETE" }); setSuccess("User deleted."); await loadUsers(); }
+    try { await authenticatedFetch(`/api/admin/users?user_id=${encodeURIComponent(user.id)}`, { method: "DELETE" }); setSuccess("User deleted."); await loadUsers(); }
     catch (err) { setError(err instanceof Error ? err.message : "User could not be deleted."); }
     finally { setBusy(false); }
   }
