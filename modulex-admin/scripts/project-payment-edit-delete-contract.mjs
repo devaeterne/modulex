@@ -14,46 +14,39 @@ function assert(condition, message) {
 
 function read(relativePath) {
   const fullPath = path.join(root, relativePath);
-  assert(fs.existsSync(fullPath), `Payment edit/delete requires ${relativePath}`);
+  assert(fs.existsSync(fullPath), `Payment edit/delete closeout requires ${relativePath}`);
   return fs.readFileSync(fullPath, "utf8");
 }
 
 function readRepo(relativePath) {
   const fullPath = path.join(repoRoot, relativePath);
-  assert(fs.existsSync(fullPath), `Payment edit/delete requires ${relativePath}`);
+  assert(fs.existsSync(fullPath), `Payment edit/delete closeout requires ${relativePath}`);
   return fs.readFileSync(fullPath, "utf8");
 }
 
 const domain = read("src/lib/customers/project-payments.ts");
 const financeTab = read("src/components/customers/project-detail/ProjectFinanceTab.tsx");
-const migration = readRepo("modulex-store/supabase/migrations/20260903150000_customer_project_payment_edit_delete_audit.sql");
+const legacyMigration = readRepo("modulex-store/supabase/migrations/20260903150000_customer_project_payment_edit_delete_audit.sql");
+const f5c = read("sql/project-f5c-payment-hardening.sql");
 
-assert(domain.includes('.rpc("update_customer_project_payment"'), "Admin/Finance payment edits must use update_customer_project_payment RPC");
-assert(domain.includes('.rpc("delete_customer_project_payment"'), "Admin/Finance hard deletes must use delete_customer_project_payment RPC");
+// Historical PB-3A audit provenance remains in place for rows created before F5C.
+assert(legacyMigration.includes("customer_project_payment_audit_log"), "Legacy edit/delete audit history must remain queryable for historical provenance");
+assert(legacyMigration.includes("before_snapshot"), "Historical audit rows must preserve pre-change snapshots");
+assert(legacyMigration.includes("after_snapshot"), "Historical edit audit rows must preserve post-change snapshots");
+assert(legacyMigration.includes("allocation_snapshot"), "Historical audit rows must preserve allocation snapshots");
+assert(legacyMigration.includes("enable row level security"), "Historical audit table must retain RLS");
+assert(legacyMigration.includes("revoke all on table public.customer_project_payment_audit_log"), "Historical audit table must remain unavailable to browser roles");
 
-assert(financeTab.includes("Edit Payment"), "Customer Payments must expose an Edit Payment action");
-assert(financeTab.includes("Delete Payment"), "Customer Payments must expose a Delete Payment action");
-assert(financeTab.includes("Update Payment"), "Finance must expose an explicit Update Payment confirmation action");
-assert(financeTab.includes("Delete reason"), "Hard delete must require a visible deletion reason");
+// F5C closes the destructive compatibility exception without dropping the public ABI.
+assert(!domain.includes('.rpc("update_customer_project_payment"'), "F5C Admin adapter must not call the legacy posted-payment edit RPC");
+assert(!domain.includes('.rpc("delete_customer_project_payment"'), "F5C Admin adapter must not call the legacy posted-payment hard-delete RPC");
+assert(!financeTab.includes("Edit Payment"), "F5C Project Finance must present posted payment history as immutable");
+assert(!financeTab.includes("Delete Payment"), "F5C Project Finance must not expose destructive posted-payment deletion");
+assert(financeTab.includes("immutable") && financeTab.includes("void/reversal"), "F5C UI must direct corrections to append-safe void/reversal semantics");
 
-assert(migration.includes("customer_project_payment_audit_log"), "Hard delete/edit must write to a dedicated immutable audit table");
-assert(migration.includes("before_snapshot"), "Audit log must preserve the pre-change payment snapshot");
-assert(migration.includes("after_snapshot"), "Edit audit must preserve the post-change payment snapshot");
-assert(migration.includes("allocation_snapshot"), "Audit log must preserve affected allocation snapshots");
-assert(migration.includes("action_type"), "Audit log must distinguish update and delete actions");
-assert(migration.includes("reason"), "Audit log must support a change/delete reason");
-assert(migration.includes("actor_id") && migration.includes("created_at"), "Audit log must record who acted and when");
+assert(f5c.includes("private.update_customer_project_payment"), "F5C must preserve the legacy update ABI as a fail-closed compatibility stub");
+assert(f5c.includes("private.delete_customer_project_payment"), "F5C must preserve the legacy delete ABI as a fail-closed compatibility stub");
+assert(f5c.includes("Posted Project payment history is immutable"), "F5C compatibility stubs must reject destructive posted-history mutation");
+assert(!/create\s+table/i.test(f5c), "F5C must not replace or rewrite the historical audit model");
 
-assert(migration.includes("delete from public.customer_project_payment_allocations"), "Financial edits/deletes must be able to clear affected allocations");
-assert(migration.includes("delete from public.customer_project_payment_transactions"), "Delete Payment must hard-delete the transaction from the canonical ledger");
-assert(migration.includes("p_amount is distinct from") || migration.includes("v_financial_change"), "Edit must detect amount/currency financial changes explicitly");
-assert(migration.includes("p_currency_code is distinct from") || migration.includes("v_financial_change"), "Currency edits must be treated as financial changes");
-assert(migration.includes("allocation_snapshot") && migration.includes("delete from public.customer_project_payment_allocations"), "Allocation history must be snapshotted before financial edits or hard delete");
-
-assert(migration.includes("raise exception") && migration.includes("42501"), "Edit/delete RPCs must remain Admin/Finance role guarded");
-assert(migration.includes("transaction_type <> 'payment'") || migration.includes("transaction_type = 'payment'"), "Only original customer payment rows may be edited or hard-deleted");
-assert(migration.includes("reversal_of_transaction_id"), "Delete/edit must account for existing reversal dependencies and fail closed when unsafe");
-assert(migration.includes("enable row level security"), "Audit table must have RLS enabled");
-assert(migration.includes("revoke all on table public.customer_project_payment_audit_log"), "Browser roles must not receive direct audit-table access");
-
-console.log("PASS: Project payment edit/delete audit contract");
+console.log("PASS: Project payment edit/delete audit compatibility closed by F5C immutable history");
