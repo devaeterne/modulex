@@ -48,11 +48,9 @@ export default function DateInput({
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
-    const parsed = parseDateInput(draft);
-    if (draft && parsed.ok && parsed.value === value) return;
     setDraft(formatDateInput(value));
     setValidationError(null);
-  }, [value]); // draft intentionally stays local while the canonical value is unchanged.
+  }, [value]);
 
   function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     const nextDraft = normalizeDraft(event.target.value);
