@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import ComponentCard from "@/components/common/ComponentCard";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { isAdminRole } from "@/lib/auth/permissions";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { supabase } from "@/lib/supabase/client";
@@ -41,13 +44,18 @@ export default function UpdatesPage() {
     return () => { mounted = false; };
   }, []);
 
-  return <div className="mx-auto max-w-4xl space-y-6">
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><p className="text-xs font-semibold uppercase tracking-wider text-brand-500">Modulex</p><h1 className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">What&apos;s New</h1><p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Product improvements, new features, fixes and maintenance notices.</p></div>
-      {canManage && <Link href="/settings/general/product-updates" className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white">Manage Updates</Link>}
-    </div>
+  return <div>
+    <PageBreadcrumb pageTitle="What's New" />
+    <div className="space-y-5">
+      <ComponentCard title="Modulex Product Updates" desc="Product improvements, new features, fixes and maintenance notices.">
+        {canManage ? <Link href="/settings/general/product-updates" className={`text-sm font-medium ${ADMIN_TEXT_STYLES.body}`}>Manage Updates →</Link> : null}
+      </ComponentCard>
 
-    {error && <div className="rounded-xl border border-error-200 bg-error-50 p-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">{error}</div>}
-    {loading ? <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Loading updates...</div> : items.length === 0 ? <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">No published updates yet.</div> : <div className="space-y-4">{items.map((item) => <article key={item.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">{SYSTEM_ANNOUNCEMENT_KIND_LABELS[item.kind]}</span><time className="text-xs text-gray-400">{formatDate(item.published_at)}</time></div><h2 className="mt-3 text-lg font-semibold text-gray-900 dark:text-white">{item.title}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-gray-300">{item.message}</p>{item.href && <Link href={item.href} className="mt-4 inline-flex text-sm font-semibold text-brand-500 hover:text-brand-600">{item.cta_label || "Open"} →</Link>}</article>)}</div>}
+      {error ? <p role="alert" className={`text-sm ${ADMIN_TEXT_STYLES.body}`}>{error}</p> : null}
+      {loading ? <ComponentCard title="Updates"><p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading updates...</p></ComponentCard> : null}
+      {!loading && items.length === 0 ? <ComponentCard title="Updates"><p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>No published updates yet.</p></ComponentCard> : null}
+
+      {!loading ? items.map((item) => <ComponentCard key={item.id} title={item.title} desc={`${SYSTEM_ANNOUNCEMENT_KIND_LABELS[item.kind]} · ${formatDate(item.published_at)}`}><p className={`whitespace-pre-wrap text-sm leading-6 ${ADMIN_TEXT_STYLES.body}`}>{item.message}</p>{item.href ? <Link href={item.href} className={`mt-4 inline-flex text-sm font-semibold ${ADMIN_TEXT_STYLES.body}`}>{item.cta_label || "Open"} →</Link> : null}</ComponentCard>) : null}
+    </div>
   </div>;
 }
