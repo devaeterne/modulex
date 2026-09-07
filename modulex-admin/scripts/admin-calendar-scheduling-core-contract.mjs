@@ -21,6 +21,7 @@ const [
   permissions,
   sidebar,
   calendarDomain,
+  calendarEvents,
   normalization,
   calendarRoute,
   calendarPage,
@@ -38,6 +39,7 @@ const [
   source("src/lib/auth/permissions.ts"),
   source("src/layout/AppSidebar.tsx"),
   source("src/lib/calendar/admin-calendar.ts"),
+  source("src/lib/calendar/calendar-events.ts"),
   source("src/lib/calendar/event-normalization.ts"),
   source("src/app/api/admin/calendar/route.ts"),
   source("src/app/(admin)/calendar/page.tsx"),
@@ -103,6 +105,14 @@ assert.match(calendarDomain, /customer_projects/);
 assert.match(calendarDomain, /customer_installations/);
 assert.match(calendarDomain, /reassignAdminCalendarOwner/);
 assert.doesNotMatch(calendarDomain, /encrypted_refresh_token|GOOGLE_CALENDAR_CLIENT_SECRET/);
+
+// Calendar event reads must apply the requested visible range in PostgREST before
+// rows are returned. Filtering an unbounded calendar_events result in JavaScript can
+// silently drop current events once Supabase's response row cap is reached.
+assert.match(calendarEvents, /eq\("all_day", false\)[\s\S]*lt\("start_at", input\.end\)/);
+assert.match(calendarEvents, /eq\("all_day", true\)[\s\S]*lt\("all_day_start", endDate\)/);
+assert.match(calendarEvents, /end_at\.gte|end_at\.is\.null|end_at/);
+assert.match(calendarEvents, /all_day_end\.gt|all_day_end\.is\.null|all_day_end/);
 
 assert.match(calendarRoute, /requirePermission\(request, "calendar\.view"\)/);
 assert.match(calendarRoute, /getAdminCalendarSnapshot|listAdminCalendarEvents/);
