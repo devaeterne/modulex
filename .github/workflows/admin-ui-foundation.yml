@@ -10,7 +10,10 @@ on:
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
-      - "modulex-store/**"
+      - "modulex-store/supabase/migrations/*countertop*.sql"
+      - "modulex-store/supabase/migrations/*manual_service*.sql"
+      - "modulex-store/supabase/migrations/*calendar*.sql"
+      - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
       - ".github/workflows/**"
   push:
     paths:
@@ -21,7 +24,10 @@ on:
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
-      - "modulex-store/**"
+      - "modulex-store/supabase/migrations/*countertop*.sql"
+      - "modulex-store/supabase/migrations/*manual_service*.sql"
+      - "modulex-store/supabase/migrations/*calendar*.sql"
+      - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
       - ".github/workflows/**"
 
 concurrency:
