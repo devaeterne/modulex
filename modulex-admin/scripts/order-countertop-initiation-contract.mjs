@@ -7,11 +7,14 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 
 const initiationMigrationPath = "../modulex-store/supabase/migrations/20260901123501_countertop_order_item_initiation.sql";
 const draftShellMigrationPath = "../modulex-store/supabase/migrations/20260901170000_countertop_new_order_draft_shell.sql";
+const titleMigrationPath = "../modulex-store/supabase/migrations/20260908020000_countertop_order_line_title.sql";
 assert(fs.existsSync(path.join(root, initiationMigrationPath)), "repo must contain the production countertop order item initiation migration");
 assert(fs.existsSync(path.join(root, draftShellMigrationPath)), "repo must contain the draft-shell migration used by New Order Countertop initiation");
+assert(fs.existsSync(path.join(root, titleMigrationPath)), "repo must contain the canonical Countertop order-line title migration");
 
 const initiationMigration = read(initiationMigrationPath);
 const draftShellMigration = read(draftShellMigrationPath);
+const titleMigration = read(titleMigrationPath);
 const pricingV2 = read("../modulex-store/supabase/migrations/20260901130000_order_product_pricing_v2.sql");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const lineDetails = read("src/components/customers/CountertopLineDetails.tsx");
@@ -39,8 +42,29 @@ assert(initiationMigration.includes("revoke all on function public.create_and_at
 assert(initiationMigration.includes("grant execute on function public.create_and_attach_countertop_order_item") && initiationMigration.includes("to authenticated"), "authenticated browser access must go through the reviewed public wrapper");
 assert(!/insert into public\.customer_order_items[\s\S]*p_unit_price/i.test(initiationMigration), "countertop initiation must not accept caller-controlled order pricing");
 
+for (const token of [
+  "private.set_countertop_order_item_title_v1",
+  "public.set_countertop_order_item_title",
+  "p_order_item_id uuid",
+  "p_title text",
+  "current_user_has_any_role(array['super_admin','admin','sales'])",
+  "countertop_configurations",
+  "product_name_snapshot",
+  "char_length(v_resolved_title) > 160",
+]) assert(titleMigration.includes(token), `Countertop line-title contract missing: ${token}`);
+assert(/v_order_status\s*<>\s*'draft'/i.test(titleMigration), "Countertop line titles must only be editable while the parent order is Draft");
+assert(titleMigration.includes("nullif(btrim(coalesce(p_title,'')),'')"), "Blank Countertop line titles must reset to the configured Stone name");
+assert(/security definer\s+set search_path\s*=\s*pg_catalog\s*,\s*public/i.test(titleMigration), "private Countertop title mutation must pin a safe search_path");
+assert(titleMigration.includes("revoke all on function public.set_countertop_order_item_title") && titleMigration.includes("from public, anon"), "public/anon execute must be revoked from Countertop line-title mutation");
+assert(titleMigration.includes("grant execute on function public.set_countertop_order_item_title") && titleMigration.includes("to authenticated"), "authenticated editors must use the reviewed Countertop line-title wrapper");
+
 assert(editOrder.includes(">Countertop</Button>"), "Edit Order must expose the Countertop product action");
 assert(editOrder.includes("CountertopConfigurator"), "Edit Order must use the canonical CountertopConfigurator");
+assert(editOrder.includes('"Line Title"'), "Draft Countertop rows must expose a Line Title field");
+assert(editOrder.includes("set_countertop_order_item_title"), "Countertop Line Title must persist through the reviewed RPC");
+assert(editOrder.includes("product_name_snapshot") && editOrder.includes("sku_snapshot"), "Order editor must preserve historical item identity snapshots");
+assert(editOrder.includes("Save title") && editOrder.includes("isConfiguredCountertop"), "Only configured Countertop rows should expose the title-save action");
+assert(!editOrder.includes('product?.sku ?? "Historical product"'), "Edit Order must use the stored SKU snapshot before falling back to Historical product");
 assert(configurator.includes("create_and_attach_countertop_order_item"), "new countertop attachment must use the secure create+attach RPC");
 assert(configurator.includes("crypto.randomUUID()") || configurator.includes("randomUUID"), "new countertop initiation must send an idempotency request id");
 assert(configurator.includes("attach_countertop_configuration"), "existing Configure Countertop path must remain intact");
