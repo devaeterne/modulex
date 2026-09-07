@@ -30,6 +30,12 @@ import {
   type OrderPriceRow,
   type OrderTaxRule,
 } from "@/lib/customers/order-domain";
+import {
+  ORDER_QUANTITY_DECIMAL,
+  parseOrderMoney,
+  parseOrderPercent,
+  parseOrderQuantity,
+} from "@/lib/customers/order-validation";
 import type { UserRole } from "@/lib/supabase/profile";
 import type {
   CountertopLineSummary,
@@ -42,10 +48,12 @@ import type {
   PaymentMethod,
   PriceGroupLookup,
 } from "@/lib/customers/types";
+import { calculateDbDecimalBulk, compareDbDecimal } from "@/lib/validation";
 
 type Product = OrderPickerProduct;
 type PriceRow = OrderPriceRow;
-type DraftItem = { id?: string;
+type DraftItem = {
+  id?: string;
   product_id: string;
   quantity: string;
   unit_price: string;
@@ -54,6 +62,25 @@ type DraftItem = { id?: string;
   line_note: string;
 };
 type TaxRule = OrderTaxRule;
+type ValidatedRevisionItem = {
+  id?: string;
+  productId: string;
+  quantity: string;
+  unitPrice: string;
+  discountPercent: string;
+  pricingModel: OrderPricingModel | null;
+  lineNote: string;
+};
+type ItemFieldErrors = Partial<Record<"quantity" | "unit_price" | "discount_percent" | "line_note", string>>;
+type FieldErrors = {
+  priceGroupId?: string;
+  paymentMethodId?: string;
+  appliedCommission?: string;
+  shippingAddressId?: string;
+  orderDiscount?: string;
+  taxRate?: string;
+  items?: Record<number, ItemFieldErrors>;
+};
 
 function money(value: number, currency = "USD") {
   try {
@@ -76,12 +103,11 @@ function pricingModelFor(item: DraftItem, product: Product | undefined): OrderPr
   return item.pricing_model ?? product?.pricing_model ?? null;
 }
 
-function resolveOrderLineUnitPrice(item: DraftItem, product: Product | undefined, priceMap: Map<string, number>) {
+function resolveOrderLineUnitPriceValue(item: DraftItem, product: Product | undefined, priceValueMap: Map<string, string>) {
   const model = pricingModelFor(item, product);
-  if (model === "price_group") return priceMap.get(item.product_id);
+  if (model === "price_group") return priceValueMap.get(item.product_id);
   if ((model === "countertop_material_band" || model === "manual_service") && (item.id || model === "manual_service")) {
-    const storedPrice = Number(item.unit_price || 0);
-    return Number.isFinite(storedPrice) && storedPrice >= 0 ? storedPrice : undefined;
+    return item.unit_price;
   }
   return undefined;
 }
@@ -132,6 +158,7 @@ export default function EditCustomerOrder() {
   const [taxRate, setTaxRate] = useState("0");
   const [orderDiscount, setOrderDiscount] = useState("0");
   const [revisionReason, setRevisionReason] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isCountertopOpen, setIsCountertopOpen] = useState(false);
   const [countertopEditItemId, setCountertopEditItemId] = useState<string | null>(null);
@@ -206,6 +233,7 @@ export default function EditCustomerOrder() {
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const activeProducts = useMemo(() => products.filter((product) => product.status === "active"), [products]);
   const priceMap = useMemo(() => new Map(prices.map((price) => [price.product_id, Number(price.amount)])), [prices]);
+  const priceValueMap = useMemo(() => new Map(prices.map((price) => [price.product_id, String(price.amount)])), [prices]);
   const summariesByItemId = useMemo(() => new Map(countertopSummaries.map((summary) => [summary.orderItemId, summary])), [countertopSummaries]);
   const selectedQuantities = useMemo(() => {
     const values = new Map<string, number>();
@@ -230,7 +258,7 @@ export default function EditCustomerOrder() {
     let subtotal = 0;
     for (const item of items) {
       const qty = Math.max(0, Number(item.quantity || 0));
-      const price = Math.max(0, resolveOrderLineUnitPrice(item, productMap.get(item.product_id), priceMap) ?? 0);
+      const price = Math.max(0, Number(resolveOrderLineUnitPriceValue(item, productMap.get(item.product_id), priceValueMap) ?? 0));
       const discount = Math.min(100, Math.max(0, Number(item.discount_percent || 0)));
       subtotal += qty * price * (1 - discount / 100);
     }
@@ -241,7 +269,34 @@ export default function EditCustomerOrder() {
     const commissionPercent = Math.max(0, Number(appliedCommission || 0));
     const commission = orderTotal * commissionPercent / 100;
     return { subtotal, tax, orderTotal, commission, grandTotal: orderTotal + commission };
-  }, [items, productMap, priceMap, orderDiscount, taxRate, appliedCommission]);
+  }, [items, productMap, priceValueMap, orderDiscount, taxRate, appliedCommission]);
+
+  function clearHeaderError(field: Exclude<keyof FieldErrors, "items">) {
+    setFieldErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  function clearItemError(index: number, field: keyof ItemFieldErrors) {
+    setFieldErrors((current) => ({
+      ...current,
+      items: current.items ? { ...current.items, [index]: { ...current.items[index], [field]: undefined } } : undefined,
+    }));
+  }
+
+  function focusFirstInvalid(errors: FieldErrors) {
+    const firstInvalid = [
+      errors.priceGroupId ? "edit-order-price-group" : null,
+      errors.paymentMethodId ? "edit-order-payment-method" : null,
+      errors.appliedCommission ? "edit-order-payment-commission" : null,
+      errors.shippingAddressId ? "edit-order-shipping-address" : null,
+      errors.orderDiscount ? "edit-order-discount" : null,
+      errors.taxRate ? "edit-order-tax-rate" : null,
+      ...Object.entries(errors.items ?? {}).flatMap(([index, itemErrors]) => [
+        itemErrors.quantity ? `edit-order-item-${index}-quantity` : null,
+        itemErrors.discount_percent ? `edit-order-item-${index}-discount` : null,
+      ]),
+    ].find((value): value is string => Boolean(value));
+    if (firstInvalid) document.getElementById(firstInvalid)?.focus();
+  }
 
   function updateItem(index: number, values: Partial<DraftItem>) {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...values } : item));
@@ -250,12 +305,18 @@ export default function EditCustomerOrder() {
   function addProduct(product: Product) {
     setItems((current) => {
       const existingIndex = current.findIndex((item) => item.product_id === product.id && pricingModelFor(item, product) === "price_group");
-      if (existingIndex >= 0) return current.map((item, index) => index === existingIndex ? { ...item, quantity: String(Number(item.quantity || 0) + 1) } : item);
-      const groupPrice = priceMap.get(product.id);
+      if (existingIndex >= 0) {
+        return current.map((item, index) => {
+          if (index !== existingIndex) return item;
+          const nextQuantity = calculateDbDecimalBulk(item.quantity, "1", "current_amount", ORDER_QUANTITY_DECIMAL);
+          return nextQuantity.error || nextQuantity.value === null ? item : { ...item, quantity: nextQuantity.value };
+        });
+      }
+      const groupPrice = priceValueMap.get(product.id);
       return [...current, {
         product_id: product.id,
         quantity: "1",
-        unit_price: groupPrice !== undefined ? String(groupPrice) : "0",
+        unit_price: groupPrice ?? "0",
         discount_percent: "0",
         pricing_model: product.pricing_model,
         line_note: "",
@@ -279,13 +340,20 @@ export default function EditCustomerOrder() {
   }
 
   function saveServiceLine(value: { lineNote: string; unitPrice: number }) {
+    const parsedPrice = parseOrderMoney(String(value.unitPrice));
+    if (parsedPrice.error || parsedPrice.value === null) {
+      setErrorMessage(parsedPrice.error ?? "Service price is invalid.");
+      return;
+    }
     if (serviceEditIndex !== null) {
-      updateItem(serviceEditIndex, { line_note: value.lineNote, unit_price: String(value.unitPrice), quantity: "1", pricing_model: "manual_service" });
+      clearItemError(serviceEditIndex, "unit_price");
+      clearItemError(serviceEditIndex, "line_note");
+      updateItem(serviceEditIndex, { line_note: value.lineNote, unit_price: parsedPrice.value, quantity: "1", pricing_model: "manual_service" });
     } else if (serviceProduct) {
       setItems((current) => [...current, {
         product_id: serviceProduct.id,
         quantity: "1",
-        unit_price: String(value.unitPrice),
+        unit_price: parsedPrice.value!,
         discount_percent: "0",
         pricing_model: "manual_service",
         line_note: value.lineNote,
@@ -353,6 +421,7 @@ export default function EditCustomerOrder() {
   }
 
   function handlePriceGroupChange(groupId: string) {
+    clearHeaderError("priceGroupId");
     setPriceGroupId(groupId);
     const group = priceGroups.find((item) => item.id === groupId);
     if (group?.system_key === "pickup_level") handleFulfillmentChange("pickup");
@@ -361,48 +430,101 @@ export default function EditCustomerOrder() {
 
   function handleFulfillmentChange(next: OrderFulfillmentType) {
     setFulfillmentType(next);
+    if (next === "pickup") clearHeaderError("shippingAddressId");
     const rule = taxRules.find((item) => item.fulfillment_type === next && item.is_active && item.tax_rate !== null);
-    if (rule) setTaxRate(String(Number(rule.tax_rate)));
+    if (rule) {
+      clearHeaderError("taxRate");
+      setTaxRate(String(rule.tax_rate));
+    }
+  }
+
+  function validateRevision(): { items: ValidatedRevisionItem[]; taxRate: string; orderDiscount: string; commission: string } | null {
+    setErrorMessage(null);
+    if (!order || !revisionPolicy?.canEdit) {
+      setErrorMessage(revisionPolicy?.reason ?? "This order cannot be revised.");
+      return null;
+    }
+    if (items.length === 0) {
+      setErrorMessage("At least one order line is required.");
+      return null;
+    }
+
+    const errors: FieldErrors = {};
+    if (!priceGroupId) errors.priceGroupId = "Price group is required.";
+    if (!paymentMethodId) errors.paymentMethodId = "Payment method is required.";
+    if (fulfillmentType !== "pickup" && !shippingAddressId) errors.shippingAddressId = "Shipping address is required for delivery.";
+
+    const commission = parseOrderPercent(appliedCommission);
+    const discount = parseOrderMoney(orderDiscount);
+    const tax = parseOrderPercent(taxRate);
+    if (commission.error || commission.value === null) errors.appliedCommission = commission.error ?? "Enter a valid payment commission.";
+    if (discount.error || discount.value === null) errors.orderDiscount = discount.error ?? "Enter a valid order discount.";
+    if (tax.error || tax.value === null) errors.taxRate = tax.error ?? "Enter a valid tax rate.";
+
+    const itemErrors: Record<number, ItemFieldErrors> = {};
+    const validatedItems: ValidatedRevisionItem[] = [];
+    let blockingMessage: string | null = null;
+
+    items.forEach((item, index) => {
+      const product = productMap.get(item.product_id);
+      const model = pricingModelFor(item, product);
+      const itemError: ItemFieldErrors = {};
+      if (model === "countertop_material_band" && !item.id) blockingMessage ??= "Countertop Material Band products must be configured through the Countertop action.";
+      if (model === "none") blockingMessage ??= "No Commercial Pricing products cannot be added to customer orders.";
+      if (!item.product_id) blockingMessage ??= "Select a product for every line.";
+
+      const quantity = parseOrderQuantity(item.quantity);
+      const lineDiscount = parseOrderPercent(item.discount_percent);
+      if (quantity.error || quantity.value === null) itemError.quantity = quantity.error ?? "Enter a valid quantity.";
+      if (lineDiscount.error || lineDiscount.value === null) itemError.discount_percent = lineDiscount.error ?? "Enter a valid line discount.";
+
+      const unitPriceValue = resolveOrderLineUnitPriceValue(item, product, priceValueMap);
+      const unitPrice = parseOrderMoney(unitPriceValue);
+      if (model === "manual_service") {
+        if (quantity.value !== null && compareDbDecimal(quantity.value, "1", ORDER_QUANTITY_DECIMAL) !== 0) itemError.quantity = "Service quantity must remain fixed at 1.";
+        if (!item.line_note.trim()) itemError.line_note = "Service detail is required.";
+        if (unitPrice.error || unitPrice.value === null) itemError.unit_price = unitPrice.error ?? "Enter a valid service price.";
+      } else if (model === "price_group" && !priceValueMap.has(item.product_id)) {
+        blockingMessage ??= `No current Price Group price exists for ${product?.sku ?? "selected product"}.`;
+      } else if (unitPrice.error || unitPrice.value === null) {
+        blockingMessage ??= "The selected product does not have a valid commercial price for this order.";
+      }
+
+      if (Object.keys(itemError).length) itemErrors[index] = itemError;
+      if (!blockingMessage && Object.keys(itemError).length === 0 && quantity.value !== null && lineDiscount.value !== null && unitPrice.value !== null) {
+        validatedItems.push({
+          id: item.id,
+          productId: item.product_id,
+          quantity: quantity.value,
+          unitPrice: unitPrice.value,
+          discountPercent: lineDiscount.value,
+          pricingModel: model,
+          lineNote: item.line_note,
+        });
+      }
+    });
+
+    if (Object.keys(itemErrors).length) errors.items = itemErrors;
+    if (blockingMessage || Object.keys(errors).length) {
+      setFieldErrors(errors);
+      setErrorMessage(blockingMessage ?? "Correct the highlighted order fields.");
+      focusFirstInvalid(errors);
+      return null;
+    }
+
+    setFieldErrors({});
+    return { items: validatedItems, taxRate: tax.value!, orderDiscount: discount.value!, commission: commission.value! };
   }
 
   async function saveRevision() {
-    setErrorMessage(null);
-    if (!order || !revisionPolicy?.canEdit) return setErrorMessage(revisionPolicy?.reason ?? "This order cannot be revised.");
-    if (!priceGroupId || !paymentMethodId) return setErrorMessage("Price group and payment method are required.");
-    if (items.length === 0) return setErrorMessage("At least one order line is required.");
-    if (Number(appliedCommission) < 0 || Number(appliedCommission) > 100) return setErrorMessage("Applied commission must be between 0 and 100%.");
-
-    for (const item of items) {
-      const product = productMap.get(item.product_id);
-      const model = pricingModelFor(item, product);
-      if (model === "countertop_material_band" && !item.id) return setErrorMessage("Countertop Material Band products must be configured through the Countertop action.");
-      if (model === "none") return setErrorMessage("No Commercial Pricing products cannot be added to customer orders.");
-      if (!item.product_id) return setErrorMessage("Select a product for every line.");
-      if (Number(item.quantity) <= 0) return setErrorMessage("Quantity must be greater than zero.");
-      if (model === "manual_service") {
-        if (Number(item.quantity) !== 1) return setErrorMessage("Service quantity must remain fixed at 1.");
-        if (!item.line_note.trim()) return setErrorMessage("Service detail is required.");
-        const servicePrice = Number(item.unit_price);
-        if (!Number.isFinite(servicePrice) || servicePrice < 0) return setErrorMessage("Service price must be a nonnegative number.");
-      }
-      if (model === "price_group" && !priceMap.has(item.product_id)) return setErrorMessage(`No current Price Group price exists for ${product?.sku ?? "selected product"}.`);
-      if (resolveOrderLineUnitPrice(item, product, priceMap) === undefined) return setErrorMessage("The selected product does not have a valid commercial price for this order.");
-      if (Number(item.discount_percent) < 0 || Number(item.discount_percent) > 100) return setErrorMessage("Line discount must be between 0 and 100%.");
-    }
+    const validated = validateRevision();
+    if (!validated || !order) return;
 
     setIsSaving(true);
     try {
       const revision = await updateCustomerOrder({
         orderId: order.id,
-        items: items.map((item) => ({
-          id: item.id,
-          productId: item.product_id,
-          quantity: item.quantity,
-          unitPrice: String(resolveOrderLineUnitPrice(item, productMap.get(item.product_id), priceMap) ?? 0),
-          discountPercent: item.discount_percent,
-          pricingModel: pricingModelFor(item, productMap.get(item.product_id)),
-          lineNote: item.line_note,
-        })),
+        items: validated.items,
         priceGroupId,
         billingAddressId,
         shippingAddressId,
@@ -410,10 +532,10 @@ export default function EditCustomerOrder() {
         customerReference: reference,
         customerNotes,
         internalNotes,
-        taxRate,
-        orderDiscountAmount: orderDiscount,
+        taxRate: validated.taxRate,
+        orderDiscountAmount: validated.orderDiscount,
         paymentMethodId,
-        paymentCommissionPercent: appliedCommission,
+        paymentCommissionPercent: validated.commission,
         revisionReason,
         fulfillmentType,
       });
@@ -435,7 +557,8 @@ export default function EditCustomerOrder() {
   if (!revisionPolicy.canEdit) {
     return <div className="space-y-5"><ComponentCard title={`Revision Locked · ${order.order_number}`} desc={`${customer.name} · ${revisionPolicy.reason}`} headerAction={<Button variant="outline" onClick={() => router.push(`/customers/${customerId}/orders/${orderId}`)}>Back to Order</Button>}><Alert variant="warning" title="Commercial revision disabled" message={`Commercial revision is disabled for status ${order.status.replaceAll("_", " ")}. Order identity, snapshots and calculated totals remain immutable; status changes continue through the dedicated status workflow.`} /></ComponentCard></div>;
   }
-  const defaultCommission = Number(selectedPaymentMethod?.commission_percent ?? 0);
+  const defaultCommissionValue = String(selectedPaymentMethod?.commission_percent ?? 0);
+  const defaultCommission = Number(defaultCommissionValue);
   const commissionOverridden = Math.abs(Number(appliedCommission || 0) - defaultCommission) > 0.0001;
   const taxHint = selectedTaxRule?.is_active && selectedTaxRule.tax_rate !== null ? `Configured tax rule: ${Number(selectedTaxRule.tax_rate).toFixed(3)}%` : "No active tax rule configured.";
   const editingService = serviceEditIndex === null ? null : items[serviceEditIndex] ?? null;
@@ -447,16 +570,16 @@ export default function EditCustomerOrder() {
 
       <ComponentCard title={`Edit ${order.order_number}`} desc={`${customer.name} · ${revisionPolicy.reason}`} headerAction={<Button variant="outline" onClick={() => router.push(`/customers/${customerId}/orders/${orderId}`)}>Back to Order</Button>}>
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-          <Field label="Price Group" hint={isLoadingPrices ? "Loading group prices…" : undefined}><Select options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} /></Field>
+          <Field label="Price Group" hint={fieldErrors.priceGroupId ?? (isLoadingPrices ? "Loading group prices…" : undefined)}><Select id="edit-order-price-group" error={Boolean(fieldErrors.priceGroupId)} options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} /></Field>
           <Field label="Fulfillment Type" hint={taxHint}><Select options={[{ value: "pickup", label: "Customer Pickup" }, { value: "delivery", label: "Delivery" }, { value: "delivery_installation", label: "Delivery + Installation" }]} value={fulfillmentType} onChange={(value) => handleFulfillmentChange(value as OrderFulfillmentType)} /></Field>
-          <Field label="Payment Method"><Select options={paymentMethods.map((method) => ({ value: method.id, label: method.name }))} value={paymentMethodId} onChange={(id) => { setPaymentMethodId(id); const method = paymentMethods.find((item) => item.id === id); setAppliedCommission(String(Number(method?.commission_percent ?? 0))); }} /></Field>
-          <Field label="Applied Commission (%)" hint={`Default ${defaultCommission.toFixed(2)}%${commissionOverridden ? " · Sales override requires approval" : ""}`}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input inputMode="decimal" value={appliedCommission} onChange={(event) => setAppliedCommission(event.target.value)} /></div><Button size="sm" variant="outline" onClick={() => setAppliedCommission(String(defaultCommission))}>Use Default</Button></div></Field>
+          <Field label="Payment Method" hint={fieldErrors.paymentMethodId}><Select id="edit-order-payment-method" error={Boolean(fieldErrors.paymentMethodId)} options={paymentMethods.map((method) => ({ value: method.id, label: method.name }))} value={paymentMethodId} onChange={(id) => { clearHeaderError("paymentMethodId"); clearHeaderError("appliedCommission"); setPaymentMethodId(id); const method = paymentMethods.find((item) => item.id === id); setAppliedCommission(String(method?.commission_percent ?? 0)); }} /></Field>
+          <Field label="Applied Commission (%)" hint={`Default ${defaultCommission.toFixed(2)}%${commissionOverridden ? " · Sales override requires approval" : ""}`}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input id="edit-order-payment-commission" inputMode="decimal" value={appliedCommission} error={Boolean(fieldErrors.appliedCommission)} hint={fieldErrors.appliedCommission} onChange={(event) => { clearHeaderError("appliedCommission"); setAppliedCommission(event.target.value); }} /></div><Button size="sm" variant="outline" onClick={() => { clearHeaderError("appliedCommission"); setAppliedCommission(defaultCommissionValue); }}>Use Default</Button></div></Field>
           <Field label="Expected Delivery"><Input type="date" value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} /></Field>
           <Field label="Customer Reference"><Input value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
           <Field label="Billing Address"><Select options={addresses.filter((address) => ["billing", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={billingAddressId} placeholder="None" allowEmpty onChange={setBillingAddressId} /></Field>
-          <Field label="Shipping Address"><Select options={addresses.filter((address) => ["shipping", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={shippingAddressId} placeholder="None" allowEmpty onChange={setShippingAddressId} /></Field>
-          <Field label={`Order Discount (${currency})`} hint="Sales discounts are approval-controlled."><Input inputMode="decimal" value={orderDiscount} onChange={(event) => setOrderDiscount(event.target.value)} /></Field>
-          <Field label="Tax Rate (%)" hint="Tax overrides against an active fulfillment rule require approval."><Input inputMode="decimal" value={taxRate} onChange={(event) => setTaxRate(event.target.value)} /></Field>
+          <Field label="Shipping Address" hint={fieldErrors.shippingAddressId}><Select id="edit-order-shipping-address" error={Boolean(fieldErrors.shippingAddressId)} options={addresses.filter((address) => ["shipping", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={shippingAddressId} placeholder="None" allowEmpty onChange={(value) => { clearHeaderError("shippingAddressId"); setShippingAddressId(value); }} /></Field>
+          <Field label={`Order Discount (${currency})`} hint="Sales discounts are approval-controlled."><Input id="edit-order-discount" inputMode="decimal" value={orderDiscount} error={Boolean(fieldErrors.orderDiscount)} hint={fieldErrors.orderDiscount} onChange={(event) => { clearHeaderError("orderDiscount"); setOrderDiscount(event.target.value); }} /></Field>
+          <Field label="Tax Rate (%)" hint="Tax overrides against an active fulfillment rule require approval."><Input id="edit-order-tax-rate" inputMode="decimal" value={taxRate} error={Boolean(fieldErrors.taxRate)} hint={fieldErrors.taxRate} onChange={(event) => { clearHeaderError("taxRate"); setTaxRate(event.target.value); }} /></Field>
         </div>
       </ComponentCard>
 
@@ -473,17 +596,19 @@ export default function EditCustomerOrder() {
                 const product = productMap.get(item.product_id);
                 const model = pricingModelFor(item, product);
                 const isService = model === "manual_service";
-                const resolvedPrice = resolveOrderLineUnitPrice(item, product, priceMap);
-                const total = Number(item.quantity || 0) * Number(resolvedPrice ?? 0) * (1 - Number(item.discount_percent || 0) / 100);
+                const resolvedPriceValue = resolveOrderLineUnitPriceValue(item, product, priceValueMap);
+                const resolvedPrice = Number(resolvedPriceValue ?? 0);
+                const total = Number(item.quantity || 0) * resolvedPrice * (1 - Number(item.discount_percent || 0) / 100);
                 const countertopSummary = item.id ? summariesByItemId.get(item.id) : null;
                 const isConfiguredCountertop = Boolean(item.id && countertopSummary);
                 const canMutateConfiguredCountertop = isConfiguredCountertop && canManageCountertop && order.status === "draft";
+                const itemError = fieldErrors.items?.[index];
                 return (
                   <TableRow key={item.id ?? `${item.product_id}-${index}`}>
-                    <TableCell variant="admin" className="min-w-[360px]"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{product?.sku ?? "Historical product"}</span>{product?.status === "inactive" ? <Badge size="sm" color="warning">Inactive</Badge> : null}</div><FormHint>{product?.name ?? item.product_id}</FormHint><CountertopLineDetails summary={countertopSummary} /><ServiceLineDetails lineNote={item.line_note} /></TableCell>
-                    <TableCell variant="admin" className="w-28">{isConfiguredCountertop ? <FormHint>{item.quantity} · configured</FormHint> : isService ? <FormHint>1 · fixed</FormHint> : <Input ariaLabel={`${product?.sku ?? "Product"} quantity`} inputMode="decimal" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} />}</TableCell>
-                    <TableCell variant="admin" className="min-w-[180px]"><span className="font-semibold">{resolvedPrice === undefined ? "Unavailable" : money(resolvedPrice, currency)}</span><FormHint>{model === "countertop_material_band" ? "Countertop · configured price" : model === "manual_service" ? "Service · explicit price" : "Price Group · server authoritative"}</FormHint></TableCell>
-                    <TableCell variant="admin" className="w-32">{isConfiguredCountertop ? <FormHint>{Number(item.discount_percent || 0).toFixed(2)}% · configured</FormHint> : <Input ariaLabel={`${product?.sku ?? "Product"} discount percent`} inputMode="decimal" value={item.discount_percent} onChange={(event) => updateItem(index, { discount_percent: event.target.value })} />}</TableCell>
+                    <TableCell variant="admin" className="min-w-[360px]"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{product?.sku ?? "Historical product"}</span>{product?.status === "inactive" ? <Badge size="sm" color="warning">Inactive</Badge> : null}</div><FormHint>{product?.name ?? item.product_id}</FormHint><CountertopLineDetails summary={countertopSummary} /><ServiceLineDetails lineNote={item.line_note} />{itemError?.unit_price ? <FormHint>{itemError.unit_price}</FormHint> : null}{itemError?.line_note ? <FormHint>{itemError.line_note}</FormHint> : null}</TableCell>
+                    <TableCell variant="admin" className="w-28">{isConfiguredCountertop ? <FormHint>{item.quantity} · configured{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : isService ? <FormHint>1 · fixed{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-quantity`} ariaLabel={`${product?.sku ?? "Product"} quantity`} inputMode="decimal" value={item.quantity} error={Boolean(itemError?.quantity)} hint={itemError?.quantity} onChange={(event) => { clearItemError(index, "quantity"); updateItem(index, { quantity: event.target.value }); }} />}</TableCell>
+                    <TableCell variant="admin" className="min-w-[180px]"><span className="font-semibold">{resolvedPriceValue === undefined ? "Unavailable" : money(resolvedPrice, currency)}</span><FormHint>{model === "countertop_material_band" ? "Countertop · configured price" : model === "manual_service" ? "Service · explicit price" : "Price Group · server authoritative"}</FormHint></TableCell>
+                    <TableCell variant="admin" className="w-32">{isConfiguredCountertop ? <FormHint>{Number(item.discount_percent || 0).toFixed(2)}% · configured{itemError?.discount_percent ? ` · ${itemError.discount_percent}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-discount`} ariaLabel={`${product?.sku ?? "Product"} discount percent`} inputMode="decimal" value={item.discount_percent} error={Boolean(itemError?.discount_percent)} hint={itemError?.discount_percent} onChange={(event) => { clearItemError(index, "discount_percent"); updateItem(index, { discount_percent: event.target.value }); }} />}</TableCell>
                     <TableCell variant="admin" className="font-semibold">{money(total, currency)}</TableCell>
                     <TableCell variant="admin" className="text-right">
                       <div className="flex flex-wrap justify-end gap-2">
