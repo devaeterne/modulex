@@ -5,13 +5,18 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = (p) => readFile(path.join(root, p), "utf8");
+const optionalSource = (p) => source(p).catch((error) => {
+  if (error?.code === "ENOENT") return "";
+  throw error;
+});
 
-const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconcile, refresh, syncRoute, companyBinding, workspace, projectTab, vercelConfig, watchChannels] = await Promise.all([
+const [sql, migration, config, provider, syncEngine, bootstrapSync, eventRoute, webhook, reconcile, refresh, syncRoute, companyBinding, workspace, projectTab, vercelConfig, watchChannels] = await Promise.all([
   source("sql/calendar-v3-bidirectional.sql"),
   source("../modulex-store/supabase/migrations/20260906113000_calendar_v3_bidirectional.sql"),
   source("src/lib/google-calendar/config.ts"),
   source("src/lib/google-calendar/google-calendar.ts"),
   source("src/lib/google-calendar/bidirectional-sync.ts"),
+  optionalSource("src/lib/google-calendar/bootstrap-sync.ts"),
   source("src/app/api/admin/calendar/events/route.ts"),
   source("src/app/api/admin/calendar/google/webhook/route.ts"),
   source("src/app/api/admin/calendar/google/reconcile/route.ts"),
@@ -71,7 +76,7 @@ assert.match(syncEngine, /PROVIDER_SYNC_PAGE_SIZE = 100/);
 assert.match(syncEngine, /export async function syncCompanyCalendarFromGooglePage/);
 assert.match(syncEngine, /continuationToken/);
 assert.match(syncRoute, /continuation_token/);
-assert.match(syncRoute, /syncCompanyCalendarFromGooglePage/);
+assert.match(syncRoute, /syncCompanyCalendarCurrentFirstPage/);
 assert.match(workspace, /while \(continuationToken\)/);
 assert.doesNotMatch(
   companyBinding,
@@ -86,14 +91,14 @@ assert.match(
 
 // Initial full sync must make the currently visible Calendar useful before walking
 // years of historical Google events. The client supplies its visible range, the
-// provider sync preserves a recent/history phase in its continuation, and each
+// bootstrap helper preserves a recent/history phase in its continuation, and each
 // bounded page is reloaded into the workspace while the remaining history continues.
 assert.match(syncRoute, /bootstrap_start/);
 assert.match(syncRoute, /bootstrap_end/);
-assert.match(syncEngine, /phase: "recent"/);
-assert.match(syncEngine, /phase: "history"/);
-assert.match(syncEngine, /timeMin: bootstrapRange\.start/);
-assert.match(syncEngine, /timeMax: bootstrapRange\.end/);
+assert.match(bootstrapSync, /phase: "recent"/);
+assert.match(bootstrapSync, /phase: "history"/);
+assert.match(bootstrapSync, /timeMin: bootstrapRange\.start/);
+assert.match(bootstrapSync, /timeMax: bootstrapRange\.end/);
 assert.match(workspace, /bootstrap_start: range\.start/);
 assert.match(workspace, /bootstrap_end: range\.end/);
 assert.match(
