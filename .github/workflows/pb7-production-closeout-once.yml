@@ -1,0 +1,191 @@
+name: PB-7 Production Closeout Once
+
+on:
+  push:
+    branches:
+      - docs/pb7-production-closeout
+    paths:
+      - .github/workflows/pb7-production-closeout-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  closeout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/pb7-production-closeout
+      - name: Patch PB-7 closeout docs
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}: {old[:120]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          project = "docs/PROJECT_BASE_PLAN.md"
+          replace_once(project,
+              "Active branch: `docs/pb5-pb6-production-closeout`",
+              "Active branch: `docs/pb7-production-closeout`")
+          replace_once(project,
+              "Current package: **PB-5 + PB-6 production closeout — COMPLETE / PRODUCTION VERIFIED**",
+              "Current package: **PB-7 Change Orders — COMPLETE / PRODUCTION VERIFIED**")
+          replace_once(project,
+              "Current status: **PB-1, PB-2, PB-3A, PB-3B, PB-5 and PB-6 are completed Project capabilities. PB-4 Project Expenses/Outgoings remains intentionally Finance-owned. PB-5 fulfillment and PB-6 participants/commission are merged and production-accepted with rollback-only mutation probes and permanent Project Base contracts.**",
+              "Current status: **PB-1, PB-2, PB-3A, PB-3B, PB-5, PB-6 and PB-7 are completed Project capabilities. PB-4 Project Expenses/Outgoings remains intentionally Finance-owned. PB-7 Change Orders are merged and production-accepted with rollback-only lifecycle/revision-link probes, Sales cost sanitization, additive security/performance hardening and zero acceptance residue.**")
+          replace_once(project,
+              "Next action: **PB-5 and PB-6 are closed. Any next Project package must start from execution-time current `main` and the relevant Project plan; do not reopen PB-5/PB-6 implicitly.**",
+              "Next action: **PB-7 is closed. Continue separately scoped Project work such as Proposal/Portal packages from execution-time current `main`; do not reopen PB-7 implicitly.**")
+
+          old_pb7 = """## PB-7 — Change Orders `[ ]`
+
+Support post-sale business-level approved scope/value changes such as added cabinets, island revision, extra vanity/bath scope, removed items, customer/vendor credit and price adjustment.
+
+Customer/sell impact and vendor/cost impact remain separate. Original approved commercial history is not destructively rewritten. Order revisions remain distinct from Project Change Orders.
+"""
+          new_pb7 = """## PB-7 — Change Orders `[x]`
+
+Support post-sale business-level approved scope/value changes such as added cabinets, island revision, extra vanity/bath scope, removed items, customer/vendor credit and price adjustment.
+
+Customer/sell impact and vendor/cost impact remain separate. Original approved commercial history is not destructively rewritten. Order revisions remain distinct from Project Change Orders.
+
+- [x] Draft → submitted → approved/rejected/cancelled lifecycle is DB-authoritative and append-safe.
+- [x] approval authorizes the business change but does not silently mutate canonical Order, Finance, Procurement, AP or AR truth.
+- [x] approved Change Orders apply only through explicit canonical Order revision linkage with reconciliation state.
+- [x] Sales sees sell-side Change Order detail while expected cost/vendor fields remain sanitized and cost writes/erasure fail closed.
+- [x] Admin/Super Admin own review/application mutation; Finance retains privileged read visibility without Project mutation ownership.
+- [x] submitted commercial content and lifecycle/application history reject destructive rewrites.
+- [x] negative customer/vendor credit effects are supported; mixed-currency reconciliation fails closed without invented FX.
+- [x] base production migration `20260905212307 — customer_project_change_orders` and security hardening `20260905213004 — customer_project_change_orders_security_hardening` are applied.
+- [x] performance hardening PR #374 merged as `4663365e4360d292e09fa054fb54639151c5fbde`; production migration `20260907225340 — customer_project_change_order_performance_hardening` is applied.
+- [x] all 13 intended PB-7 FK relationships have leading index coverage; PostgreSQL truncated the long correction index physical identifier to `customer_project_change_orders_correction_of_change_order_id_id`.
+- [x] rollback-only production acceptance passed the 22-check lifecycle/RBAC/revision-link/currency/no-side-effect matrix and left zero fixture residue.
+- [x] fresh Performance Advisor reports zero PB-7 `unindexed_foreign_keys`; new low-traffic indexes appear only as expected `unused_index` INFO.
+- [x] fresh Security Advisor findings match the intentional RPC-only boundary: PB-7 tables are RLS-enabled with no browser DML grants; guarded public wrappers are authenticated-only and anon/PUBLIC execute is denied.
+- [x] acceptance artifact: `docs/acceptance/pb-7-project-change-orders.md`.
+
+**Status: COMPLETE / PRODUCTION VERIFIED.**
+"""
+          replace_once(project, old_pb7, new_pb7)
+          replace_once(project,
+              "- PB-1, PB-2, PB-3A, PB-3B, PB-5 and PB-6: merged / production-accepted.",
+              "- PB-1, PB-2, PB-3A, PB-3B, PB-5, PB-6 and PB-7: merged / production-accepted.")
+          replace_once(project,
+              "- PB-5/PB-6 are closed and must not be reopened implicitly.",
+              "- PB-5/PB-6/PB-7 are closed and must not be reopened implicitly.\n- PB-7 production hardening migration: `20260907225340 — customer_project_change_order_performance_hardening`; PB-7 unindexed-FK debt is 0 and rollback acceptance left no application fixture residue.")
+
+          roadmap = "modulex-admin/ADMIN_ROADMAP.md"
+          replace_once(roadmap,
+              "Current parallel Project package: **Project Base PB-5 Delivery & Installation Rollup and PB-6 Participants & Commission Ledger are complete and production-verified; there is no active PB-5/PB-6 delivery package.**",
+              "Current parallel Project package: **Project Base PB-5 Delivery & Installation Rollup, PB-6 Participants & Commission Ledger, and PB-7 Change Orders are complete and production-verified; there is no active PB-5/PB-6/PB-7 delivery package.**")
+          replace_once(roadmap,
+              "## Project Base — PB-5 / PB-6 production closeout",
+              "## Project Base — PB-5 / PB-6 / PB-7 production closeout")
+          marker = "\n## Product Master UX v2\n"
+          p = Path(roadmap)
+          text = p.read_text()
+          if text.count(marker) != 1:
+              raise SystemExit(f"{roadmap}: expected one Product Master marker")
+          pb7_roadmap = """
+- [x] **PB-7 — Change Orders.** Production-accepted auditable scope/value authorization layer with explicit approval/application separation, canonical Order revision linkage, Sales cost sanitization and append-safe history.
+  - base migration `20260905212307 — customer_project_change_orders` and security hardening `20260905213004 — customer_project_change_orders_security_hardening` are live;
+  - performance hardening PR #374 merged as `4663365e4360d292e09fa054fb54639151c5fbde`; migration `20260907225340 — customer_project_change_order_performance_hardening` is live;
+  - rollback-only production acceptance passed 22/22 checks including Admin approval, Sales mutation denial/cost sanitization, explicit canonical revision application, negative credit effects, mixed-currency fail-closed behavior, immutable submitted history and zero fixture residue;
+  - approval itself produced no canonical Order/Finance/Procurement/AP/AR side effects;
+  - all 13 intended PB-7 FK relationships have leading index coverage and Performance Advisor has zero PB-7 unindexed-FK findings; fresh index `unused_index` INFO is expected before traffic;
+  - PB-7 tables remain RLS-enabled with no PUBLIC/anon/authenticated direct DML, and guarded public RPCs remain authenticated-only with anon/PUBLIC execute denied;
+  - evidence: `docs/acceptance/pb-7-project-change-orders.md`.
+"""
+          p.write_text(text.replace(marker, "\n" + pb7_roadmap + marker, 1))
+
+          acceptance = Path("docs/acceptance/pb-7-project-change-orders.md")
+          acceptance.write_text("""# PB-7 — Project Change Orders Acceptance
+
+Status: **COMPLETE / PRODUCTION VERIFIED**
+
+PB-7 is closed as an auditable Project business-authorization layer. It does not replace canonical Order revisions, Finance, Procurement, AP or AR truth.
+
+## Delivery
+
+- implementation PR #318 introduced PB-7 Change Orders;
+- security hardening PR #319 closed Sales hidden-cost write/erase and canonical revision-lock gaps;
+- performance hardening PR #374 merged as `4663365e4360d292e09fa054fb54639151c5fbde`;
+- production migrations:
+  - `20260905212307 — customer_project_change_orders`;
+  - `20260905213004 — customer_project_change_orders_security_hardening`;
+  - `20260907225340 — customer_project_change_order_performance_hardening`.
+
+## Production acceptance
+
+The final rollback-only matrix passed **22/22** checks.
+
+1. All four PB-7 tables exist with RLS enabled and no PUBLIC/anon/authenticated direct DML grants.
+2. PUBLIC and anon cannot execute PB-7 RPCs; authenticated execution remains limited to guarded public wrappers.
+3. Sales read projection exposes sell-side Change Order truth while `expected_cost_delta`, cost currency, vendor detail and privileged pending-cost fields remain hidden/NULL.
+4. Admin/Super Admin and Finance privileged reads retain expected-cost/vendor visibility according to PB-7 role rules.
+5. Draft Change Order creation and canonical Draft line replacement succeeded.
+6. Submission locked commercial header/line history against destructive mutation.
+7. Sales review/cancel/application-link mutations were denied.
+8. Admin approval succeeded and appended lifecycle history.
+9. Approval alone left canonical Order totals/items/revision history unchanged.
+10. Unrelated Project/Order revision linkage failed closed.
+11. A valid post-approval canonical Order revision linked successfully.
+12. Application reconciliation advanced through the canonical `pending` / `partial` / `applied` model without double-counting Project commercial totals.
+13. Negative sell/customer-credit effects were accepted without manufacturing Finance/AP/AR rows.
+14. Mixed-currency reconciliation failed closed; PB-7 invented no FX conversion.
+15. Sales could neither inject hidden cost/vendor fields nor erase pre-existing hidden cost data through full-line replacement.
+16. Canonical revision application locks the revision row before global uniqueness checks.
+17. Finance remains read-capable but does not gain PB-7 business mutation ownership.
+18. PB-7 application/events history remains append-safe.
+19. No acceptance-side Finance/AP/AR mutation was observed.
+20. Rollback-only fixtures left zero PB-7 application residue; post-closeout production counts remained one real Change Order, one line, three lifecycle events and zero applications.
+21. Performance hardening was preflighted transactionally before merge, then applied from the merged canonical migration after owner merge.
+22. Post-migration Security/Performance Advisor and direct catalog/ACL checks passed the PB-7 closeout classification below.
+
+## Performance closeout
+
+Fresh direct `pg_constraint` / `pg_index` inspection before hardening found 13 genuinely uncovered PB-7 foreign-key columns. PR #374 added only `CREATE INDEX IF NOT EXISTS` statements.
+
+After production migration:
+
+- PB-7 unindexed foreign-key count: **0**;
+- all 13 intended FK relationships have leading index coverage;
+- PostgreSQL's 63-byte identifier limit truncates the long correction index physical name to `customer_project_change_orders_correction_of_change_order_id_id`; the index still leads on `correction_of_change_order_id`;
+- the new indexes may initially appear as `unused_index` INFO because PB-7 production traffic is low. This is expected and is not a closeout blocker.
+
+## Security closeout
+
+Fresh direct ACL/catalog inspection confirmed:
+
+- all four PB-7 tables have RLS enabled;
+- PUBLIC, anon and authenticated have no direct SELECT/INSERT/UPDATE/DELETE table privileges;
+- all ten reviewed public PB-7 wrappers are `SECURITY DEFINER`, authenticated-executable, and denied to PUBLIC/anon;
+- wrapper configuration pins `search_path=pg_catalog, public, private` and the PB-7 functions retain their internal role guards;
+- Security Advisor therefore reports the PB-7 RLS-no-policy INFO and authenticated SECURITY DEFINER WARN entries as expected for this deliberate RPC-only architecture, not as newly introduced privilege regressions.
+
+Unrelated Store/Finance/Calendar/Proposal/security advisor findings remain owned by their respective workstreams and are not PB-7 closeout blockers.
+
+## Scope boundary
+
+PB-7 adds no Store, Customer Portal or Dealer Portal projection. Approval is business authorization only; canonical Order revision linkage is explicit, and Finance/Procurement remain authoritative for their own domains.
+
+**PB-7 is COMPLETE / PRODUCTION VERIFIED. Future Change Order work requires a new explicitly scoped package.**
+""")
+          PY
+      - name: Commit closeout
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/PROJECT_BASE_PLAN.md modulex-admin/ADMIN_ROADMAP.md docs/acceptance/pb-7-project-change-orders.md
+          git diff --cached --check
+          git commit -m "docs(project): close PB-7 production acceptance"
+          git push origin HEAD:docs/pb7-production-closeout
