@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
+import DateInput from "@/components/form/DateInput";
 import Label from "@/components/form/Label";
 import Input from "@/components/form/input/InputField";
 import TextArea from "@/components/form/input/TextArea";
@@ -80,11 +81,10 @@ export default function ProjectProposalEditor({
         </div>
         <div>
           <Label htmlFor={`proposal-valid-until-${revision.id}`}>Valid Until</Label>
-          <Input
+          <DateInput
             id={`proposal-valid-until-${revision.id}`}
-            type="date"
             value={validUntil}
-            onChange={(event) => setValidUntil(event.target.value)}
+            onChange={setValidUntil}
             disabled={!editable}
           />
         </div>
