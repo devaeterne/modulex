@@ -6,6 +6,11 @@ type CountertopConfigurationRow = {
   pricing_snapshot: unknown;
 };
 
+type CountertopLineSummaryWithFaucet = CountertopLineSummary & {
+  faucetName: string | null;
+  faucetSku: string | null;
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -23,11 +28,12 @@ function compactNumber(value: number) {
   return String(Number(value.toFixed(4)));
 }
 
-function parseCountertopLineSummary(row: CountertopConfigurationRow): CountertopLineSummary {
+function parseCountertopLineSummary(row: CountertopConfigurationRow): CountertopLineSummaryWithFaucet {
   const snapshot = asRecord(row.pricing_snapshot);
   const stone = asRecord(snapshot.stone);
   const edge = asRecord(snapshot.edge);
   const sink = asRecord(snapshot.sink);
+  const faucet = asRecord(snapshot.faucet);
   const manualOverride = asRecord(snapshot.manual_override);
   const serviceRows = Array.isArray(snapshot.services) ? snapshot.services : [];
 
@@ -43,6 +49,8 @@ function parseCountertopLineSummary(row: CountertopConfigurationRow): Countertop
     edgeLinearFt: numberValue(edge.linear_ft),
     sinkName: textValue(sink.name),
     sinkSku: textValue(sink.sku),
+    faucetName: textValue(faucet.name),
+    faucetSku: textValue(faucet.sku),
     services: serviceRows.flatMap((entry) => {
       const service = asRecord(entry);
       const name = textValue(service.name);
@@ -70,6 +78,7 @@ export async function loadCountertopLineSummaries(orderItemIds: string[]): Promi
 
 export function formatCountertopPrintDetail(summary?: CountertopLineSummary | null): string | null {
   if (!summary) return null;
+  const faucetSummary = summary as CountertopLineSummaryWithFaucet;
 
   const material = [
     summary.stoneType ? `Material: ${summary.stoneType}` : summary.stoneName ? `Material: ${summary.stoneName}` : null,
@@ -81,6 +90,7 @@ export function formatCountertopPrintDetail(summary?: CountertopLineSummary | nu
     material.length ? material.join(" · ") : null,
     summary.edgeName ? `Edge: ${summary.edgeName}${summary.edgeLinearFt !== null ? ` · ${compactNumber(summary.edgeLinearFt)} lf` : ""}` : null,
     summary.sinkName ? `Sink: ${summary.sinkName}${summary.sinkSku ? ` (${summary.sinkSku})` : ""}` : null,
+    faucetSummary.faucetName ? `Faucet: ${faucetSummary.faucetName}${faucetSummary.faucetSku ? ` (${faucetSummary.faucetSku})` : ""}` : null,
     summary.services.length
       ? `Services: ${summary.services.map((service) => `${service.name} ×${compactNumber(service.quantity)}`).join(", ")}`
       : null,
