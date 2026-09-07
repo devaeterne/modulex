@@ -6,7 +6,6 @@ import {
   listActiveWatchChannels,
   setCompanyCalendarBinding,
 } from "@/lib/google-calendar/v3-repository";
-import { ensureCompanyCalendarWatch } from "@/lib/google-calendar/watch-channels";
 import { withApiTiming } from "@/lib/observability/apiTiming";
 
 async function companyStatus() {
@@ -72,21 +71,15 @@ async function handlePut(request: Request) {
       actorUserId: auth.actor.user.id,
     });
 
-    // The historical provider pull is intentionally deferred to the continuation-aware
-    // Sync Now flow. Binding selection itself must remain a short request.
-    let watch_error_code: string | null = null;
-    try {
-      await ensureCompanyCalendarWatch(request.url);
-    } catch (error) {
-      watch_error_code = error instanceof Error ? error.message.slice(0, 120) : "watch_setup_failed";
-    }
-
+    // The historical provider pull and watch setup are deferred to the bounded Sync Now
+    // flow. This prevents Google from firing a watch notification that starts a second
+    // full-history pull while the initial import is still in progress.
     return Response.json({
       ...(await companyStatus()),
       binding,
       sync_error_code: null,
       sync_pending: true,
-      watch_error_code,
+      watch_error_code: null,
     });
   } catch (error) {
     if (error instanceof GoogleCalendarImportError) return jsonError(error.message, error.status);
