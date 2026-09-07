@@ -67,6 +67,7 @@ type CompanySyncResponse = {
   provider: {
     complete: boolean;
     continuation_token: string | null;
+    phase: "recent" | "history" | "incremental";
   };
 };
 
@@ -278,7 +279,11 @@ export default function AdminCalendarWorkspace({
     do {
       const result: CompanySyncResponse = await authenticatedFetch<CompanySyncResponse>("/api/admin/calendar/google/sync", {
         method: "POST",
-        body: JSON.stringify(continuationToken ? { continuation_token: continuationToken } : {}),
+        body: JSON.stringify({
+          ...(continuationToken ? { continuation_token: continuationToken } : {}),
+          bootstrap_start: range.start,
+          bootstrap_end: range.end,
+        }),
       });
       const nextContinuationToken: string | null = result.provider.continuation_token;
       if (!result.provider.complete && !nextContinuationToken) {
@@ -289,6 +294,7 @@ export default function AdminCalendarWorkspace({
       }
       if (nextContinuationToken) seenContinuationTokens.add(nextContinuationToken);
       continuationToken = nextContinuationToken;
+      if (result.provider.phase !== "history") await load();
     } while (continuationToken);
   }
 

@@ -146,24 +146,49 @@ export async function deleteCalendarEvent(id: string, actorId: string): Promise<
   assertNoError(error, "Calendar event could not be deleted.");
 }
 
-export async function listCalendarEvents(input: {
+type CalendarEventListInput = {
   start: string;
   end: string;
   projectId?: string | null;
   ownerProfileId?: string | null;
-}): Promise<CalendarEventRecord[]> {
+};
+
+async function listCalendarEventRowsForRange(input: CalendarEventListInput, allDay: boolean): Promise<CalendarEventRecord[]> {
   let query = supabaseAdmin
     .from("calendar_events")
     .select("*")
     .is("deleted_at", null)
-    .neq("status", "cancelled");
+    .neq("status", "cancelled")
+    .eq("all_day", allDay);
+
   if (input.projectId) query = query.eq("project_id", input.projectId);
   if (input.ownerProfileId) query = query.eq("owner_profile_id", input.ownerProfileId);
-  const { data, error } = await query.order("created_at");
+
+  if (allDay) {
+    const startDate = input.start.slice(0, 10);
+    const endDate = input.end.slice(0, 10);
+    query = query
+      .lt("all_day_start", endDate)
+      .or(`all_day_end.gt.${startDate},all_day_start.gt.${startDate}`);
+  } else {
+    query = query
+      .lt("start_at", input.end)
+      .or(`end_at.gte.${input.start},start_at.gte.${input.start}`);
+  }
+
+  const { data, error } = await query.order(allDay ? "all_day_start" : "start_at");
   assertNoError(error, "Calendar events could not be loaded.");
+  return (data ?? []) as CalendarEventRecord[];
+}
+
+export async function listCalendarEvents(input: CalendarEventListInput): Promise<CalendarEventRecord[]> {
+  const [timedRows, allDayRows] = await Promise.all([
+    listCalendarEventRowsForRange(input, false),
+    listCalendarEventRowsForRange(input, true),
+  ]);
   const start = new Date(input.start);
   const end = new Date(input.end);
-  return ((data ?? []) as CalendarEventRecord[]).filter((event) => {
+  return [...timedRows, ...allDayRows].filter((event) => {
     if (event.all_day) return Boolean(event.all_day_start && event.all_day_start < input.end.slice(0, 10) && (event.all_day_end ?? event.all_day_start) > input.start.slice(0, 10));
     if (!event.start_at) return false;
     const eventStart = new Date(event.start_at);
