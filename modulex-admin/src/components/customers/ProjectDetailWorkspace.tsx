@@ -12,6 +12,7 @@ import ProjectFulfillmentTab from "@/components/customers/project-detail/Project
 import ProjectProcurementTab from "@/components/customers/project-detail/ProjectProcurementTab";
 import ProjectPendingDomainTab from "@/components/customers/project-detail/ProjectPendingDomainTab";
 import ProjectParticipantsCommissionPanel from "@/components/customers/project-detail/ProjectParticipantsCommissionPanel";
+import ProjectProposalTab from "@/components/customers/project-detail/ProjectProposalTab";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
 import Input from "@/components/form/input/InputField";
@@ -52,7 +53,7 @@ type ProjectStatusHistory = {
 };
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
 
-const PROJECT_TABS = ["Overview", "Orders", "Finance", "Participants & Commission", "Change Orders", "Procurement", "Fulfillment", "Calendar", "Documents", "Activity"] as const;
+const PROJECT_TABS = ["Overview", "Proposal", "Orders", "Finance", "Participants & Commission", "Change Orders", "Procurement", "Fulfillment", "Calendar", "Documents", "Activity"] as const;
 type ProjectTab = (typeof PROJECT_TABS)[number];
 
 const projectStatusOptions: Array<{ value: ProjectStatus; label: string }> = [
@@ -452,6 +453,10 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
             </ComponentCard>
           ) : null}
         </div>
+      ) : null}
+
+      {activeTab === "Proposal" ? (
+        <ProjectProposalTab projectId={project.id} />
       ) : null}
 
       {activeTab === "Orders" ? (
