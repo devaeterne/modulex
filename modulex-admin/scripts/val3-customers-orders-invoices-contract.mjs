@@ -107,10 +107,10 @@ check(/paid_amount/i.test(databaseSource) && /total_amount/i.test(databaseSource
 check(/ledger_managed/i.test(databaseSource), "Ledger-managed invoices must reject manual payment truth");
 check(/Sales cannot record customer payments/i.test(databaseSource), "Sales must remain unable to mutate customer payment truth");
 
-// VAL-3 belongs to the normal Admin smoke chain and remains in-progress before production acceptance.
+// VAL-3 belongs to the normal Admin smoke chain and must reflect its production-closeout roadmap state.
 check(/"smoke:val-3-customers-orders-invoices"/.test(packageJson), "package.json must expose the VAL-3 contract command");
 check(/"smoke"\s*:\s*"[^"]*smoke:val-3-customers-orders-invoices/.test(packageJson), "Normal Admin smoke must include VAL-3");
-check(/- \[~\] VAL-3 — Customers \/ Orders \/ Invoices\./.test(roadmap), "VAL-3 roadmap row must be in progress until production acceptance");
+check(/- \[x\] VAL-3 — Customers \/ Orders \/ Invoices\./.test(roadmap), "VAL-3 roadmap row must remain complete after production acceptance");
 
 if (failures.length) {
   throw new Error(`VAL-3 Customers / Orders / Invoices contract failures:\n- ${failures.join("\n- ")}`);
