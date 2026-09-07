@@ -6,6 +6,7 @@ import {
   deleteGoogleCalendarEvent,
   getGoogleCalendarEvent,
   GoogleCalendarProviderError,
+  listGoogleCalendarEventPage,
   listGoogleCalendarEvents,
   patchGoogleCalendarEvent,
   type GoogleCalendarEventResource,
@@ -35,6 +36,8 @@ import { supabaseAdmin } from "@/lib/supabase/server-admin";
 
 export type SyncResult = { processed: number; created: number; updated: number; deleted: number; conflicts: number; errors: number; mode?: "full" | "incremental" };
 export type BatchResult = SyncResult & { attempted: number };
+export type ProviderSyncPageResult = SyncResult & { complete: boolean; continuationToken: string | null };
+export const PROVIDER_SYNC_PAGE_SIZE = 100;
 
 function blankResult(): SyncResult {
   return { processed: 0, created: 0, updated: 0, deleted: 0, conflicts: 0, errors: 0 };
@@ -272,6 +275,52 @@ export async function applyGoogleEventChange(event: GoogleCalendarEventResource,
   return { ...blankResult(), processed: 1, created: result.created ? 1 : 0, updated: result.updated ? 1 : 0, deleted: result.deleted ? 1 : 0 };
 }
 
+async function applyProviderEvents(input: { bindingId: string; events: GoogleCalendarEventResource[]; requestUrl?: string; mode: "full" | "incremental" }) {
+  const total: SyncResult = { ...blankResult(), mode: input.mode };
+  for (const event of input.events) {
+    try {
+      const applied = await applyGoogleEventChange(event, input.requestUrl);
+      total.processed += applied.processed;
+      total.created += applied.created;
+      total.updated += applied.updated;
+      total.deleted += applied.deleted;
+      total.conflicts += applied.conflicts;
+    } catch (error) {
+      total.errors += 1;
+      await insertCalendarSyncAudit({ bindingId: input.bindingId, providerEventId: event.id, direction: "google_to_modulex", action: "apply_error", resolution: providerErrorCode(error) });
+    }
+  }
+  if (total.errors > 0) throw new Error(`Google Calendar sync had ${total.errors} apply errors.`);
+  return total;
+}
+
+async function runProviderSyncPage(input: {
+  bindingId: string;
+  syncToken?: string | null;
+  continuationToken?: string | null;
+  requestUrl?: string;
+  mode: "full" | "incremental";
+}): Promise<ProviderSyncPageResult> {
+  const binding = await getCompanyCalendarBinding();
+  if (!binding || binding.id !== input.bindingId) throw new Error("Company Calendar binding is not active.");
+  const { accessToken } = await getConnectedGoogleAccessToken(input.requestUrl);
+  const page = await listGoogleCalendarEventPage({
+    accessToken,
+    calendarId: binding.provider_calendar_id,
+    syncToken: input.syncToken ?? null,
+    pageToken: input.continuationToken ?? null,
+    maxResults: PROVIDER_SYNC_PAGE_SIZE,
+    singleEvents: true,
+  });
+  const total = await applyProviderEvents({ bindingId: binding.id, events: page.items, requestUrl: input.requestUrl, mode: input.mode });
+  const complete = !page.nextPageToken;
+  if (complete) {
+    if (!page.nextSyncToken) throw new Error("Google Calendar sync did not return a final sync token.");
+    await updateCompanyBindingSync({ bindingId: binding.id, syncToken: page.nextSyncToken, success: true });
+  }
+  return { ...total, complete, continuationToken: page.nextPageToken };
+}
+
 async function runProviderSync(input: { bindingId: string; syncToken?: string | null; requestUrl?: string; mode: "full" | "incremental" }) {
   const binding = await getCompanyCalendarBinding();
   if (!binding || binding.id !== input.bindingId) throw new Error("Company Calendar binding is not active.");
@@ -282,23 +331,39 @@ async function runProviderSync(input: { bindingId: string; syncToken?: string | 
     syncToken: input.syncToken ?? null,
     singleEvents: true,
   });
-  const total: SyncResult = { ...blankResult(), mode: input.mode };
-  for (const event of page.items) {
-    try {
-      const applied = await applyGoogleEventChange(event, input.requestUrl);
-      total.processed += applied.processed;
-      total.created += applied.created;
-      total.updated += applied.updated;
-      total.deleted += applied.deleted;
-      total.conflicts += applied.conflicts;
-    } catch (error) {
-      total.errors += 1;
-      await insertCalendarSyncAudit({ bindingId: binding.id, providerEventId: event.id, direction: "google_to_modulex", action: "apply_error", resolution: providerErrorCode(error) });
-    }
-  }
-  if (total.errors > 0) throw new Error(`Google Calendar sync had ${total.errors} apply errors.`);
+  const total = await applyProviderEvents({ bindingId: binding.id, events: page.items, requestUrl: input.requestUrl, mode: input.mode });
   await updateCompanyBindingSync({ bindingId: binding.id, syncToken: page.nextSyncToken, success: true });
   return total;
+}
+
+export async function syncCompanyCalendarFromGooglePage(
+  reason: "watch" | "manual" | "reconcile",
+  requestUrl?: string,
+  continuationToken?: string | null,
+): Promise<ProviderSyncPageResult> {
+  const binding = await getCompanyCalendarBinding();
+  if (!binding) throw new Error("Company Calendar is not configured.");
+  try {
+    if (!binding.provider_sync_token) {
+      return await runProviderSyncPage({ bindingId: binding.id, continuationToken, requestUrl, mode: "full" });
+    }
+    return await runProviderSyncPage({
+      bindingId: binding.id,
+      syncToken: binding.provider_sync_token,
+      continuationToken,
+      requestUrl,
+      mode: "incremental",
+    });
+  } catch (error) {
+    if (error instanceof GoogleCalendarProviderError && (error.code === "sync_token_gone" || error.status === 410)) {
+      await updateCompanyBindingSync({ bindingId: binding.id, syncToken: null });
+      const result = await runProviderSyncPage({ bindingId: binding.id, continuationToken: null, requestUrl, mode: "full" });
+      await insertCalendarSyncAudit({ bindingId: binding.id, direction: "system", action: "full_resync", resolution: "sync_token_gone", details: { reason } });
+      return result;
+    }
+    await updateCompanyBindingSync({ bindingId: binding.id, errorCode: providerErrorCode(error) });
+    throw error;
+  }
 }
 
 export async function syncCompanyCalendarFromGoogle(reason: "watch" | "manual" | "reconcile", requestUrl?: string): Promise<SyncResult> {
