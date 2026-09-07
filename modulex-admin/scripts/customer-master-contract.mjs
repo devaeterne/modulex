@@ -35,7 +35,8 @@ requireMatch(table, /supabase\.rpc\(\s*["']create_customer["']/, "Customer creat
 requireNoMatch(table, /\.from\(\s*["']customers["']\s*\)\.insert\(/, "Customer creation must not insert directly into customers from the browser.");
 requireMatch(operationsSql, /create or replace function public\.create_customer\s*\(/i, "Customer operations SQL must define create_customer.");
 requireMatch(operationsSql, /create_customer[\s\S]{0,1800}security\s+invoker/i, "create_customer must remain SECURITY INVOKER.");
-requireMatch(operationsSql, /current_user_has_any_role\s*\(\s*array\s*\[\s*['"]super_admin['"]\s*,\s*['"]admin['"]\s*,\s*['"]sales['"]/i, "create_customer must authorize the approved Customer mutation roles.");
+requireMatch(operationsSql, /select\s+p\.role[\s\S]{0,260}from\s+public\.profiles\s+p[\s\S]{0,220}p\.id\s*=\s*auth\.uid\(\)[\s\S]{0,160}p\.is_active\s*=\s*true/i, "create_customer must resolve the active caller profile before authorizing mutations.");
+requireMatch(operationsSql, /v_role\s+not\s+in\s*\(\s*['"]super_admin['"]\s*,\s*['"]admin['"]\s*,\s*['"]sales['"]\s*\)/i, "create_customer must authorize only the approved Customer mutation roles.");
 requireMatch(operationsSql, /insert into public\.customers/i, "create_customer must create the customer inside the RPC transaction.");
 requireMatch(operationsSql, /insert into public\.customer_activity/i, "create_customer must write the creation activity atomically.");
 requireMatch(operationsSql, /revoke all on function public\.create_customer[\s\S]{0,500}from public/i, "create_customer must revoke PUBLIC execute.");

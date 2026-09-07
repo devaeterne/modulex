@@ -507,7 +507,7 @@ export default function CustomersTable() {
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <FormHint>Showing {startRow}–{endRow} of {filteredCount}</FormHint>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="w-full sm:w-36"><Select value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); resetToFirstPage(); }} options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} / page` }))} /></div>
+                <div className="w-full sm:w-36"><Select ariaLabel="Rows per page" value={String(pageSize)} onChange={(value) => { setPageSize(Number(value)); resetToFirstPage(); }} options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size} / page` }))} /></div>
                 <Button type="button" variant="outline" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</Button>
                 <FormHint>{currentPage} / {totalPages}</FormHint>
                 <Button type="button" variant="outline" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>Next</Button>
