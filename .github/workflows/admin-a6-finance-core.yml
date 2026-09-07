@@ -29,6 +29,8 @@ on:
       - "modulex-admin/scripts/a6-finance-ap-aging-contract.mjs"
       - "modulex-admin/scripts/a6-finance-customer-receipts-contract.mjs"
       - "modulex-admin/scripts/a6-finance-ar-aging-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-reporting-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-f7-hardening-contract.mjs"
       - "modulex-admin/scripts/finance-reports-ui-contract.mjs"
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
@@ -47,8 +49,13 @@ on:
       - "modulex-admin/sql/a6-finance-ap-aging.sql"
       - "modulex-admin/sql/a6-finance-customer-receipts.sql"
       - "modulex-admin/sql/a6-finance-ar-aging.sql"
+      - "modulex-admin/sql/a6-finance-reporting.sql"
+      - "modulex-admin/sql/a6-finance-f7-hardening.sql"
       - "modulex-admin/docs/acceptance/a6-f4-payroll-finance-integration.md"
+      - "modulex-admin/docs/acceptance/a6-f6-finance-reporting.md"
+      - "modulex-admin/docs/acceptance/a6-f7-finance-hardening.md"
       - "modulex-admin/docs/FINANCE_DOMAIN_PLAN.md"
+      - "modulex-admin/ADMIN_ROADMAP.md"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - "modulex-store/supabase/migrations/20260904150000_a6_finance_employee_payments.sql"
@@ -66,6 +73,8 @@ on:
       - "modulex-store/supabase/migrations/20260906141000_a6_finance_ap_aging.sql"
       - "modulex-store/supabase/migrations/20260906193000_a6_finance_customer_receipts.sql"
       - "modulex-store/supabase/migrations/20260906212500_a6_finance_ar_aging.sql"
+      - "modulex-store/supabase/migrations/20260907114500_a6_finance_reporting.sql"
+      - "modulex-store/supabase/migrations/20260907123000_a6_finance_f7_hardening.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
   pull_request:
     paths:
@@ -95,6 +104,8 @@ on:
       - "modulex-admin/scripts/a6-finance-ap-aging-contract.mjs"
       - "modulex-admin/scripts/a6-finance-customer-receipts-contract.mjs"
       - "modulex-admin/scripts/a6-finance-ar-aging-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-reporting-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-f7-hardening-contract.mjs"
       - "modulex-admin/scripts/finance-reports-ui-contract.mjs"
       - "modulex-admin/sql/a6-finance-core.sql"
       - "modulex-admin/sql/a6-finance-core-hardening.sql"
@@ -113,8 +124,13 @@ on:
       - "modulex-admin/sql/a6-finance-ap-aging.sql"
       - "modulex-admin/sql/a6-finance-customer-receipts.sql"
       - "modulex-admin/sql/a6-finance-ar-aging.sql"
+      - "modulex-admin/sql/a6-finance-reporting.sql"
+      - "modulex-admin/sql/a6-finance-f7-hardening.sql"
       - "modulex-admin/docs/acceptance/a6-f4-payroll-finance-integration.md"
+      - "modulex-admin/docs/acceptance/a6-f6-finance-reporting.md"
+      - "modulex-admin/docs/acceptance/a6-f7-finance-hardening.md"
       - "modulex-admin/docs/FINANCE_DOMAIN_PLAN.md"
+      - "modulex-admin/ADMIN_ROADMAP.md"
       - "modulex-store/supabase/migrations/20260904120000_a6_finance_core.sql"
       - "modulex-store/supabase/migrations/20260904121000_a6_finance_core_hardening.sql"
       - "modulex-store/supabase/migrations/20260904150000_a6_finance_employee_payments.sql"
@@ -132,6 +148,8 @@ on:
       - "modulex-store/supabase/migrations/20260906141000_a6_finance_ap_aging.sql"
       - "modulex-store/supabase/migrations/20260906193000_a6_finance_customer_receipts.sql"
       - "modulex-store/supabase/migrations/20260906212500_a6_finance_ar_aging.sql"
+      - "modulex-store/supabase/migrations/20260907114500_a6_finance_reporting.sql"
+      - "modulex-store/supabase/migrations/20260907123000_a6_finance_f7_hardening.sql"
       - ".github/workflows/admin-a6-finance-core.yml"
 
 concurrency:
@@ -165,4 +183,6 @@ jobs:
       - run: node scripts/a6-finance-ap-aging-contract.mjs
       - run: node scripts/a6-finance-customer-receipts-contract.mjs
       - run: node scripts/a6-finance-ar-aging-contract.mjs
+      - run: node scripts/a6-finance-reporting-contract.mjs
       - run: node scripts/finance-reports-ui-contract.mjs
+      - run: node scripts/a6-finance-f7-hardening-contract.mjs
