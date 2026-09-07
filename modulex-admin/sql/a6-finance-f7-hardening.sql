@@ -1,7 +1,8 @@
 -- A6-F7: Finance hardening.
 -- Cover Finance-owned / Finance-integration foreign keys reported by the
--- production Performance Advisor. This migration is intentionally index-only:
--- it does not rewrite business data or change Finance authorization/RPCs.
+-- production Performance Advisor and close the one private trigger execute
+-- exposure found by the production ACL audit. This migration does not rewrite
+-- business data or widen Finance authorization/RPCs.
 
 create index if not exists customer_project_payment_finance_links_created_by_idx
   on public.customer_project_payment_finance_links(created_by);
@@ -62,3 +63,8 @@ create index if not exists vendor_payment_schedules_created_by_idx
   on public.vendor_payment_schedules(created_by);
 create index if not exists vendor_payment_schedules_updated_by_idx
   on public.vendor_payment_schedules(updated_by);
+
+-- Internal trigger function only. F7 production ACL audit found default EXECUTE
+-- exposure on this private helper while the rest of the Finance private cores
+-- were already browser-inaccessible.
+revoke all on function private.guard_allocated_vendor_payment_void() from public, anon, authenticated;
