@@ -46,6 +46,9 @@ type ReferenceConfig = {
   columns: string;
   orderBy: string;
 };
+type CountertopReferenceManagerProps = {
+  kinds?: readonly ReferenceKind[];
+};
 
 const EMPTY_DRAFT: ReferenceDraft = { name: "", code: "", price: "", pricing_method: "" };
 const METHOD_OPTIONS = [
@@ -59,7 +62,7 @@ const CONFIGS: ReferenceConfig[] = [
   { key: "stone_type", title: "Stone Types", description: "Manage the Stone Type choices used by Countertop products and Order configuration.", table: "countertop_stone_types", columns: "id,name,is_active", orderBy: "name" },
   { key: "material_band", title: "Material Price Bands", description: "Manage B/R material bands and their authoritative $/sq ft values.", table: "countertop_material_price_bands", columns: "id,code,price_per_sqft,is_active", orderBy: "sort_order" },
   { key: "edge", title: "Edge Profiles", description: "Manage edge options and their pricing method/unit price.", table: "countertop_edge_profiles", columns: "id,name,pricing_method,unit_price,is_active", orderBy: "name" },
-  { key: "service", title: "Services", description: "Manage removal, plumbing and cutout services available in Countertop configuration.", table: "countertop_services", columns: "id,name,pricing_method,unit_price,is_active", orderBy: "name" },
+  { key: "service", title: "Additional Services", description: "Manage removal, plumbing and cutout services available in Countertop configuration.", table: "countertop_services", columns: "id,name,pricing_method,unit_price,is_active", orderBy: "name" },
 ];
 
 function money(value: string | number | null | undefined) {
@@ -69,7 +72,7 @@ function money(value: string | number | null | undefined) {
     : "—";
 }
 
-export default function CountertopReferenceManager() {
+export default function CountertopReferenceManager({ kinds }: CountertopReferenceManagerProps = {}) {
   const [rows, setRows] = useState<Record<ReferenceKind, ReferenceRow[]>>({ stone_type: [], material_band: [], edge: [], service: [] });
   const [editor, setEditor] = useState<ReferenceKind | null>(null);
   const [draft, setDraft] = useState<ReferenceDraft>(EMPTY_DRAFT);
@@ -78,18 +81,24 @@ export default function CountertopReferenceManager() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const activeConfig = useMemo(() => CONFIGS.find((config) => config.key === editor) ?? null, [editor]);
+  const kindsKey = kinds?.join("|") ?? "";
+  const visibleConfigs = useMemo(() => {
+    if (!kindsKey) return CONFIGS;
+    const requested = new Set(kindsKey.split("|") as ReferenceKind[]);
+    return CONFIGS.filter((config) => requested.has(config.key));
+  }, [kindsKey]);
+  const activeConfig = useMemo(() => visibleConfigs.find((config) => config.key === editor) ?? null, [editor, visibleConfigs]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const entries = await Promise.all(CONFIGS.map(async (config) => {
+    const entries = await Promise.all(visibleConfigs.map(async (config) => {
       const result = await supabase.from(config.table).select(config.columns).order(config.orderBy);
       return [config.key, result] as const;
     }));
     const failed = entries.find(([, result]) => result.error);
     if (failed?.[1].error) {
-      setError(failed[1].error.message || "Unable to load Countertop Setup references.");
+      setError(failed[1].error.message || "Unable to load Countertop references.");
       setLoading(false);
       return false;
     }
@@ -98,7 +107,7 @@ export default function CountertopReferenceManager() {
     setRows(next);
     setLoading(false);
     return true;
-  }, []);
+  }, [visibleConfigs]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -177,7 +186,7 @@ export default function CountertopReferenceManager() {
       {error ? <div className="space-y-3"><Alert variant="error" title="Countertop Setup" message={error} /><Button variant="outline" size="sm" onClick={() => void load()}>Retry</Button></div> : null}
       {message ? <Alert variant="success" title="Countertop Setup" message={message} /> : null}
 
-      {CONFIGS.map((config) => (
+      {visibleConfigs.map((config) => (
         <ComponentCard key={config.key} title={config.title} desc={config.description} headerAction={<Button onClick={() => openNew(config.key)}>Add</Button>}>
           <TableViewport>
             <Table variant="admin" minWidth="standard">
