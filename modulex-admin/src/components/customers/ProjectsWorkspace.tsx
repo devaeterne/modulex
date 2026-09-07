@@ -276,7 +276,11 @@ export default function ProjectsWorkspace() {
       ) : null}
 
       {canManageProjects ? (
-        <ComponentCard title="Create Project" desc="Create the Job container first; Orders can then be created inside it.">
+        <ComponentCard
+          title="Create Project"
+          desc="Create the Job container first; Orders can then be created inside it."
+          className="!overflow-visible"
+        >
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <Label htmlFor="project-customer">Customer</Label>
