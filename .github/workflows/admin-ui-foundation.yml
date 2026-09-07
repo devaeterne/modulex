@@ -87,12 +87,20 @@ jobs:
         run: |
           set -o pipefail
           npm run smoke:admin-ui-strict 2>&1 | tee admin-ui-strict.log
+      - name: Collect Admin UI strict source diagnostics
+        if: failure()
+        run: |
+          awk -F: '/^src\// { print $1 }' admin-ui-strict.log | sort -u > admin-ui-strict-files.txt
+          tar -czf admin-ui-strict-sources.tgz -T admin-ui-strict-files.txt
       - name: Upload Admin UI strict diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: admin-ui-strict-diagnostics
-          path: modulex-admin/admin-ui-strict.log
+          path: |
+            modulex-admin/admin-ui-strict.log
+            modulex-admin/admin-ui-strict-files.txt
+            modulex-admin/admin-ui-strict-sources.tgz
       - run: npm run smoke:countertop-ui
       - run: npm run smoke:countertop-domain
       - run: node scripts/countertop-material-band-selection-contract.mjs
