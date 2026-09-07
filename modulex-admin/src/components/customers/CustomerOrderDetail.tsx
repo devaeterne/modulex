@@ -313,7 +313,7 @@ export default function CustomerOrderDetail() {
                     <TableCell variant="admin">{item.line_no}</TableCell>
                     <TableCell variant="admin" className="font-semibold">{item.sku_snapshot}</TableCell>
                     <TableCell variant="admin" className="min-w-[360px]">
-                      <span>{item.product_name_snapshot}</span>
+                      <span>{item.display_name_override || item.product_name_snapshot}</span>
                       <CountertopLineDetails summary={countertopSummary} />
                       <ServiceLineDetails lineNote={item.line_note} />
                     </TableCell>
