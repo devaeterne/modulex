@@ -7,6 +7,7 @@ import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
 import { armNotificationAudio, queueNotificationChime } from "@/lib/notification-sound";
+import { systemAnnouncementSeverity, type SystemAnnouncementKind } from "@/lib/system-announcements";
 import {
   canRoleSeeNotification,
   type AppNotification,
@@ -58,6 +59,20 @@ type UserNotificationRow = {
   created_at: string;
 };
 
+type SystemAnnouncementRow = {
+  id: string;
+  kind: SystemAnnouncementKind;
+  title: string;
+  message: string;
+  href: string | null;
+  published_at: string;
+};
+
+type SystemAnnouncementReadRow = {
+  announcement_id: string;
+  read_at: string;
+};
+
 function severityStyles(severity: NotificationSeverity) {
   if (severity === "critical") return { icon: "bg-error-50 text-error-600 ring-error-100 dark:bg-error-500/10 dark:text-error-400 dark:ring-error-500/20", badge: "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400", dot: "bg-error-500", label: "Critical" };
   if (severity === "warning") return { icon: "bg-warning-50 text-warning-700 ring-warning-100 dark:bg-warning-500/10 dark:text-warning-400 dark:ring-warning-500/20", badge: "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400", dot: "bg-warning-500", label: "Attention" };
@@ -70,6 +85,7 @@ function notificationIcon(notification: AppNotification) {
   const styles = severityStyles(notification.severity);
   const base = `flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold ring-1 ${styles.icon}`;
   const labels: Partial<Record<NotificationEventType, string>> = {
+    system_announcement: "NEW",
     low_stock: "STK",
     new_order_request: "ORD",
     new_store_lead: "LEAD",
@@ -181,6 +197,7 @@ export default function NotificationDropdown() {
   const [isLoading, setIsLoading] = useState(true);
   const panelIdsRef = useRef<Set<string> | null>(null);
   const userNotificationIdsRef = useRef<Set<string> | null>(null);
+  const announcementIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
     armNotificationAudio();
@@ -201,7 +218,7 @@ export default function NotificationDropdown() {
         if (initial) setIsLoading(true);
         const profile = currentProfile;
         const next: AppNotification[] = [];
-        const [panelResult, stockResult, userResult] = await Promise.all([
+        const [panelResult, stockResult, userResult, announcementResult, announcementReadsResult] = await Promise.all([
           supabase.rpc("get_panel_notification_feed", { p_limit: 30 }),
           canRoleSeeNotification(profile.role, "low_stock")
             ? supabase.rpc("search_stock", { p_query: "", p_limit: 100 })
@@ -211,7 +228,43 @@ export default function NotificationDropdown() {
             .select("id,event_type,title,description,severity,href,sound_enabled,read_at,created_at")
             .order("created_at", { ascending: false })
             .limit(30),
+          supabase
+            .from("system_announcements")
+            .select("id,kind,title,message,href,published_at")
+            .eq("status", "published")
+            .lte("published_at", new Date().toISOString())
+            .order("published_at", { ascending: false })
+            .limit(30),
+          supabase
+            .from("system_announcement_reads")
+            .select("announcement_id,read_at")
+            .eq("user_id", profile.id),
         ]);
+
+        const announcementRows = ((announcementResult.data as SystemAnnouncementRow[] | null) ?? []);
+        const currentAnnouncementIds = new Set(announcementRows.map((row) => row.id));
+        const previousAnnouncementIds = announcementIdsRef.current;
+        if (previousAnnouncementIds && announcementRows.some((row) => !previousAnnouncementIds.has(row.id))) {
+          queueNotificationChime();
+        }
+        announcementIdsRef.current = currentAnnouncementIds;
+
+        const nextPersistentReadIds = new Set<string>(
+          ((announcementReadsResult.data as SystemAnnouncementReadRow[] | null) ?? [])
+            .map((row) => `announcement:${row.announcement_id}`),
+        );
+
+        for (const row of announcementRows) {
+          next.push({
+            id: `announcement:${row.id}`,
+            type: "system_announcement",
+            title: row.title,
+            description: row.message,
+            severity: systemAnnouncementSeverity(row.kind),
+            href: row.href ?? "/updates",
+            timeLabel: relativeTime(row.published_at),
+          });
+        }
 
         const panelRows = ((panelResult.data as PanelFeedRow[] | null) ?? []);
         const currentPanelIds = new Set(panelRows.map((row) => row.id));
@@ -264,7 +317,6 @@ export default function NotificationDropdown() {
         }
         userNotificationIdsRef.current = currentUserIds;
 
-        const nextPersistentReadIds = new Set<string>();
         for (const row of userRows) {
           const type = row.event_type as NotificationEventType;
           if (!canRoleSeeNotification(profile.role, type)) continue;
@@ -324,7 +376,8 @@ export default function NotificationDropdown() {
   }, []);
 
   const visibleNotifications = useMemo(() => role ? notifications.filter((notification) => canRoleSeeNotification(role, notification.type)) : [], [notifications, role]);
-  const isRead = (id: string) => id.startsWith("user:") ? persistentReadIds.has(id) : readIds.has(id);
+  const isPersistentId = (id: string) => id.startsWith("user:") || id.startsWith("announcement:");
+  const isRead = (id: string) => isPersistentId(id) ? persistentReadIds.has(id) : readIds.has(id);
   const unreadNotifications = visibleNotifications.filter((notification) => !isRead(notification.id));
   const unreadCount = unreadNotifications.length;
 
@@ -341,6 +394,14 @@ export default function NotificationDropdown() {
       await supabase.rpc("mark_user_notification_read", { p_notification_id: id.slice(5) });
       return;
     }
+    if (id.startsWith("announcement:") && userId) {
+      setPersistentReadIds((current) => new Set(current).add(id));
+      await supabase.from("system_announcement_reads").upsert(
+        { announcement_id: id.slice("announcement:".length), user_id: userId, read_at: new Date().toISOString() },
+        { onConflict: "announcement_id,user_id" },
+      );
+      return;
+    }
     const next = new Set(readIds);
     next.add(id);
     persistReadIds(next);
@@ -348,13 +409,26 @@ export default function NotificationDropdown() {
 
   async function markAllAsRead() {
     const next = new Set(readIds);
-    visibleNotifications.filter((notification) => !notification.id.startsWith("user:")).forEach((notification) => next.add(notification.id));
+    visibleNotifications.filter((notification) => !isPersistentId(notification.id)).forEach((notification) => next.add(notification.id));
     persistReadIds(next);
     setPersistentReadIds((current) => {
       const result = new Set(current);
-      visibleNotifications.filter((notification) => notification.id.startsWith("user:")).forEach((notification) => result.add(notification.id));
+      visibleNotifications.filter((notification) => isPersistentId(notification.id)).forEach((notification) => result.add(notification.id));
       return result;
     });
+
+    if (userId) {
+      const announcementReads = visibleNotifications
+        .filter((notification) => notification.id.startsWith("announcement:"))
+        .map((notification) => ({
+          announcement_id: notification.id.slice("announcement:".length),
+          user_id: userId,
+          read_at: new Date().toISOString(),
+        }));
+      if (announcementReads.length) {
+        await supabase.from("system_announcement_reads").upsert(announcementReads, { onConflict: "announcement_id,user_id" });
+      }
+    }
     await supabase.rpc("mark_all_user_notifications_read");
   }
 
@@ -366,7 +440,7 @@ export default function NotificationDropdown() {
 
     <Dropdown isOpen={isOpen} onClose={() => setIsOpen(false)} className="absolute -right-[240px] mt-[17px] flex w-[360px] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[400px] lg:right-0">
       <div className="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
-        <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><h5 className="text-base font-semibold text-gray-800 dark:text-white/90">Notifications</h5>{unreadCount > 0 && <span className="rounded-full bg-error-50 px-2 py-0.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400">{unreadCount} new</span>}</div><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Actionable updates for your assigned role and requests</p></div><button type="button" onClick={() => setIsOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5" aria-label="Close notifications">×</button></div>
+        <div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><h5 className="text-base font-semibold text-gray-800 dark:text-white/90">Notifications</h5>{unreadCount > 0 && <span className="rounded-full bg-error-50 px-2 py-0.5 text-xs font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400">{unreadCount} new</span>}</div><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Role-based work alerts and Modulex product updates</p></div><button type="button" onClick={() => setIsOpen(false)} className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5" aria-label="Close notifications">×</button></div>
         {unreadCount > 0 && <button type="button" onClick={() => void markAllAsRead()} className="mt-3 text-xs font-medium text-brand-500 hover:text-brand-600">Mark all as read</button>}
       </div>
 
@@ -375,12 +449,12 @@ export default function NotificationDropdown() {
           {unreadNotifications.map((notification) => {
             const unread = !isRead(notification.id);
             const styles = severityStyles(notification.severity);
-            return <li key={notification.id}><DropdownItem tag="a" href={notification.href ?? "/"} onClick={() => void markAsRead(notification.id)} onItemClick={() => setIsOpen(false)} baseClassName="block w-full text-left" className={`relative flex gap-3 px-4 py-4 transition hover:bg-gray-50 dark:hover:bg-white/[0.03] ${unread ? "bg-brand-50/30 dark:bg-brand-500/[0.03]" : ""}`}>{unread && <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-brand-500" />}{notificationIcon(notification)}<span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-2"><span className="block text-sm font-medium text-gray-800 dark:text-white/90">{notification.title}</span><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${styles.badge}`}>{styles.label}</span></span><span className="mt-1.5 block text-xs leading-5 text-gray-500 dark:text-gray-400">{notification.description}</span><span className="mt-2 flex items-center gap-2 text-[11px] text-gray-400"><span className={`h-1.5 w-1.5 rounded-full ${styles.dot}`} />{notification.timeLabel}</span></span></DropdownItem></li>;
+            return <li key={notification.id}><DropdownItem tag="a" href={notification.href ?? "/"} onClick={() => void markAsRead(notification.id)} onItemClick={() => setIsOpen(false)} baseClassName="block w-full text-left" className={`relative flex gap-3 px-4 py-4 transition hover:bg-gray-50 dark:hover:bg-white/[0.03] ${unread ? "bg-brand-50/30 dark:bg-brand-500/[0.03]" : ""}`}>{unread && <span className="absolute left-1.5 top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-brand-500" />}{notificationIcon(notification)}<span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-2"><span className="block text-sm font-medium text-gray-800 dark:text-white/90">{notification.title}</span><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${styles.badge}`}>{notification.type === "system_announcement" ? "Update" : styles.label}</span></span><span className="mt-1.5 block text-xs leading-5 text-gray-500 dark:text-gray-400">{notification.description}</span><span className="mt-2 flex items-center gap-2 text-[11px] text-gray-400"><span className={`h-1.5 w-1.5 rounded-full ${styles.dot}`} />{notification.timeLabel}</span></span></DropdownItem></li>;
           })}
         </ul>}
       </div>
 
-      <div className="border-t border-gray-100 p-3 dark:border-gray-800"><Link href="/settings/general" onClick={() => setIsOpen(false)} className="block rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">Notification settings</Link></div>
+      <div className="grid grid-cols-2 gap-2 border-t border-gray-100 p-3 dark:border-gray-800"><Link href="/updates" onClick={() => setIsOpen(false)} className="block rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">What&apos;s New</Link><Link href="/settings/general" onClick={() => setIsOpen(false)} className="block rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-center text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">Notification settings</Link></div>
     </Dropdown>
   </div>;
 }
