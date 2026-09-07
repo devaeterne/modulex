@@ -57,6 +57,8 @@ jobs:
         run: npm run smoke:us-date-format
       - name: Store US date format contract
         run: npm --prefix ../modulex-store run smoke:us-date-format
+      - name: Shared Admin DateInput contract
+        run: node scripts/admin-date-input-contract.mjs
       - name: CI workflow architecture contract
         run: npm run smoke:ci-workflow-architecture
       - name: API timing contract
