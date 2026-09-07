@@ -62,7 +62,7 @@ for (const neutralKind of ["deposit", "withdrawal", "transfer", "refund"]) {
 expect(sidebar.includes('path: "/finance/reports"') && sidebar.includes('permission: "finance.view"'), "Finance sidebar must expose /finance/reports under finance.view");
 expect(route.includes("Finance Reports") && route.includes("FinanceReportsWorkspace"), "Finance Reports route must mount the F6 workspace");
 expect(projectWorkspace.includes('hasPermission(profile.roles, "finance.view")'), "Project workspace must derive finance.view before exposing Finance actuals");
-expect(projectFinanceTab.includes("ProjectFinanceActuals") && projectFinanceTab.includes("canViewFinanceReporting"), "Project Finance tab must mount Finance actuals behind an explicit permission prop");
+expect(projectWorkspace.includes("ProjectFinanceActuals") && projectWorkspace.includes("canViewFinanceReporting"), "Project Finance workspace must mount Finance actuals behind finance.view independently from Project payment permission");
 expect(projectFinanceTab.includes("ProjectFinancialSummary"), "F6 must preserve the existing commercial/current-cost Project summary");
 expect(projectActuals.includes("getProjectFinanceActuals"), "Project Finance actuals card must consume the canonical F6 client");
 expect(workspace.includes("getArAgingSummary") && workspace.includes("getApAgingSummary"), "F6 workspace must reuse canonical AR/AP summaries");
