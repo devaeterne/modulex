@@ -2,13 +2,13 @@ import FormHint from "@/components/form/FormHint";
 import Badge from "@/components/ui/badge/Badge";
 import type { CountertopLineSummary } from "@/lib/customers/types";
 
-type CountertopLineDetailsProps = {
-  summary?: CountertopLineSummary | null;
-};
-
 type CountertopLineSummaryWithFaucet = CountertopLineSummary & {
   faucetName?: string | null;
   faucetSku?: string | null;
+};
+
+type CountertopLineDetailsProps = {
+  summary?: CountertopLineSummaryWithFaucet | null;
 };
 
 function quantity(value: number | null, suffix: string) {
@@ -18,7 +18,6 @@ function quantity(value: number | null, suffix: string) {
 
 export default function CountertopLineDetails({ summary }: CountertopLineDetailsProps) {
   if (!summary) return null;
-  const faucetSummary = summary as CountertopLineSummaryWithFaucet;
 
   const serviceText = summary.services.length
     ? summary.services.map((service) => `${service.name} ×${Number(service.quantity.toFixed(4))}`).join(", ")
@@ -28,7 +27,7 @@ export default function CountertopLineDetails({ summary }: CountertopLineDetails
       ? `Edge: ${summary.edgeName}${summary.edgeLinearFt !== null ? ` · ${quantity(summary.edgeLinearFt, "lf")}` : ""}`
       : null,
     summary.sinkName ? `Sink: ${summary.sinkName}${summary.sinkSku ? ` (${summary.sinkSku})` : ""}` : null,
-    faucetSummary.faucetName ? `Faucet: ${faucetSummary.faucetName}${faucetSummary.faucetSku ? ` (${faucetSummary.faucetSku})` : ""}` : null,
+    summary.faucetName ? `Faucet: ${summary.faucetName}${summary.faucetSku ? ` (${summary.faucetSku})` : ""}` : null,
     serviceText ? `Services: ${serviceText}` : null,
   ].filter((value): value is string => Boolean(value));
 
