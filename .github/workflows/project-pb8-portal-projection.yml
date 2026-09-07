@@ -1,0 +1,33 @@
+name: Project PB-8 Portal Projection
+
+on:
+  pull_request:
+    paths:
+      - "modulex-admin/scripts/project-pb8-portal-projection-contract.mjs"
+      - "modulex-store/supabase/migrations/*project*portal*.sql"
+      - "modulex-store/src/lib/portal/projects.ts"
+      - "modulex-store/src/components/portal/PortalProject*.tsx"
+      - "modulex-store/src/components/portal/PortalNavigation.tsx"
+      - "modulex-store/src/app/account/(portal)/projects/**"
+      - "modulex-store/src/app/dealer/(portal)/projects/**"
+      - "modulex-store/STORE_ROADMAP.md"
+      - "docs/PROJECT_BASE_PLAN.md"
+      - ".github/workflows/project-pb8-portal-projection.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pb8-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: PB-8 portal Project projection contract
+        run: node scripts/project-pb8-portal-projection-contract.mjs
