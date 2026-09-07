@@ -15,6 +15,10 @@ assert.doesNotMatch(migration, /insert\s+into\s+public\.user_notifications/i, "A
 
 assert.match(model, /new_feature/);
 assert.match(model, /maintenance/);
+assert.match(model, /validateSystemAnnouncementHref/, "Announcement model must expose shared href validation");
+assert.match(model, /startsWith\("\/"\)/, "Announcement href validation must require an internal absolute path");
+assert.match(publisher, /validateSystemAnnouncementHref\(href\)/, "Publisher must validate href before both draft and publish inserts");
+assert.doesNotMatch(publisher, /href:\s*href\.trim\(\)\s*\|\|\s*null/, "Publisher must not send unchecked href input directly to Supabase");
 assert.match(notifications, /system_announcements/);
 assert.match(notifications, /system_announcement_reads/);
 assert.match(notifications, /announcement:/);
