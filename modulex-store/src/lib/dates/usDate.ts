@@ -84,6 +84,10 @@ export function formatTimestampDate(
   value: string | Date | null | undefined,
   options: DateFormatOptions = {},
 ): string {
+  if (typeof value === "string" && canonicalParts(value)) {
+    return formatDateOnly(value);
+  }
+
   const date = parseTimestamp(value);
   if (!date) return "—";
 
