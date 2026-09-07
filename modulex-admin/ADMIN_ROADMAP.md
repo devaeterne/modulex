@@ -5,7 +5,7 @@ Main baseline: `ab23762e3558204a24b2400fb6603391f1322eb1`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current parallel Admin package: **A6 Finance F0→F7 is complete and production-verified; there is no active Finance delivery package. Future Finance work requires a new explicitly scoped package.**
-Current parallel Project package: **PB-5 Delivery & Installation Rollup is active in draft PR #296 on `feat/project-pb5-fulfillment-rollup`; current `main` is incorporated, production PB-5 DDL/RPC is intentionally unapplied, and Store/Portal projections remain unchanged.**
+Current parallel Project package: **Project Base PB-5 Delivery & Installation Rollup and PB-6 Participants & Commission Ledger are complete and production-verified; there is no active PB-5/PB-6 delivery package.**
 Current Admin next action: **Preserve the active non-Finance workstreams. The A6 Finance F0→F7 foundation is closed; do not reopen it implicitly from unrelated Project, HR, validation, Store, or operations work.**
 
 ## A6-F7 Finance hardening status
@@ -42,26 +42,21 @@ Current Admin next action: **Preserve the active non-Finance workstreams. The A6
 - [x] Standardize the production Dashboard with shared TailAdmin cards, alerts, buttons, and admin table primitives without changing KPI/RPC, retry, or role-filtering behavior.
   - `smoke:dashboard-ui` is wired into the normal Admin smoke chain; Dashboard UI, Admin UI, production-surface, RBAC, TypeScript, lint, production build, and diff-check passed locally.
 
-## Project Base — PB-5 Delivery & Installation Rollup
+## Project Base — PB-5 / PB-6 production closeout
 
-- [x] **PB-1 — Project Core + Order Integration.** Customer → Project → multiple Orders is production-accepted without replacing Order lifecycle, pricing, revision, reservation or fulfillment truth. `customer_orders.project_id` remains nullable for legacy standalone Orders; Project Customer/Order Customer mismatch fails closed; Project Sales Rep is authoritative at Project level; cancelled Orders remain explicit history but are excluded from active Project calculations.
-- [x] **PB-2 — Project Financial Rollup.** Project Sales/Cost/Gross Profit/Margin/Markup/Invoiced/Paid/Balance derive from canonical Order/Invoice/cost truth. Missing cost and mixed-currency cases fail closed; detailed cost/margin remains Admin/Finance-gated and is not exposed to Store/Portal.
-- [x] **PB-3A — Customer Payment Ledger.** Payment requirements, actual customer payment transactions and explicit allocations are separate canonical concepts with partial payments, unallocated credit and append-safe reversal/void behavior. Sales receives sanitized collection status only; payment mutation remains Admin/Finance-only.
-- [x] **PB-3B — Procurement.** Confirmed Order requirements, vendor commitments, partial delivery events, shared Vendor Invoice allocations and sanitized Sales procurement status are production-accepted without fabricating Inventory movements. The approved role-aware `ProjectProcurementTab` is restored in PR #296; the pre-existing placeholder wiring found during PB-5 verification is no longer used.
-- [!] **PB-4 — Project Expenses / Outgoings.** Intentionally not a Project-owned ledger. Expenses, AP, payroll/commission payment and outgoing cash remain Finance-owned canonical truth; Project may consume stable Finance projections later.
-- [~] **PB-5 — Delivery & Installation Rollup.** Project-level fulfillment visibility is implemented as a narrow projection over canonical Orders, Shipments, Installations and PB-3B procurement quantities.
-  - Multiple Shipments and multiple Installations remain separate canonical records; Project only derives rollup state.
-  - `pickup` remains explicit Customer Pickup and is excluded from delivery-required counts.
-  - Canonical Installation records remain authoritative even when legacy Order `fulfillment_type` metadata is `delivery` rather than `delivery_installation`.
-  - Cancelled Orders are excluded from active rollup while remaining available as inactive history.
-  - Procurement blocker projection exposes only Sales-safe quantity/status states; vendor identity, vendor cost, margin, Finance transactions and internal notes are excluded.
-  - DB/client visibility does not broaden Finance into Shipment/Installation access. Store/Customer Portal/Dealer Portal behavior is unchanged.
-  - No Project fulfillment table/ledger is created. Repository source is `modulex-admin/sql/project-pb5-fulfillment-rollup.sql`; production DDL/RPC remains unapplied before owner merge.
-  - TDD RED was recorded before implementation. The PB-5 contract is wired into the consolidated `Admin Project Base` workflow rather than a new workflow wrapper.
-  - Fresh Project Base runs **#220 and #221 are GREEN** after the PB-3B workspace restoration; final-head Admin UI Foundation verification remains the last code/CI gate before owner review.
-  - Acceptance artifact: `docs/acceptance/pb-5-project-fulfillment.md`.
-  - Draft PR: **#296 — `feat(project): add PB-5 fulfillment rollup`**.
-- [ ] **PB-6 — Participants & Commission Ledger.** Next Project package after PB-5 merge/deploy/DB acceptance. Commission obligations belong to Project business truth; actual commission payment remains Finance-owned canonical money movement.
+- [x] **PB-1 — Project Core + Order Integration.** Production-accepted canonical Customer → Project → Orders foundation.
+- [x] **PB-2 — Project Financial Rollup.** Production-accepted canonical sales/cost/profitability rollup.
+- [x] **PB-3A — Customer Payment Ledger.** Production-accepted receivables/payment/allocation truth.
+- [x] **PB-3B — Procurement.** Production-accepted Project procurement projection over canonical Vendor/Inventory domains.
+- [!] **PB-4 — Project Expenses / Outgoings.** Intentionally Finance-owned; no parallel Project cash ledger.
+- [x] **PB-5 — Delivery & Installation Rollup.** Migration `20260904125157 — customer_project_fulfillment_summary` is applied; Admin/Sales RBAC, multi-shipment, partial delivery, Customer Pickup, canonical Installation, cancelled-history and rollback residue checks passed.
+- [x] **PB-6 — Participants & Commission Ledger.** Ordering migration `20260907191844 — customer_project_commission_event_ordering` is applied. Fixed/percentage/gross-profit commissions, append-only lifecycle, deterministic identity ordering, Sales-only denial, Finance payout attribution and mixed-currency fail-closed behavior passed production acceptance.
+  - six events in one transaction: one timestamp / six distinct sequences;
+  - fixed `$500.00`, sales-% `$663.50`, GP basis `$3,616.70`, GP commission `$361.67`;
+  - obligation/event rewrites and negative entitlement remain fail-closed;
+  - rollback acceptance left zero temporary cost/account/commission/Finance residue;
+  - fresh Advisors retain unrelated project-wide debt but no PB-5/PB-6-specific blocker.
+  - evidence: `docs/acceptance/pb-5-project-fulfillment.md`, `docs/acceptance/pb-6-project-participants-commission.md`, `modulex-admin/docs/acceptance/pb-6-commission-event-ordering-hardening.md`.
 
 ## Product Master UX v2
 

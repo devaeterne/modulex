@@ -3,7 +3,7 @@
 Date: 2026-09-07
 Branch: `fix/pb6-commission-event-ordering`
 PR: #352
-Status: implementation / CI gate; production migration intentionally unapplied before merge
+Status: COMPLETE / PRODUCTION VERIFIED
 
 ## Production-closeout finding
 
@@ -129,22 +129,15 @@ CI owner:
 
 - `.github/workflows/admin-project-base.yml`
 
-## Production boundary
+## Production closeout — 2026-09-07
 
-The hardening migration must not be applied to production before PR #352 is merged.
+PR #352 merged before production apply. Production history contains `20260907191844 — customer_project_commission_event_ordering`.
 
-After merge, production acceptance must:
+- identity-backed `event_sequence`, no null historical value;
+- 15 expected ordering/FK hardening indexes present;
+- event projection PUBLIC/anon denied, authenticated allowed; private current-status helper PUBLIC denied;
+- status and event projection both use `event_sequence DESC`;
+- full rollback acceptance passed deterministic same-timestamp ordering, commission calculations, negative guard, immutable history, true Sales-only denial, canonical Finance payout attribution, mixed-currency fail-closed behavior and zero residue;
+- fresh Advisors show no PB-6-specific blocker; broader project findings remain separate.
 
-1. apply the canonical migration;
-2. verify `event_sequence` is identity-backed and non-null for historical rows;
-3. verify event-ordering indexes and PB-6 FK covering indexes;
-4. reproduce `earned -> approved -> adjustment -> approved` deterministically in one rollback-only transaction;
-5. verify offset/reversal ordering and negative-entitlement guard;
-6. verify immutable UPDATE/DELETE guards remain active;
-7. verify Admin/Finance commission management and denied roles;
-8. verify event projection ACLs and deterministic order;
-9. verify canonical Finance payout attribution without introducing a duplicate commission-payment ledger;
-10. rerun Security and Performance Advisors and confirm no PB-5/PB-6-specific blocking finding remains;
-11. confirm zero acceptance residue.
-
-PB-5 production acceptance is independently GREEN; final Project Base plan/roadmap closeout will mark PB-5 and PB-6 complete only after this PB-6 migration and post-merge acceptance pass.
+**PB-6 ordering hardening status: COMPLETE / PRODUCTION VERIFIED.**

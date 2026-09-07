@@ -3,7 +3,7 @@
 Date: 2026-09-04
 PR: #308
 Branch: `feat/pb6-participants-commission-ledger`
-Status: code / CI owner-merge gate; production unchanged
+Status: COMPLETE / PRODUCTION VERIFIED
 
 ## Goal
 
@@ -176,29 +176,18 @@ Admin UI Foundation then correctly rejected feature-level appearance recreation 
 
 Final-head CI identifiers are recorded in PR #308 and this acceptance artifact after the last documentation commit completes.
 
-## Production boundary
+## Production closeout — 2026-09-07
 
-No PB-6 migration, DDL, RPC or business-data mutation has been applied to production before owner merge.
+PB-6 core/hardening/percentage/gross-profit migrations are installed. PR #352 supplied the final deterministic event-ordering hardening.
 
-Production was queried read-only to verify the existing canonical contracts used by PB-6, including `customer_projects`, `hr_employees`, `customer_contacts`, `profiles`, Order/product/category references, `finance_transactions`, and `finance_transaction_links`.
+- production ordering migration: `20260907191844 — customer_project_commission_event_ordering`;
+- `event_sequence` is `GENERATED ALWAYS AS IDENTITY`, historical values are non-null, and 15 targeted hardening indexes are present;
+- current-status and event-history projections use `event_sequence DESC`; PUBLIC/anon execute remains denied and authenticated execute remains allowed;
+- rollback acceptance verified fixed `$500.00`, sales basis `$6,635.00` → `$663.50`, GP revenue/cost/basis/commission `$6,540.70 / $2,924.00 / $3,616.70 / $361.67`;
+- `earned → approved → adjustment → approved → offset → reversal` passed with one shared timestamp and six distinct sequences;
+- negative entitlement, true Sales-only denial and immutable UPDATE/DELETE guards passed;
+- canonical posted Finance payout attribution rolled up same-currency and failed closed for mixed currency;
+- all temporary costs/accounts/obligations/events/Finance rows rolled back with zero residue;
+- fresh Advisors show no PB-5/PB-6-specific blocker; unrelated debt remains separate.
 
-## Post-merge production acceptance
-
-Only after explicit owner approval:
-
-1. apply PB-6 migrations in order;
-2. verify tables, indexes, triggers, RLS policies, RPC grants and private-function execute lockdown;
-3. verify Sales Rep projection against existing `customer_projects.sales_rep_id` without changing Project Sales Rep truth;
-4. prove only Sales Rep remains a structural role while other seeded roles are configurable;
-5. use rollback-only role-authenticated probes for Admin participant management and Finance commission lifecycle;
-6. prove inactive/wrong-Customer participant assignments fail closed;
-7. prove Sales sees only own commission obligations/history and no payout detail;
-8. prove unrelated roles and anon cannot read PB-6 internal data;
-9. prove category/product scope mismatch fails closed;
-10. prove immutable UPDATE/DELETE guards reject destructive rewrites;
-11. prove corrections cannot drive current entitlement below zero;
-12. prove same-currency posted Finance attribution rolls up and mixed-currency attribution fails closed;
-13. rerun Supabase Security and Performance Advisors;
-14. deploy Admin and perform signed-in Project Detail acceptance, including role configuration and reversal selection.
-
-PB-7 Change Orders is explicitly outside PR #308 and has not started.
+**PB-6 status: COMPLETE / PRODUCTION VERIFIED.**
