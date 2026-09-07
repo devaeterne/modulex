@@ -438,7 +438,7 @@ These rules are mandatory for all future Modulex Admin work:
   - The A2.4 SQL package keeps security-invoker views, adds narrow paginated/filterable reporting RPCs with exact counts and deterministic ordering, and adds movement created-at/from/to warehouse indexes.
 - [x] Review inventory and movement reports for correctness and export needs.
   - Inventory/location/movement and low-stock CSV paths page through bounded filtered RPC calls to the exact count rather than inheriting the former 1,000-row client ceiling. Permanent repository verification is `smoke:a2-low-stock-reporting` plus `.github/workflows/admin-a2-low-stock-reporting.yml`.
-  - Production acceptance: `docs/acceptance/a2-4-low-stock-reporting.md` is PASS/CLOSED. Migration `20260830155834`, source/RPC reconciliation, authenticated browser route smoke, deterministic filtering/pagination, and complete CSV exports passed on deployment SHA `2d08d28`.
+  - Production acceptance: `docs/acceptance/a2-4-low-stock-reporting.md` is PASS/CLOSED. Migration `20260830155834`, source/RPC reconciliation, Advisor review, authenticated browser route smoke, deterministic filtering/pagination, and complete CSV exports passed on deployment SHA `2d08d28`.
 
 ### Phase A2 Exit Gate
 
