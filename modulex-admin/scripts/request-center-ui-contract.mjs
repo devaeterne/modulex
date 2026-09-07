@@ -8,6 +8,8 @@ const expect = (condition, message) => {
 };
 
 const center = read("src/components/requests/RequestCenter.tsx");
+const announcementAction = read("src/components/requests/RequestCenterAnnouncementAction.tsx");
+const requestsPage = read("src/app/(admin)/requests/page.tsx");
 const textArea = read("src/components/form/input/TextArea.tsx");
 const emailRoute = read("src/app/api/requests/notify-created/route.ts");
 const schema = read("docs/REQUEST_CENTER_SCHEMA.sql");
@@ -25,6 +27,12 @@ expect(center.includes("updatingRequestIds"), "Per-request update saving state m
 expect(center.includes("useSearchParams"), "Request Center must read request deep links");
 expect(center.includes("scrollIntoView"), "Deep-linked requests must scroll into view");
 expect(center.includes("ring-2 ring-brand-500"), "Deep-linked requests must receive a visible highlight");
+
+expect(requestsPage.includes("RequestCenterAnnouncementAction"), "Request Center page must expose the product update action");
+expect(announcementAction.includes('role === "admin"') && announcementAction.includes('role === "super_admin"'), "Product update action must be limited to Admin and Super Admin roles");
+expect(announcementAction.includes('router.push("/settings/general/product-updates")'), "Product update action must open the announcement publisher");
+expect(announcementAction.includes("Publish product update"), "Product update action label must be explicit");
+expect(announcementAction.includes("Button"), "Product update action must use the shared Button primitive");
 
 for (const primitive of ["ComponentCard", "Label", "Input", "Select", "TextArea", "Button", "Badge", "Alert"]) {
   expect(center.includes(primitive), `Request Center must compose the shared ${primitive} primitive`);
