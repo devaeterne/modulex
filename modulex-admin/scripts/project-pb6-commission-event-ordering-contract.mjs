@@ -25,6 +25,29 @@ assert.match(migration, /alter\s+table\s+public\.project_commission_events[\s\S]
   "PB-6 must add a database-assigned append sequence");
 assert.match(migration, /create\s+(?:unique\s+)?index[\s\S]*project_commission_events[\s\S]*obligation_id[\s\S]*event_sequence\s+desc/i,
   "PB-6 must index event lookup by obligation + descending append sequence");
+
+const requiredFkIndexes = [
+  "project_commission_events_created_by_idx",
+  "project_commission_obligations_participant_project_idx",
+  "project_commission_obligations_created_by_idx",
+  "project_commission_obligations_order_idx",
+  "project_commission_obligations_category_idx",
+  "project_commission_obligations_product_idx",
+  "project_participant_roles_created_by_idx",
+  "project_participants_created_by_idx",
+  "project_participants_contact_idx",
+  "project_participants_employee_idx",
+  "project_participants_profile_idx",
+  "project_participants_role_idx",
+  "project_participants_updated_by_idx",
+];
+for (const indexName of requiredFkIndexes) {
+  assert.match(migration, new RegExp(`create\\s+index\\s+if\\s+not\\s+exists\\s+${indexName}\\b`, "i"),
+    `PB-6 hardening must include ${indexName}`);
+}
+assert.match(migration, /project_commission_obligations_participant_project_idx[\s\S]*participant_id\s*,\s*project_id/i,
+  "Composite participant/project FK must have a matching leading-column index");
+
 assert.match(migration, /current_project_commission_status[\s\S]*order\s+by\s+e\.event_sequence\s+desc/i,
   "Current commission status must use deterministic append order");
 assert.match(migration, /get_customer_project_commission_events[\s\S]*order\s+by\s+e\.event_sequence\s+desc/i,
