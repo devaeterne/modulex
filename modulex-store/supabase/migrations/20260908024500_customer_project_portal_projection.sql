@@ -196,10 +196,15 @@ as $$
   select private.get_store_portal_project(p_project_id);
 $$;
 
-revoke execute on function private.get_store_portal_projects(integer, integer) from public, anon, authenticated;
-revoke execute on function private.get_store_portal_project(uuid) from public, anon, authenticated;
+-- Match the established Store Portal pattern: authenticated callers may execute
+-- the context-scoped read cores used by SECURITY INVOKER public wrappers; anon and
+-- service-role direct core execution remain denied.
+revoke execute on function private.get_store_portal_projects(integer, integer) from public, anon, authenticated, service_role;
+revoke execute on function private.get_store_portal_project(uuid) from public, anon, authenticated, service_role;
+grant execute on function private.get_store_portal_projects(integer, integer) to authenticated;
+grant execute on function private.get_store_portal_project(uuid) to authenticated;
 
 revoke execute on function public.get_store_portal_projects(integer, integer) from public, anon;
 revoke execute on function public.get_store_portal_project(uuid) from public, anon;
-grant execute on function public.get_store_portal_projects(integer, integer) to authenticated;
-grant execute on function public.get_store_portal_project(uuid) to authenticated;
+grant execute on function public.get_store_portal_projects(integer, integer) to authenticated, service_role;
+grant execute on function public.get_store_portal_project(uuid) to authenticated, service_role;
