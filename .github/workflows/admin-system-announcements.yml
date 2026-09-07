@@ -1,0 +1,40 @@
+name: Admin System Announcements
+
+on:
+  pull_request:
+    paths:
+      - "modulex-admin/src/components/header/NotificationDropdown.tsx"
+      - "modulex-admin/src/lib/notifications.ts"
+      - "modulex-admin/src/lib/system-announcements.ts"
+      - "modulex-admin/src/app/(admin)/updates/**"
+      - "modulex-admin/src/app/(admin)/settings/general/product-updates/**"
+      - "modulex-admin/scripts/system-announcements-contract.mjs"
+      - "modulex-store/supabase/migrations/*system_announcements*.sql"
+      - ".github/workflows/admin-system-announcements.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: System announcements contract
+        run: node scripts/system-announcements-contract.mjs
+      - name: Typecheck
+        run: npm run typecheck
