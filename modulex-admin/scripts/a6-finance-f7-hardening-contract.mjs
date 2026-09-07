@@ -70,7 +70,14 @@ for (const indexName of coveringIndexes) {
 
 expect(!/\bdrop\s+(table|index|function|schema)\b/i.test(sql), "F7 hardening must not destructively drop Finance schema objects");
 expect(!/\bdelete\s+from\b|\bupdate\s+public\.|\binsert\s+into\b/i.test(sql), "F7 hardening migration must not rewrite production business data");
-expect(!/\bgrant\b|\brevoke\b|\bsecurity\s+definer\b/i.test(sql), "F7 performance hardening must not widen or rewrite Finance authorization boundaries");
+expect(!/\bgrant\b/i.test(sql), "F7 hardening must not widen Finance grants");
+expect(!/create\s+or\s+replace\s+function|\bsecurity\s+definer\b/i.test(sql), "F7 hardening must not rewrite Finance function bodies/security mode");
+const revokeStatements = sql.match(/\brevoke\b[^;]*;/gi) ?? [];
+expect(revokeStatements.length === 1, `F7 hardening must contain exactly one targeted REVOKE, found ${revokeStatements.length}`);
+expect(
+  /revoke all on function private\.guard_allocated_vendor_payment_void\(\) from public, anon, authenticated;/i.test(sql),
+  "F7 must revoke browser execution from the exposed private vendor-payment trigger helper",
+);
 
 expect(core.includes("pg_advisory_xact_lock"), "Finance idempotency must serialize same-key retries with a transaction advisory lock");
 expect(core.includes("finance_idempotency_requests_unique_key unique (operation, idempotency_key)"), "Finance idempotency must retain its unique operation/key boundary");
