@@ -153,6 +153,9 @@ function unnamedInteractiveCount(nodes) {
 }
 
 async function main() {
+  if (typeof WebSocket !== "function") {
+    throw new Error("Customer production acceptance requires Node.js 22 or newer (global WebSocket support)." );
+  }
   const options = parseAcceptanceArgs(process.argv.slice(2));
   const targets = await fetchTargets(options.cdpOrigin, options.timeoutMs);
   const target = choosePageTarget(targets, options.baseUrl);
@@ -186,6 +189,7 @@ async function main() {
       media: "screen",
       features: [{ name: "prefers-color-scheme", value: "dark" }],
     });
+    await evaluate(client, "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
 
     const beforeFocus = await evaluate(client, `(() => {
       const navigation = performance.getEntriesByType("navigation")[0];
