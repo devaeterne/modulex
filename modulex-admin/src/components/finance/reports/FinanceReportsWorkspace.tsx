@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input from "@/components/form/input/InputField";
 import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
 import {
@@ -14,6 +17,7 @@ import {
   TableStateRow,
   TableViewport,
 } from "@/components/ui/table";
+import { ADMIN_SURFACE_CARD, ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { getFinanceAccounts, type FinanceAccount } from "@/lib/finance/core";
 import { getApAgingSummary, type ApAgingSummary } from "@/lib/finance/apAging";
 import { getArAgingSummary, type ArAgingSummary } from "@/lib/finance/arAging";
@@ -65,10 +69,10 @@ function displayDate(value: string) {
 
 function Metric({ label, value, helper }: { label: string; value: string; helper?: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">{value}</p>
-      {helper ? <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{helper}</p> : null}
+    <div className={`${ADMIN_SURFACE_CARD} p-4`}>
+      <p className={`text-xs font-medium uppercase tracking-wide ${ADMIN_TEXT_STYLES.muted}`}>{label}</p>
+      <p className={`mt-2 text-xl font-semibold ${ADMIN_TEXT_STYLES.strong}`}>{value}</p>
+      {helper ? <p className={`mt-1 text-xs ${ADMIN_TEXT_STYLES.muted}`}>{helper}</p> : null}
     </div>
   );
 }
@@ -184,6 +188,11 @@ export default function FinanceReportsWorkspace() {
     unconverted: cashFlow.reduce((sum, point) => sum + Number(point.unconverted_count || 0), 0),
   }), [cashFlow]);
 
+  const accountOptions = useMemo(
+    () => accounts.map((account) => ({ value: account.id, label: `${account.name} · ${account.currency_code}` })),
+    [accounts],
+  );
+
   function applyFilters() {
     setAccountOffset(0);
     setProjectOffset(0);
@@ -204,23 +213,21 @@ export default function FinanceReportsWorkspace() {
       <ComponentCard title="Reporting Period" desc="Finance actuals use posted transaction-time snapshots. AR/AP remain canonical source projections as of the selected end date.">
         <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
           <div>
-            <label htmlFor="finance-report-from" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">From</label>
-            <input
+            <Label htmlFor="finance-report-from">From</Label>
+            <Input
               id="finance-report-from"
               type="date"
               value={from}
               onChange={(event) => setFrom(event.target.value)}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 outline-none focus:border-brand-500 dark:border-gray-700 dark:text-white/90"
             />
           </div>
           <div>
-            <label htmlFor="finance-report-to" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">To</label>
-            <input
+            <Label htmlFor="finance-report-to">To</Label>
+            <Input
               id="finance-report-to"
               type="date"
               value={to}
               onChange={(event) => setTo(event.target.value)}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 outline-none focus:border-brand-500 dark:border-gray-700 dark:text-white/90"
             />
           </div>
           <Button onClick={applyFilters} disabled={loading}>Refresh Reports</Button>
@@ -274,19 +281,19 @@ export default function FinanceReportsWorkspace() {
 
       <ComponentCard title="Account Movements" desc="Account-side cash movement from posted Finance transactions. Reversals offset the original; transfers appear on both affected accounts.">
         <div className="mb-4 max-w-md">
-          <label htmlFor="finance-report-account" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Finance account</label>
-          <select
+          <Label htmlFor="finance-report-account">Finance account</Label>
+          <Select
             id="finance-report-account"
+            options={accountOptions}
             value={selectedAccountId}
-            onChange={(event) => {
-              setSelectedAccountId(event.target.value);
+            onChange={(value) => {
+              setSelectedAccountId(value);
               setAccountOffset(0);
             }}
-            className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-          >
-            {accounts.length === 0 ? <option value="">No Finance accounts</option> : null}
-            {accounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency_code}</option>)}
-          </select>
+            placeholder="No Finance accounts"
+            allowEmpty={accounts.length === 0}
+            disabled={accounts.length === 0}
+          />
         </div>
         <TableViewport>
           <Table variant="admin" minWidth="wide">
@@ -316,7 +323,7 @@ export default function FinanceReportsWorkspace() {
             </TableBody>
           </Table>
         </TableViewport>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
+        <div className={`mt-4 flex flex-wrap items-center justify-between gap-3 text-sm ${ADMIN_TEXT_STYLES.muted}`}>
           <span>{selectedAccount ? `${selectedAccount.name}: ` : ""}{accountTotal} movement(s)</span>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" disabled={accountOffset === 0 || movementLoading} onClick={() => setAccountOffset((value) => Math.max(value - PAGE_SIZE, 0))}>Previous</Button>
@@ -328,20 +335,13 @@ export default function FinanceReportsWorkspace() {
       <ComponentCard title="Project Finance Actuals" desc="Only explicit Project/Order Finance allocations are included. No attribution is inferred from Customer, Invoice, Vendor or source-document links.">
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end">
           <div className="flex-1">
-            <label htmlFor="finance-project-search" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Search Projects</label>
-            <input
+            <Label htmlFor="finance-project-search">Search Projects</Label>
+            <Input
               id="finance-project-search"
               type="search"
               value={projectSearch}
               placeholder="Project number, name or Customer"
               onChange={(event) => setProjectSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  setProjectOffset(0);
-                  void loadProjects();
-                }
-              }}
-              className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 outline-none focus:border-brand-500 dark:border-gray-700 dark:text-white/90"
             />
           </div>
           <Button onClick={() => { setProjectOffset(0); void loadProjects(); }} disabled={projectLoading}>Search</Button>
@@ -365,7 +365,7 @@ export default function FinanceReportsWorkspace() {
               {projects.map((project) => (
                 <TableRow key={project.project_id}>
                   <TableCell variant="admin">
-                    <Link className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400" href={`/projects/${project.project_id}?tab=Finance`}>
+                    <Link className={`font-medium ${ADMIN_TEXT_STYLES.strong}`} href={`/projects/${project.project_id}?tab=Finance`}>
                       {project.project_number} · {project.project_name}
                     </Link>
                   </TableCell>
@@ -380,7 +380,7 @@ export default function FinanceReportsWorkspace() {
             </TableBody>
           </Table>
         </TableViewport>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
+        <div className={`mt-4 flex flex-wrap items-center justify-between gap-3 text-sm ${ADMIN_TEXT_STYLES.muted}`}>
           <span>{projectTotal} Project(s)</span>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" disabled={projectOffset === 0 || projectLoading} onClick={() => setProjectOffset((value) => Math.max(value - PAGE_SIZE, 0))}>Previous</Button>
