@@ -4,18 +4,21 @@ Last reviewed: 2026-09-07
 Main baseline: `bd0f2afe765681415c6e34fe0c342457819c8bf6`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
-Current parallel Admin package: **A6-F7 Finance Hardening & Production Acceptance is active in draft PR #349 on `feat/a6-f7-finance-hardening`; F0–F6 are complete/production-verified, and the F7 migration remains intentionally unapplied before owner merge.**
+Current parallel Admin package: **A6 Finance F0→F7 is complete and production-verified; there is no active Finance delivery package. Future Finance work requires a new explicitly scoped package.**
 Current parallel Project package: **PB-5 Delivery & Installation Rollup is active in draft PR #296 on `feat/project-pb5-fulfillment-rollup`; current `main` is incorporated, production PB-5 DDL/RPC is intentionally unapplied, and Store/Portal projections remain unchanged.**
-Current Admin next action: **Preserve the active non-Finance workstreams. For Finance, finish F7 exact-head CI/review on #349; do not apply the F7 hardening migration before owner merge, then run the separate production migration/advisor/reconciliation/rollback/signed-in acceptance gate.**
+Current Admin next action: **Preserve the active non-Finance workstreams. The A6 Finance F0→F7 foundation is closed; do not reopen it implicitly from unrelated Project, HR, validation, Store, or operations work.**
 
 ## A6-F7 Finance hardening status
 
-- [~] Close the locked A6 operational Finance program with RLS/RPC/RBAC, idempotency/concurrency, append-safe reversal, FX/allocation reconciliation, Advisor-backed performance hardening and post-merge production acceptance.
-  - F6 Reporting & Project Financial Projection is production-verified, including `/finance/reports` HTTP 200 on current production and the canonical reporting migration.
-  - F7 TDD RED is recorded in Admin A6 Finance Core run #322: F1–F6 stayed GREEN and only the intentionally missing F7 artifact failed.
-  - The F7 migration is deliberately narrow: Advisor-supported Finance FK covering indexes plus a targeted browser-execute revoke on `private.guard_allocated_vendor_payment_void()` found by the production ACL audit; no business-data rewrite/backfill or public grant widening is introduced.
-  - Admin SQL and Store migration mirror must remain byte-identical. Production F7 migration is forbidden before owner merge.
-  - Acceptance artifact: `docs/acceptance/a6-f7-finance-hardening.md`; draft PR: **#349**.
+- [x] Close the locked A6 operational Finance program with RLS/RPC/RBAC, idempotency/concurrency, append-safe reversal, FX/allocation reconciliation, Advisor-backed performance hardening and post-merge production acceptance.
+  - Implementation PR #349 merged as `c9dcebc552d61b79ed4609e670a9df2dda58b78c`.
+  - Production migration `20260907114208 — a6_finance_f7_hardening` is applied.
+  - All 24/24 targeted Finance/Finance-integration FK covering indexes exist in production.
+  - Browser EXECUTE on `private.guard_allocated_vendor_payment_void()` is revoked; reviewed Finance private cores expose no browser execute path and public Finance wrappers remain authenticated-only with the locked authorization/search-path boundary.
+  - Rollback-only production acceptance passed idempotent retry, changed-fingerprint rejection, posting, posted immutability, append-safe reversal, transaction-time FX snapshot, negative RBAC and zero-residue checks.
+  - Read-only reconciliation returned zero over-allocation, broken Finance links/reversals and checked context mismatches.
+  - Fresh Security/Performance Advisor review found no F7-specific blocking finding; unrelated project-wide advisor debt remains separate.
+  - Live Finance route/session-boundary smoke is healthy. Detailed evidence: `docs/acceptance/a6-f7-finance-hardening.md`.
 
 ## Customer read performance cleanup
 
@@ -678,7 +681,7 @@ Finance ownership is now explicitly committed product scope. The authoritative a
 - [x] **A6-F4 — Payroll Finance integration.** HR remains calculation/source truth; Finance owns actual Employee Payments and settlement-derived state. Production acceptance is complete.
 - [x] **A6-F5 — Sales / Accounts Receivable integration.** Customer Receipts, AR Aging/Customer Balances and Project-payment reconciliation hardening are production-verified without a duplicate cash ledger.
 - [x] **A6-F6 — Finance reporting & Project projection.** Cash flow, operational income/expense, account movements and explicit Project/Order Finance actuals are production-verified; commercial/current-cost Project profitability remains separate.
-- [~] **A6-F7 — Finance hardening & production acceptance.** Draft PR #349 adds aggregate RLS/RPC/RBAC/idempotency/reversal/FX/allocation contracts, Advisor-supported FK covering indexes and one targeted private-trigger execute revoke. Keep `[~]` until owner merge plus production migration, Advisor/reconciliation checks, rollback-only behavioral acceptance and signed-in Admin smoke complete.
+- [x] **A6-F7 — Finance hardening & production acceptance.** Production migration, Advisor review, RBAC/ACL checks, reconciliation, rollback-only idempotency/reversal/FX acceptance and live Finance smoke are complete. Detailed evidence: `docs/acceptance/a6-f7-finance-hardening.md`.
 
 The existing `/finance/payroll` and `/finance/compensation` surfaces remain HR-backed source views. They do not define a second Finance payroll/compensation data model.
 
@@ -692,9 +695,9 @@ The existing `/finance/payroll` and `/finance/compensation` surfaces remain HR-b
 
 - [ ] Every visible business module has an explicit product purpose.
 - [ ] Placeholder modules are removed from production navigation/routes.
-- [~] Finance has one documented ownership model and staged F0→F7 delivery contract; F0–F6 are complete/production-verified and F7 is active.
+- [x] Finance has one documented ownership model and staged F0→F7 delivery contract; F0–F7 are complete/production-verified.
 - [ ] Personnel/Finance overlap is explicit: HR owns payroll calculation/source records; Finance owns actual payment/money movement and financial reporting.
-- [~] Finance Core production migration/advisor/deploy/signed-in acceptance is complete through F6; F7 final production hardening/acceptance remains pending owner merge.
+- [x] Finance Core production migration/advisor/runtime acceptance is complete through F7; production mutation probes are rollback-only and leave zero acceptance residue.
 
 ---
 
@@ -865,14 +868,11 @@ Record material decisions here when they affect future phases.
 
 # Next Action
 
-Keep existing non-Finance workstreams in their own acceptance flows. Finance F7 is the active closing package for the A6 Finance workstream.
+Keep existing non-Finance workstreams in their own acceptance flows. The A6 Finance F0→F7 operational foundation is complete and production-verified.
 
-1. Require exact-head `Admin A6 Finance Core`, `Admin UI Foundation`, `Store Core CI` and affected regression workflows GREEN on draft PR #349; F7 contract must remain inside the existing Finance workflow.
-2. Confirm the PR diff remains narrow: F7 hardening indexes + targeted private-helper revoke + contracts/docs/workflow ownership; no Finance business-data rewrite, public grant widening or Store/Portal projection change.
-3. Project owner reviews/merges #349. Do **not** apply `modulex-admin/sql/a6-finance-f7-hardening.sql` to production before that owner gate.
-4. After owner merge, re-check current production schema/index/ACL state, apply the canonical F7 migration, verify all covering indexes and the private-helper revoke, then rerun Supabase Security + Performance Advisors.
-5. Run read-only reconciliation plus rollback-only idempotency/concurrency/reversal/FX/allocation/AR/AP/Payroll/Project-bridge acceptance with explicit residue checks.
-6. Complete signed-in Admin Finance route/permission smoke and only then mark F7 / A6 Finance complete.
+1. Do not reopen Finance F0→F7 implicitly from unrelated packages; any future Finance feature starts as a new explicitly scoped package against the locked Finance ownership model.
+2. Preserve Finance/Core regressions, authenticated-wrapper/private-core authorization, append-safe correction, stored FX snapshots and contextual allocation semantics while other roadmaps evolve.
+3. Continue the active non-Finance Project/validation/Store/Admin workstreams according to their own merge and production acceptance gates.
 
 **Cross-roadmap coordination:** F7 changes no Store public/Customer Portal/Dealer Portal projection. The Store migration directory contains only the shared Supabase deployment mirror, so `modulex-store/STORE_ROADMAP.md` requires no functional status mutation for this package.
 
