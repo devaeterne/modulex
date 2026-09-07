@@ -438,7 +438,7 @@ These rules are mandatory for all future Modulex Admin work:
   - The A2.4 SQL package keeps security-invoker views, adds narrow paginated/filterable reporting RPCs with exact counts and deterministic ordering, and adds movement created-at/from/to warehouse indexes.
 - [x] Review inventory and movement reports for correctness and export needs.
   - Inventory/location/movement and low-stock CSV paths page through bounded filtered RPC calls to the exact count rather than inheriting the former 1,000-row client ceiling. Permanent repository verification is `smoke:a2-low-stock-reporting` plus `.github/workflows/admin-a2-low-stock-reporting.yml`.
-  - Production acceptance: `docs/acceptance/a2-4-low-stock-reporting.md` is PASS/CLOSED. Migration `20260830155834`, source/RPC reconciliation, Advisor review, authenticated browser route smoke, deterministic filtering/pagination, and complete CSV exports passed on deployment SHA `2d08d28`.
+  - Production acceptance: `docs/acceptance/a2-4-low-stock-reporting.md` is PASS/CLOSED. Migration `20260830155834`, source/RPC reconciliation, authenticated browser route smoke, deterministic filtering/pagination, and complete CSV exports passed on deployment SHA `2d08d28`.
 
 ### Phase A2 Exit Gate
 
@@ -536,7 +536,7 @@ A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality
   - Authenticated super-admin rollback acceptance exercised `stock_in_idempotent` with quantity `0.01`; the transaction created one idempotent movement and adjusted inventory by exactly `0.01`, then rollback restored the original quantity and left zero acceptance movement rows.
   - Stock in/out/transfer/reserve/release RPCs remain SECURITY INVOKER, authenticated-executable, and anon/PUBLIC-denied. `/warehouses`, `/stock-operations`, and `/inventory` return production HTTP 200 with the expected Modulex bundles, and no runtime errors were found for those routes in the inspected 24-hour window.
   - Fresh Security + Performance Advisor scans show no VAL-4-specific blocker; existing unrelated project-wide advisor backlog remains separate. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
-- [ ] VAL-5 — Store CMS / Users / Settings / remaining Admin forms.
+- [~] VAL-5 — Store CMS / Users / Settings / remaining Admin forms.
 - [ ] VAL-6 — Full validation regression & production acceptance.
 
 The VAL track is cross-cutting and additive: it does not overwrite the UI-2 track or functional Admin roadmap. Domain packages remediate validation debt only after a mismatch inventory and the database-contract-first audit described in `docs/ADMIN_VALIDATION_GUIDE.md`.
