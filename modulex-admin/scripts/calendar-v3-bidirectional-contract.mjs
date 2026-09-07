@@ -84,6 +84,24 @@ assert.match(
   "Open-page refresh must not start an unbounded full-history pull before initial Sync Now finishes.",
 );
 
+// Initial full sync must make the currently visible Calendar useful before walking
+// years of historical Google events. The client supplies its visible range, the
+// provider sync preserves a recent/history phase in its continuation, and each
+// bounded page is reloaded into the workspace while the remaining history continues.
+assert.match(syncRoute, /bootstrap_start/);
+assert.match(syncRoute, /bootstrap_end/);
+assert.match(syncEngine, /phase: "recent"/);
+assert.match(syncEngine, /phase: "history"/);
+assert.match(syncEngine, /timeMin: bootstrapRange\.start/);
+assert.match(syncEngine, /timeMax: bootstrapRange\.end/);
+assert.match(workspace, /bootstrap_start: range\.start/);
+assert.match(workspace, /bootstrap_end: range\.end/);
+assert.match(
+  workspace,
+  /await load\(\);[\s\S]*while \(continuationToken\)/,
+  "Sync Now must refresh the visible Calendar after each bounded provider page instead of waiting for the entire historical backfill.",
+);
+
 assert.match(refresh, /requirePermission\(request, "calendar\.view"\)/);
 assert.match(refresh, /getCompanyCalendarBinding/);
 assert.match(refresh, /last_sync_at/);
