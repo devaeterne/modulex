@@ -98,3 +98,4 @@ assert.doesNotMatch(ui, /<button\b|<input\b|<select\b|<textarea\b|<label\b/, "Pr
 assert.doesNotMatch(ui, /\bbg-(?:red|blue|green|yellow|gray|slate|stone|zinc|neutral|white|black)-/, "Proposal feature UI must not own route-local appearance colors");
 
 console.log("Project Proposal Admin UI contract PASS");
+await import("./project-proposal-lifecycle-ui-contract.mjs");
