@@ -12,10 +12,7 @@ const Label: FC<LabelProps> = ({ htmlFor, children, className }) => {
     <label
       htmlFor={htmlFor}
       className={twMerge(
-        // Default classes that apply by default
         "mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400",
-
-        // User-defined className that can override the default margin
         className
       )}
     >
@@ -23,5 +20,13 @@ const Label: FC<LabelProps> = ({ htmlFor, children, className }) => {
     </label>
   );
 };
+
+/** Behavior-preserving adapter used only while migrating legacy feature markup. */
+export const LabelNative = React.forwardRef<
+  HTMLLabelElement,
+  React.LabelHTMLAttributes<HTMLLabelElement>
+>(function LabelNative(props, ref) {
+  return <label ref={ref} {...props} />;
+});
 
 export default Label;
