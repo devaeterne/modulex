@@ -1,14 +1,14 @@
 # Modulex Project Base — Implementation Plan
 
 Last reviewed: 2026-09-07
-Active branch: `docs/pb5-pb6-production-closeout`
+Active branch: `docs/pb7-production-closeout`
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
-Current package: **PB-5 + PB-6 production closeout — COMPLETE / PRODUCTION VERIFIED**
+Current package: **PB-7 Change Orders — COMPLETE / PRODUCTION VERIFIED**
 
-Current status: **PB-1, PB-2, PB-3A, PB-3B, PB-5 and PB-6 are completed Project capabilities. PB-4 Project Expenses/Outgoings remains intentionally Finance-owned. PB-5 fulfillment and PB-6 participants/commission are merged and production-accepted with rollback-only mutation probes and permanent Project Base contracts.**
+Current status: **PB-1, PB-2, PB-3A, PB-3B, PB-5, PB-6 and PB-7 are completed Project capabilities. PB-4 Project Expenses/Outgoings remains intentionally Finance-owned. PB-7 Change Orders are merged and production-accepted with rollback-only lifecycle/revision-link probes, Sales cost sanitization, additive security/performance hardening and zero acceptance residue.**
 
-Next action: **PB-5 and PB-6 are closed. Any next Project package must start from execution-time current `main` and the relevant Project plan; do not reopen PB-5/PB-6 implicitly.**
+Next action: **PB-7 is closed. Continue separately scoped Project work such as Proposal/Portal packages from execution-time current `main`; do not reopen PB-7 implicitly.**
 
 This file is the operational source of truth for the Project Base workstream. When asked where Project Base stands, read this file first and report the current package, completed packages, acceptance evidence, blockers and next action.
 
@@ -302,11 +302,28 @@ Project owns participant assignment and commission entitlement history; Finance 
 **Status: COMPLETE / PRODUCTION VERIFIED.**
 ---
 
-## PB-7 — Change Orders `[ ]`
+## PB-7 — Change Orders `[x]`
 
 Support post-sale business-level approved scope/value changes such as added cabinets, island revision, extra vanity/bath scope, removed items, customer/vendor credit and price adjustment.
 
 Customer/sell impact and vendor/cost impact remain separate. Original approved commercial history is not destructively rewritten. Order revisions remain distinct from Project Change Orders.
+
+- [x] Draft → submitted → approved/rejected/cancelled lifecycle is DB-authoritative and append-safe.
+- [x] approval authorizes the business change but does not silently mutate canonical Order, Finance, Procurement, AP or AR truth.
+- [x] approved Change Orders apply only through explicit canonical Order revision linkage with reconciliation state.
+- [x] Sales sees sell-side Change Order detail while expected cost/vendor fields remain sanitized and cost writes/erasure fail closed.
+- [x] Admin/Super Admin own review/application mutation; Finance retains privileged read visibility without Project mutation ownership.
+- [x] submitted commercial content and lifecycle/application history reject destructive rewrites.
+- [x] negative customer/vendor credit effects are supported; mixed-currency reconciliation fails closed without invented FX.
+- [x] base production migration `20260905212307 — customer_project_change_orders` and security hardening `20260905213004 — customer_project_change_orders_security_hardening` are applied.
+- [x] performance hardening PR #374 merged as `4663365e4360d292e09fa054fb54639151c5fbde`; production migration `20260907225340 — customer_project_change_order_performance_hardening` is applied.
+- [x] all 13 intended PB-7 FK relationships have leading index coverage; PostgreSQL truncated the long correction index physical identifier to `customer_project_change_orders_correction_of_change_order_id_id`.
+- [x] rollback-only production acceptance passed the 22-check lifecycle/RBAC/revision-link/currency/no-side-effect matrix and left zero fixture residue.
+- [x] fresh Performance Advisor reports zero PB-7 `unindexed_foreign_keys`; new low-traffic indexes appear only as expected `unused_index` INFO.
+- [x] fresh Security Advisor findings match the intentional RPC-only boundary: PB-7 tables are RLS-enabled with no browser DML grants; guarded public wrappers are authenticated-only and anon/PUBLIC execute is denied.
+- [x] acceptance artifact: `docs/acceptance/pb-7-project-change-orders.md`.
+
+**Status: COMPLETE / PRODUCTION VERIFIED.**
 
 ---
 
@@ -345,12 +362,13 @@ When required:
 
 As of 2026-09-07:
 
-- PB-1, PB-2, PB-3A, PB-3B, PB-5 and PB-6: merged / production-accepted.
+- PB-1, PB-2, PB-3A, PB-3B, PB-5, PB-6 and PB-7: merged / production-accepted.
 - PB-4: intentionally Finance-owned; no Project-owned outgoing-money ledger.
 - PB-5 migration: `20260904125157 — customer_project_fulfillment_summary`; RBAC and fulfillment scenario acceptance passed with zero residue.
 - PB-6 ordering migration: `20260907191844 — customer_project_commission_event_ordering`; commission math, deterministic lifecycle, immutable history, Sales-only denial, Finance payout attribution and mixed-currency fail-closed acceptance passed with zero residue.
 - Store/Portal internal Project exposure remains unchanged by PB-5/PB-6.
-- PB-5/PB-6 are closed and must not be reopened implicitly.
+- PB-5/PB-6/PB-7 are closed and must not be reopened implicitly.
+- PB-7 production hardening migration: `20260907225340 — customer_project_change_order_performance_hardening`; PB-7 unindexed-FK debt is 0 and rollback acceptance left no application fixture residue.
 ---
 
 # 6. Tracking Protocol
