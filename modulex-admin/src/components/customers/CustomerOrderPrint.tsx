@@ -137,7 +137,7 @@ export default function CustomerOrderPrint() {
     lines: items.map((item) => ({
       lineNo: String(item.line_no),
       sku: item.sku_snapshot,
-      description: item.product_name_snapshot,
+      description: item.display_name_override || item.product_name_snapshot,
       detail: lineDetail(summariesByItemId.get(item.id), item.line_note),
       quantity: String(Number(item.quantity)),
       unitPrice: formatMoney(item.unit_price),

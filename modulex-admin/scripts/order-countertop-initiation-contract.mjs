@@ -7,17 +7,22 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 
 const initiationMigrationPath = "../modulex-store/supabase/migrations/20260901123501_countertop_order_item_initiation.sql";
 const draftShellMigrationPath = "../modulex-store/supabase/migrations/20260901170000_countertop_new_order_draft_shell.sql";
+const titleMigrationPath = "../modulex-store/supabase/migrations/20260908020000_countertop_order_line_title.sql";
 assert(fs.existsSync(path.join(root, initiationMigrationPath)), "repo must contain the production countertop order item initiation migration");
 assert(fs.existsSync(path.join(root, draftShellMigrationPath)), "repo must contain the draft-shell migration used by New Order Countertop initiation");
+assert(fs.existsSync(path.join(root, titleMigrationPath)), "repo must contain the canonical Countertop order-line title migration");
 
 const initiationMigration = read(initiationMigrationPath);
 const draftShellMigration = read(draftShellMigrationPath);
+const titleMigration = read(titleMigrationPath);
 const pricingV2 = read("../modulex-store/supabase/migrations/20260901130000_order_product_pricing_v2.sql");
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const lineDetails = read("src/components/customers/CountertopLineDetails.tsx");
 const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
 const editOrder = read("src/components/customers/EditCustomerOrder.tsx");
 const orderDetail = read("src/components/customers/CustomerOrderDetail.tsx");
+const orderPrint = read("src/components/customers/CustomerOrderPrint.tsx");
+const customerTypes = read("src/lib/customers/types.ts");
 const picker = read("src/components/customers/OrderProductPicker.tsx");
 const orderDomain = read("src/lib/customers/order-domain.ts");
 
@@ -39,8 +44,38 @@ assert(initiationMigration.includes("revoke all on function public.create_and_at
 assert(initiationMigration.includes("grant execute on function public.create_and_attach_countertop_order_item") && initiationMigration.includes("to authenticated"), "authenticated browser access must go through the reviewed public wrapper");
 assert(!/insert into public\.customer_order_items[\s\S]*p_unit_price/i.test(initiationMigration), "countertop initiation must not accept caller-controlled order pricing");
 
+for (const token of [
+  "add column display_name_override text null",
+  "private.set_countertop_order_item_title_v1",
+  "public.set_countertop_order_item_title",
+  "p_order_item_id uuid",
+  "p_title text",
+  "current_user_has_any_role(array['super_admin','admin','sales'])",
+  "countertop_configurations",
+  "display_name_override",
+  "char_length(v_normalized_override) > 160",
+  "private.apply_order_item_display_name_to_invoice_item",
+  "trg_customer_invoice_items_order_display_name",
+]) assert(titleMigration.includes(token), `Countertop line-title contract missing: ${token}`);
+assert(/v_order_status\s*<>\s*'draft'/i.test(titleMigration), "Countertop line titles must only be editable while the parent order is Draft");
+assert(titleMigration.includes("nullif(btrim(coalesce(p_title,'')),'')"), "Blank Countertop line titles must reset to the historical Stone title");
+assert(titleMigration.includes("set display_name_override = v_normalized_override"), "Countertop title changes must use the dedicated display override column");
+assert(!/set\s+product_name_snapshot\s*=\s*v_/i.test(titleMigration), "Countertop title changes must not rewrite the immutable product_name_snapshot");
+assert(titleMigration.includes("coalesce(oi.display_name_override, oi.product_name_snapshot)"), "Invoice creation must freeze the effective order-line display name into invoice history");
+assert(/security definer\s+set search_path\s*=\s*pg_catalog\s*,\s*public/i.test(titleMigration), "private Countertop title mutation must pin a safe search_path");
+assert(titleMigration.includes("revoke all on function public.set_countertop_order_item_title") && titleMigration.includes("from public, anon"), "public/anon execute must be revoked from Countertop line-title mutation");
+assert(titleMigration.includes("grant execute on function public.set_countertop_order_item_title") && titleMigration.includes("to authenticated"), "authenticated editors must use the reviewed Countertop line-title wrapper");
+
 assert(editOrder.includes(">Countertop</Button>"), "Edit Order must expose the Countertop product action");
 assert(editOrder.includes("CountertopConfigurator"), "Edit Order must use the canonical CountertopConfigurator");
+assert(editOrder.includes('"Line Title"'), "Draft Countertop rows must expose a Line Title field");
+assert(editOrder.includes("set_countertop_order_item_title"), "Countertop Line Title must persist through the reviewed RPC");
+assert(editOrder.includes("display_name_override") && editOrder.includes("product_name_snapshot") && editOrder.includes("sku_snapshot"), "Order editor must keep presentation override separate from historical item identity snapshots");
+assert(editOrder.includes("Save title") && editOrder.includes("isConfiguredCountertop"), "Only configured Countertop rows should expose the title-save action");
+assert(!editOrder.includes('product?.sku ?? "Historical product"'), "Edit Order must use the stored SKU snapshot before falling back to Historical product");
+assert(customerTypes.includes("display_name_override?: string | null"), "CustomerOrderItem typing must expose the optional display-name override");
+assert(orderDetail.includes("item.display_name_override || item.product_name_snapshot"), "Order Detail must render the manual line title before the immutable snapshot");
+assert(orderPrint.includes("item.display_name_override || item.product_name_snapshot"), "Printable Order/PDF must render the manual line title before the immutable snapshot");
 assert(configurator.includes("create_and_attach_countertop_order_item"), "new countertop attachment must use the secure create+attach RPC");
 assert(configurator.includes("crypto.randomUUID()") || configurator.includes("randomUUID"), "new countertop initiation must send an idempotency request id");
 assert(configurator.includes("attach_countertop_configuration"), "existing Configure Countertop path must remain intact");
