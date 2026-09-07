@@ -14,6 +14,12 @@ for (const invalid of ["02.29.2027", "02.30.2026", "13.01.2026", "1.2.2026", "20
   assert.deepEqual(dates.parseDateInput(invalid), { ok: false, error: "Enter a date as MM.DD.YYYY." }, invalid);
 }
 
+assert.equal(
+  dates.formatTimestampDate("2026-09-08T01:30:00Z", { timeZone: "America/New_York" }),
+  "09.07.2026",
+);
+assert.equal(dates.formatTimestampDate(undefined), "—");
+
 const timestamp = dates.formatDateTime("2026-09-07T15:30:00Z", { timeStyle: "short", timeZone: "UTC" });
 assert.match(timestamp, /^09\.07\.2026\s+/);
 assert.match(timestamp, /15|3/);
