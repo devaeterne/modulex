@@ -109,10 +109,11 @@ assert.doesNotMatch(calendarDomain, /encrypted_refresh_token|GOOGLE_CALENDAR_CLI
 // Calendar event reads must apply the requested visible range in PostgREST before
 // rows are returned. Filtering an unbounded calendar_events result in JavaScript can
 // silently drop current events once Supabase's response row cap is reached.
-assert.match(calendarEvents, /eq\("all_day", false\)[\s\S]*lt\("start_at", input\.end\)/);
-assert.match(calendarEvents, /eq\("all_day", true\)[\s\S]*lt\("all_day_start", endDate\)/);
-assert.match(calendarEvents, /end_at\.gte|end_at\.is\.null|end_at/);
-assert.match(calendarEvents, /all_day_end\.gt|all_day_end\.is\.null|all_day_end/);
+assert.match(calendarEvents, /\.eq\("all_day", allDay\)/);
+assert.match(calendarEvents, /if \(allDay\)[\s\S]*\.lt\("all_day_start", endDate\)/);
+assert.match(calendarEvents, /else \{[\s\S]*\.lt\("start_at", input\.end\)/);
+assert.match(calendarEvents, /end_at\.gte\.\$\{input\.start\}/);
+assert.match(calendarEvents, /all_day_end\.gt\.\$\{startDate\}/);
 
 assert.match(calendarRoute, /requirePermission\(request, "calendar\.view"\)/);
 assert.match(calendarRoute, /getAdminCalendarSnapshot|listAdminCalendarEvents/);
