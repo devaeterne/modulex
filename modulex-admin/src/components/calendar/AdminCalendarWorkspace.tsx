@@ -276,11 +276,11 @@ export default function AdminCalendarWorkspace({
     let continuationToken: string | null = null;
     const seenContinuationTokens = new Set<string>();
     do {
-      const result = await authenticatedFetch<CompanySyncResponse>("/api/admin/calendar/google/sync", {
+      const result: CompanySyncResponse = await authenticatedFetch<CompanySyncResponse>("/api/admin/calendar/google/sync", {
         method: "POST",
         body: JSON.stringify(continuationToken ? { continuation_token: continuationToken } : {}),
       });
-      const nextContinuationToken = result.provider.continuation_token;
+      const nextContinuationToken: string | null = result.provider.continuation_token;
       if (!result.provider.complete && !nextContinuationToken) {
         throw new Error("Google Calendar sync stopped before the provider history was complete.");
       }
