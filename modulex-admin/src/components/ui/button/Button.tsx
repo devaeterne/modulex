@@ -45,4 +45,15 @@ const Button: React.FC<ButtonProps> = ({
   );
 };
 
+/**
+ * Behavior-preserving adapter for strict migrations of legacy feature markup.
+ * It intentionally adds no defaults or styling so native button semantics remain unchanged.
+ */
+export const ButtonNative = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement>
+>(function ButtonNative(props, ref) {
+  return <button ref={ref} {...props} />;
+});
+
 export default Button;
