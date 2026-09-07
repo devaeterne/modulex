@@ -1,13 +1,11 @@
 import { jsonError, requirePermission } from "@/lib/auth/admin-api";
 import { discoverGoogleCalendars, GoogleCalendarImportError } from "@/lib/google-calendar/calendar-import";
-import { syncCompanyCalendarFromGoogle } from "@/lib/google-calendar/bidirectional-sync";
 import { getGoogleCredential } from "@/lib/google-calendar/repository";
 import {
   getCompanyCalendarBinding,
   listActiveWatchChannels,
   setCompanyCalendarBinding,
 } from "@/lib/google-calendar/v3-repository";
-import { ensureCompanyCalendarWatch } from "@/lib/google-calendar/watch-channels";
 import { withApiTiming } from "@/lib/observability/apiTiming";
 
 async function companyStatus() {
@@ -73,24 +71,15 @@ async function handlePut(request: Request) {
       actorUserId: auth.actor.user.id,
     });
 
-    let sync_error_code: string | null = null;
-    let watch_error_code: string | null = null;
-    try {
-      await syncCompanyCalendarFromGoogle("manual", request.url);
-    } catch (error) {
-      sync_error_code = error instanceof Error ? error.message.slice(0, 120) : "initial_sync_failed";
-    }
-    try {
-      await ensureCompanyCalendarWatch(request.url);
-    } catch (error) {
-      watch_error_code = error instanceof Error ? error.message.slice(0, 120) : "watch_setup_failed";
-    }
-
+    // The historical provider pull and watch setup are deferred to the bounded Sync Now
+    // flow. This prevents Google from firing a watch notification that starts a second
+    // full-history pull while the initial import is still in progress.
     return Response.json({
       ...(await companyStatus()),
       binding,
-      sync_error_code,
-      watch_error_code,
+      sync_error_code: null,
+      sync_pending: true,
+      watch_error_code: null,
     });
   } catch (error) {
     if (error instanceof GoogleCalendarImportError) return jsonError(error.message, error.status);

@@ -62,6 +62,13 @@ type DiscoveryItem = {
   primary: boolean;
   write_eligible: boolean;
 };
+type CompanySyncResponse = {
+  mode: "company";
+  provider: {
+    complete: boolean;
+    continuation_token: string | null;
+  };
+};
 
 type Range = { start: string; end: string };
 
@@ -265,6 +272,26 @@ export default function AdminCalendarWorkspace({
     }
   }
 
+  async function runCompanySyncToCompletion() {
+    let continuationToken: string | null = null;
+    const seenContinuationTokens = new Set<string>();
+    do {
+      const result: CompanySyncResponse = await authenticatedFetch<CompanySyncResponse>("/api/admin/calendar/google/sync", {
+        method: "POST",
+        body: JSON.stringify(continuationToken ? { continuation_token: continuationToken } : {}),
+      });
+      const nextContinuationToken: string | null = result.provider.continuation_token;
+      if (!result.provider.complete && !nextContinuationToken) {
+        throw new Error("Google Calendar sync stopped before the provider history was complete.");
+      }
+      if (nextContinuationToken && seenContinuationTokens.has(nextContinuationToken)) {
+        throw new Error("Google Calendar sync returned a repeated continuation token.");
+      }
+      if (nextContinuationToken) seenContinuationTokens.add(nextContinuationToken);
+      continuationToken = nextContinuationToken;
+    } while (continuationToken);
+  }
+
   async function saveCompanyBinding() {
     if (!bindingCalendarId || !bindingOwnerId) return;
     setBusy(true);
@@ -274,8 +301,9 @@ export default function AdminCalendarWorkspace({
         method: "PUT",
         body: JSON.stringify({ provider_calendar_id: bindingCalendarId, owner_profile_id: bindingOwnerId }),
       });
-      setSuccess("Company Calendar selected. Initial bidirectional synchronization has started.");
       setDiscoveryOpen(false);
+      await runCompanySyncToCompletion();
+      setSuccess("Company Calendar selected and initial synchronization completed.");
       await load();
     } catch (bindingError) {
       setError(bindingError instanceof Error ? bindingError.message : "Company Calendar could not be selected.");
@@ -288,7 +316,7 @@ export default function AdminCalendarWorkspace({
     setBusy(true);
     setError(null);
     try {
-      await authenticatedFetch("/api/admin/calendar/google/sync", { method: "POST", body: JSON.stringify({}) });
+      await runCompanySyncToCompletion();
       setSuccess("Company Calendar synchronization completed.");
       await load();
     } catch (syncError) {

@@ -74,6 +74,7 @@ export type GoogleCalendarEventResource = GoogleCalendarEventInput & {
 };
 
 export type GoogleCalendarEventPage = { items: GoogleCalendarEventResource[]; nextSyncToken: string | null };
+export type GoogleCalendarEventBatchPage = GoogleCalendarEventPage & { nextPageToken: string | null };
 export type GoogleCalendarWatchChannel = {
   id: string;
   resourceId?: string;
@@ -163,6 +164,41 @@ export async function getGoogleCalendarEvent(input: { accessToken: string; calen
   return googleCalendarRequest({ accessToken: input.accessToken, url: eventUrl(input.calendarId, input.eventId) });
 }
 
+export async function listGoogleCalendarEventPage(input: {
+  accessToken: string;
+  calendarId: string;
+  syncToken?: string | null;
+  pageToken?: string | null;
+  maxResults?: number;
+  timeMin?: string | null;
+  timeMax?: string | null;
+  singleEvents?: boolean;
+}): Promise<GoogleCalendarEventBatchPage> {
+  const singleEvents = input.singleEvents ?? true;
+  const maxResults = Math.min(2500, Math.max(1, Math.trunc(input.maxResults ?? 2500)));
+  const url = new URL(eventUrl(input.calendarId));
+  url.searchParams.set("maxResults", String(maxResults));
+  url.searchParams.set("showDeleted", "true");
+  url.searchParams.set("singleEvents", String(singleEvents));
+  if (input.syncToken) {
+    url.searchParams.set("syncToken", input.syncToken);
+  } else {
+    if (input.timeMin) url.searchParams.set("timeMin", input.timeMin);
+    if (input.timeMax) url.searchParams.set("timeMax", input.timeMax);
+    if (singleEvents) url.searchParams.set("orderBy", "startTime");
+  }
+  if (input.pageToken) url.searchParams.set("pageToken", input.pageToken);
+  const page = await googleCalendarRequest<{ items?: GoogleCalendarEventResource[]; nextPageToken?: string; nextSyncToken?: string }>({
+    accessToken: input.accessToken,
+    url: url.toString(),
+  });
+  return {
+    items: page.items ?? [],
+    nextPageToken: page.nextPageToken ?? null,
+    nextSyncToken: page.nextSyncToken ?? null,
+  };
+}
+
 export async function listGoogleCalendarEvents(input: {
   accessToken: string;
   calendarId: string;
@@ -174,23 +210,14 @@ export async function listGoogleCalendarEvents(input: {
   const items: GoogleCalendarEventResource[] = [];
   let pageToken: string | null = null;
   let nextSyncToken: string | null = null;
-  const singleEvents = input.singleEvents ?? true;
   do {
-    const url = new URL(eventUrl(input.calendarId));
-    url.searchParams.set("maxResults", "2500");
-    url.searchParams.set("showDeleted", "true");
-    url.searchParams.set("singleEvents", String(singleEvents));
-    if (input.syncToken) {
-      url.searchParams.set("syncToken", input.syncToken);
-    } else {
-      if (input.timeMin) url.searchParams.set("timeMin", input.timeMin);
-      if (input.timeMax) url.searchParams.set("timeMax", input.timeMax);
-      if (singleEvents) url.searchParams.set("orderBy", "startTime");
-    }
-    if (pageToken) url.searchParams.set("pageToken", pageToken);
-    const page = await googleCalendarRequest<{ items?: GoogleCalendarEventResource[]; nextPageToken?: string; nextSyncToken?: string }>({ accessToken: input.accessToken, url: url.toString() });
-    items.push(...(page.items ?? []));
-    pageToken = page.nextPageToken ?? null;
+    const page = await listGoogleCalendarEventPage({
+      ...input,
+      pageToken,
+      maxResults: 2500,
+    });
+    items.push(...page.items);
+    pageToken = page.nextPageToken;
     nextSyncToken = page.nextSyncToken ?? nextSyncToken;
   } while (pageToken);
   return { items, nextSyncToken };
