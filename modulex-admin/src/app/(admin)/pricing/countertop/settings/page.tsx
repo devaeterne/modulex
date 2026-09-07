@@ -8,7 +8,7 @@ export default function CountertopReferenceSettingsPage() {
   return (
     <div className="space-y-6">
       <PageBreadcrumb pageTitle="Countertop Setup" />
-      <CountertopReferenceManager />
+      <CountertopReferenceManager kinds={["stone_type", "material_band", "edge"]} />
     </div>
   );
 }
