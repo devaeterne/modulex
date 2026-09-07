@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Button from "@/components/ui/button/Button";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableViewport } from "@/components/ui/table";
+import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
-import { hasPermission } from "@/lib/auth/permissions";
+import { parseDbDecimal } from "@/lib/validation";
 
 type TaxRule = {
   fulfillment_type: "pickup" | "delivery" | "delivery_installation";
@@ -13,6 +21,9 @@ type TaxRule = {
   notes: string | null;
 };
 
+type TaxRuleErrors = Record<string, string | undefined>;
+const TAX_RATE_DECIMAL = { precision: 7, scale: 3, min: 0, max: 100 } as const;
+
 export default function TaxRulesSettings() {
   const [rules, setRules] = useState<TaxRule[]>([]);
   const [canEdit, setCanEdit] = useState(false);
@@ -20,6 +31,7 @@ export default function TaxRulesSettings() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<TaxRuleErrors>({});
 
   async function load() {
     setIsLoading(true);
@@ -39,16 +51,21 @@ export default function TaxRulesSettings() {
     setIsLoading(false);
   }
 
-  useEffect(() => {
-    void load();
-  }, []);
+  useEffect(() => { void load(); }, []);
 
   function updateRule(type: TaxRule["fulfillment_type"], values: Partial<TaxRule>) {
-    setRules((current) =>
-      current.map((rule) =>
-        rule.fulfillment_type === type ? { ...rule, ...values } : rule
-      )
-    );
+    setRules((current) => current.map((rule) => rule.fulfillment_type === type ? { ...rule, ...values } : rule));
+    setSuccessMessage(null);
+  }
+
+  function validateRate(rule: TaxRule) {
+    const raw = rule.tax_rate === null ? "" : String(rule.tax_rate).trim();
+    if (!raw) {
+      return rule.is_active
+        ? { value: null, error: "Enter a tax rate between 0 and 100 before enabling the rule." }
+        : { value: null, error: null };
+    }
+    return parseDbDecimal(raw, TAX_RATE_DECIMAL);
   }
 
   async function save() {
@@ -56,32 +73,27 @@ export default function TaxRulesSettings() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    const nextErrors: TaxRuleErrors = {};
+    const parsedRates = new Map<TaxRule["fulfillment_type"], string | null>();
     for (const rule of rules) {
-      const rate =
-        rule.tax_rate === null || String(rule.tax_rate).trim() === ""
-          ? null
-          : Number(rule.tax_rate);
-      if (
-        rule.is_active &&
-        (rate === null || !Number.isFinite(rate) || rate < 0 || rate > 100)
-      ) {
-        setErrorMessage(
-          `${rule.label}: enter a tax rate between 0 and 100 before enabling the rule.`
-        );
-        return;
-      }
+      const parsedRate = validateRate(rule);
+      if (parsedRate.error) nextErrors[rule.fulfillment_type] = parsedRate.error;
+      else parsedRates.set(rule.fulfillment_type, parsedRate.value);
+    }
+    setFieldErrors(nextErrors);
+    const firstInvalid = rules.find((rule) => nextErrors[rule.fulfillment_type]);
+    if (firstInvalid) {
+      requestAnimationFrame(() => document.getElementById(`tax-rate-${firstInvalid.fulfillment_type}`)?.focus());
+      return;
     }
 
     setIsSaving(true);
     for (const rule of rules) {
-      const rate =
-        rule.tax_rate === null || String(rule.tax_rate).trim() === ""
-          ? null
-          : Number(rule.tax_rate);
+      const rateValue = parsedRates.get(rule.fulfillment_type) ?? null;
       const { error } = await supabase
         .from("order_tax_rules")
         .update({
-          tax_rate: rate,
+          tax_rate: rateValue,
           is_active: rule.is_active,
           notes: rule.notes?.trim() || null,
         })
@@ -98,115 +110,44 @@ export default function TaxRulesSettings() {
     await load();
   }
 
-  if (isLoading) {
-    return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">
-        Loading tax rules...
-      </div>
-    );
-  }
+  if (isLoading) return <Alert variant="info" title="Loading tax rules" message="Fulfillment tax configuration is being loaded." />;
 
   return (
     <div className="space-y-5">
-      {errorMessage && (
-        <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">
-          {errorMessage}
+      {errorMessage ? <Alert variant="error" title="Tax rule update failed" message={errorMessage} /> : null}
+      {successMessage ? <Alert variant="success" title="Tax rules updated" message={successMessage} /> : null}
+      <ComponentCard
+        title="Fulfillment Tax Rules"
+        desc="Configure the rate the application expects for each fulfillment mode. Rates use the production numeric(7,3) contract; active rules require a value from 0 to 100."
+      >
+        <TableViewport>
+          <Table variant="admin" minWidth="medium">
+            <TableHeader variant="admin">
+              <TableRow>{["Fulfillment", "Tax Rate (%)", "Active", "Notes"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow>
+            </TableHeader>
+            <TableBody variant="admin">
+              {rules.map((rule) => {
+                const error = fieldErrors[rule.fulfillment_type];
+                return (
+                  <TableRow key={rule.fulfillment_type}>
+                    <TableCell variant="admin"><div className="space-y-1"><strong>{rule.label}</strong><div>{rule.fulfillment_type.replaceAll("_", " ")}</div></div></TableCell>
+                    <TableCell variant="admin">
+                      <Label htmlFor={`tax-rate-${rule.fulfillment_type}`}>Tax rate</Label>
+                      <Input id={`tax-rate-${rule.fulfillment_type}`} value={rule.tax_rate ?? ""} inputMode="decimal" disabled={!canEdit} onChange={(event) => { updateRule(rule.fulfillment_type, { tax_rate: event.target.value }); setFieldErrors((current) => ({ ...current, [rule.fulfillment_type]: undefined })); }} error={Boolean(error)} hint={error} placeholder="e.g. 6.000" />
+                    </TableCell>
+                    <TableCell variant="admin"><Checkbox id={`tax-active-${rule.fulfillment_type}`} checked={rule.is_active} disabled={!canEdit} label="Use rule" onChange={(checked) => updateRule(rule.fulfillment_type, { is_active: checked })} /></TableCell>
+                    <TableCell variant="admin"><Input id={`tax-notes-${rule.fulfillment_type}`} value={rule.notes ?? ""} disabled={!canEdit} onChange={(event) => updateRule(rule.fulfillment_type, { notes: event.target.value })} placeholder="Optional internal note" /></TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableViewport>
+        <div className="mt-5 space-y-3">
+          <Alert variant="warning" title="Tax configuration" message="Use rates confirmed for the company’s actual tax jurisdiction and transaction type. The application enforces the configured business rule; it does not determine tax law automatically." />
+          {canEdit ? <div className="flex justify-end"><Button disabled={isSaving} onClick={() => void save()}>{isSaving ? "Saving..." : "Save Tax Rules"}</Button></div> : null}
         </div>
-      )}
-      {successMessage && (
-        <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">
-          {successMessage}
-        </div>
-      )}
-
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-        <div className="max-w-3xl">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Fulfillment Tax Rules
-          </h2>
-          <p className="mt-1 text-sm leading-6 text-gray-500">
-            Configure the rate the application expects for each fulfillment mode.
-            No tax rate is prefilled by the system. When an active rule exists,
-            a Sales user who tries to use a different rate is routed to approval.
-          </p>
-        </div>
-
-        <div className="mt-6 overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-            <thead>
-              <tr>
-                {["Fulfillment", "Tax Rate (%)", "Active", "Notes"].map((label) => (
-                  <th key={label} className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {rules.map((rule) => (
-                <tr key={rule.fulfillment_type}>
-                  <td className="px-3 py-4">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-white/90">{rule.label}</p>
-                    <p className="mt-1 text-xs text-gray-400">{rule.fulfillment_type.replaceAll("_", " ")}</p>
-                  </td>
-                  <td className="px-3 py-4">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.001"
-                      value={rule.tax_rate ?? ""}
-                      disabled={!canEdit}
-                      onChange={(event) => updateRule(rule.fulfillment_type, { tax_rate: event.target.value })}
-                      placeholder="e.g. 6.000"
-                      className="h-10 w-40 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                    />
-                  </td>
-                  <td className="px-3 py-4">
-                    <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={rule.is_active}
-                        disabled={!canEdit}
-                        onChange={(event) => updateRule(rule.fulfillment_type, { is_active: event.target.checked })}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      Use rule
-                    </label>
-                  </td>
-                  <td className="px-3 py-4">
-                    <input
-                      value={rule.notes ?? ""}
-                      disabled={!canEdit}
-                      onChange={(event) => updateRule(rule.fulfillment_type, { notes: event.target.value })}
-                      placeholder="Optional internal note"
-                      className="h-10 min-w-72 rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-5 rounded-xl bg-warning-50 px-4 py-3 text-sm leading-6 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400">
-          Use rates confirmed for the company’s actual tax jurisdiction and transaction type.
-          The application enforces the configured business rule; it does not determine US tax law automatically.
-        </div>
-
-        {canEdit && (
-          <div className="mt-5 flex justify-end">
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={isSaving}
-              className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {isSaving ? "Saving..." : "Save Tax Rules"}
-            </button>
-          </div>
-        )}
-      </div>
+      </ComponentCard>
     </div>
   );
 }
