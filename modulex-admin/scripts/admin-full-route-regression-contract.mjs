@@ -40,7 +40,7 @@ const sidebarRoutes = [...sidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) =>
 const uniqueSidebarRoutes = [...new Set(sidebarRoutes)];
 
 expect(sidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
-expect(uniqueSidebarRoutes.length === 86, `UI-2D expects 86 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
+expect(uniqueSidebarRoutes.length === 87, `UI-2D expects 87 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
 for (const route of uniqueSidebarRoutes) {
   expect(pageRoutes.has(route), `Sidebar route is missing a page.tsx: ${route}`);
 }
@@ -64,6 +64,7 @@ for (const route of [
   "/finance/payment-schedule",
   "/finance/ap-aging",
   "/finance/ar-aging",
+  "/finance/reports",
   "/settings/integrations/google-calendar",
   "/settings/general/project-participant-roles",
   "/store/cabinet-content",
@@ -72,6 +73,10 @@ for (const route of [
   expect(uniqueSidebarRoutes.includes(route), `Post-audit sidebar route missing: ${route}`);
 }
 
+expect(
+  /name:\s*"Finance Reports"[\s\S]{0,180}path:\s*"\/finance\/reports"[\s\S]{0,180}permission:\s*"finance\.view"/.test(sidebar),
+  "Finance Reports must be discoverable under finance.view navigation",
+);
 expect(
   /name:\s*"Google Calendar"[\s\S]{0,180}path:\s*"\/settings\/integrations\/google-calendar"[\s\S]{0,180}permission:\s*"settings\.view"/.test(sidebar),
   "Google Calendar must be discoverable under settings.view navigation",
