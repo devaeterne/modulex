@@ -86,25 +86,34 @@ expect(coreHardening.includes("v_other_allocated + new.allocated_amount > v_tran
 expect(core.includes("reversal_of_transaction_id"), "Finance history must retain append-safe reversal linkage");
 expect(core.includes("base_currency_code") && core.includes("base_amount") && core.includes("fx_rate"), "Finance Core must retain stored FX/base snapshots");
 
-expect(/F6[^\n]*COMPLETE[^\n]*PRODUCTION VERIFIED/i.test(plan), "Finance plan must close F6 as production verified before F7 closeout");
-expect(/F7[^\n]*(ACTIVE|IN PROGRESS|HARDENING)/i.test(plan), "Finance plan must identify F7 as active/in progress");
+expect(/F6[^\n]*COMPLETE[^\n]*PRODUCTION VERIFIED/i.test(plan), "Finance plan must keep F6 production verified");
+expect(
+  /F7[^\n]*(ACTIVE|IN PROGRESS|HARDENING|COMPLETE|PRODUCTION VERIFIED)/i.test(plan),
+  "Finance plan must identify F7 as active hardening or production-verified closeout",
+);
 expect(/PRODUCTION VERIFIED/i.test(f6Acceptance), "F6 acceptance must record post-merge production verification");
-expect(/F7/i.test(roadmap) && /Finance/i.test(roadmap), "Admin roadmap must track the active F7 Finance package");
+expect(/F7/i.test(roadmap) && /Finance/i.test(roadmap), "Admin roadmap must track the F7 Finance package");
 
 for (const phrase of [
-  "RLS/RPC/RBAC",
+  "RLS / RPC / RBAC",
   "idempotency",
   "concurrency",
   "append-safe",
   "FX snapshot",
-  "allocation reconciliation",
-  "migration",
+  "Allocation / reconciliation",
+  "Production migration",
   "Security Advisor",
   "Performance Advisor",
-  "signed-in Admin",
+  "Admin production smoke",
   "ROLLBACK",
 ]) {
   expect(f7Acceptance.toLowerCase().includes(phrase.toLowerCase()), `F7 acceptance must cover: ${phrase}`);
+}
+
+if (/Status:\s*\*\*COMPLETE \/ PRODUCTION VERIFIED/i.test(f7Acceptance)) {
+  expect(/20260907114208[^\n]*a6_finance_f7_hardening/i.test(f7Acceptance), "F7 closeout must record the actual production migration version");
+  expect(/24\/24/i.test(f7Acceptance), "F7 closeout must record all covering indexes present");
+  expect(/residue:\s*\*\*0/i.test(f7Acceptance), "F7 closeout must record zero rollback residue");
 }
 
 console.log("A6-F7 Finance hardening contract: ok");
