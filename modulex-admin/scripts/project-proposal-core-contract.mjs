@@ -17,12 +17,16 @@ const migrationPath = "../modulex-store/supabase/migrations/20260907203000_proje
 const sqlPath = "sql/project-proposal-core.sql";
 const rejectionMigrationPath = "../modulex-store/supabase/migrations/20260907204500_project_proposal_rejection_state.sql";
 const rejectionSqlPath = "sql/project-proposal-rejection-state.sql";
+const acceptedLockMigrationPath = "../modulex-store/supabase/migrations/20260907210000_project_proposal_accepted_revision_lock.sql";
+const acceptedLockSqlPath = "sql/project-proposal-accepted-revision-lock.sql";
 
 for (const [file, message] of [
   [migrationPath, "Proposal Core canonical migration must exist"],
   [sqlPath, "Proposal Core Admin SQL mirror must exist"],
   [rejectionMigrationPath, "Proposal rejection-state canonical migration must exist"],
   [rejectionSqlPath, "Proposal rejection-state Admin SQL mirror must exist"],
+  [acceptedLockMigrationPath, "Proposal accepted-Revision lock canonical migration must exist"],
+  [acceptedLockSqlPath, "Proposal accepted-Revision lock Admin SQL mirror must exist"],
 ]) {
   assert.equal(exists(file), true, message);
 }
@@ -31,10 +35,13 @@ const migration = read(migrationPath);
 const sql = read(sqlPath);
 const rejectionMigration = read(rejectionMigrationPath);
 const rejectionSql = read(rejectionSqlPath);
+const acceptedLockMigration = read(acceptedLockMigrationPath);
+const acceptedLockSql = read(acceptedLockSqlPath);
 assert.equal(migration, sql, "Proposal Core Admin SQL mirror and Supabase migration must stay byte-identical");
 assert.equal(rejectionMigration, rejectionSql, "Proposal rejection-state Admin SQL mirror and Supabase migration must stay byte-identical");
+assert.equal(acceptedLockMigration, acceptedLockSql, "Proposal accepted-Revision lock Admin SQL mirror and Supabase migration must stay byte-identical");
 
-const dbSql = `${migration}\n${sql}\n${rejectionMigration}\n${rejectionSql}`;
+const dbSql = `${migration}\n${sql}\n${rejectionMigration}\n${rejectionSql}\n${acceptedLockMigration}\n${acceptedLockSql}`;
 
 for (const table of [
   "proposal_area_types",
@@ -72,6 +79,7 @@ assert.match(dbSql, /area_type_id\s+uuid\s+null/i, "Area Type must remain option
 assert.match(dbSql, /direct_sell_amount[\s\S]*pricing_group_id[\s\S]*(?:check|constraint)|pricing_group_id[\s\S]*direct_sell_amount[\s\S]*(?:check|constraint)/i, "Area direct pricing and Pricing Group membership must be mutually exclusive");
 assert.match(dbSql, /PROPOSAL_PRICING_GROUP_REVISION_MISMATCH/i, "Cross-Revision Pricing Group assignment must fail closed");
 assert.match(dbSql, /PROPOSAL_REVISION_IMMUTABLE/i, "Non-draft Revision content must be immutable");
+assert.match(dbSql, /PROPOSAL_ACCEPTED_REVISION_FULLY_IMMUTABLE/i, "Accepted Revision must reject every subsequent UPDATE, including lifecycle metadata rewrites");
 assert.match(dbSql, /PROPOSAL_ACCEPTANCE_APPEND_ONLY/i, "Acceptance evidence must be append-safe");
 assert.match(dbSql, /PROPOSAL_REJECTION_PRESERVES_ACTIVE_DRAFT/i, "Rejecting an older sent Revision must preserve a newer active draft at Proposal header level");
 assert.match(dbSql, /for\s+update/i, "Proposal lifecycle transitions must lock authoritative rows");
