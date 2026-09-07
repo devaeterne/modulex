@@ -1,7 +1,7 @@
 # Modulex Finance Domain — Locked Architecture & Delivery Plan
 
-Status: **LOCKED FOR A6 IMPLEMENTATION — F0/F1/F2/F3/F4/F5A COMPLETE; F5B NEXT**
-Date: 2026-09-06
+Status: **LOCKED FOR A6 IMPLEMENTATION — F0/F1/F2/F3/F4/F5A/F5B/F5C COMPLETE; F6 NEXT**
+Date: 2026-09-07
 Scope: `modulex-admin` operational finance
 
 Supporting architecture and acceptance evidence:
@@ -11,6 +11,9 @@ Supporting architecture and acceptance evidence:
 - `docs/superpowers/plans/2026-09-06-a6-f4-payroll-finance-closeout.md`
 - `docs/acceptance/a6-f4-payroll-finance-integration.md`
 - `docs/acceptance/a6-f5a-customer-receipts.md`
+- `docs/acceptance/a6-f5b-ar-aging.md`
+- `docs/superpowers/plans/2026-09-06-a6-f5c-project-payment-reconciliation-hardening.md`
+- `docs/acceptance/a6-f5c-project-payment-hardening.md`
 
 ## 1. Locked ownership rule
 
@@ -172,9 +175,9 @@ Finance Core financial history is append-safe:
 
 Deactivating an account/category must not make historical correction impossible. Draft hard-delete remains guarded and must never widen into posted/voided history deletion.
 
-### Existing Project-payment compatibility exception
+### Project-payment compatibility status
 
-The specialized Project-payment domain still has historical compatibility behavior that is broader than Finance Core. **Do not copy this exception into Finance Core.** Existing Project payment IDs/history remain intact until F5 deliberately integrates or narrows that behavior through an explicit reviewed migration.
+The specialized Project-payment domain remains a Project-scoped commercial compatibility surface and must not be copied into Finance Core. F5A introduced explicit Project→Finance reconciliation and Finance-owned correction for bridged cash. F5C then narrowed the remaining destructive compatibility exception: posted/voided Project payment transactions and their historical allocations are immutable, legacy posted edit/hard-delete RPCs fail closed, and corrections use canonical Project void/reversal before bridging or canonical Finance correction after bridging. Existing Project payment IDs/history remain intact.
 
 ## 8. Authorization boundary
 
@@ -254,7 +257,7 @@ Detailed production evidence: `docs/acceptance/a6-f4-payroll-finance-integration
 
 **Exit:** Payroll obligations remain HR-owned, actual Employee Payments remain Finance-owned, settlement state is Finance-derived, direct-source double-payment paths fail closed, and partial/full/reversal/void behavior is production-verified with no acceptance residue.
 
-### A6-F5 — Sales / Accounts Receivable integration — **IN PROGRESS**
+### A6-F5 — Sales / Accounts Receivable integration — **COMPLETE / PRODUCTION VERIFIED 2026-09-07**
 
 #### A6-F5A — Customer Receipts / AR Bridge — **COMPLETE / PRODUCTION VERIFIED 2026-09-06**
 
@@ -270,33 +273,54 @@ Delivered and production-verified:
 - Controlled production acceptance exercised partial settlement, full settlement, exact idempotent retry, overpayment / wrong-Customer / wrong-currency failures, void, re-settlement, Project-payment bridge, no-double-counting proof, Project-side immutability and Finance reversal inside an explicit transaction ending with `ROLLBACK`.
 - Post-rollback acceptance residue is zero for Finance receipts, Project payment transactions, Project payment requirements and bridge rows; the temporary Invoice fixture returned to its original draft / zero-paid state.
 - Fresh Security/Performance Advisors contain no F5A-specific blocking finding; the bridge `created_by` unindexed-FK INFO is deferred to F7 performance hardening.
-- Admin production is `READY` on current `main` commit `e2c04c92ec901f190fc3db8a9209b0b88b730e47`; `/finance/customer-receipts` resolves HTTP 200 with the expected Customer Receipts bundle and authentication boundary.
+- F5A production verification completed on application commit `e2c04c92ec901f190fc3db8a9209b0b88b730e47`; later F5B/F5C deployments preserve the same canonical Customer Receipt boundary.
 
 Detailed production evidence: `docs/acceptance/a6-f5a-customer-receipts.md`.
 
 **Exit:** Customer Receipt cash movement is Finance-owned, Invoice settlement is Finance-derived, Project payment history reconciles without duplicate cash truth, bridged source history is protected from conflicting correction, and production acceptance is GREEN with zero residue.
 
-#### A6-F5B — AR Aging / Customer Balance — **NEXT**
+#### A6-F5B — AR Aging / Customer Balance — **COMPLETE / PRODUCTION VERIFIED 2026-09-07**
 
-- Add Finance-derived AR aging buckets (`Current`, `1–30`, `31–60`, `61–90`, `90+`).
-- Add Customer outstanding balance / open Invoice / overdue Invoice / partial-payment projections.
-- Add Customer payment history built from canonical Customer Receipts and corrections.
-- Add search, filter and server pagination suitable for Finance operations.
-- Reuse Invoice and Finance allocation truth; do not introduce a parallel AR balance ledger.
+Delivered and production-verified:
 
-**Exit:** Finance can answer what each Customer owes, how old the receivable is, and which canonical receipts/corrections explain the balance.
+- Finance-derived AR aging buckets: `Current`, `1–30`, `31–60`, `61–90`, `90+`;
+- Customer outstanding balance, open/overdue Invoice and partial/full settlement projections;
+- Customer Payment History derived from canonical Customer Receipts/corrections and Project compatibility history;
+- Project→Finance bridge reconciliation excludes the Project component and prevents double counting;
+- search, filter and server pagination suitable for Finance operations;
+- foreign-currency Invoice balance fails closed as unconverted when the Invoice lacks a historical FX snapshot, while Finance Payment History uses stored transaction-time base amount/FX snapshots;
+- authenticated Finance read boundary with no source-table RLS/GRANT widening;
+- production migration `20260906214953 — a6_finance_ar_aging`;
+- controlled production acceptance covering unpaid/partial/full, void/reversal, Project-only/bridged cash, no-double-counting, exact aging boundaries, Customer totals, pagination/filter, permissions, isolation and FX semantics with explicit `ROLLBACK` and zero residue;
+- current Admin production route `/finance/ar-aging` resolves HTTP `200` with the expected `AR Aging | Modulex Admin` bundle and authentication boundary.
 
-#### A6-F5C — Project Payment Reconciliation Hardening — **AFTER F5B**
+Detailed production evidence: `docs/acceptance/a6-f5b-ar-aging.md`.
 
-- Preserve existing Project payment IDs and historical source records.
-- Narrow the remaining Project-payment posted-edit / hard-delete compatibility exception through an explicit reviewed migration.
-- Keep Finance-bridged Project payment source/allocation history immutable.
-- Route corrections for Finance-reconciled cash events through canonical Finance void/reversal.
-- Reconcile historical compatibility behavior without fabricating Finance transactions or destructively rewriting source history.
+**Exit:** Finance can answer what each Customer owes, how old the receivable is, and which canonical receipts/corrections explain the balance without introducing a parallel AR balance ledger.
 
-**Exit:** Project-specific payment workflows remain operational, but reconciled cash truth and correction ownership are unambiguously Finance-owned.
+#### A6-F5C — Project Payment Reconciliation Hardening — **COMPLETE / PRODUCTION VERIFIED 2026-09-07**
 
-### A6-F6 — Reporting & Project financial projection
+Delivered and production-verified:
+
+- existing Project payment IDs and historical source records preserved;
+- posted/voided Project payment transaction hard-delete blocked;
+- posted/voided historical allocation update/delete blocked while append-safe allocation INSERT paths remain available;
+- legacy posted edit/hard-delete RPC ABIs retained as fail-closed compatibility stubs;
+- Payment Plans with posted allocation history cannot be destructively removed; unallocated plans retain controlled deletion;
+- canonical Project void/reversal remains available for unbridged corrections;
+- Finance-bridged Project payment source/allocation history remains immutable and Project-side correction fails closed;
+- bridged cash corrections remain owned by canonical Finance Customer Receipt void/reversal;
+- Admin Project Finance no longer advertises posted-payment Edit/Delete operations;
+- no Finance transaction fabrication/backfill or destructive source-history rewrite;
+- production migration `20260907090811 — a6_f5c_project_payment_hardening` applied after PR #345 merge;
+- production acceptance matrix `15/15 GREEN` inside explicit `ROLLBACK`, with zero Project/Finance/bridge/audit residue and the temporary Invoice restored exactly;
+- fresh Advisors contain no F5C-specific blocking finding while pre-existing advisor debt remains explicitly deferred to F7.
+
+Detailed production evidence: `docs/acceptance/a6-f5c-project-payment-hardening.md`.
+
+**Exit:** Project-specific payment workflows remain operational, but destructive posted-history compatibility is closed and reconciled cash truth/correction ownership is unambiguously Finance-owned.
+
+### A6-F6 — Reporting & Project financial projection — **NEXT**
 
 - cash flow
 - income vs expense operational reporting
