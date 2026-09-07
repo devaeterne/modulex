@@ -35,7 +35,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   admin-ui:
@@ -53,6 +53,24 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
+      - name: Apply Admin US date migration to date branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/us-date-format-standardization-v2'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          git fetch origin "${HEAD_REF}"
+          git checkout -B "${HEAD_REF}" "origin/${HEAD_REF}"
+          node scripts/us-date-migrate.mjs --write
+          cd ..
+          if git diff --quiet -- modulex-admin/src; then
+            echo "Admin date migration already committed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin/src
+          git commit -m "refactor: migrate Admin dates to shared US format"
+          git push origin "HEAD:${HEAD_REF}"
       - name: Dry-run fail-closed Admin US date migration
         run: node scripts/us-date-migrate.mjs
       - name: US date audit scanner self-test
