@@ -17,7 +17,7 @@ import type { Customer, CustomerInvoice, CustomerInvoiceItem, CustomerInvoiceSta
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettings } from "@/lib/settings/types";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
-import { parseDbDecimal } from "@/lib/validation";
+import { compareDbDecimal, parseDbDecimal } from "@/lib/validation";
 
 type LedgerAwareInvoice = CustomerInvoice & { ledger_managed?: boolean };
 
@@ -76,6 +76,7 @@ export default function CustomerInvoiceDetail() {
   const [canManage, setCanManage] = useState(false);
   const [canManagePayments, setCanManagePayments] = useState(false);
   const [paidAmount, setPaidAmount] = useState("");
+  const [paidAmountError, setPaidAmountError] = useState<string | null>(null);
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -85,6 +86,7 @@ export default function CustomerInvoiceDetail() {
   async function load() {
     setIsLoading(true);
     setErrorMessage(null);
+    setPaidAmountError(null);
 
     const { profile, error: profileError } = await getCurrentProfile();
     if (profileError || !profile) {
@@ -149,22 +151,41 @@ export default function CustomerInvoiceDetail() {
     if (!invoice || !canManage || isSaving) return;
     setErrorMessage(null);
     setSuccessMessage(null);
-    setIsSaving(true);
+    setPaidAmountError(null);
 
     let amount: string | null = null;
     if (!invoice.ledger_managed && canManagePayments) {
       const rawAmount = explicitPaid ?? (paidAmount.trim() ? paidAmount : null);
       if (rawAmount !== null) {
-        const parsedAmount = parseDbDecimal(rawAmount, { precision: 18, scale: 4, min: 0 });
+        const decimalContract = { precision: 18, scale: 4, min: 0 } as const;
+        const parsedAmount = parseDbDecimal(rawAmount, decimalContract);
         if (parsedAmount.error || parsedAmount.value === null) {
-          setErrorMessage(parsedAmount.error ?? "Enter a valid paid amount.");
-          setIsSaving(false);
+          const message = parsedAmount.error ?? "Enter a valid paid amount.";
+          setPaidAmountError(message);
+          setErrorMessage(message);
+          document.getElementById("invoice-paid-amount")?.focus();
+          return;
+        }
+        const comparedToTotal = compareDbDecimal(parsedAmount.value, invoice.total_amount, decimalContract);
+        if (comparedToTotal === null) {
+          const message = "Invoice total could not be validated.";
+          setPaidAmountError(message);
+          setErrorMessage(message);
+          document.getElementById("invoice-paid-amount")?.focus();
+          return;
+        }
+        if (comparedToTotal > 0) {
+          const message = "Paid amount cannot be greater than the invoice total.";
+          setPaidAmountError(message);
+          setErrorMessage(message);
+          document.getElementById("invoice-paid-amount")?.focus();
           return;
         }
         amount = parsedAmount.value;
       }
     }
 
+    setIsSaving(true);
     const { data, error } = await supabase.rpc("update_customer_invoice_state", {
       p_invoice_id: invoice.id,
       p_status: status ?? null,
@@ -311,7 +332,7 @@ export default function CustomerInvoiceDetail() {
             {invoice.status === "draft" ? <Button disabled={isSaving} onClick={() => void updateState("issued")}>Issue Invoice</Button> : null}
             {!ledgerManaged && canManagePayments && !["draft", "void"].includes(invoice.status) ? (
               <>
-                <div className="w-44"><Label htmlFor="invoice-paid-amount">Paid amount</Label><Input id="invoice-paid-amount" type="number" min="0" max={String(invoice.total_amount)} step="0.0001" value={paidAmount} onChange={(event) => setPaidAmount(event.target.value)} /></div>
+                <div className="w-44"><Label htmlFor="invoice-paid-amount">Paid amount</Label><Input id="invoice-paid-amount" type="number" min="0" max={String(invoice.total_amount)} step="0.0001" value={paidAmount} error={Boolean(paidAmountError)} hint={paidAmountError ?? undefined} onChange={(event) => { setPaidAmount(event.target.value); setPaidAmountError(null); }} /></div>
                 <Button variant="outline" disabled={isSaving} onClick={() => void updateState()}>Save Payment</Button>
                 {invoice.status !== "paid" ? <Button disabled={isSaving} onClick={() => void updateState("paid", invoice.total_amount)}>Mark Paid</Button> : null}
               </>
