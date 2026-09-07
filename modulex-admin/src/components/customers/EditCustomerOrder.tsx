@@ -36,6 +36,7 @@ import {
   parseOrderPercent,
   parseOrderQuantity,
 } from "@/lib/customers/order-validation";
+import { supabase } from "@/lib/supabase/client";
 import type { UserRole } from "@/lib/supabase/profile";
 import type {
   CountertopLineSummary,
@@ -55,6 +56,8 @@ type PriceRow = OrderPriceRow;
 type DraftItem = {
   id?: string;
   product_id: string;
+  sku_snapshot: string;
+  product_name_snapshot: string;
   quantity: string;
   unit_price: string;
   discount_percent: string;
@@ -116,6 +119,8 @@ function mapDraftItem(item: CustomerOrderItem): DraftItem {
   return {
     id: item.id,
     product_id: item.product_id ?? "",
+    sku_snapshot: item.sku_snapshot ?? "",
+    product_name_snapshot: item.product_name_snapshot ?? "",
     quantity: String(item.quantity),
     unit_price: String(item.unit_price),
     discount_percent: String(item.discount_percent),
@@ -165,6 +170,7 @@ export default function EditCustomerOrder() {
   const [countertopRemoveItemId, setCountertopRemoveItemId] = useState<string | null>(null);
   const [countertopRemoveReason, setCountertopRemoveReason] = useState("");
   const [isRemovingCountertop, setIsRemovingCountertop] = useState(false);
+  const [savingCountertopTitleItemId, setSavingCountertopTitleItemId] = useState<string | null>(null);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [serviceEditIndex, setServiceEditIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -315,6 +321,8 @@ export default function EditCustomerOrder() {
       const groupPrice = priceValueMap.get(product.id);
       return [...current, {
         product_id: product.id,
+        sku_snapshot: product.sku,
+        product_name_snapshot: product.name,
         quantity: "1",
         unit_price: groupPrice ?? "0",
         discount_percent: "0",
@@ -352,6 +360,8 @@ export default function EditCustomerOrder() {
     } else if (serviceProduct) {
       setItems((current) => [...current, {
         product_id: serviceProduct.id,
+        sku_snapshot: serviceProduct.sku,
+        product_name_snapshot: serviceProduct.name,
         quantity: "1",
         unit_price: parsedPrice.value!,
         discount_percent: "0",
@@ -378,6 +388,27 @@ export default function EditCustomerOrder() {
       setCountertopEditItemId(null);
     } catch (error) {
       setErrorMessage(operationErrorMessage(error, "Countertop was saved but the order line could not be refreshed."));
+    }
+  }
+
+  async function saveCountertopLineTitle(index: number) {
+    const item = items[index];
+    if (!item?.id || !order || order.status !== "draft" || !summariesByItemId.has(item.id)) return;
+
+    setSavingCountertopTitleItemId(item.id);
+    setErrorMessage(null);
+    try {
+      const { data, error } = await supabase.rpc("set_countertop_order_item_title", {
+        p_order_item_id: item.id,
+        p_title: item.product_name_snapshot,
+      });
+      if (error) throw error;
+      if (typeof data !== "string") throw new Error("Countertop line title mutation returned an invalid response.");
+      updateItem(index, { product_name_snapshot: data });
+    } catch (error) {
+      setErrorMessage(operationErrorMessage(error, "Unable to save Countertop line title."));
+    } finally {
+      setSavingCountertopTitleItemId(null);
     }
   }
 
@@ -485,7 +516,7 @@ export default function EditCustomerOrder() {
         if (!item.line_note.trim()) itemError.line_note = "Service detail is required.";
         if (unitPrice.error || unitPrice.value === null) itemError.unit_price = unitPrice.error ?? "Enter a valid service price.";
       } else if (model === "price_group" && !priceValueMap.has(item.product_id)) {
-        blockingMessage ??= `No current Price Group price exists for ${product?.sku ?? "selected product"}.`;
+        blockingMessage ??= `No current Price Group price exists for ${product?.sku ?? item.sku_snapshot ?? "selected product"}.`;
       } else if (unitPrice.error || unitPrice.value === null) {
         blockingMessage ??= "The selected product does not have a valid commercial price for this order.";
       }
@@ -603,12 +634,31 @@ export default function EditCustomerOrder() {
                 const isConfiguredCountertop = Boolean(item.id && countertopSummary);
                 const canMutateConfiguredCountertop = isConfiguredCountertop && canManageCountertop && order.status === "draft";
                 const itemError = fieldErrors.items?.[index];
+                const displaySku = item.sku_snapshot || product?.sku || "Historical product";
+                const displayName = item.product_name_snapshot || product?.name || item.product_id;
                 return (
                   <TableRow key={item.id ?? `${item.product_id}-${index}`}>
-                    <TableCell variant="admin" className="min-w-[360px]"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{product?.sku ?? "Historical product"}</span>{product?.status === "inactive" ? <Badge size="sm" color="warning">Inactive</Badge> : null}</div><FormHint>{product?.name ?? item.product_id}</FormHint><CountertopLineDetails summary={countertopSummary} /><ServiceLineDetails lineNote={item.line_note} />{itemError?.unit_price ? <FormHint>{itemError.unit_price}</FormHint> : null}{itemError?.line_note ? <FormHint>{itemError.line_note}</FormHint> : null}</TableCell>
-                    <TableCell variant="admin" className="w-28">{isConfiguredCountertop ? <FormHint>{item.quantity} · configured{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : isService ? <FormHint>1 · fixed{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-quantity`} ariaLabel={`${product?.sku ?? "Product"} quantity`} inputMode="decimal" value={item.quantity} error={Boolean(itemError?.quantity)} hint={itemError?.quantity} onChange={(event) => { clearItemError(index, "quantity"); updateItem(index, { quantity: event.target.value }); }} />}</TableCell>
+                    <TableCell variant="admin" className="min-w-[360px]">
+                      <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{displaySku}</span>{product?.status === "inactive" ? <Badge size="sm" color="warning">Inactive</Badge> : null}</div>
+                      <FormHint>{displayName}</FormHint>
+                      {canMutateConfiguredCountertop && item.id ? (
+                        <div className="mt-3 max-w-xl">
+                          <Field label="Line Title" hint="Order-only display name. Leave blank and save to reset to the configured Stone name. Maximum 160 characters.">
+                            <div className="flex flex-wrap gap-2">
+                              <div className="min-w-[220px] flex-1"><Input ariaLabel="Countertop line title" value={item.product_name_snapshot} onChange={(event) => updateItem(index, { product_name_snapshot: event.target.value })} /></div>
+                              <Button size="sm" variant="outline" disabled={savingCountertopTitleItemId === item.id} onClick={() => void saveCountertopLineTitle(index)}>{savingCountertopTitleItemId === item.id ? "Saving…" : "Save title"}</Button>
+                            </div>
+                          </Field>
+                        </div>
+                      ) : null}
+                      <CountertopLineDetails summary={countertopSummary} />
+                      <ServiceLineDetails lineNote={item.line_note} />
+                      {itemError?.unit_price ? <FormHint>{itemError.unit_price}</FormHint> : null}
+                      {itemError?.line_note ? <FormHint>{itemError.line_note}</FormHint> : null}
+                    </TableCell>
+                    <TableCell variant="admin" className="w-28">{isConfiguredCountertop ? <FormHint>{item.quantity} · configured{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : isService ? <FormHint>1 · fixed{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-quantity`} ariaLabel={`${displaySku} quantity`} inputMode="decimal" value={item.quantity} error={Boolean(itemError?.quantity)} hint={itemError?.quantity} onChange={(event) => { clearItemError(index, "quantity"); updateItem(index, { quantity: event.target.value }); }} />}</TableCell>
                     <TableCell variant="admin" className="min-w-[180px]"><span className="font-semibold">{resolvedPriceValue === undefined ? "Unavailable" : money(resolvedPrice, currency)}</span><FormHint>{model === "countertop_material_band" ? "Countertop · configured price" : model === "manual_service" ? "Service · explicit price" : "Price Group · server authoritative"}</FormHint></TableCell>
-                    <TableCell variant="admin" className="w-32">{isConfiguredCountertop ? <FormHint>{Number(item.discount_percent || 0).toFixed(2)}% · configured{itemError?.discount_percent ? ` · ${itemError.discount_percent}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-discount`} ariaLabel={`${product?.sku ?? "Product"} discount percent`} inputMode="decimal" value={item.discount_percent} error={Boolean(itemError?.discount_percent)} hint={itemError?.discount_percent} onChange={(event) => { clearItemError(index, "discount_percent"); updateItem(index, { discount_percent: event.target.value }); }} />}</TableCell>
+                    <TableCell variant="admin" className="w-32">{isConfiguredCountertop ? <FormHint>{Number(item.discount_percent || 0).toFixed(2)}% · configured{itemError?.discount_percent ? ` · ${itemError.discount_percent}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-discount`} ariaLabel={`${displaySku} discount percent`} inputMode="decimal" value={item.discount_percent} error={Boolean(itemError?.discount_percent)} hint={itemError?.discount_percent} onChange={(event) => { clearItemError(index, "discount_percent"); updateItem(index, { discount_percent: event.target.value }); }} />}</TableCell>
                     <TableCell variant="admin" className="font-semibold">{money(total, currency)}</TableCell>
                     <TableCell variant="admin" className="text-right">
                       <div className="flex flex-wrap justify-end gap-2">
@@ -632,7 +682,7 @@ export default function EditCustomerOrder() {
       </ComponentCard>
 
       {isCountertopOpen ? <CountertopConfigurator orderId={order.id} orderContext={{ orderNumber: order.order_number }} onAttached={handleCountertopAttached} onClose={() => setIsCountertopOpen(false)} /> : null}
-      {countertopEditItemId ? <CountertopConfigurator orderId={order.id} orderItemId={countertopEditItemId} orderContext={{ orderNumber: order.order_number, sku: productMap.get(countertopEditItem?.product_id ?? "")?.sku, productName: productMap.get(countertopEditItem?.product_id ?? "")?.name }} onAttached={handleCountertopAttached} onClose={() => setCountertopEditItemId(null)} /> : null}
+      {countertopEditItemId ? <CountertopConfigurator orderId={order.id} orderItemId={countertopEditItemId} orderContext={{ orderNumber: order.order_number, sku: countertopEditItem?.sku_snapshot || productMap.get(countertopEditItem?.product_id ?? "")?.sku, productName: countertopEditItem?.product_name_snapshot || productMap.get(countertopEditItem?.product_id ?? "")?.name }} onAttached={handleCountertopAttached} onClose={() => setCountertopEditItemId(null)} /> : null}
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="space-y-5 xl:col-span-8"><ComponentCard title="Notes" desc="Customer-facing and internal context for this revision."><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes"><TextArea rows={5} value={customerNotes} onChange={setCustomerNotes} /></Field><Field label="Internal Notes"><TextArea rows={5} value={internalNotes} onChange={setInternalNotes} /></Field></div></ComponentCard><ComponentCard title="Revision Reason" desc="Record why the commercial order changed."><Field label="Reason" hint="Recommended. Sales revisions from Confirmed through Ready for Shipment stay pending until Admin approval; Shipped and later orders are revision-locked."><Input value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} placeholder="e.g. Quantity changed after customer request" /></Field></ComponentCard></div>
