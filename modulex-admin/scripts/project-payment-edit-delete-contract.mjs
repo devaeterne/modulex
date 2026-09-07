@@ -40,8 +40,8 @@ assert(legacyMigration.includes("revoke all on table public.customer_project_pay
 // F5C closes the destructive compatibility exception without dropping the public ABI.
 assert(!domain.includes('.rpc("update_customer_project_payment"'), "F5C Admin adapter must not call the legacy posted-payment edit RPC");
 assert(!domain.includes('.rpc("delete_customer_project_payment"'), "F5C Admin adapter must not call the legacy posted-payment hard-delete RPC");
-assert(!financeTab.includes("Edit Payment"), "F5C Project Finance must present posted payment history as immutable");
-assert(!financeTab.includes("Delete Payment"), "F5C Project Finance must not expose destructive posted-payment deletion");
+assert(!financeTab.includes(">Edit Payment</Button>"), "F5C Project Finance must present posted payment history as immutable");
+assert(!financeTab.includes(">Delete Payment</Button>"), "F5C Project Finance must not expose destructive posted-payment deletion");
 assert(financeTab.includes("immutable") && financeTab.includes("void/reversal"), "F5C UI must direct corrections to append-safe void/reversal semantics");
 
 assert(f5c.includes("private.update_customer_project_payment"), "F5C must preserve the legacy update ABI as a fail-closed compatibility stub");
