@@ -11,6 +11,14 @@ const configurator = read("src/components/countertop/CountertopConfigurator.tsx"
 const thumbnail = read("src/components/common/ProductImageThumbnail.tsx");
 const catalogPage = read("src/app/(admin)/pricing/countertop/catalog/page.tsx");
 const setupPage = read("src/app/(admin)/pricing/countertop/settings/page.tsx");
+const sidebar = read("src/layout/AppSidebar.tsx");
+const customerTypes = read("src/lib/customers/types.ts");
+const orderDomain = read("src/lib/customers/order-domain.ts");
+const countertopSummary = read("src/lib/customers/countertop-summary.ts");
+const lineDetails = read("src/components/customers/CountertopLineDetails.tsx");
+const servicesPagePath = "src/app/(admin)/pricing/countertop/services/page.tsx";
+const servicesPageExists = fs.existsSync(path.join(root, servicesPagePath));
+const servicesPage = servicesPageExists ? read(servicesPagePath) : "";
 
 for (const primitive of ["ComponentCard", "Label", "Input", "Select", "Alert", "Badge", "Button", "Modal", "TableViewport", "TableStateRow"]) {
   assert(catalog.includes(primitive), `Countertop Catalog must compose shared ${primitive}`);
@@ -80,5 +88,26 @@ assert(configurator.includes('import SearchableSelect from "@/components/form/Se
 assert((configurator.match(/<SearchableSelect/g) ?? []).length >= 2, "Countertop Stone and Sink fields must both render searchable dropdowns");
 assert(!configurator.includes('ariaLabel="Search stone by name or SKU"'), "Stone search must live inside its dropdown instead of as a separate field");
 assert(!configurator.includes('ariaLabel="Search sink by name or SKU"'), "Sink search must live inside its dropdown instead of as a separate field");
+
+// Additional Services is a first-class Admin-managed Countertop pricing surface.
+assert(servicesPageExists, "Countertop Additional Services page must exist");
+assert(servicesPage.includes("PageBreadcrumb") && servicesPage.includes('pageTitle="Additional Services"'), "Additional Services must use the shared page heading convention");
+assert(servicesPage.includes("CountertopReferenceManager") && servicesPage.includes('kinds={["service"]}'), "Additional Services must reuse canonical Countertop reference management for service-only CRUD");
+assert(setup.includes("kinds?: ReferenceKind[]") && setup.includes("visibleConfigs"), "Countertop reference manager must support focused reference surfaces");
+assert(sidebar.includes('{ name: "Additional Services", path: "/pricing/countertop/services", permission: "pricing.manage" }'), "Pricing navigation must expose Additional Services to pricing managers");
+assert(setupPage.includes('kinds={["stone_type", "material_band", "edge"]}'), "Countertop Setup must leave service management to the dedicated Additional Services page");
+
+// Customer-provided sinks are a commercial selection, not a fake Product Master record.
+assert(configurator.includes('const CUSTOMER_PROVIDED_SINK_VALUE = "__customer_provided__"'), "Countertop Sink selector must define the customer-provided sentinel");
+assert(configurator.includes('label: "Customer Provides"'), "Countertop Sink selector must expose Customer Provides");
+assert(configurator.includes('sink_source: sinkId === CUSTOMER_PROVIDED_SINK_VALUE ? "customer_provided"'), "Customer-provided Sink selection must persist as Countertop configuration semantics");
+assert(configurator.includes("selectedSinkProductId"), "Customer-provided Sink selection must map to a null canonical Sink product id");
+assert(customerTypes.includes("sinkCustomerProvided: boolean"), "Countertop line summary must model customer-provided Sink state");
+for (const source of [orderDomain, countertopSummary]) {
+  assert(source.includes('configuration: unknown'), "Countertop summary readers must load configuration semantics");
+  assert(source.includes('sinkCustomerProvided: configuration.sink_source === "customer_provided"'), "Countertop summary readers must restore customer-provided Sink state");
+}
+assert(lineDetails.includes('summary.sinkCustomerProvided ? "Sink: Customer Provides"'), "Order line details must display Customer Provides Sink");
+assert(countertopSummary.includes('summary.sinkCustomerProvided ? "Sink: Customer Provides"'), "Commercial print detail must display Customer Provides Sink");
 
 console.log("Countertop shared UI contract: PASS");
