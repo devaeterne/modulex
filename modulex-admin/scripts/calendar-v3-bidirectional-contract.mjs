@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = (p) => readFile(path.join(root, p), "utf8");
 
-const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconcile, refresh, workspace, projectTab, vercelConfig, watchChannels] = await Promise.all([
+const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconcile, refresh, syncRoute, companyBinding, workspace, projectTab, vercelConfig, watchChannels] = await Promise.all([
   source("sql/calendar-v3-bidirectional.sql"),
   source("../modulex-store/supabase/migrations/20260906113000_calendar_v3_bidirectional.sql"),
   source("src/lib/google-calendar/config.ts"),
@@ -16,6 +16,8 @@ const [sql, migration, config, provider, syncEngine, eventRoute, webhook, reconc
   source("src/app/api/admin/calendar/google/webhook/route.ts"),
   source("src/app/api/admin/calendar/google/reconcile/route.ts"),
   source("src/app/api/admin/calendar/google/refresh/route.ts"),
+  source("src/app/api/admin/calendar/google/sync/route.ts"),
+  source("src/app/api/admin/calendar/company-binding/route.ts"),
   source("src/components/calendar/AdminCalendarWorkspace.tsx"),
   source("src/components/customers/project-detail/ProjectCalendarTab.tsx"),
   source("vercel.json"),
@@ -59,6 +61,28 @@ assert.match(eventRoute, /requirePermission\(request, "calendar\.manage"\)/);
 assert.match(webhook, /x-goog-channel-id/i);
 assert.match(webhook, /x-goog-resource-id/i);
 assert.match(reconcile, /CRON_SECRET|cron/i);
+
+// Large first-time Google calendars must be pulled in bounded provider pages so a
+// manual Sync Now never depends on one Vercel request surviving the whole history.
+assert.match(provider, /export async function listGoogleCalendarEventPage/);
+assert.match(provider, /pageToken\?: string \| null/);
+assert.match(provider, /maxResults\?: number/);
+assert.match(syncEngine, /PROVIDER_SYNC_PAGE_SIZE = 100/);
+assert.match(syncEngine, /export async function syncCompanyCalendarFromGooglePage/);
+assert.match(syncEngine, /continuationToken/);
+assert.match(syncRoute, /continuation_token/);
+assert.match(syncRoute, /syncCompanyCalendarFromGooglePage/);
+assert.match(workspace, /while \(continuationToken\)/);
+assert.doesNotMatch(
+  companyBinding,
+  /await syncCompanyCalendarFromGoogle\("manual"/,
+  "Choosing a Company Calendar must not run an unbounded first-time provider pull inside the binding request.",
+);
+assert.match(
+  refresh,
+  /binding\.provider_sync_token/,
+  "Open-page refresh must not start an unbounded full-history pull before initial Sync Now finishes.",
+);
 
 assert.match(refresh, /requirePermission\(request, "calendar\.view"\)/);
 assert.match(refresh, /getCompanyCalendarBinding/);
