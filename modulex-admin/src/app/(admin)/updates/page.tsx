@@ -6,17 +6,13 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ComponentCard from "@/components/common/ComponentCard";
 import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { isAdminRole } from "@/lib/auth/permissions";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { supabase } from "@/lib/supabase/client";
 import {
   SYSTEM_ANNOUNCEMENT_KIND_LABELS,
   type SystemAnnouncement,
 } from "@/lib/system-announcements";
-
-function formatDate(value: string | null) {
-  if (!value) return "";
-  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" }).format(new Date(value));
-}
 
 export default function UpdatesPage() {
   const [items, setItems] = useState<SystemAnnouncement[]>([]);
@@ -55,7 +51,7 @@ export default function UpdatesPage() {
       {loading ? <ComponentCard title="Updates"><p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading updates...</p></ComponentCard> : null}
       {!loading && items.length === 0 ? <ComponentCard title="Updates"><p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>No published updates yet.</p></ComponentCard> : null}
 
-      {!loading ? items.map((item) => <ComponentCard key={item.id} title={item.title} desc={`${SYSTEM_ANNOUNCEMENT_KIND_LABELS[item.kind]} · ${formatDate(item.published_at)}`}><p className={`whitespace-pre-wrap text-sm leading-6 ${ADMIN_TEXT_STYLES.body}`}>{item.message}</p>{item.href ? <Link href={item.href} className={`mt-4 inline-flex text-sm font-semibold ${ADMIN_TEXT_STYLES.body}`}>{item.cta_label || "Open"} →</Link> : null}</ComponentCard>) : null}
+      {!loading ? items.map((item) => <ComponentCard key={item.id} title={item.title} desc={`${SYSTEM_ANNOUNCEMENT_KIND_LABELS[item.kind]} · ${formatTimestampDate(item.published_at)}`}><p className={`whitespace-pre-wrap text-sm leading-6 ${ADMIN_TEXT_STYLES.body}`}>{item.message}</p>{item.href ? <Link href={item.href} className={`mt-4 inline-flex text-sm font-semibold ${ADMIN_TEXT_STYLES.body}`}>{item.cta_label || "Open"} →</Link> : null}</ComponentCard>) : null}
     </div>
   </div>;
 }
