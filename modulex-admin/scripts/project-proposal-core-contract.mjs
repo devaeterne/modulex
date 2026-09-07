@@ -15,19 +15,26 @@ const exists = (file) => fs.existsSync(path.join(root, file));
 
 const migrationPath = "../modulex-store/supabase/migrations/20260907203000_project_proposal_core.sql";
 const sqlPath = "sql/project-proposal-core.sql";
+const rejectionMigrationPath = "../modulex-store/supabase/migrations/20260907204500_project_proposal_rejection_state.sql";
+const rejectionSqlPath = "sql/project-proposal-rejection-state.sql";
 
 for (const [file, message] of [
   [migrationPath, "Proposal Core canonical migration must exist"],
   [sqlPath, "Proposal Core Admin SQL mirror must exist"],
+  [rejectionMigrationPath, "Proposal rejection-state canonical migration must exist"],
+  [rejectionSqlPath, "Proposal rejection-state Admin SQL mirror must exist"],
 ]) {
   assert.equal(exists(file), true, message);
 }
 
 const migration = read(migrationPath);
 const sql = read(sqlPath);
+const rejectionMigration = read(rejectionMigrationPath);
+const rejectionSql = read(rejectionSqlPath);
 assert.equal(migration, sql, "Proposal Core Admin SQL mirror and Supabase migration must stay byte-identical");
+assert.equal(rejectionMigration, rejectionSql, "Proposal rejection-state Admin SQL mirror and Supabase migration must stay byte-identical");
 
-const dbSql = `${migration}\n${sql}`;
+const dbSql = `${migration}\n${sql}\n${rejectionMigration}\n${rejectionSql}`;
 
 for (const table of [
   "proposal_area_types",
@@ -66,6 +73,7 @@ assert.match(dbSql, /direct_sell_amount[\s\S]*pricing_group_id[\s\S]*(?:check|co
 assert.match(dbSql, /PROPOSAL_PRICING_GROUP_REVISION_MISMATCH/i, "Cross-Revision Pricing Group assignment must fail closed");
 assert.match(dbSql, /PROPOSAL_REVISION_IMMUTABLE/i, "Non-draft Revision content must be immutable");
 assert.match(dbSql, /PROPOSAL_ACCEPTANCE_APPEND_ONLY/i, "Acceptance evidence must be append-safe");
+assert.match(dbSql, /PROPOSAL_REJECTION_PRESERVES_ACTIVE_DRAFT/i, "Rejecting an older sent Revision must preserve a newer active draft at Proposal header level");
 assert.match(dbSql, /for\s+update/i, "Proposal lifecycle transitions must lock authoritative rows");
 assert.match(dbSql, /pg_advisory_xact_lock/i, "Proposal numbering/revision creation must be concurrency-safe");
 assert.match(dbSql, /customer_project_proposal_number_seq/i, "Proposal numbering must use a dedicated sequence");
