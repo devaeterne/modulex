@@ -36,7 +36,6 @@ async function handlePost(request: Request) {
     const authorizationUrl = createGoogleAuthorizationUrl({
       state,
       requestUrl: request.url,
-      loginHint: auth.actor.user.email,
     });
     const response = Response.json({ authorization_url: authorizationUrl });
     response.headers.append("Set-Cookie", oauthCookie(state, request));
