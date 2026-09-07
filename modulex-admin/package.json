@@ -13,7 +13,7 @@
     "smoke:runtime-config": "node scripts/runtime-config-contract.mjs",
     "smoke:validation-data-contract": "node scripts/validation-data-contract.mjs",
     "smoke:val-2-products-pricing": "node scripts/val-2-products-pricing-validation-contract.mjs",
-    "smoke:val-3-customers-orders-invoices": "node scripts/val3-customers-orders-invoices-contract.mjs",
+    "smoke:val-3-customers-orders-invoices": "node scripts/val3-customers-orders-invoices-contract.mjs && node scripts/cust7-customer-lifecycle-migration-contract.mjs",
     "smoke:val-4-inventory-validation": "node scripts/val-4-inventory-warehouses-validation-contract.mjs",
     "smoke:val-5-store-users-settings": "node scripts/val5-store-users-settings-contract.mjs",
     "smoke:pricing-product-types": "node scripts/pricing-product-type-contract.mjs",
