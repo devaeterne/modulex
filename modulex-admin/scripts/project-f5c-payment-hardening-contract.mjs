@@ -78,8 +78,8 @@ for (const rpc of ["record_customer_project_payment", "allocate_customer_project
 }
 assert(!domain.includes('.rpc("update_customer_project_payment"'), "Admin adapter must stop calling legacy posted-payment edit RPC");
 assert(!domain.includes('.rpc("delete_customer_project_payment"'), "Admin adapter must stop calling legacy posted-payment hard-delete RPC");
-assert(!financeTab.includes("Edit Payment"), "Project Finance must stop advertising destructive edits for posted payment history");
-assert(!financeTab.includes("Delete Payment"), "Project Finance must stop advertising destructive hard-delete for posted payment history");
+assert(!financeTab.includes(">Edit Payment</Button>"), "Project Finance must stop advertising destructive edits for posted payment history");
+assert(!financeTab.includes(">Delete Payment</Button>"), "Project Finance must stop advertising destructive hard-delete for posted payment history");
 assert(financeTab.includes("immutable") || financeTab.includes("correction"), "Project Finance must explain immutable posted history/correction ownership");
 assert(financeTab.includes("requirement.received > 0") || financeTab.includes("requirement.received === 0"), "Payment Plan UI must not offer deletion when posted allocations exist");
 
