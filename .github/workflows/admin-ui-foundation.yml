@@ -5,6 +5,8 @@ on:
     paths:
       - "AGENTS.md"
       - "docs/CI_WORKFLOW_ARCHITECTURE.md"
+      - "docs/acceptance/us-date-format-audit.json"
+      - "scripts/us-date-format-audit.mjs"
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
@@ -17,6 +19,8 @@ on:
     paths:
       - "AGENTS.md"
       - "docs/CI_WORKFLOW_ARCHITECTURE.md"
+      - "docs/acceptance/us-date-format-audit.json"
+      - "scripts/us-date-format-audit.mjs"
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
@@ -49,6 +53,8 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
+      - name: US date audit scanner self-test
+        run: node ../scripts/us-date-format-audit.mjs --self-test
       - name: CI workflow architecture contract
         run: npm run smoke:ci-workflow-architecture
       - name: API timing contract
