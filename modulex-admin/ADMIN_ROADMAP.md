@@ -536,7 +536,7 @@ A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality
   - Authenticated super-admin rollback acceptance exercised `stock_in_idempotent` with quantity `0.01`; the transaction created one idempotent movement and adjusted inventory by exactly `0.01`, then rollback restored the original quantity and left zero acceptance movement rows.
   - Stock in/out/transfer/reserve/release RPCs remain SECURITY INVOKER, authenticated-executable, and anon/PUBLIC-denied. `/warehouses`, `/stock-operations`, and `/inventory` return production HTTP 200 with the expected Modulex bundles, and no runtime errors were found for those routes in the inspected 24-hour window.
   - Fresh Security + Performance Advisor scans show no VAL-4-specific blocker; existing unrelated project-wide advisor backlog remains separate. Detailed evidence: `docs/acceptance/val-2-val-4-production.md`.
-- [ ] VAL-5 — Store CMS / Users / Settings / remaining Admin forms.
+- [~] VAL-5 — Store CMS / Users / Settings / remaining Admin forms.
 - [ ] VAL-6 — Full validation regression & production acceptance.
 
 The VAL track is cross-cutting and additive: it does not overwrite the UI-2 track or functional Admin roadmap. Domain packages remediate validation debt only after a mismatch inventory and the database-contract-first audit described in `docs/ADMIN_VALIDATION_GUIDE.md`.

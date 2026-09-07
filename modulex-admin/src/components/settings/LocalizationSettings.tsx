@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Input from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Button from "@/components/ui/button/Button";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { isValidCurrencyCode, normalizeCurrencyCode } from "@/lib/validation";
 
-const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:disabled:bg-gray-800";
+export type LocalizationFieldErrors = { currency?: string; locale?: string; timezone?: string };
 
 export default function LocalizationSettings() {
   const [currency, setCurrency] = useState("USD");
@@ -16,6 +21,7 @@ export default function LocalizationSettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<LocalizationFieldErrors>({});
 
   useEffect(() => {
     async function load() {
@@ -30,29 +36,41 @@ export default function LocalizationSettings() {
     void load();
   }, []);
 
+  function focusFirstInvalid(errors: LocalizationFieldErrors) {
+    const id = errors.currency ? "localization-currency" : errors.locale ? "localization-locale" : errors.timezone ? "localization-timezone" : null;
+    if (id) requestAnimationFrame(() => document.getElementById(id)?.focus());
+  }
+
   async function save() {
     const normalizedCurrency = normalizeCurrencyCode(currency);
-    if (!isValidCurrencyCode(normalizedCurrency)) return setError("Currency must be a 3-letter ISO code, for example USD or CAD.");
-    if (!locale.trim()) return setError("Locale is required.");
-    if (!timezone.trim()) return setError("Timezone is required.");
+    const normalizedLocale = locale.trim();
+    const normalizedTimezone = timezone.trim();
+    const next: LocalizationFieldErrors = {};
+    if (!isValidCurrencyCode(normalizedCurrency)) next.currency = "Currency must be a 3-letter ISO code, for example USD or CAD.";
+    if (!normalizedLocale) next.locale = "Locale is required.";
+    if (!normalizedTimezone) next.timezone = "Timezone is required.";
+    setFieldErrors(next);
+    if (Object.keys(next).length) { setError("Correct the highlighted localization fields before saving."); focusFirstInvalid(next); return; }
+
     setSaving(true); setError(null); setSuccess(null);
-    const { error: saveError } = await supabase.from("general_settings").update({ default_currency: normalizedCurrency, locale: locale.trim(), timezone: timezone.trim() }).eq("id", 1);
+    const { error: saveError } = await supabase.from("general_settings").update({ default_currency: normalizedCurrency, locale: normalizedLocale, timezone: normalizedTimezone }).eq("id", 1);
     if (saveError) setError(saveError.message);
-    else { setCurrency(normalizedCurrency); setSuccess("Localization settings saved."); }
+    else { setCurrency(normalizedCurrency); setLocale(normalizedLocale); setTimezone(normalizedTimezone); setSuccess("Localization settings saved."); }
     setSaving(false);
   }
 
-  if (loading) return <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Loading localization settings...</div>;
+  if (loading) return <Alert variant="info" title="Loading localization" message="System localization defaults are being loaded." />;
   const disabled = !canEdit || saving;
 
-  return <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Localization</h1><p className="mt-1 text-sm text-gray-500">System-wide currency, number/date locale and timezone defaults.</p></div>{canEdit && <button type="button" onClick={save} disabled={disabled} className="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">{saving ? "Saving..." : "Save Localization"}</button>}</div>
-    {error && <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{error}</div>}
-    {success && <div className="mt-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">{success}</div>}
-    <div className="mt-6 grid gap-4 md:grid-cols-3">
-      <label><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Currency *</span><input value={currency} onChange={(event) => setCurrency(normalizeCurrencyCode(event.target.value))} disabled={disabled} maxLength={3} placeholder="USD" autoCapitalize="characters" spellCheck={false} className={inputClass} /><span className="mt-1.5 block text-xs text-gray-400">3-letter ISO code.</span></label>
-      <label><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Locale *</span><input value={locale} onChange={(event) => setLocale(event.target.value)} disabled={disabled} placeholder="en-US" className={inputClass} /><span className="mt-1.5 block text-xs text-gray-400">Used for number and date formatting.</span></label>
-      <label><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Timezone *</span><input value={timezone} onChange={(event) => setTimezone(event.target.value)} disabled={disabled} placeholder="America/New_York" className={inputClass} /><span className="mt-1.5 block text-xs text-gray-400">IANA timezone identifier.</span></label>
-    </div>
-  </section>;
+  return <div className="space-y-5">
+    {error ? <Alert variant="error" title="Localization" message={error} /> : null}
+    {success ? <Alert variant="success" title="Localization" message={success} /> : null}
+    <ComponentCard title="Localization" desc="System-wide currency, number/date locale and timezone defaults." headerAction={canEdit ? <Button onClick={() => void save()} disabled={disabled}>{saving ? "Saving..." : "Save Localization"}</Button> : undefined}>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div><Label htmlFor="localization-currency">Default Currency *</Label><Input id="localization-currency" value={currency} onChange={(event) => { setCurrency(normalizeCurrencyCode(event.target.value)); setFieldErrors((current) => ({ ...current, currency: undefined })); }} disabled={disabled} maxLength={3} placeholder="USD" error={Boolean(fieldErrors.currency)} hint={fieldErrors.currency ?? "3-letter ISO code."} /></div>
+        <div><Label htmlFor="localization-locale">Locale *</Label><Input id="localization-locale" value={locale} onChange={(event) => { setLocale(event.target.value); setFieldErrors((current) => ({ ...current, locale: undefined })); }} disabled={disabled} placeholder="en-US" error={Boolean(fieldErrors.locale)} hint={fieldErrors.locale ?? "Used for number and date formatting."} /></div>
+        <div><Label htmlFor="localization-timezone">Timezone *</Label><Input id="localization-timezone" value={timezone} onChange={(event) => { setTimezone(event.target.value); setFieldErrors((current) => ({ ...current, timezone: undefined })); }} disabled={disabled} placeholder="America/New_York" error={Boolean(fieldErrors.timezone)} hint={fieldErrors.timezone ?? "IANA timezone identifier."} /></div>
+      </div>
+    </ComponentCard>
+  </div>;
 }

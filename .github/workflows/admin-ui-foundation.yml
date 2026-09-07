@@ -83,6 +83,8 @@ jobs:
         run: node scripts/dashboard-shell-ui-contract.mjs
       - name: General settings UI contract
         run: node scripts/general-settings-ui-contract.mjs
+      - name: VAL-5 Store Users Settings contract
+        run: node scripts/val5-store-users-settings-contract.mjs
       - name: Mobile shell UI contract
         run: node scripts/mobile-shell-ui-contract.mjs
       - name: Personnel UI contract

@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/theme/adminTheme";
 
 interface InputProps {
-  type?: "text" | "number" | "email" | "password" | "date" | "time" | "tel" | "url" | string;
+  type?: "text" | "number" | "email" | "password" | "date" | "time" | "tel" | "url" | "file" | string;
   id?: string;
   name?: string;
   placeholder?: string;
@@ -23,6 +23,7 @@ interface InputProps {
   pattern?: string;
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   autoComplete?: string;
+  accept?: string;
   required?: boolean;
   readOnly?: boolean;
   disabled?: boolean;
@@ -51,6 +52,7 @@ const Input: FC<InputProps> = ({
   pattern,
   inputMode,
   autoComplete,
+  accept,
   required = false,
   readOnly = false,
   disabled = false,
@@ -91,6 +93,7 @@ const Input: FC<InputProps> = ({
         pattern={pattern}
         inputMode={inputMode}
         autoComplete={autoComplete}
+        accept={accept}
         required={required}
         readOnly={readOnly}
         disabled={disabled}
@@ -101,11 +104,7 @@ const Input: FC<InputProps> = ({
       />
 
       {hint ? (
-        <p
-          id={hintId}
-          role={error ? "alert" : undefined}
-          className={`mt-1.5 text-xs ${hintClass}`}
-        >
+        <p id={hintId} role={error ? "alert" : undefined} className={`mt-1.5 text-xs ${hintClass}`}>
           {hint}
         </p>
       ) : null}
