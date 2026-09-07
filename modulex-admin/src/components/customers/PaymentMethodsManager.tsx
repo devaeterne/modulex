@@ -1,19 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase/client";
-import { getCurrentProfile } from "@/lib/supabase/profile";
+import ComponentCard from "@/components/common/ComponentCard";
+import Label from "@/components/form/Label";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Button from "@/components/ui/button/Button";
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableViewport } from "@/components/ui/table";
 import { hasPermission } from "@/lib/auth/permissions";
 import type { PaymentMethod } from "@/lib/customers/types";
+import { getCurrentProfile } from "@/lib/supabase/profile";
+import { supabase } from "@/lib/supabase/client";
+import { parseDbDecimal } from "@/lib/validation";
 
-const inputClass =
-  "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs transition placeholder:text-gray-400 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-
-const primaryButtonClass =
-  "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50";
-
-const secondaryButtonClass =
-  "inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 shadow-theme-xs transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05]";
+const PERCENT_DECIMAL = { precision: 7, scale: 3, min: 0, max: 100, allowNull: false } as const;
 
 function makeSystemKey(value: string) {
   return value
@@ -34,28 +35,21 @@ export default function PaymentMethodsManager() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newCommission, setNewCommission] = useState("0");
+  const [newNameError, setNewNameError] = useState<string | null>(null);
+  const [newCommissionError, setNewCommissionError] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<Record<string, { name?: string; commission?: string }>>({});
 
-  const sorted = useMemo(
-    () => [...methods].sort((a, b) => a.sort_order - b.sort_order),
-    [methods]
-  );
+  const sorted = useMemo(() => [...methods].sort((a, b) => a.sort_order - b.sort_order), [methods]);
 
   async function load() {
     setIsLoading(true);
     setErrorMessage(null);
-
     const { data, error } = await supabase
       .from("payment_methods")
       .select("id, system_key, name, commission_percent, sort_order, is_active, created_at, updated_at")
       .order("sort_order");
-
-    if (error) {
-      setErrorMessage(error.message);
-      setIsLoading(false);
-      return;
-    }
-
-    setMethods((data ?? []) as PaymentMethod[]);
+    if (error) setErrorMessage(error.message);
+    else setMethods((data ?? []) as PaymentMethod[]);
     setIsLoading(false);
   }
 
@@ -70,72 +64,79 @@ export default function PaymentMethodsManager() {
       setCanEdit(hasPermission(profile?.roles, "finance.manage"));
       await load();
     }
-    init();
+    void init();
   }, []);
+
+  function focus(id: string) {
+    requestAnimationFrame(() => document.getElementById(id)?.focus());
+  }
 
   async function addMethod() {
     const name = newName.trim();
-    const commission = Number(newCommission || 0);
-    if (!name) return setErrorMessage("Payment method name is required.");
-    if (!Number.isFinite(commission) || commission < 0 || commission > 100) {
-      return setErrorMessage("Commission must be between 0 and 100%.");
+    const parsedCommission = parseDbDecimal(newCommission, PERCENT_DECIMAL);
+    const nameError = name ? null : "Payment method name is required.";
+    const commissionError = parsedCommission.error;
+    setNewNameError(nameError);
+    setNewCommissionError(commissionError);
+    if (nameError || commissionError || parsedCommission.value === null) {
+      focus(nameError ? "new-payment-name" : "new-payment-commission");
+      return;
     }
 
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-
-    const nextSort = sorted.length ? Math.max(...sorted.map((m) => m.sort_order)) + 10 : 10;
+    const nextSort = sorted.length ? Math.max(...sorted.map((method) => method.sort_order)) + 10 : 10;
     const { error } = await supabase.from("payment_methods").insert({
       system_key: makeSystemKey(name),
       name,
-      commission_percent: commission,
+      commission_percent: parsedCommission.value,
       sort_order: nextSort,
       is_active: true,
     });
-
-    if (error) {
-      setErrorMessage(error.message);
-      setIsSaving(false);
-      return;
+    if (error) setErrorMessage(error.message);
+    else {
+      setNewName("");
+      setNewCommission("0");
+      setNewNameError(null);
+      setNewCommissionError(null);
+      await load();
+      setSuccessMessage("Payment method added.");
     }
-
-    setNewName("");
-    setNewCommission("0");
-    await load();
-    setSuccessMessage("Payment method added.");
     setIsSaving(false);
   }
 
   async function saveMethod(method: PaymentMethod) {
-    const commission = Number(method.commission_percent);
-    if (!method.name.trim()) return setErrorMessage("Payment method name cannot be empty.");
-    if (!Number.isFinite(commission) || commission < 0 || commission > 100) {
-      return setErrorMessage("Commission must be between 0 and 100%.");
+    const name = method.name.trim();
+    const parsedCommission = parseDbDecimal(method.commission_percent, PERCENT_DECIMAL);
+    const errors = {
+      name: name ? undefined : "Payment method name cannot be empty.",
+      commission: parsedCommission.error ?? undefined,
+    };
+    setRowErrors((current) => ({ ...current, [method.id]: errors }));
+    if (errors.name || errors.commission || parsedCommission.value === null) {
+      focus(errors.name ? `payment-name-${method.id}` : `payment-commission-${method.id}`);
+      return;
     }
 
     setIsSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-
     const { error } = await supabase
       .from("payment_methods")
       .update({
-        name: method.name.trim(),
-        commission_percent: commission,
+        name,
+        commission_percent: parsedCommission.value,
         is_active: method.is_active,
         sort_order: method.sort_order,
       })
       .eq("id", method.id);
-
-    if (error) {
-      setErrorMessage(error.message);
-      setIsSaving(false);
-      return;
+    if (error) setErrorMessage(error.message);
+    else {
+      setRowErrors((current) => ({ ...current, [method.id]: {} }));
+      await load();
+      setSuccessMessage("Payment method saved.");
     }
-
-    await load();
-    setSuccessMessage("Payment method saved.");
     setIsSaving(false);
   }
 
@@ -143,9 +144,9 @@ export default function PaymentMethodsManager() {
     const index = sorted.findIndex((item) => item.id === method.id);
     const swapIndex = index + direction;
     if (index < 0 || swapIndex < 0 || swapIndex >= sorted.length) return;
-
     const other = sorted[swapIndex];
     setIsSaving(true);
+    setErrorMessage(null);
     const first = await supabase.from("payment_methods").update({ sort_order: other.sort_order }).eq("id", method.id);
     if (first.error) {
       setErrorMessage(first.error.message);
@@ -153,96 +154,59 @@ export default function PaymentMethodsManager() {
       return;
     }
     const second = await supabase.from("payment_methods").update({ sort_order: method.sort_order }).eq("id", other.id);
-    if (second.error) {
-      setErrorMessage(second.error.message);
-      setIsSaving(false);
-      return;
-    }
-    await load();
+    if (second.error) setErrorMessage(second.error.message);
+    else await load();
     setIsSaving(false);
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-[360px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" />
-          <p className="text-sm text-gray-500">Loading payment methods...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <Alert variant="info" title="Loading payment methods" message="Payment method configuration is being loaded." />;
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
-        <h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Payment Methods</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Manage the payment methods available on customer orders and the commission added to each method.
-        </p>
-      </div>
+      <ComponentCard title="Payment Methods" desc="Manage payment methods available on customer orders and their commission percentages." />
+      {errorMessage ? <Alert variant="error" title="Payment method update failed" message={errorMessage} /> : null}
+      {successMessage ? <Alert variant="success" title="Payment methods updated" message={successMessage} /> : null}
 
-      {errorMessage && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{errorMessage}</div>}
-      {successMessage && <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">{successMessage}</div>}
-
-      {canEdit && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-          <h2 className="text-sm font-semibold text-gray-800 dark:text-white/90">Add Payment Method</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px_auto]">
-            <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Card, Cash, Bank Transfer" className={inputClass} />
-            <div className="relative">
-              <input value={newCommission} onChange={(e) => setNewCommission(e.target.value)} inputMode="decimal" className={`${inputClass} pr-8`} />
-              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">%</span>
+      {canEdit ? (
+        <ComponentCard title="Add Payment Method" desc="Commission is stored with the database numeric(7,3) contract.">
+          <div className="grid gap-3 md:grid-cols-[1fr_180px_auto] md:items-end">
+            <div>
+              <Label htmlFor="new-payment-name">Payment method name</Label>
+              <Input id="new-payment-name" value={newName} onChange={(event) => { setNewName(event.target.value); setNewNameError(null); }} error={Boolean(newNameError)} hint={newNameError ?? undefined} />
             </div>
-            <button disabled={isSaving} onClick={addMethod} className={primaryButtonClass}>Add Method</button>
+            <div>
+              <Label htmlFor="new-payment-commission">Commission (%)</Label>
+              <Input id="new-payment-commission" value={newCommission} inputMode="decimal" onChange={(event) => { setNewCommission(event.target.value); setNewCommissionError(null); }} error={Boolean(newCommissionError)} hint={newCommissionError ?? undefined} />
+            </div>
+            <Button disabled={isSaving} onClick={() => void addMethod()}>Add Method</Button>
           </div>
-        </div>
-      )}
+        </ComponentCard>
+      ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/[0.02]">
-              <tr>
-                {['Order','Payment Method','System Key','Commission','Status','Actions'].map((label) => (
-                  <th key={label} className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">{label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {sorted.map((method, index) => (
-                <tr key={method.id}>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <button disabled={!canEdit || isSaving || index === 0} onClick={() => move(method, -1)} className={secondaryButtonClass}>↑</button>
-                      <button disabled={!canEdit || isSaving || index === sorted.length - 1} onClick={() => move(method, 1)} className={secondaryButtonClass}>↓</button>
-                    </div>
-                  </td>
-                  <td className="min-w-[240px] px-4 py-3">
-                    <input disabled={!canEdit} value={method.name} onChange={(e) => setMethods((current) => current.map((item) => item.id === method.id ? { ...item, name: e.target.value } : item))} className={inputClass} />
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{method.system_key}</td>
-                  <td className="w-[160px] px-4 py-3">
-                    <div className="relative">
-                      <input disabled={!canEdit} value={String(method.commission_percent)} onChange={(e) => setMethods((current) => current.map((item) => item.id === method.id ? { ...item, commission_percent: e.target.value } : item))} inputMode="decimal" className={`${inputClass} pr-8`} />
-                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-gray-400">%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <label className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                      <input disabled={!canEdit} type="checkbox" checked={method.is_active} onChange={(e) => setMethods((current) => current.map((item) => item.id === method.id ? { ...item, is_active: e.target.checked } : item))} className="h-4 w-4 accent-brand-500" />
-                      {method.is_active ? 'Active' : 'Inactive'}
-                    </label>
-                  </td>
-                  <td className="px-4 py-3">
-                    {canEdit && <button disabled={isSaving} onClick={() => saveMethod(method)} className={primaryButtonClass}>Save</button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <ComponentCard title="Configured Methods" desc="Order controls affect presentation order only; method keys remain stable.">
+        <TableViewport>
+          <Table variant="admin" minWidth="medium">
+            <TableHeader variant="admin">
+              <TableRow>{["Order", "Payment Method", "System Key", "Commission", "Status", "Actions"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow>
+            </TableHeader>
+            <TableBody variant="admin">
+              {sorted.map((method, index) => {
+                const errors = rowErrors[method.id] ?? {};
+                return (
+                  <TableRow key={method.id}>
+                    <TableCell variant="admin"><div className="flex gap-1"><Button size="sm" variant="outline" disabled={!canEdit || isSaving || index === 0} onClick={() => void move(method, -1)}>↑</Button><Button size="sm" variant="outline" disabled={!canEdit || isSaving || index === sorted.length - 1} onClick={() => void move(method, 1)}>↓</Button></div></TableCell>
+                    <TableCell variant="admin"><Input id={`payment-name-${method.id}`} disabled={!canEdit} value={method.name} onChange={(event) => { setMethods((current) => current.map((item) => item.id === method.id ? { ...item, name: event.target.value } : item)); setRowErrors((current) => ({ ...current, [method.id]: { ...current[method.id], name: undefined } })); }} error={Boolean(errors.name)} hint={errors.name} /></TableCell>
+                    <TableCell variant="admin">{method.system_key}</TableCell>
+                    <TableCell variant="admin"><Input id={`payment-commission-${method.id}`} disabled={!canEdit} value={String(method.commission_percent)} inputMode="decimal" onChange={(event) => { setMethods((current) => current.map((item) => item.id === method.id ? { ...item, commission_percent: event.target.value } : item)); setRowErrors((current) => ({ ...current, [method.id]: { ...current[method.id], commission: undefined } })); }} error={Boolean(errors.commission)} hint={errors.commission} /></TableCell>
+                    <TableCell variant="admin"><Checkbox id={`payment-active-${method.id}`} disabled={!canEdit} checked={method.is_active} label={method.is_active ? "Active" : "Inactive"} onChange={(checked) => setMethods((current) => current.map((item) => item.id === method.id ? { ...item, is_active: checked } : item))} /></TableCell>
+                    <TableCell variant="admin">{canEdit ? <Button size="sm" disabled={isSaving} onClick={() => void saveMethod(method)}>Save</Button> : null}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableViewport>
+      </ComponentCard>
     </div>
   );
 }
