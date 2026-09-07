@@ -84,7 +84,15 @@ jobs:
       - name: Admin UI strict changed-file gate
         env:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
-        run: npm run smoke:admin-ui-strict
+        run: |
+          set -o pipefail
+          npm run smoke:admin-ui-strict 2>&1 | tee admin-ui-strict.log
+      - name: Upload Admin UI strict diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-strict-diagnostics
+          path: modulex-admin/admin-ui-strict.log
       - run: npm run smoke:countertop-ui
       - run: npm run smoke:countertop-domain
       - run: node scripts/countertop-material-band-selection-contract.mjs
