@@ -112,4 +112,12 @@ const Input: FC<InputProps> = ({
   );
 };
 
+/** Behavior-preserving adapter used only while migrating legacy feature markup. */
+export const InputNative = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement>
+>(function InputNative(props, ref) {
+  return <input ref={ref} {...props} />;
+});
+
 export default Input;
