@@ -31,9 +31,31 @@ function money(value: number, currency: string) {
   }
 }
 
+function lifecycleEvidence(revision: ProjectProposalRevision) {
+  if (revision.state === "accepted") {
+    return {
+      label: "Accepted",
+      timestamp: revision.acceptedAt,
+      detail: revision.acceptance
+        ? `${revision.acceptance.acceptedName} · ${revision.acceptance.acceptanceMethod}`
+        : null,
+    };
+  }
+  if (revision.state === "rejected") {
+    return { label: "Rejected", timestamp: revision.rejectedAt, detail: revision.rejectionNote };
+  }
+  if (revision.state === "sent") {
+    return { label: "Sent", timestamp: revision.sentAt, detail: null };
+  }
+  if (revision.state === "superseded") {
+    return { label: "Superseded", timestamp: revision.supersededAt, detail: null };
+  }
+  return { label: "Draft", timestamp: null, detail: null };
+}
+
 export default function ProjectProposalRevisionHistory({ revisions }: { revisions: ProjectProposalRevision[] }) {
   return (
-    <ComponentCard title="Revision History" desc="Commercial history is read-only in P2. Send, reject, acceptance, and new-revision lifecycle actions are delivered in P3.">
+    <ComponentCard title="Revision History" desc="Read-only lifecycle evidence for each exact Proposal revision.">
       <TableViewport>
         <Table variant="admin" minWidth="standard">
           <TableHeader variant="admin">
@@ -41,19 +63,28 @@ export default function ProjectProposalRevisionHistory({ revisions }: { revision
               <TableCell isHeader variant="admin">Revision</TableCell>
               <TableCell isHeader variant="admin">State</TableCell>
               <TableCell isHeader variant="admin">Total</TableCell>
-              <TableCell isHeader variant="admin">Note</TableCell>
+              <TableCell isHeader variant="admin">Lifecycle Evidence</TableCell>
+              <TableCell isHeader variant="admin">Revision Note</TableCell>
             </TableRow>
           </TableHeader>
           <TableBody variant="admin">
-            {revisions.length === 0 ? <TableStateRow colSpan={4}>No Proposal revisions yet.</TableStateRow> : null}
-            {revisions.map((revision) => (
-              <TableRow key={revision.id}>
-                <TableCell variant="admin"><span className="font-medium">Revision {revision.revisionNo}</span></TableCell>
-                <TableCell variant="admin"><Badge color={tone(revision.state)}>{revision.state.replaceAll("_", " ")}</Badge></TableCell>
-                <TableCell variant="admin">{money(revision.proposalTotal, revision.currencyCode)}</TableCell>
-                <TableCell variant="admin">{revision.revisionNote || revision.rejectionNote || "—"}</TableCell>
-              </TableRow>
-            ))}
+            {revisions.length === 0 ? <TableStateRow colSpan={5}>No Proposal revisions yet.</TableStateRow> : null}
+            {revisions.map((revision) => {
+              const evidence = lifecycleEvidence(revision);
+              return (
+                <TableRow key={revision.id}>
+                  <TableCell variant="admin"><span className="font-medium">Revision {revision.revisionNo}</span></TableCell>
+                  <TableCell variant="admin"><Badge color={tone(revision.state)}>{revision.state.replaceAll("_", " ")}</Badge></TableCell>
+                  <TableCell variant="admin">{money(revision.proposalTotal, revision.currencyCode)}</TableCell>
+                  <TableCell variant="admin">
+                    <span className="font-medium">{evidence.label}</span>
+                    {evidence.timestamp ? <p className="text-sm">{evidence.timestamp}</p> : null}
+                    {evidence.detail ? <p className="text-sm">{evidence.detail}</p> : null}
+                  </TableCell>
+                  <TableCell variant="admin">{revision.revisionNote || "—"}</TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableViewport>
