@@ -10,12 +10,13 @@ const optionalSource = (p) => source(p).catch((error) => {
   throw error;
 });
 
-const [sql, migration, config, provider, syncEngine, bootstrapSync, eventRoute, webhook, reconcile, refresh, syncRoute, companyBinding, workspace, projectTab, vercelConfig, watchChannels] = await Promise.all([
+const [sql, migration, config, provider, syncEngine, providerReplica, bootstrapSync, eventRoute, webhook, reconcile, refresh, syncRoute, companyBinding, workspace, projectTab, vercelConfig, watchChannels] = await Promise.all([
   source("sql/calendar-v3-bidirectional.sql"),
   source("../modulex-store/supabase/migrations/20260906113000_calendar_v3_bidirectional.sql"),
   source("src/lib/google-calendar/config.ts"),
   source("src/lib/google-calendar/google-calendar.ts"),
   source("src/lib/google-calendar/bidirectional-sync.ts"),
+  source("src/lib/google-calendar/provider-event-replica.ts"),
   optionalSource("src/lib/google-calendar/bootstrap-sync.ts"),
   source("src/app/api/admin/calendar/events/route.ts"),
   source("src/app/api/admin/calendar/google/webhook/route.ts"),
@@ -66,6 +67,31 @@ assert.match(eventRoute, /requirePermission\(request, "calendar\.manage"\)/);
 assert.match(webhook, /x-goog-channel-id/i);
 assert.match(webhook, /x-goog-resource-id/i);
 assert.match(reconcile, /CRON_SECRET|cron/i);
+
+// Google can return provider events whose end shape is absent or non-advancing.
+// The replica adapter must never manufacture end === start because calendar_events
+// deliberately rejects that shape. Timed events may keep a null end; all-day events
+// must synthesize a valid exclusive end when the provider end is unusable.
+assert.doesNotMatch(
+  providerReplica,
+  /event\.end\?\.dateTime\s*\?\?\s*event\.start\?\.dateTime/,
+  "Provider timed events must not collapse a missing end to the start timestamp.",
+);
+assert.doesNotMatch(
+  providerReplica,
+  /event\.end\?\.date\s*\?\?\s*event\.start\?\.date/,
+  "Provider all-day events must not collapse a missing end to the start date.",
+);
+assert.match(
+  providerReplica,
+  /parsed\.setUTCDate\(parsed\.getUTCDate\(\) \+ 1\)[\s\S]*allDayEnd:\s*providerEnd && providerEnd > allDayStart \? providerEnd : nextUtcDate\(allDayStart\)/,
+  "Provider all-day events with a missing or non-advancing end must synthesize the next UTC date as the exclusive end.",
+);
+assert.match(
+  providerReplica,
+  /const endAt = providerEnd && Number\.isFinite\(startMs\) && Number\.isFinite\(endMs\) && endMs <= startMs\s*\?\s*null\s*:\s*providerEnd/,
+  "Provider timed events whose end does not advance past start must normalize end_at to null.",
+);
 
 // Large first-time Google calendars must be pulled in bounded provider pages so a
 // manual Sync Now never depends on one Vercel request surviving the whole history.
