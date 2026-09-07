@@ -11,7 +11,7 @@ const expect = (condition, message) => {
 const permissions = read("src/lib/auth/permissions.ts");
 const sidebar = read("src/layout/AppSidebar.tsx");
 const notifications = read("src/lib/notifications.ts");
-const dropdown = read("src/components/header/NotificationDropdown.tsx");
+const dropdown = read("src/components/ui/NotificationDropdown.tsx");
 const page = read("src/app/(admin)/requests/page.tsx");
 const center = read("src/components/requests/RequestCenter.tsx");
 const emailRoute = read("src/app/api/requests/notify-created/route.ts");
