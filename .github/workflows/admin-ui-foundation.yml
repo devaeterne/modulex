@@ -59,6 +59,8 @@ jobs:
         run: |
           node ../scripts/us-date-format-audit.mjs --write
           cat ../docs/acceptance/us-date-format-audit.json
+      - name: Enforce Admin US date presentation migration
+        run: node ../scripts/us-date-format-audit.mjs --check --scope admin
       - name: Admin US date format contract
         run: npm run smoke:us-date-format
       - name: Store US date format contract
