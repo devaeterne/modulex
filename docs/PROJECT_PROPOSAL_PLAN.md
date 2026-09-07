@@ -27,7 +27,7 @@
 - New form/mutation behavior must follow `modulex-admin/docs/ADMIN_VALIDATION_GUIDE.md`: DB/RPC contract first, explicit normalization, duplicate-submit protection, end-to-end authorization, and clear loading/empty/error/permission states.
 - Schema/RPC/grant/RLS changes require Security/Performance Advisor review and production migration only after owner merge unless the user explicitly requests otherwise.
 - Do not broaden Store/Customer Portal/Dealer Portal exposure in the Proposal Core phases. Any later customer-facing proposal surface requires its own explicit package and contract.
-- Current planning baseline: `main` at `aaba756e21ff15ad5290bf6b6c923a623113f39c` (2026-09-07). Open PR #361 is Calendar-specific; Proposal Core must not depend on or modify its Calendar range-query work.
+- Current execution baseline for P3: `main` at `0e7d5a66d7334d25660f4a420d8a5333ebb86051` (2026-09-08). P1 is production-accepted, P2 is merged via PR #376, and P3 is isolated in PR #381. Open #369/#380 are US-date standardization/integration work and P3 avoids their ProjectDetailWorkspace surface.
 
 ---
 
@@ -461,7 +461,7 @@ Exit criteria: design decisions above are accepted and this file is on the imple
 
 ### P1 — Proposal Core DB + RBAC + Read Model
 
-Status: `[ ] NOT STARTED`
+Status: `[x] PRODUCTION ACCEPTED`
 
 Primary files:
 
@@ -472,20 +472,20 @@ Primary files:
 
 Scope:
 
-- [ ] Create `proposal_area_types` with seed types.
-- [ ] Create Proposal, Revision, Pricing Group, Area, Acceptance tables.
-- [ ] Add RLS/grants/lifecycle guards.
-- [ ] Add derived Proposal total read model.
-- [ ] Add Proposal list/detail + Area Type reads.
-- [ ] Add draft Proposal/Revision/Area/Pricing Group mutation RPCs.
-- [ ] Add send/reject/accept lifecycle RPCs with concurrency-safe revision/acceptance behavior.
-- [ ] Lock non-draft Revision content at DB boundary.
-- [ ] Verify accepted Revision cannot be rewritten/deleted.
-- [ ] Verify Area direct pricing vs Pricing Group exclusivity.
-- [ ] Verify cross-Revision Pricing Group assignment fails closed.
-- [ ] Run targeted RED → GREEN contract.
-- [ ] Run migration mirror contract.
-- [ ] Run Supabase Security/Performance Advisors after schema/RPC/grant/RLS changes.
+- [x] Create `proposal_area_types` with seed types.
+- [x] Create Proposal, Revision, Pricing Group, Area, Acceptance tables.
+- [x] Add RLS/grants/lifecycle guards.
+- [x] Add derived Proposal total read model.
+- [x] Add Proposal list/detail + Area Type reads.
+- [x] Add draft Proposal/Revision/Area/Pricing Group mutation RPCs.
+- [x] Add send/reject/accept lifecycle RPCs with concurrency-safe revision/acceptance behavior.
+- [x] Lock non-draft Revision content at DB boundary.
+- [x] Verify accepted Revision cannot be rewritten/deleted.
+- [x] Verify Area direct pricing vs Pricing Group exclusivity.
+- [x] Verify cross-Revision Pricing Group assignment fails closed.
+- [x] Run targeted RED → GREEN contract.
+- [x] Run migration mirror contract.
+- [x] Run Supabase Security/Performance Advisors after schema/RPC/grant/RLS changes.
 
 P1 acceptance:
 
@@ -499,7 +499,7 @@ P1 acceptance:
 
 ### P2 — Project Proposal Admin UI
 
-Status: `[ ] NOT STARTED`
+Status: `[x] MERGED / VERIFIED`
 
 Primary files:
 
@@ -510,20 +510,20 @@ Primary files:
 
 Scope:
 
-- [ ] Add `Proposal` Project tab before `Orders`.
-- [ ] Explicit loading, empty, populated, error/retry, and permission-denied states.
-- [ ] `Create Proposal` empty-state action.
-- [ ] Draft Proposal header editor.
-- [ ] `+ Add Area` workflow.
-- [ ] Configurable Area Type selector + free-text Area Name.
-- [ ] Optional secondary Area sections.
-- [ ] Material Product search/select with custom description fallback.
-- [ ] Pricing Group UI and direct/group pricing exclusivity.
-- [ ] Derived pricing summary and total.
-- [ ] Reorder Areas without changing commercial values.
-- [ ] Duplicate-submit guards and RPC error mapping.
-- [ ] Responsive Admin UI and keyboard/accessibility behavior.
-- [ ] Run `smoke:admin-ui-strict`, relevant Project regression, RBAC, typecheck, lint, and production build at final gate.
+- [x] Add `Proposal` Project tab before `Orders`.
+- [x] Explicit loading, empty, populated, error/retry, and permission-denied states.
+- [x] `Create Proposal` empty-state action.
+- [x] Draft Proposal header editor.
+- [x] `+ Add Area` workflow.
+- [x] Configurable Area Type selector + free-text Area Name.
+- [x] Optional secondary Area sections.
+- [x] Material Product search/select with custom description fallback.
+- [x] Pricing Group UI and direct/group pricing exclusivity.
+- [x] Derived pricing summary and total.
+- [x] Reorder Areas without changing commercial values.
+- [x] Duplicate-submit guards and RPC error mapping.
+- [x] Responsive Admin UI and keyboard/accessibility behavior.
+- [x] Run `smoke:admin-ui-strict`, relevant Project regression, RBAC, typecheck, lint, and production build at final gate.
 
 P2 acceptance:
 
@@ -535,18 +535,18 @@ P2 acceptance:
 
 ### P3 — Revision / Send / Acceptance UX
 
-Status: `[ ] NOT STARTED`
+Status: `[~] IMPLEMENTATION VERIFIED — PR #381; MERGE + LIVE ACCEPTANCE PENDING`
 
 Scope:
 
-- [ ] Show Proposal revision history.
-- [ ] Send a draft Revision.
-- [ ] Create a new draft Revision from a previously sent Revision.
-- [ ] Reject a sent Revision with note.
-- [ ] Accept an exact sent Revision.
-- [ ] Freeze accepted Revision controls in UI as well as DB.
-- [ ] Reflect Proposal commercial state without overloading Project status.
-- [ ] Define conservative Project lifecycle integration: Proposal sent may support Project `quoted`; Proposal accepted may support Project `approved` only through an explicit reviewed transition, not an accidental side effect.
+- [x] Show Proposal revision history.
+- [x] Send a draft Revision.
+- [x] Create a new draft Revision from a previously sent Revision.
+- [x] Reject a sent Revision with note.
+- [x] Accept an exact sent Revision.
+- [x] Freeze accepted Revision controls in UI as well as DB.
+- [x] Reflect Proposal commercial state without overloading Project status.
+- [x] Define conservative Project lifecycle integration: Proposal sent may support Project `quoted`; Proposal accepted may support Project `approved` only through an explicit reviewed transition, not an accidental side effect.
 
 P3 acceptance:
 
@@ -702,11 +702,12 @@ For every package:
 | Date | Package | Status | Branch / PR | Notes |
 | --- | --- | --- | --- | --- |
 | 2026-09-07 | P0 — Design Lock & Baseline | Planned / documented | `docs/project-proposal-plan` | Current `main` verified at `aaba756e...`; Proposal architecture locked; PR #361 is Calendar-only and non-overlapping. |
+| 2026-09-08 | P1 — Proposal Core DB + RBAC + Read Model | Production accepted | PR #370 | Exact merged migrations are live; rollback-safe production acceptance, RBAC/RLS/grants and advisor review completed. |
+| 2026-09-08 | P2 — Project Proposal Admin UI | Merged / verified | PR #376 | Proposal tab, draft editor, Areas, Pricing Groups and authoritative total UI merged; Project Base + Admin UI Foundation green. |
+| 2026-09-08 | P3 — Revision / Send / Acceptance UX | Implementation verified | PR #381 | RED run 34170652759; GREEN Project Base 34170930717 + Admin UI Foundation 34170930765. Merge + signed-in production acceptance pending. |
 
 ---
 
 ## 9. Current Next Action
 
-**Next package: P1 — Proposal Core DB + RBAC + Read Model.**
-
-Before touching schema, inspect execution-time production tables/functions/grants and current Project Base test/migration conventions. Then add the P1 RED contract and implement only the Proposal Core DB boundary; do not start UI, PDF, Documents, Order conversion, or Calendar integration in the same package.
+**Current package: P3 — Revision / Send / Acceptance UX.** Implementation and CI are verified in PR #381. Before marking P3 `[x]`, merge the PR after an execution-time main/open-PR recheck, confirm the Admin production deployment contains the merged SHA, and run signed-in Proposal lifecycle smoke. No P3 schema migration is required because the lifecycle RPC boundary was delivered and production-accepted in P1. After that closeout, the next package is **P4 — Proposal PDF Rendering**.

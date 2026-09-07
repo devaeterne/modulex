@@ -1,11 +1,11 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-08
-Main baseline: `2b6946b520d8cd0817600a08f4c72527a58e45e1`
+Main baseline: `0e7d5a66d7334d25660f4a420d8a5333ebb86051`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current parallel Admin package: **A6 Finance F0→F7 is complete and production-verified; there is no active Finance delivery package. Future Finance work requires a new explicitly scoped package.**
-Current parallel Project package: **Project Base PB-5 Delivery & Installation Rollup, PB-6 Participants & Commission Ledger, and PB-7 Change Orders are complete and production-verified; there is no active PB-5/PB-6/PB-7 delivery package.**
+Current parallel Project package: **Project Base PB-5/PB-6/PB-7 are production-verified. Project Proposal P1 is production-accepted, P2 is merged via PR #376, and P3 Revision / Send / Acceptance UX is implementation-verified in PR #381 with merge + signed-in production acceptance pending.**
 Current Admin next action: **Preserve the active non-Finance workstreams. The A6 Finance F0→F7 foundation is closed; do not reopen it implicitly from unrelated Project, HR, validation, Store, or operations work.**
 
 ## A6-F7 Finance hardening status
@@ -67,6 +67,13 @@ Current Admin next action: **Preserve the active non-Finance workstreams. The A6
   - all 13 intended PB-7 FK relationships have leading index coverage and Performance Advisor has zero PB-7 unindexed-FK findings; fresh index `unused_index` INFO is expected before traffic;
   - PB-7 tables remain RLS-enabled with no PUBLIC/anon/authenticated direct DML, and guarded public RPCs remain authenticated-only with anon/PUBLIC execute denied;
   - evidence: `docs/acceptance/pb-7-project-change-orders.md`.
+
+## Project Proposal / Estimate
+
+- [x] **P1 — Proposal Core DB + RBAC + Read Model.** PR #370 merged; exact canonical Proposal migrations are live in production and rollback-safe production acceptance passed lifecycle integrity, pricing, RBAC/RLS/grants and zero-residue checks. Evidence: `docs/acceptance/project-proposal-p1.md`.
+- [x] **P2 — Project Proposal Admin UI.** PR #376 merged; Project Detail now owns Proposal before Orders with draft header editing, flexible Areas, Pricing Groups, server-authoritative totals and read-only revision history. Final Project Base and Admin UI Foundation gates were green.
+- [~] **P3 — Revision / Send / Acceptance UX.** PR #381 adds draft Send, sent New Revision / Reject / exact Accept, retry-safe revision idempotency, acceptance evidence fields, lifecycle error mapping and read-only lifecycle evidence. RED run `34170652759`; GREEN Project Base `34170930717` and Admin UI Foundation `34170930765`. No schema migration is added; merge + signed-in production acceptance remain before [x]. Evidence: `docs/acceptance/project-proposal-p3.md`.
+- [ ] **P4 — Proposal PDF Rendering.** Do not start until P3 production closeout.
 
 ## Product Master UX v2
 
