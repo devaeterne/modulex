@@ -144,6 +144,7 @@ const managementItems: NavItem[] = [
       { name: "Payment Schedule", path: "/finance/payment-schedule", permission: "finance.view" },
       { name: "AP Aging", path: "/finance/ap-aging", permission: "finance.view" },
       { name: "AR Aging", path: "/finance/ar-aging", permission: "finance.view", new: true },
+      { name: "Finance Reports", path: "/finance/reports", permission: "finance.view", new: true },
       { name: "Invoices", path: "/customers/invoices", permission: "invoices.view" },
       { name: "Payroll", path: "/finance/payroll", permission: "finance.view", new: true },
       { name: "Compensation", path: "/finance/compensation", permission: "finance.view" },

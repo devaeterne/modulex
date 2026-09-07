@@ -1,3 +1,4 @@
+import "./a6-finance-reporting-contract.mjs";
 import fs from "node:fs";
 import path from "node:path";
 const root = process.cwd();
@@ -7,6 +8,7 @@ const routes = [
   ["src/app/(admin)/customers/invoices/page.tsx", "/customers/invoices"],
   ["src/app/(admin)/finance/payroll/page.tsx", "/finance/payroll"],
   ["src/app/(admin)/finance/compensation/page.tsx", "/finance/compensation"],
+  ["src/app/(admin)/finance/reports/page.tsx", "/finance/reports"],
   ["src/app/(admin)/approvals/page.tsx", "/approvals"],
   ["src/app/(admin)/pricing/cost-margin/page.tsx", "/pricing/cost-margin"],
   ["src/app/(admin)/settings/general/tax-rules/page.tsx", "/settings/general/tax-rules"],
@@ -23,7 +25,7 @@ function collect(dir) {
   if (!fs.existsSync(full)) return [];
   return fs.readdirSync(full, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? collect(path.join(dir, entry.name)) : entry.name.endsWith(".tsx") ? [read(path.join(dir, entry.name))] : []);
 }
-const supporting = ["src/components/approvals", "src/components/reports"].flatMap(collect).join("\n");
+const supporting = ["src/components/approvals", "src/components/reports", "src/components/finance"].flatMap(collect).join("\n");
 const sources = `${routeSources}\n${supporting}`;
 expect(sources.includes("dark:"), "Finance/Reports surfaces must support dark mode");
 expect(/\b(sm|md|lg|xl):/.test(sources) || sources.includes("overflow-x-auto"), "Finance/Reports surfaces need responsive behavior");

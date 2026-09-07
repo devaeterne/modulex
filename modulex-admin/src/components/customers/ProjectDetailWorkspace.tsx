@@ -6,6 +6,7 @@ import ComponentCard from "@/components/common/ComponentCard";
 import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
 import ProjectCalendarTab from "@/components/customers/project-detail/ProjectCalendarTab";
 import ProjectChangeOrdersTab from "@/components/customers/project-detail/ProjectChangeOrdersTab";
+import ProjectFinanceActuals from "@/components/customers/project-detail/ProjectFinanceActuals";
 import ProjectFinanceTab from "@/components/customers/project-detail/ProjectFinanceTab";
 import ProjectFulfillmentTab from "@/components/customers/project-detail/ProjectFulfillmentTab";
 import ProjectProcurementTab from "@/components/customers/project-detail/ProjectProcurementTab";
@@ -132,6 +133,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   const [canManageOrders, setCanManageOrders] = useState(false);
   const [canManageProjects, setCanManageProjects] = useState(false);
   const [canViewProjectFinancials, setCanViewProjectFinancials] = useState(false);
+  const [canViewFinanceReporting, setCanViewFinanceReporting] = useState(false);
   const [canViewProjectPayments, setCanViewProjectPayments] = useState(false);
   const [canManageProjectPayments, setCanManageProjectPayments] = useState(false);
   const [canViewProcurement, setCanViewProcurement] = useState(false);
@@ -218,6 +220,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
 
       const nextCanManageProjects = Boolean(profile && hasPermission(profile.roles, "projects.manage"));
       const nextCanViewProjectFinancials = Boolean(profile && hasPermission(profile.roles, "pricing.cost.view"));
+      const nextCanViewFinanceReporting = Boolean(profile && hasPermission(profile.roles, "finance.view"));
       const nextCanViewProcurement = Boolean(profile && hasPermission(profile.roles, "project_procurement.view"));
       const nextCanManageProcurement = Boolean(profile && hasPermission(profile.roles, "project_procurement.manage"));
       const nextCanManageProcurementInvoices = Boolean(
@@ -261,6 +264,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       setCanManageOrders(Boolean(profile && hasPermission(profile.roles, "orders.manage")));
       setCanManageProjects(nextCanManageProjects);
       setCanViewProjectFinancials(nextCanViewProjectFinancials);
+      setCanViewFinanceReporting(nextCanViewFinanceReporting);
       setCanViewProjectPayments(Boolean(profile && hasPermission(profile.roles, "project_payments.view")));
       setCanManageProjectPayments(Boolean(profile && hasPermission(profile.roles, "project_payments.manage")));
       setCanViewProcurement(nextCanViewProcurement);
@@ -504,16 +508,19 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       ) : null}
 
       {activeTab === "Finance" ? (
-        canViewProjectPayments ? (
-          <ProjectFinanceTab
-            projectId={project.id}
-            canManageProjectPayments={canManageProjectPayments}
-            canViewCostMargin={canViewProjectFinancials}
-            orderTotals={orderTotals}
-          />
-        ) : (
-          <Alert variant="warning" title="Finance access restricted" message="You do not have permission to view Project customer collection status." />
-        )
+        <div className="space-y-6">
+          {canViewFinanceReporting ? <ProjectFinanceActuals projectId={project.id} /> : null}
+          {canViewProjectPayments ? (
+            <ProjectFinanceTab
+              projectId={project.id}
+              canManageProjectPayments={canManageProjectPayments}
+              canViewCostMargin={canViewProjectFinancials}
+              orderTotals={orderTotals}
+            />
+          ) : !canViewFinanceReporting ? (
+            <Alert variant="warning" title="Finance access restricted" message="You do not have permission to view Project Finance actuals or customer collection status." />
+          ) : null}
+        </div>
       ) : null}
 
       {activeTab === "Participants & Commission" && canViewParticipantsCommission ? (
