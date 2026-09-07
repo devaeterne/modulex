@@ -111,7 +111,7 @@ export async function syncCompanyCalendarCurrentFirstPage(
   reason: "watch" | "manual" | "reconcile",
   requestUrl?: string,
   continuationToken?: string | null,
-  bootstrapRange?: CalendarBootstrapRange | null,
+  requestedBootstrapRange?: CalendarBootstrapRange | null,
 ): Promise<CurrentFirstProviderSyncPageResult> {
   const binding = await getCompanyCalendarBinding();
   if (!binding) throw new Error("Company Calendar is not configured.");
@@ -125,11 +125,11 @@ export async function syncCompanyCalendarCurrentFirstPage(
   }
 
   const continuation = decodeContinuation(continuationToken);
-  const phase = continuation?.phase ?? (bootstrapRange ? "recent" : "history");
+  const phase = continuation?.phase ?? (requestedBootstrapRange ? "recent" : "history");
 
   if (phase === "recent") {
-    const effectiveRange = continuation?.bootstrapRange ?? bootstrapRange;
-    if (!effectiveRange) throw new Error("Google Calendar bootstrap range is missing.");
+    const bootstrapRange = continuation?.bootstrapRange ?? requestedBootstrapRange;
+    if (!bootstrapRange) throw new Error("Google Calendar bootstrap range is missing.");
 
     const { accessToken } = await getConnectedGoogleAccessToken(requestUrl);
     const page = await listGoogleCalendarEventPage({
@@ -137,8 +137,8 @@ export async function syncCompanyCalendarCurrentFirstPage(
       calendarId: binding.provider_calendar_id,
       pageToken: continuation?.pageToken ?? null,
       maxResults: PROVIDER_SYNC_PAGE_SIZE,
-      timeMin: effectiveRange.start,
-      timeMax: effectiveRange.end,
+      timeMin: bootstrapRange.start,
+      timeMax: bootstrapRange.end,
       singleEvents: true,
     });
     const total = await applyBootstrapEvents({ bindingId: binding.id, events: page.items, requestUrl });
@@ -151,7 +151,7 @@ export async function syncCompanyCalendarCurrentFirstPage(
         continuationToken: encodeContinuation({
           phase: "recent",
           pageToken: page.nextPageToken,
-          bootstrapRange: effectiveRange,
+          bootstrapRange,
         }),
       };
     }
