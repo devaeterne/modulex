@@ -1,0 +1,39 @@
+name: PB56 contract patch
+
+on:
+  push:
+    branches:
+      - docs/pb5-pb6-production-closeout
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/pb5-pb6-production-closeout
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Relax JSX formatting-only contract assumption
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('modulex-admin/scripts/project-base-contract.mjs')
+          text = path.read_text()
+          old = r'/\{canManageProjects\s*\?\s*\(\s*<ComponentCard title="Create Project"/.test(projectsWorkspace)'
+          new = r'/\{canManageProjects\s*\?\s*\(\s*<ComponentCard\s+title="Create Project"/.test(projectsWorkspace)'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one brittle regex, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
+      - name: Commit contract fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add modulex-admin/scripts/project-base-contract.mjs
+          git commit -m "test(project): allow formatted create card guard"
+          git push origin HEAD:docs/pb5-pb6-production-closeout
