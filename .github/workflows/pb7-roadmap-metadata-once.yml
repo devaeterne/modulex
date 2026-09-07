@@ -19,8 +19,8 @@ jobs:
           ref: docs/pb7-production-closeout
       - name: Update tracker metadata
         run: |
-          python -c "from pathlib import Path; p=Path('docs/PROJECT_BASE_PLAN.md'); t=p.read_text(); assert t.count('Last reviewed: 2026-09-07')==1; p.write_text(t.replace('Last reviewed: 2026-09-07','Last reviewed: 2026-09-08',1))"
-          python -c "from pathlib import Path; p=Path('modulex-admin/ADMIN_ROADMAP.md'); t=p.read_text(); assert t.count('Last reviewed: 2026-09-07')==1; assert t.count('Main baseline: `ab23762e3558204a24b2400fb6603391f1322eb1`')==1; t=t.replace('Last reviewed: 2026-09-07','Last reviewed: 2026-09-08',1); t=t.replace('Main baseline: `ab23762e3558204a24b2400fb6603391f1322eb1`','Main baseline: `2b6946b520d8cd0817600a08f4c72527a58e45e1`',1); p.write_text(t)"
+          python -c 'from pathlib import Path; p=Path("docs/PROJECT_BASE_PLAN.md"); t=p.read_text(); assert t.count("Last reviewed: 2026-09-07")==1; p.write_text(t.replace("Last reviewed: 2026-09-07","Last reviewed: 2026-09-08",1))'
+          python -c 'from pathlib import Path; p=Path("modulex-admin/ADMIN_ROADMAP.md"); t=p.read_text(); old="Main baseline: "+chr(96)+"ab23762e3558204a24b2400fb6603391f1322eb1"+chr(96); new="Main baseline: "+chr(96)+"2b6946b520d8cd0817600a08f4c72527a58e45e1"+chr(96); assert t.count("Last reviewed: 2026-09-07")==1; assert t.count(old)==1; t=t.replace("Last reviewed: 2026-09-07","Last reviewed: 2026-09-08",1).replace(old,new,1); p.write_text(t)'
       - name: Commit tracker metadata
         run: |
           git config user.name "github-actions[bot]"
