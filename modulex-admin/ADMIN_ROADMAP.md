@@ -171,7 +171,7 @@ These rules are mandatory for all future Modulex Admin work:
   - Removed the explicit `/error-404` TailAdmin template route, rebranded the global Next.js 404 as Modulex Admin, and removed the `info@dasoft.me` sign-in prefill in favor of an empty production login field.
   - `smoke:production-surface` now prevents the explicit template 404 route, TailAdmin branding in the global 404, and the known developer-account prefill from returning.
   - TDD evidence: Actions run `33254287380` failed on the still-present explicit TailAdmin 404 route before implementation; targeted GREEN run `33254350807` passed after the bounded fixes.
-  - Full package verification: Actions run `33254494898` passed production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint (0 errors / 35 existing warnings), Next.js production build, and diff-check.
+  - Full package verification: Actions run `33254494898` passed production-surface, RBAC, secondary CMS Admin, dealer onboarding, dealer portal Admin, Store portal Admin, auth recovery, polling, lint, Next.js production build, and diff-check.
 
 - [x] Add an Admin production-surface contract test.
   - `scripts/admin-production-surface-contract.mjs` blocks the known demo route files and `/api-test` navigation, protects the intentional `/profile` surface, and guards the production 404/login shell against known template/developer residue.
@@ -517,7 +517,7 @@ A3.3 Pricing is closed. UI-2A → UI-2E remains a parallel cross-cutting quality
   - Sink create/edit keeps Product Master v2 canonical and writes USD `product_prices` through the existing append-safe bulk pricing RPC for every active order-eligible, non-internal commercial price group exactly once.
   - Product activate/deactivate stays on `set_product_status`; inactive Stone/Sink catalog products are excluded from Order Countertop dropdowns.
   - TDD RED is recorded in Actions run `33525475929`. Fresh branch CI on PR #230 passes Admin UI Foundation run `33526954540`, Admin Products Pricing run `33526954525`, and Admin A1/Store portal boundaries run `33526954604`.
-  - Migration `20260901152500_countertop_catalog_product` is source-controlled but intentionally **not applied before merge**. Keep this row `[~]` until merge, production migration/advisor checks, deploy, and signed-in catalog acceptance are complete.
+  - Migration `20260901152500_countertop_catalog_product` is source-controlled but intentionally **not applied to production before merge**. Keep this row `[~]` until merge, production migration/advisor checks, deploy, and signed-in catalog acceptance are complete.
 
 ## Cross-cutting validation and data contract hardening track (VAL-1 → VAL-6)
 
