@@ -1,6 +1,7 @@
 import PortalPageHeader from "@/components/portal/PortalPageHeader";
 import PortalStatusBadge from "@/components/portal/PortalStatusBadge";
 import PortalTimeline from "@/components/portal/PortalTimeline";
+import { formatDateTime } from "@/lib/dates/usDate";
 import type { PortalInstallationDetailData } from "@/lib/portal/fulfillment";
 
 function addressLines(address: Record<string, unknown> | null) {
@@ -12,11 +13,6 @@ function addressLines(address: Record<string, unknown> | null) {
     [text("city"), text("state_region"), text("postal_code")].filter(Boolean).join(", "),
     text("country_code"),
   ].filter(Boolean);
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 export default function PortalInstallationDetail({ installation }: { installation: PortalInstallationDetailData }) {
