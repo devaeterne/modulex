@@ -6,9 +6,12 @@ export type DateInputParseResult =
   | { ok: true; value: string }
   | { ok: false; error: string };
 
-export type DateTimeFormatOptions = {
-  timeStyle?: "short" | "medium";
+export type DateFormatOptions = {
   timeZone?: string;
+};
+
+export type DateTimeFormatOptions = DateFormatOptions & {
+  timeStyle?: "short" | "medium";
 };
 
 function isLeapYear(year: number) {
@@ -71,13 +74,18 @@ function part(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTyp
   return parts.find((item) => item.type === type)?.value ?? "";
 }
 
-export function formatDateTime(
-  value: string | Date | null | undefined,
-  options: DateTimeFormatOptions = {},
-): string {
-  if (!value) return "—";
+function parseTimestamp(value: string | Date | null | undefined) {
+  if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.valueOf())) return "—";
+  return Number.isNaN(date.valueOf()) ? null : date;
+}
+
+export function formatTimestampDate(
+  value: string | Date | null | undefined,
+  options: DateFormatOptions = {},
+): string {
+  const date = parseTimestamp(value);
+  if (!date) return "—";
 
   const dateOptions: Intl.DateTimeFormatOptions = {
     year: "numeric",
@@ -90,11 +98,23 @@ export function formatDateTime(
   const day = part(dateParts, "day");
   const year = part(dateParts, "year");
   if (!month || !day || !year) return "—";
+  return `${month}.${day}.${year}`;
+}
+
+export function formatDateTime(
+  value: string | Date | null | undefined,
+  options: DateTimeFormatOptions = {},
+): string {
+  const date = parseTimestamp(value);
+  if (!date) return "—";
+
+  const formattedDate = formatTimestampDate(date, options);
+  if (formattedDate === "—") return "—";
 
   const timeOptions: Intl.DateTimeFormatOptions = {
     timeStyle: options.timeStyle ?? "short",
     ...(options.timeZone ? { timeZone: options.timeZone } : {}),
   };
   const time = new Intl.DateTimeFormat("en-US", timeOptions).format(date);
-  return `${month}.${day}.${year} ${time}`;
+  return `${formattedDate} ${time}`;
 }
