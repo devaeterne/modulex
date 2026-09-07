@@ -11,7 +11,6 @@ const configurator = read("src/components/countertop/CountertopConfigurator.tsx"
 const thumbnail = read("src/components/common/ProductImageThumbnail.tsx");
 const catalogPage = read("src/app/(admin)/pricing/countertop/catalog/page.tsx");
 const setupPage = read("src/app/(admin)/pricing/countertop/settings/page.tsx");
-const sidebar = read("src/layout/AppSidebar.tsx");
 const countertopSummary = read("src/lib/customers/countertop-summary.ts");
 const lineDetails = read("src/components/customers/CountertopLineDetails.tsx");
 const servicesPagePath = "src/app/(admin)/pricing/countertop/services/page.tsx";
@@ -94,7 +93,7 @@ assert(servicesPageExists, "Countertop Additional Services page must exist");
 assert(servicesPage.includes("PageBreadcrumb") && servicesPage.includes('pageTitle="Additional Services"'), "Additional Services must use the shared page heading convention");
 assert(servicesPage.includes("CountertopReferenceManager") && servicesPage.includes('kinds={["service"]}'), "Additional Services must reuse canonical Countertop reference management for service-only CRUD");
 assert(setup.includes("kinds?: readonly ReferenceKind[]") && setup.includes("visibleConfigs"), "Countertop reference manager must support focused reference surfaces");
-assert(sidebar.includes('{ name: "Additional Services", path: "/pricing/countertop/services", permission: "pricing.manage" }'), "Pricing navigation must expose Additional Services to pricing managers");
+assert(setupPage.includes('href="/pricing/countertop/services"') && setupPage.includes("Manage Additional Services"), "Countertop Setup must link admins to Additional Services management");
 assert(setupPage.includes('kinds={["stone_type", "material_band", "edge"]}'), "Countertop Setup must leave service management to the dedicated Additional Services page");
 
 // Customer-provided sinks are project information, not a priced/inventory Sink line.
