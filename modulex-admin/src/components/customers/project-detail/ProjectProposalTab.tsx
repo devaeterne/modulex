@@ -19,6 +19,7 @@ import {
 } from "@/lib/customers/project-proposal-domain";
 import ProjectProposalAreaList from "./ProjectProposalAreaList";
 import ProjectProposalEditor from "./ProjectProposalEditor";
+import ProjectProposalLifecycleActions from "./ProjectProposalLifecycleActions";
 import ProjectProposalPricingGroups from "./ProjectProposalPricingGroups";
 import ProjectProposalRevisionHistory from "./ProjectProposalRevisionHistory";
 
@@ -212,8 +213,9 @@ export default function ProjectProposalTab({ projectId }: { projectId: string })
 
       {proposal && selectedRevision ? (
         <>
+          <ProjectProposalLifecycleActions proposal={proposal} canManage={canManage} onChanged={refreshSelected} />
           {!editable && canManage ? (
-            <Alert variant="info" title="Revision locked" message="This revision cannot be edited in place. P3 adds the explicit new-revision and lifecycle actions required after send." />
+            <Alert variant="info" title="Revision locked" message="This revision cannot be edited in place. Use the Proposal Lifecycle actions for sent revisions; accepted commercial changes belong in Project Change Orders." />
           ) : null}
           <ProjectProposalEditor revision={selectedRevision} canManage={editable} onSaved={refreshSelected} />
           <ProjectProposalPricingGroups
