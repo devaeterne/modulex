@@ -1,6 +1,5 @@
 import { jsonError, requirePermission } from "@/lib/auth/admin-api";
 import { discoverGoogleCalendars, GoogleCalendarImportError } from "@/lib/google-calendar/calendar-import";
-import { syncCompanyCalendarFromGoogle } from "@/lib/google-calendar/bidirectional-sync";
 import { getGoogleCredential } from "@/lib/google-calendar/repository";
 import {
   getCompanyCalendarBinding,
@@ -73,13 +72,9 @@ async function handlePut(request: Request) {
       actorUserId: auth.actor.user.id,
     });
 
-    let sync_error_code: string | null = null;
+    // The historical provider pull is intentionally deferred to the continuation-aware
+    // Sync Now flow. Binding selection itself must remain a short request.
     let watch_error_code: string | null = null;
-    try {
-      await syncCompanyCalendarFromGoogle("manual", request.url);
-    } catch (error) {
-      sync_error_code = error instanceof Error ? error.message.slice(0, 120) : "initial_sync_failed";
-    }
     try {
       await ensureCompanyCalendarWatch(request.url);
     } catch (error) {
@@ -89,7 +84,8 @@ async function handlePut(request: Request) {
     return Response.json({
       ...(await companyStatus()),
       binding,
-      sync_error_code,
+      sync_error_code: null,
+      sync_pending: true,
       watch_error_code,
     });
   } catch (error) {
