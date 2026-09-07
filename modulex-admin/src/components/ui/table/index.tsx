@@ -163,6 +163,53 @@ const TableStateRow: React.FC<TableStateRowProps> = ({
   </TableRow>
 );
 
+/**
+ * Behavior-preserving native-compatible adapters for mechanical strict migrations.
+ * They intentionally add no variants or styling; feature appearance remains owned
+ * by shared theme tokens while existing DOM/event semantics stay unchanged.
+ */
+export const TableNative = React.forwardRef<
+  HTMLTableElement,
+  React.TableHTMLAttributes<HTMLTableElement>
+>(function TableNative(props, ref) {
+  return <table ref={ref} {...props} />;
+});
+
+export const TableHeaderNative = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(function TableHeaderNative(props, ref) {
+  return <thead ref={ref} {...props} />;
+});
+
+export const TableBodyNative = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(function TableBodyNative(props, ref) {
+  return <tbody ref={ref} {...props} />;
+});
+
+export const TableRowNative = React.forwardRef<
+  HTMLTableRowElement,
+  React.HTMLAttributes<HTMLTableRowElement>
+>(function TableRowNative(props, ref) {
+  return <tr ref={ref} {...props} />;
+});
+
+export const TableHeaderCellNative = React.forwardRef<
+  HTMLTableCellElement,
+  React.ThHTMLAttributes<HTMLTableCellElement>
+>(function TableHeaderCellNative(props, ref) {
+  return <th ref={ref} {...props} />;
+});
+
+export const TableCellNative = React.forwardRef<
+  HTMLTableCellElement,
+  React.TdHTMLAttributes<HTMLTableCellElement>
+>(function TableCellNative(props, ref) {
+  return <td ref={ref} {...props} />;
+});
+
 export {
   TableViewport,
   Table,
