@@ -9,6 +9,7 @@ const assert = (condition, message) => {
 
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const migrationPath = "../modulex-store/supabase/migrations/20260903030000_countertop_sink_manual_fallback.sql";
+const faucetMigrationPath = "../modulex-store/supabase/migrations/20260908010000_countertop_faucet_selection.sql";
 
 assert(configurator.includes('import SearchableSelect from "@/components/form/SearchableSelect"'), "Countertop Stone/Sink selection must use the shared searchable dropdown primitive");
 assert((configurator.match(/<SearchableSelect/g) ?? []).length >= 2, "Countertop Stone and Sink fields must both render searchable dropdowns");
@@ -16,7 +17,9 @@ assert(configurator.includes('searchPlaceholder="Search stone by name or SKU"'),
 assert(configurator.includes('searchPlaceholder="Search sink by name or SKU"'), "Sink search must be discoverable by name/SKU inside its dropdown");
 assert(configurator.includes("manualSinkPrice"), "Countertop configurator must keep manual Sink fallback price state");
 assert(configurator.includes("Manual sink price fallback"), "Countertop configurator must label the manual Sink fallback clearly");
-assert(configurator.includes('rpc("calculate_countertop_price_with_sink_fallback"'), "Countertop preview must use the server-authoritative Sink fallback pricing RPC");
+const usesDirectSinkFallback = configurator.includes('rpc("calculate_countertop_price_with_sink_fallback"');
+const usesFaucetWrapper = configurator.includes('rpc("calculate_countertop_price_with_faucet"');
+assert(usesDirectSinkFallback || usesFaucetWrapper, "Countertop preview must use a server-authoritative pricing RPC that preserves Sink fallback semantics");
 assert(configurator.includes("p_manual_sink_price"), "Countertop preview must pass the normalized manual Sink fallback price");
 assert(configurator.includes("parseDbDecimal"), "Manual Sink fallback must use the shared DB decimal validator");
 assert(configurator.includes("precision: 18") && configurator.includes("scale: 4"), "Manual Sink fallback must preserve numeric(18,4) precision");
@@ -33,5 +36,13 @@ assert(migration.includes("manual_sink_price = case"), "Attach RPC must persist 
 assert(migration.includes("update of edge_profile_id, sink_product_id, price_group_id, sqft, edge_linear_ft, slab_quantity, manual_price_per_sqft, manual_sink_price"), "Snapshot trigger must refresh when manual Sink fallback changes");
 assert(migration.includes("revoke all on function public.calculate_countertop_price_with_sink_fallback"), "New public pricing RPC must not inherit PUBLIC execute");
 assert(migration.includes("grant execute on function public.calculate_countertop_price_with_sink_fallback") && migration.includes("to authenticated"), "New public pricing RPC must grant execute only to authenticated callers");
+
+if (usesFaucetWrapper) {
+  assert(fs.existsSync(path.join(root, faucetMigrationPath)), "Faucet pricing wrapper migration is missing");
+  const faucetMigration = read(faucetMigrationPath);
+  assert(faucetMigration.includes("calculate_countertop_price_with_faucet"), "Faucet pricing migration must define the wrapper used by Countertop preview");
+  assert(faucetMigration.includes("v_snapshot := public.calculate_countertop_price_with_sink_fallback("), "Faucet pricing wrapper must delegate material/edge/Sink pricing to the authoritative Sink fallback RPC");
+  assert(/calculate_countertop_price_with_sink_fallback\([\s\S]*p_manual_sink_price[\s\S]*\);/i.test(faucetMigration), "Faucet pricing wrapper must forward the manual Sink fallback price to the authoritative Sink fallback RPC");
+}
 
 console.log("Countertop Sink search + manual fallback contract: PASS");
