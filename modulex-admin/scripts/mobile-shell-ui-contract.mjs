@@ -35,7 +35,7 @@ expect(css.includes("safe-area-inset-top"), "Mobile notification panel must resp
 expect(css.includes("@media (min-width: 1024px)"), "Desktop notification alignment must be restored at lg breakpoint");
 expect(css.includes("position: absolute") && css.includes("right: 0"), "Desktop notification dropdown must remain trigger-aligned");
 
-expect(notificationBridge.includes("@/components/ui/NotificationDropdown"), "Header notification bridge must delegate to the shared notification primitive");
+expect(notificationBridge.includes("../ui/NotificationDropdown"), "Header notification bridge must delegate to the shared notification primitive");
 expect(notifications.includes("Notification settings") && notifications.includes("markAllAsRead"), "Notification behavior must remain intact while layout changes");
 expect(notifications.includes('aria-expanded={isOpen}'), "Notification trigger must retain accessible expanded state");
 
