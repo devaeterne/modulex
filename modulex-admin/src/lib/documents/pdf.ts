@@ -4,8 +4,8 @@ import type { CommercialDocument, CommercialDocumentLine } from "@/lib/documents
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN = 42;
-const PRIMARY_LOGO_BOX = { x: 238, y: 755, maxWidth: 112, maxHeight: 45 } as const;
-const SECONDARY_LOGO_BOX = { x: 378, y: 738, maxWidth: 175, maxHeight: 78 } as const;
+const SECONDARY_CENTER_LOGO_BOX = { x: 215, y: 741, maxWidth: 160, maxHeight: 70 } as const;
+const PRIMARY_RIGHT_LOGO_BOX = { x: 397, y: 751, maxWidth: 140, maxHeight: 50 } as const;
 const FIRST_PAGE_LINE_HEIGHT = 270;
 const CONTINUATION_PAGE_LINE_HEIGHT = 370;
 const encoder = new TextEncoder();
@@ -169,8 +169,14 @@ function renderHeader(settings: GeneralSettings, primary: PdfImage | null, secon
     commands += text(entry, MARGIN, y, y === 794 ? 9.5 : 8, y === 794);
     y -= 12;
   }
-  commands += imageCommand("ImPrimary", primary, PRIMARY_LOGO_BOX.x, PRIMARY_LOGO_BOX.y, PRIMARY_LOGO_BOX.maxWidth, PRIMARY_LOGO_BOX.maxHeight);
-  commands += imageCommand("ImSecondary", secondary, SECONDARY_LOGO_BOX.x, SECONDARY_LOGO_BOX.y, SECONDARY_LOGO_BOX.maxWidth, SECONDARY_LOGO_BOX.maxHeight);
+
+  if (secondary) {
+    commands += imageCommand("ImSecondary", secondary, SECONDARY_CENTER_LOGO_BOX.x, SECONDARY_CENTER_LOGO_BOX.y, SECONDARY_CENTER_LOGO_BOX.maxWidth, SECONDARY_CENTER_LOGO_BOX.maxHeight);
+    commands += imageCommand("ImPrimary", primary, PRIMARY_RIGHT_LOGO_BOX.x, PRIMARY_RIGHT_LOGO_BOX.y, PRIMARY_RIGHT_LOGO_BOX.maxWidth, PRIMARY_RIGHT_LOGO_BOX.maxHeight);
+  } else {
+    commands += imageCommand("ImPrimary", primary, SECONDARY_CENTER_LOGO_BOX.x, SECONDARY_CENTER_LOGO_BOX.y, SECONDARY_CENTER_LOGO_BOX.maxWidth, SECONDARY_CENTER_LOGO_BOX.maxHeight);
+  }
+
   commands += line(MARGIN, 720, PAGE_WIDTH - MARGIN, 720, 0.8);
   return commands;
 }
