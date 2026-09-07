@@ -22,8 +22,9 @@ const cases = [
   ['<Input type="date" />', 'native-date-input'],
   ['<input type="date" />', 'native-date-input'],
   ['value.toLocaleDateString()', 'locale-date-display'],
+  ['updatedAt.toLocaleString()', 'locale-date-display'],
+  ['new Date(value).toLocaleString()', 'locale-date-display'],
   ['new Intl.DateTimeFormat(undefined, { dateStyle: "medium" })', 'intl-date-display'],
-  ['new Date(value).toLocaleString()', 'manual-date-construction'],
   ['placeholder="dd.mm.yyyy"', 'date-placeholder'],
   ['placeholder="yyyy-mm-dd"', 'date-placeholder'],
 ];
@@ -32,20 +33,32 @@ function normalizePath(value) {
   return value.split(path.sep).join("/");
 }
 
-function classifyLine(line) {
+function isPresentationPath(relativePath) {
+  const normalized = normalizePath(relativePath);
+  if (normalized.includes("/src/components/")) return true;
+  if (normalized.includes("/src/app/") && !normalized.includes("/src/app/api/")) return true;
+  return false;
+}
+
+function looksLikeDateReceiver(line) {
+  return /(?:date|time|timestamp|created|updated|issued|expire|due|start|end|paid|posted|received|scheduled|submitted|completed|observed|generated|last[A-Z_]|_at\b|At\b)[\w?.]*\.toLocaleString\s*\(/i.test(line);
+}
+
+function classifyLine(line, relativePath = "modulex-admin/src/components/example.tsx") {
   const categories = new Set();
+  const presentation = isPresentationPath(relativePath);
 
   if (/(?:\btype\s*=\s*["']date["']|\btype\s*:\s*["']date["'])/.test(line)) {
     categories.add("native-date-input");
   }
-  if (/\.toLocaleDateString\s*\(/.test(line) || /\.toLocaleString\s*\(/.test(line)) {
+  if (presentation && /\.toLocaleDateString\s*\(/.test(line)) {
     categories.add("locale-date-display");
   }
-  if (/\bIntl\.DateTimeFormat\s*\(/.test(line)) {
-    categories.add("intl-date-display");
+  if (presentation && (/\bnew\s+Date\s*\([^)]*\)\.toLocaleString\s*\(/.test(line) || looksLikeDateReceiver(line))) {
+    categories.add("locale-date-display");
   }
-  if (/\bnew\s+Date\s*\(/.test(line)) {
-    categories.add("manual-date-construction");
+  if (presentation && /\bIntl\.DateTimeFormat\s*\(/.test(line)) {
+    categories.add("intl-date-display");
   }
   if (
     /placeholder\s*=\s*["'][^"']*(?:dd[.\/-]mm[.\/-]yyyy|yyyy[.\/-]mm[.\/-]dd|mm[\/-]dd[\/-]yyyy)[^"']*["']/i.test(line) ||
@@ -85,7 +98,7 @@ async function walkDirectory(absoluteRoot, relativeRoot) {
     for (let index = 0; index < lines.length; index += 1) {
       const snippet = lines[index].trim();
       if (!snippet) continue;
-      for (const category of classifyLine(lines[index])) {
+      for (const category of classifyLine(lines[index], relativePath)) {
         findings.push({
           path: relativePath,
           line: index + 1,
@@ -201,6 +214,12 @@ function runSelfTest() {
   for (const [source, expected] of cases) {
     assert.ok(classifyLine(source).includes(expected), `${expected} was not detected for ${source}`);
   }
+  assert.deepEqual(classifyLine("amount.toLocaleString()"), [], "numeric locale formatting must not be treated as a date violation");
+  assert.deepEqual(
+    classifyLine("new Date(value).toISOString()", "modulex-admin/src/lib/example.ts"),
+    [],
+    "canonical/internal Date construction must not be treated as a presentation violation",
+  );
 
   for (const excluded of [
     "modulex-store/supabase/migrations/20260907000000_example.sql",
