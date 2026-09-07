@@ -1,6 +1,7 @@
 import { hasPermission, type Permission, type RoleInput } from "@/lib/auth/permissions";
 
 export type NotificationEventType =
+  | "system_announcement"
   | "low_stock"
   | "new_order_request"
   | "new_store_lead"
@@ -39,6 +40,7 @@ const NOTIFICATION_PERMISSION_POLICY: Record<
   NotificationEventType,
   Permission
 > = {
+  system_announcement: "profile.view",
   low_stock: "inventory.manage",
   new_order_request: "orders.view",
   new_store_lead: "leads.view",
@@ -65,6 +67,7 @@ export function canRoleSeeNotification(
 }
 
 export const NOTIFICATION_LABELS: Record<NotificationEventType, string> = {
+  system_announcement: "Product Update",
   low_stock: "Low / Critical Stock",
   new_order_request: "New Order Request",
   new_store_lead: "New Store Lead",
