@@ -1,6 +1,6 @@
 # A6-F6 — Finance Reporting & Project Financial Projection
 
-Status: **IMPLEMENTATION / PRE-MERGE VERIFICATION**
+Status: **COMPLETE / PRODUCTION VERIFIED 2026-09-07**
 Date: 2026-09-07
 
 ## Scope
@@ -19,7 +19,7 @@ Canonical implementation:
 - Implementation plan: `modulex-admin/docs/superpowers/plans/2026-09-07-a6-f6-finance-reporting-project-projection.md`
 - Implementation PR: `#347 — feat(finance): add A6 F6 reporting and project actuals`
 
-The Admin SQL and Store migration mirror are required to remain byte-identical by contract.
+The Admin SQL and Store migration mirror remain byte-identical by contract.
 
 ## Locked reporting behavior
 
@@ -64,38 +64,41 @@ No Project payment permission is broadened merely to expose Finance reporting, a
 
 ## Correction semantics
 
-Finance Core reversal is the append-safe reporting correction path. The canonical reversal RPC swaps Finance account sides and copies the original transaction allocation links to the reversal transaction. Therefore Project/Order actuals can offset the original allocation on the same attribution deterministically.
+Finance Core reversal is the append-safe reporting correction path. The canonical reversal RPC swaps Finance account sides and copies the original transaction allocation links to the reversal transaction. Therefore Project/Order actuals offset the original allocation on the same attribution deterministically.
 
 Voided Finance transactions are excluded from actual reporting because reporting is posted-only.
 
 ## TDD / CI evidence
 
-The F6 contract was wired before implementation. The initial RED run kept the existing F1–F5 Finance contracts GREEN and failed only because the new F6 implementation artifact was absent, proving the new gate was active without manufacturing a regression in earlier Finance packages.
+The F6 contract was wired before implementation. The initial RED run kept the existing F1–F5 Finance contracts GREEN and failed only because the new F6 implementation artifact was absent.
 
-During implementation, PR #347 exposed two additional pre-merge failures that are treated as contract feedback rather than bypassed:
+During implementation, PR #347 also exposed and corrected two contract failures instead of bypassing them:
 
 - Finance Core verification required this acceptance artifact;
-- Admin UI strict verification rejected raw feature-level appearance classes and native form controls in the new reporting UI, requiring shared Admin primitives/theme tokens.
+- Admin UI strict verification required shared Admin primitives/theme tokens instead of raw feature-level appearance classes/native form controls.
 
-Final GREEN run IDs and merge evidence must be recorded only after fresh PR verification succeeds. This document intentionally does not claim production verification before merge.
+Final exact-head verification on `4de1c4ab27ad843cdba989251bcf99e5f702c1e2` was GREEN:
 
-## Production boundary
+- Admin A6 Finance Core run `#317`;
+- Admin UI Foundation run `#2237`, including strict UI, route regression, RBAC, TypeScript, lint and production build;
+- Admin Project Base run `#417`;
+- Store Core CI run `#777`, including production build;
+- Admin Vendor Catalog Sync run `#531`.
 
-No A6-F6 production migration is to be applied before PR #347 is merged by the owner.
+PR #347 was merged as `cab2dfd4fb5e7f4d38d90325d75c7706881c5864`.
 
-Production migration, authenticated database acceptance, deployment smoke and advisor review remain post-merge closeout work. Pre-merge implementation must not mutate production schema merely to make reporting tests pass.
+## Production verification
 
-## Exit criteria
+- Production migration history contains `20260907102913 — a6_finance_reporting`, applied from the canonical F6 SQL after owner merge.
+- Production catalog verification found all 12 F6 reporting functions installed with the reviewed `SECURITY DEFINER` / pinned empty `search_path` boundary.
+- Public reporting wrappers are authenticated-executable while private Finance reporting cores remain non-executable by browser roles and retain `finance.view` authorization.
+- Production Performance Advisor produced no F6-specific blocking performance finding.
+- Security Advisor continues to flag reviewed public `SECURITY DEFINER` wrappers generically; this is intentional in the locked authenticated-wrapper/private-role-check architecture and is not treated as permission to weaken Finance authorization.
+- Vercel production subsequently advanced to current `main` `bd0f2afe765681415c6e34fe0c342457819c8bf6` and is `READY`, preserving the F6 application bundle.
+- Live `https://admin.oakwellcabinetry.com/finance/reports` returns HTTP `200`, matches `/finance/reports`, exposes the expected `Finance Reports | Modulex Admin` metadata/bundle and stops at the normal `Checking session...` authentication boundary for an unsigned request.
 
-A6-F6 is ready to merge only when all of the following are GREEN on a fresh PR head:
+No additional Finance business-data mutation was required for this F6 closeout.
 
-- F1–F5 Finance contracts remain GREEN;
-- F6 reporting contract is GREEN;
-- Admin SQL and Store migration mirror are byte-identical;
-- Admin strict UI contract is GREEN;
-- Project/Finance permission boundaries remain intact;
-- TypeScript, lint and production build are GREEN;
-- Store Core CI and Project Base CI remain GREEN;
-- no production F6 migration has been applied before merge.
+## Exit
 
-Post-merge production migration and acceptance will update this document or a dedicated closeout record with actual production evidence.
+A6-F6 is COMPLETE / PRODUCTION VERIFIED: Finance reporting consumes canonical posted Finance history, AR/AP summary truth and explicit Project/Order allocations without introducing a parallel ledger or current-FX historical rewrite. Project financial reporting consumes Finance attribution while commercial/current-cost profitability remains a separate source-derived view.

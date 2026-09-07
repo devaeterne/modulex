@@ -1,6 +1,6 @@
 # Modulex Finance Domain — Locked Architecture & Delivery Plan
 
-Status: **LOCKED FOR A6 IMPLEMENTATION — F0/F1/F2/F3/F4/F5A/F5B/F5C COMPLETE; F6 NEXT**
+Status: **LOCKED FOR A6 IMPLEMENTATION — F0/F1/F2/F3/F4/F5A/F5B/F5C/F6 COMPLETE; F7 ACTIVE**
 Date: 2026-09-07
 Scope: `modulex-admin` operational finance
 
@@ -14,6 +14,8 @@ Supporting architecture and acceptance evidence:
 - `docs/acceptance/a6-f5b-ar-aging.md`
 - `docs/superpowers/plans/2026-09-06-a6-f5c-project-payment-reconciliation-hardening.md`
 - `docs/acceptance/a6-f5c-project-payment-hardening.md`
+- `docs/acceptance/a6-f6-finance-reporting.md`
+- `docs/acceptance/a6-f7-finance-hardening.md`
 
 ## 1. Locked ownership rule
 
@@ -320,29 +322,41 @@ Detailed production evidence: `docs/acceptance/a6-f5c-project-payment-hardening.
 
 **Exit:** Project-specific payment workflows remain operational, but destructive posted-history compatibility is closed and reconciled cash truth/correction ownership is unambiguously Finance-owned.
 
-### A6-F6 — Reporting & Project financial projection — **NEXT**
+### A6-F6 — Reporting & Project financial projection — **COMPLETE / PRODUCTION VERIFIED 2026-09-07**
 
-- cash flow
-- income vs expense operational reporting
-- AR aging
-- AP aging
-- account balances/movements
-- Project financial summary based on linked/allocated Finance records
-- Order/Project profitability inputs where applicable
+Delivered and production-verified:
 
-**Exit:** Project reports consume Finance attribution; they do not own or duplicate Finance transactions.
+- canonical posted Finance history drives cash flow, operating income/expense/result and account movement reporting;
+- AR and AP cards reuse the existing aging summary RPCs instead of duplicating receivable/payable truth;
+- Project/Order Finance actuals use explicit `finance_transaction_links` allocations only and preserve deterministic reversal attribution;
+- historical base-currency reporting uses stored transaction-time `base_amount`/FX snapshots and fails closed when an authoritative snapshot is unavailable;
+- the existing commercial/current-cost Project profitability summary remains separate from Finance actuals;
+- `/finance/reports` is protected by `finance.view` and Project Finance exposes actuals independently from legacy Project payment permissions;
+- implementation PR #347 merged as `cab2dfd4fb5e7f4d38d90325d75c7706881c5864` after all Finance/UI/Project/Store gates were GREEN;
+- production migration `20260907102913 — a6_finance_reporting` installed the reporting functions;
+- production ACL/search-path verification and Advisor review found no F6-specific blocking finding;
+- current Admin production serves `/finance/reports` with HTTP 200 and the expected Finance Reports bundle/authentication boundary.
 
-### A6-F7 — Hardening & production acceptance
+Detailed production evidence: `docs/acceptance/a6-f6-finance-reporting.md`.
 
-- RLS/RPC/RBAC review
-- mutation idempotency and concurrency tests
-- append-safe audit/reversal tests
-- FX snapshot tests
-- allocation reconciliation tests
-- migration/backfill reconciliation
-- Security/Performance Advisors
-- signed-in Admin acceptance
-- production smoke and reporting reconciliation
+**Exit:** Project reports consume canonical Finance attribution; they do not own or duplicate Finance transactions, and operational Finance reporting is production-verified.
+
+### A6-F7 — Hardening & production acceptance — **ACTIVE / PRE-MERGE HARDENING**
+
+Active package: draft PR #349 on `feat/a6-f7-finance-hardening`.
+
+Current scope:
+
+- aggregate RLS/RPC/RBAC regression over the existing authenticated-wrapper/private-core architecture;
+- idempotency/concurrency and append-safe reversal contracts;
+- FX snapshot and allocation reconciliation coverage;
+- Finance-owned / Finance-integration foreign-key covering indexes supported by the production Performance Advisor;
+- targeted removal of browser execute exposure from the internal `private.guard_allocated_vendor_payment_void()` trigger helper found by the F7 production ACL audit;
+- migration/reconciliation, Advisors, rollback-only mutation acceptance and signed-in Admin smoke after owner merge.
+
+The F7 migration is source-controlled but intentionally **unapplied before merge**. F7 remains active until post-merge migration, Security/Performance Advisor re-check, reconciliation, rollback-only behavioral acceptance and signed-in production smoke are complete.
+
+Detailed pre-merge acceptance matrix: `docs/acceptance/a6-f7-finance-hardening.md`.
 
 ## 10. Implementation order
 
