@@ -29,7 +29,7 @@ const sidebar = read("src/layout/AppSidebar.tsx");
 
 expect(brands.includes("TaxonomyManager") && categories.includes("TaxonomyManager"), "Brands/Categories must use the audited taxonomy manager");
 expect(!taxonomy.includes("error.message") && !taxonomy.includes("window.confirm"), "Taxonomy UI must not expose raw errors or native confirm dialogs");
-expect(taxonomy.includes("toLocaleDateString()"), "Taxonomy dates must use runtime locale");
+expect(taxonomy.includes("formatTimestampDate") && !taxonomy.includes("toLocaleDateString()"), "Taxonomy dates must use deterministic MM.DD.YYYY formatting");
 expect(taxonomy.includes("TableViewport") && taxonomy.includes("min-w-[680px]") && tablePrimitives.includes("overflow-x-auto"), "Taxonomy tables need mobile-safe horizontal overflow");
 expect(taxonomy.includes('role="dialog"') && taxonomy.includes('aria-live="polite"'), "Taxonomy destructive/error states need accessible UI");
 expect(
