@@ -2,8 +2,13 @@ import FormHint from "@/components/form/FormHint";
 import Badge from "@/components/ui/badge/Badge";
 import type { CountertopLineSummary } from "@/lib/customers/types";
 
+type CountertopLineSummaryWithFaucet = CountertopLineSummary & {
+  faucetName?: string | null;
+  faucetSku?: string | null;
+};
+
 type CountertopLineDetailsProps = {
-  summary?: CountertopLineSummary | null;
+  summary?: CountertopLineSummaryWithFaucet | null;
 };
 
 function quantity(value: number | null, suffix: string) {
@@ -22,6 +27,7 @@ export default function CountertopLineDetails({ summary }: CountertopLineDetails
       ? `Edge: ${summary.edgeName}${summary.edgeLinearFt !== null ? ` · ${quantity(summary.edgeLinearFt, "lf")}` : ""}`
       : null,
     summary.sinkName ? `Sink: ${summary.sinkName}${summary.sinkSku ? ` (${summary.sinkSku})` : ""}` : null,
+    summary.faucetName ? `Faucet: ${summary.faucetName}${summary.faucetSku ? ` (${summary.faucetSku})` : ""}` : null,
     serviceText ? `Services: ${serviceText}` : null,
   ].filter((value): value is string => Boolean(value));
 
