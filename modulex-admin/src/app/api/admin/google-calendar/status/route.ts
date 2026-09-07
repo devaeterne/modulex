@@ -28,17 +28,18 @@ async function buildStatus(): Promise<GoogleCalendarStatusDto> {
     getGeneralTimezone(),
     getGoogleCredential(),
   ]);
-  const importScopesGranted = hasGoogleCalendarImportScopes(credential?.granted_scopes);
+  const connected = credential?.status === "connected";
+  const importScopesGranted = Boolean(connected && hasGoogleCalendarImportScopes(credential?.granted_scopes));
   const reconnectRequired = Boolean(
     credential &&
-      (credential.status === "error" || (credential.status === "connected" && !importScopesGranted)),
+      (credential.status === "error" || (connected && !importScopesGranted)),
   );
 
   return {
     configured: isGoogleCalendarConfigured(),
     connection: {
       status: credential?.status ?? "disconnected",
-      provider_account_email: credential?.provider_account_email ?? null,
+      provider_account_email: credential?.status === "connected" ? credential.provider_account_email : null,
       connected_at: credential?.connected_at ?? null,
       disconnected_at: credential?.disconnected_at ?? null,
       last_success_at: credential?.last_success_at ?? null,
