@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-// TDD RED gate: the index-only migration is intentionally absent at this commit.
 const root = process.cwd();
 const read = (file) => {
   try { return fs.readFileSync(path.join(root, file), "utf8"); }
