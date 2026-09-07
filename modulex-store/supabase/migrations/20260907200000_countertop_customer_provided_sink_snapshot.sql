@@ -20,8 +20,9 @@ declare
   v_sink jsonb := null;
   v_services jsonb := '[]'::jsonb;
   v_sink_price_source text;
-  v_customer_sink_product record;
   v_customer_sink_product_id uuid;
+  v_customer_sink_product_name text;
+  v_customer_sink_product_sku text;
   v_customer_sink_note text;
   v_customer_sink_display_name text;
 begin
@@ -58,8 +59,8 @@ begin
     v_customer_sink_note := nullif(btrim(coalesce(new.configuration->>'customer_provided_sink_note','')), '');
 
     if v_customer_sink_product_id is not null then
-      select p.id, p.name, p.sku
-        into v_customer_sink_product
+      select p.name, p.sku
+        into v_customer_sink_product_name, v_customer_sink_product_sku
       from public.products p
       where p.id = v_customer_sink_product_id
         and lower(coalesce(p.metadata->>'product_kind','')) = 'sink';
@@ -76,18 +77,18 @@ begin
     v_customer_sink_display_name := concat_ws(
       ' · ',
       'Customer Provides',
-      case when v_customer_sink_product_id is not null then v_customer_sink_product.name else null end,
+      v_customer_sink_product_name,
       v_customer_sink_note
     );
     v_sink_price_source := 'customer_provided';
     v_sink := jsonb_build_object(
       'product_id', null,
-      'sku', case when v_customer_sink_product_id is not null then v_customer_sink_product.sku else null end,
+      'sku', v_customer_sink_product_sku,
       'name', 'Customer Provides' || substr(v_customer_sink_display_name, length('Customer Provides') + 1),
       'customer_provided', true,
       'customer_provided_product_id', v_customer_sink_product_id,
-      'customer_provided_product_name', case when v_customer_sink_product_id is not null then v_customer_sink_product.name else null end,
-      'customer_provided_product_sku', case when v_customer_sink_product_id is not null then v_customer_sink_product.sku else null end,
+      'customer_provided_product_name', v_customer_sink_product_name,
+      'customer_provided_product_sku', v_customer_sink_product_sku,
       'customer_provided_sink_note', v_customer_sink_note,
       'price_source', 'customer_provided',
       'unit_price', 0,
