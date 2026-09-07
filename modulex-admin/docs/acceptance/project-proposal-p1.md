@@ -1,9 +1,9 @@
 # Project Proposal P1 — Acceptance Record
 
-Date: 2026-09-07
+Date: 2026-09-08
 Package: P1 — Proposal Core DB + RBAC + Read Model
 PR: #370 (`feat/project-proposal-core`)
-Status: implementation verified; owner merge + production migration/advisor acceptance pending
+Status: production accepted / completed
 
 ## Scope delivered
 
@@ -55,32 +55,45 @@ Two semantic defects were captured with RED tests before their fixes:
 
 Canonical Store migrations and Admin SQL mirrors are contract-checked byte-identical.
 
-## Rollback-only production-schema verification
+## Production migration closeout
 
-Production Supabase project `bzjoeernnmvuhzyvbowc` was used only for rollback-only compile/behavior tests. No Proposal schema or data was persisted.
+PR #370 was verified merged before production mutation. The exact merged canonical migrations were applied to Supabase production project `bzjoeernnmvuhzyvbowc` in timestamp order:
 
-Verified behavior includes:
+1. `20260907203000_project_proposal_core.sql`
+2. `20260907204500_project_proposal_rejection_state.sql`
+3. `20260907210000_project_proposal_accepted_revision_lock.sql`
 
-- minimal Proposal / Area creation contract
-- nullable optional fields
-- grouped total calculation
-- Proposal read total
-- sent Revision immutability
-- cross-Revision Pricing Group rejection
-- acceptance and draft superseding
-- append-only acceptance
-- rejection preserving a newer active draft
-- accepted Revision metadata rewrite/delete rejection
+No unmerged or locally modified Proposal SQL was applied.
 
-Post-test residue check: 0 Proposal tables, 0 Proposal functions, 0 Proposal sequence in production.
+## Persisted production acceptance
 
-## Production gate
+Rollback-safe behavioral acceptance was run against the persisted production schema and passed:
 
-Do not apply the Proposal migrations before owner merge unless explicitly requested.
+- minimal Proposal plus Area creation
+- Area creation with only `area_name`
+- nullable optional Area fields remaining `NULL`
+- direct Area pricing
+- grouped pricing counted once per Pricing Group
+- representative authoritative total `350.00`
+- cross-Revision Pricing Group assignment rejected fail-closed
+- sent Revision content immutability
+- accepted Revision full immutability, including update/delete attempts
+- Acceptance append-only behavior
+- rejecting an older sent Revision while a newer draft exists preserves the Proposal header draft state
+- Proposal detail read-model authoritative total
+- anonymous access denied
+- read/manage role boundary enforcement
+- RLS/grant boundary verification
 
-After merge:
+The acceptance transaction was rolled back. Post-acceptance residue check found zero temporary Proposal business rows.
 
-1. Apply the exact merged Proposal migrations in timestamp order.
-2. Run read-only/rollback-safe production acceptance against the persisted schema.
-3. Run Supabase Security and Performance Advisors with the Proposal objects present.
-4. Only then mark P1 production-accepted and move the execution tracker to P2 — Project Proposal Admin UI.
+## Advisor closeout
+
+Fresh Supabase Security and Performance Advisor scans were reviewed with the Proposal objects present.
+
+- No Proposal-specific Performance Advisor warning/error blocks P1. Remaining Proposal signals are informational FK/index-usage observations expected on a newly introduced domain with no production workload history yet.
+- Security Advisor identifies the intentional Proposal `SECURITY DEFINER` RPC boundary. The functions retain pinned search paths, explicit application-role guards, authenticated-only execution, and anon/PUBLIC denial. Production negative RBAC/anon acceptance confirmed the boundary fails closed, so it was not weakened merely to silence the advisor.
+
+## Final status
+
+P1 is production accepted and completed. P2 — Project Proposal Admin UI may build on this persisted Proposal Core contract.

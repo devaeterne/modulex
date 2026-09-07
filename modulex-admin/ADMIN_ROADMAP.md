@@ -1,11 +1,11 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-09-07
-Main baseline: `ab23762e3558204a24b2400fb6603391f1322eb1`
+Last reviewed: 2026-09-08
+Main baseline: `2b6946b520d8cd0817600a08f4c72527a58e45e1`
 Current phase: **Phase A4 — Store CMS, Leads & Dealer Operations**
 Current cross-roadmap package: **Vendor Catalog Review v3 availability/bulk-approval hardening is active on `feat/vendor-availability-bulk-approval`; current `main` is incorporated and Store public projections remain unchanged.**
 Current parallel Admin package: **A6 Finance F0→F7 is complete and production-verified; there is no active Finance delivery package. Future Finance work requires a new explicitly scoped package.**
-Current parallel Project package: **Project Base PB-5 Delivery & Installation Rollup and PB-6 Participants & Commission Ledger are complete and production-verified; there is no active PB-5/PB-6 delivery package.**
+Current parallel Project package: **Project Base PB-5 Delivery & Installation Rollup, PB-6 Participants & Commission Ledger, and PB-7 Change Orders are complete and production-verified; there is no active PB-5/PB-6/PB-7 delivery package.**
 Current Admin next action: **Preserve the active non-Finance workstreams. The A6 Finance F0→F7 foundation is closed; do not reopen it implicitly from unrelated Project, HR, validation, Store, or operations work.**
 
 ## A6-F7 Finance hardening status
@@ -42,7 +42,7 @@ Current Admin next action: **Preserve the active non-Finance workstreams. The A6
 - [x] Standardize the production Dashboard with shared TailAdmin cards, alerts, buttons, and admin table primitives without changing KPI/RPC, retry, or role-filtering behavior.
   - `smoke:dashboard-ui` is wired into the normal Admin smoke chain; Dashboard UI, Admin UI, production-surface, RBAC, TypeScript, lint, production build, and diff-check passed locally.
 
-## Project Base — PB-5 / PB-6 production closeout
+## Project Base — PB-5 / PB-6 / PB-7 production closeout
 
 - [x] **PB-1 — Project Core + Order Integration.** Production-accepted canonical Customer → Project → Orders foundation.
 - [x] **PB-2 — Project Financial Rollup.** Production-accepted canonical sales/cost/profitability rollup.
@@ -57,6 +57,16 @@ Current Admin next action: **Preserve the active non-Finance workstreams. The A6
   - rollback acceptance left zero temporary cost/account/commission/Finance residue;
   - fresh Advisors retain unrelated project-wide debt but no PB-5/PB-6-specific blocker.
   - evidence: `docs/acceptance/pb-5-project-fulfillment.md`, `docs/acceptance/pb-6-project-participants-commission.md`, `modulex-admin/docs/acceptance/pb-6-commission-event-ordering-hardening.md`.
+
+
+- [x] **PB-7 — Change Orders.** Production-accepted auditable scope/value authorization layer with explicit approval/application separation, canonical Order revision linkage, Sales cost sanitization and append-safe history.
+  - base migration `20260905212307 — customer_project_change_orders` and security hardening `20260905213004 — customer_project_change_orders_security_hardening` are live;
+  - performance hardening PR #374 merged as `4663365e4360d292e09fa054fb54639151c5fbde`; migration `20260907225340 — customer_project_change_order_performance_hardening` is live;
+  - rollback-only production acceptance passed 22/22 checks including Admin approval, Sales mutation denial/cost sanitization, explicit canonical revision application, negative credit effects, mixed-currency fail-closed behavior, immutable submitted history and zero fixture residue;
+  - approval itself produced no canonical Order/Finance/Procurement/AP/AR side effects;
+  - all 13 intended PB-7 FK relationships have leading index coverage and Performance Advisor has zero PB-7 unindexed-FK findings; fresh index `unused_index` INFO is expected before traffic;
+  - PB-7 tables remain RLS-enabled with no PUBLIC/anon/authenticated direct DML, and guarded public RPCs remain authenticated-only with anon/PUBLIC execute denied;
+  - evidence: `docs/acceptance/pb-7-project-change-orders.md`.
 
 ## Product Master UX v2
 

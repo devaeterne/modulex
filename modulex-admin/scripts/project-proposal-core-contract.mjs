@@ -130,3 +130,4 @@ for (const seed of seeds) {
 }
 
 console.log("Project Proposal Core contract PASS");
+await import("./project-proposal-admin-ui-contract.mjs");
