@@ -1,4 +1,4 @@
-import { parseDbDecimal, type DecimalParseResult } from "@/lib/validation";
+import { parseDbDecimal, type DecimalValidation } from "@/lib/validation";
 
 export const ORDER_QUANTITY_DECIMAL = {
   precision: 18,
@@ -22,19 +22,34 @@ export const ORDER_PERCENT_DECIMAL = {
   allowNull: false,
 } as const;
 
-export function parseOrderQuantity(value: string | number | null | undefined): DecimalParseResult {
-  return parseDbDecimal(value, ORDER_QUANTITY_DECIMAL);
+export type RequiredOrderDecimalParseResult =
+  | Readonly<{ value: string; error: null }>
+  | Readonly<{ value: null; error: string }>;
+
+function parseRequiredOrderDecimal(
+  value: string | number | null | undefined,
+  contract: DecimalValidation,
+): RequiredOrderDecimalParseResult {
+  const result = parseDbDecimal(value, contract);
+  if (result.value === null) {
+    return { value: null, error: result.error ?? "A value is required." };
+  }
+  return { value: result.value, error: null };
 }
 
-export function parseOrderMoney(value: string | number | null | undefined): DecimalParseResult {
-  return parseDbDecimal(value, ORDER_MONEY_DECIMAL);
+export function parseOrderQuantity(value: string | number | null | undefined): RequiredOrderDecimalParseResult {
+  return parseRequiredOrderDecimal(value, ORDER_QUANTITY_DECIMAL);
 }
 
-export function parseOrderPercent(value: string | number | null | undefined): DecimalParseResult {
-  return parseDbDecimal(value, ORDER_PERCENT_DECIMAL);
+export function parseOrderMoney(value: string | number | null | undefined): RequiredOrderDecimalParseResult {
+  return parseRequiredOrderDecimal(value, ORDER_MONEY_DECIMAL);
 }
 
-function requireDecimal(result: DecimalParseResult, label: string): string {
+export function parseOrderPercent(value: string | number | null | undefined): RequiredOrderDecimalParseResult {
+  return parseRequiredOrderDecimal(value, ORDER_PERCENT_DECIMAL);
+}
+
+function requireDecimal(result: RequiredOrderDecimalParseResult, label: string): string {
   if (result.error || result.value === null) {
     throw new Error(`${label}: ${result.error ?? "A value is required."}`);
   }
