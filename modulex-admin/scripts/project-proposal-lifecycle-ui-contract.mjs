@@ -14,15 +14,16 @@ const read = (file) => {
 const exists = (file) => fs.existsSync(path.join(root, file));
 
 const files = {
-  domain: "src/lib/customers/project-proposal-domain.ts",
+  lifecycleDomain: "src/lib/customers/project-proposal-lifecycle-domain.ts",
   tab: "src/components/customers/project-detail/ProjectProposalTab.tsx",
   lifecycle: "src/components/customers/project-detail/ProjectProposalLifecycleActions.tsx",
   revisions: "src/components/customers/project-detail/ProjectProposalRevisionHistory.tsx",
 };
 
+assert.equal(exists(files.lifecycleDomain), true, "P3 must add a focused Proposal lifecycle domain extension");
 assert.equal(exists(files.lifecycle), true, "P3 must add a focused ProjectProposalLifecycleActions component");
 
-const domain = read(files.domain);
+const domain = read(files.lifecycleDomain);
 const tab = read(files.tab);
 const lifecycle = read(files.lifecycle);
 const revisions = read(files.revisions);
@@ -34,7 +35,7 @@ for (const rpc of [
   "reject_project_proposal_revision",
   "accept_project_proposal_revision",
 ]) {
-  assert.ok(domain.includes(rpc), `P3 domain client must call canonical lifecycle RPC ${rpc}`);
+  assert.ok(domain.includes(rpc), `P3 lifecycle domain must call canonical RPC ${rpc}`);
 }
 
 assert.match(domain, /p_idempotency_key/, "New revision creation must pass the canonical idempotency key");
