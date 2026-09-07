@@ -43,6 +43,8 @@ export default function CommercialDocument({ document, settings }: Props) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const primaryLogo = settings.primary_logo_on_light_url || settings.logo_url;
   const secondaryLogo = settings.secondary_logo_on_light_url;
+  const centerLogo = secondaryLogo || primaryLogo;
+  const rightLogo = secondaryLogo ? primaryLogo : null;
   const addressLines = companyAddress(settings);
 
   async function downloadPdf() {
@@ -86,11 +88,11 @@ export default function CommercialDocument({ document, settings }: Props) {
           <div className={`text-xs leading-[1.55] ${ADMIN_DOCUMENT_STYLES.companyText}`}>
             {addressLines.map((line, index) => <p key={`${line}-${index}`} className={index === 0 ? `font-semibold ${ADMIN_DOCUMENT_STYLES.companyStrong}` : ""}>{line}</p>)}
           </div>
-          <div className="flex min-h-16 items-center justify-start sm:justify-center">
-            {primaryLogo ? <img src={primaryLogo} alt={`${settings.company_name} primary logo`} className="max-h-16 max-w-[180px] object-contain" /> : <span className={`text-lg font-semibold tracking-tight ${ADMIN_DOCUMENT_STYLES.logoFallback}`}>{settings.company_name}</span>}
+          <div className="commercial-document-secondary-logo flex h-24 items-center justify-start sm:justify-center">
+            {centerLogo ? <img src={centerLogo} alt={secondaryLogo ? "Secondary brand logo" : `${settings.company_name} primary logo`} className="max-h-24 max-w-[188px] origin-center scale-[1.18] object-contain" /> : <span className={`text-lg font-semibold tracking-tight ${ADMIN_DOCUMENT_STYLES.logoFallback}`}>{settings.company_name}</span>}
           </div>
-          <div className="commercial-document-secondary-logo flex h-24 items-center justify-start sm:justify-end">
-            {secondaryLogo ? <img src={secondaryLogo} alt="Secondary brand logo" className="max-h-24 max-w-[188px] origin-center scale-[1.12] object-contain" /> : null}
+          <div className="flex min-h-16 items-center justify-start sm:justify-end">
+            {rightLogo ? <img src={rightLogo} alt={`${settings.company_name} primary logo`} className="max-h-16 max-w-[170px] object-contain" /> : null}
           </div>
         </header>
 
