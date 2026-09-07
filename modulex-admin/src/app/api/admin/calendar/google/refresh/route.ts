@@ -36,6 +36,7 @@ async function handlePost(request: Request) {
   let provider: unknown = null;
   let watch: unknown = null;
   const providerSyncFresh = isProviderSyncFresh(binding.last_sync_at);
+  const initialSyncPending = !binding.provider_sync_token;
 
   try {
     outbox = await flushCalendarOutboxBatch(25, request.url);
@@ -43,7 +44,9 @@ async function handlePost(request: Request) {
     errors.push(error instanceof Error ? error.message : "outbox_flush_failed");
   }
 
-  if (!providerSyncFresh) {
+  // A first-time calendar can contain years of history. That pull is completed by
+  // the bounded Sync Now continuation flow instead of a 60-second open-page request.
+  if (!providerSyncFresh && !initialSyncPending) {
     try {
       provider = await syncCompanyCalendarFromGoogle("manual", request.url);
     } catch (error) {
@@ -57,10 +60,16 @@ async function handlePost(request: Request) {
     errors.push(error instanceof Error ? error.message : "watch_setup_failed");
   }
 
+  const providerSync = initialSyncPending
+    ? "skipped_initial_sync_pending"
+    : providerSyncFresh
+      ? "skipped_fresh"
+      : "requested";
+
   return Response.json(
     {
       status: errors.length === 0 ? "SUCCEEDED" : "PARTIAL_FAILURE",
-      provider_sync: providerSyncFresh ? "skipped_fresh" : "requested",
+      provider_sync: providerSync,
       errors,
       outbox,
       provider,
