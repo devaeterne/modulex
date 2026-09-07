@@ -7,8 +7,8 @@ type CountertopConfigurationRow = {
 };
 
 type CountertopLineSummaryWithFaucet = CountertopLineSummary & {
-  faucetName: string | null;
-  faucetSku: string | null;
+  faucetName?: string | null;
+  faucetSku?: string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -76,9 +76,8 @@ export async function loadCountertopLineSummaries(orderItemIds: string[]): Promi
   return ((data ?? []) as CountertopConfigurationRow[]).map(parseCountertopLineSummary);
 }
 
-export function formatCountertopPrintDetail(summary?: CountertopLineSummary | null): string | null {
+export function formatCountertopPrintDetail(summary?: CountertopLineSummaryWithFaucet | null): string | null {
   if (!summary) return null;
-  const faucetSummary = summary as CountertopLineSummaryWithFaucet;
 
   const material = [
     summary.stoneType ? `Material: ${summary.stoneType}` : summary.stoneName ? `Material: ${summary.stoneName}` : null,
@@ -90,7 +89,7 @@ export function formatCountertopPrintDetail(summary?: CountertopLineSummary | nu
     material.length ? material.join(" · ") : null,
     summary.edgeName ? `Edge: ${summary.edgeName}${summary.edgeLinearFt !== null ? ` · ${compactNumber(summary.edgeLinearFt)} lf` : ""}` : null,
     summary.sinkName ? `Sink: ${summary.sinkName}${summary.sinkSku ? ` (${summary.sinkSku})` : ""}` : null,
-    faucetSummary.faucetName ? `Faucet: ${faucetSummary.faucetName}${faucetSummary.faucetSku ? ` (${faucetSummary.faucetSku})` : ""}` : null,
+    summary.faucetName ? `Faucet: ${summary.faucetName}${summary.faucetSku ? ` (${summary.faucetSku})` : ""}` : null,
     summary.services.length
       ? `Services: ${summary.services.map((service) => `${service.name} ×${compactNumber(service.quantity)}`).join(", ")}`
       : null,
