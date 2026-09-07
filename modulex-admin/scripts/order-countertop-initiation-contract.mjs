@@ -52,7 +52,7 @@ assert(configurator.includes("material_subtotal") && configurator.includes("edge
 assert(newOrder.includes('"Countertop"') && newOrder.includes("startCountertop"), "New Order must expose the Countertop product action instead of a Pricing workspace link");
 assert(!newOrder.includes("Open Countertop workspace") && !newOrder.includes('href="/pricing/countertop"'), "New Order must not route order entry through pricing.manage workspace permissions");
 assert(newOrder.includes("hasPermission") && newOrder.includes('"orders.manage"'), "New Order Countertop action must use the canonical orders.manage permission");
-assert(newOrder.includes("getCurrentProfile") && newOrder.includes('createOrder(validItems, "draft")'), "New Order Countertop action must authorize the current editor and create a canonical Draft shell before attaching configuration");
+assert(newOrder.includes("getCurrentProfile") && /createOrder\(validItems,\s*header,\s*"draft"\)/.test(newOrder), "New Order Countertop action must authorize the current editor and create a canonical Draft shell before attaching configuration");
 assert(newOrder.includes("CountertopConfigurator") && newOrder.includes("countertopDraftOrderId"), "New Order must open the canonical CountertopConfigurator against the saved Draft shell");
 assert(newOrder.includes("FormHint") && newOrder.includes("SummaryRow"), "New Order must use shared dark-mode-safe helper and summary primitives");
 assert(!newOrder.includes('<h1 className="text-2xl font-semibold">New Order</h1>'), "New Order must not recreate a duplicate route-local page heading");
