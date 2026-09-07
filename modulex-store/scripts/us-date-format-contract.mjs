@@ -18,6 +18,11 @@ assert.equal(
   dates.formatTimestampDate("2026-09-08T01:30:00Z", { timeZone: "America/New_York" }),
   "09.07.2026",
 );
+assert.equal(
+  dates.formatTimestampDate("2026-09-07", { timeZone: "America/Los_Angeles" }),
+  "09.07.2026",
+  "canonical date-only values must not shift across timezones",
+);
 assert.equal(dates.formatTimestampDate(undefined), "—");
 
 const timestamp = dates.formatDateTime("2026-09-07T15:30:00Z", { timeStyle: "short", timeZone: "UTC" });
