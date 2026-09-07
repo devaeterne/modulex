@@ -6,6 +6,11 @@ type CountertopLineDetailsProps = {
   summary?: CountertopLineSummary | null;
 };
 
+type CountertopLineSummaryWithFaucet = CountertopLineSummary & {
+  faucetName?: string | null;
+  faucetSku?: string | null;
+};
+
 function quantity(value: number | null, suffix: string) {
   if (value === null || !Number.isFinite(value)) return null;
   return `${Number(value.toFixed(4))} ${suffix}`;
@@ -13,6 +18,7 @@ function quantity(value: number | null, suffix: string) {
 
 export default function CountertopLineDetails({ summary }: CountertopLineDetailsProps) {
   if (!summary) return null;
+  const faucetSummary = summary as CountertopLineSummaryWithFaucet;
 
   const serviceText = summary.services.length
     ? summary.services.map((service) => `${service.name} ×${Number(service.quantity.toFixed(4))}`).join(", ")
@@ -22,6 +28,7 @@ export default function CountertopLineDetails({ summary }: CountertopLineDetails
       ? `Edge: ${summary.edgeName}${summary.edgeLinearFt !== null ? ` · ${quantity(summary.edgeLinearFt, "lf")}` : ""}`
       : null,
     summary.sinkName ? `Sink: ${summary.sinkName}${summary.sinkSku ? ` (${summary.sinkSku})` : ""}` : null,
+    faucetSummary.faucetName ? `Faucet: ${faucetSummary.faucetName}${faucetSummary.faucetSku ? ` (${faucetSummary.faucetSku})` : ""}` : null,
     serviceText ? `Services: ${serviceText}` : null,
   ].filter((value): value is string => Boolean(value));
 
