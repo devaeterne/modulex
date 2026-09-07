@@ -10,10 +10,7 @@ on:
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
-      - "modulex-store/supabase/migrations/*countertop*.sql"
-      - "modulex-store/supabase/migrations/*manual_service*.sql"
-      - "modulex-store/supabase/migrations/*calendar*.sql"
-      - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
+      - "modulex-store/**"
       - ".github/workflows/**"
   push:
     paths:
@@ -24,10 +21,7 @@ on:
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
-      - "modulex-store/supabase/migrations/*countertop*.sql"
-      - "modulex-store/supabase/migrations/*manual_service*.sql"
-      - "modulex-store/supabase/migrations/*calendar*.sql"
-      - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
+      - "modulex-store/**"
       - ".github/workflows/**"
 
 concurrency:
@@ -59,6 +53,10 @@ jobs:
         run: |
           node ../scripts/us-date-format-audit.mjs --write
           cat ../docs/acceptance/us-date-format-audit.json
+      - name: Admin US date format contract
+        run: npm run smoke:us-date-format
+      - name: Store US date format contract
+        run: npm --prefix ../modulex-store run smoke:us-date-format
       - name: CI workflow architecture contract
         run: npm run smoke:ci-workflow-architecture
       - name: API timing contract
