@@ -1,3 +1,5 @@
+import { formatDateTime } from "@/lib/dates/usDate";
+
 export type PortalTimelineStep = {
   label: string;
   timestamp?: string | null;
@@ -12,24 +14,28 @@ type PortalTimelineProps = {
 
 function formatTimestamp(value: string | null | undefined) {
   if (!value) return null;
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  const formatted = formatDateTime(value);
+  return formatted === "—" ? null : formatted;
 }
 
 export default function PortalTimeline({ steps }: PortalTimelineProps) {
   return (
     <ol className="portal-timeline">
-      {steps.map((step) => (
-        <li
-          key={step.label}
-          className={`portal-timeline__step${step.complete ? " portal-timeline__step--complete" : ""}${step.current ? " portal-timeline__step--current" : ""}${step.exception ? " portal-timeline__step--exception" : ""}`}
-        >
-          <span className="portal-timeline__dot" aria-hidden="true" />
-          <div>
-            <strong>{step.label}</strong>
-            {formatTimestamp(step.timestamp) ? <span className="portal-muted">{formatTimestamp(step.timestamp)}</span> : null}
-          </div>
-        </li>
-      ))}
+      {steps.map((step) => {
+        const timestamp = formatTimestamp(step.timestamp);
+        return (
+          <li
+            key={step.label}
+            className={`portal-timeline__step${step.complete ? " portal-timeline__step--complete" : ""}${step.current ? " portal-timeline__step--current" : ""}${step.exception ? " portal-timeline__step--exception" : ""}`}
+          >
+            <span className="portal-timeline__dot" aria-hidden="true" />
+            <div>
+              <strong>{step.label}</strong>
+              {timestamp ? <span className="portal-muted">{timestamp}</span> : null}
+            </div>
+          </li>
+        );
+      })}
     </ol>
   );
 }
