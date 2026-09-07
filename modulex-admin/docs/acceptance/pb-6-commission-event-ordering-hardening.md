@@ -77,6 +77,40 @@ Admin Project Base run `34131174019` / run #418:
 
 The permanent GREEN contract additionally requires all PB-6-owned FK covering indexes listed above so this package cannot be closed while its known Advisor debt remains unaddressed.
 
+## Corrected pre-merge production-safe acceptance
+
+A later broad acceptance attempt initially reported an obligation-immutability failure. That was an acceptance-layer false negative, not a missing database guard.
+
+The authenticated role is intentionally unable to perform direct table reads that depend on the execute-locked `private.can_view_project_commission(...)` helper. User-surface acceptance must therefore use the public SECURITY DEFINER RPCs, while low-level trigger/sequence assertions must run as the database owner after resetting the role.
+
+An isolated production probe confirmed both destructive obligation operations are rejected with SQLSTATE `P0001` and the expected `PROJECT_COMMISSION_HISTORY_IMMUTABLE` message. The same guard remains attached to commission events.
+
+The corrected exact-migration `BEGIN ... ROLLBACK` matrix then passed:
+
+- 15/15 hardening indexes present in-transaction: 2 ordering indexes + 13 PB-6 FK-covering indexes;
+- fixed commission base: `500.00`;
+- Project sales-percentage commission base: `663.50`;
+- gross-profit revenue snapshot: `6540.70`;
+- gross-profit cost snapshot with two rollback-only temporary canonical costs: `2924.00`;
+- gross-profit basis: `3616.70`;
+- gross-profit commission at 10%: `361.67`;
+- six lifecycle events shared one transaction timestamp but had six distinct `event_sequence` values;
+- `earned -> approved -> adjustment -> approved -> offset -> reversal` resolved deterministically;
+- negative-entitlement guard passed;
+- Sales-only commission and event visibility stayed denied, including the Project Sales Rep subject;
+- Sales-only create/append mutation attempts were denied;
+- obligation UPDATE/DELETE and event UPDATE/DELETE immutability guards passed at the DB level.
+
+Post-rollback residue was explicitly rechecked and was zero for:
+
+- `event_sequence` column;
+- all hardening indexes;
+- temporary Product Cost rows;
+- acceptance commission obligations/events;
+- Finance probe rows.
+
+A live pre-merge Finance payout mutation probe was not executed because the tool safety layer blocked that rollback-only mutation before it reached PostgreSQL. The existing PB-6 projection remains statically bound to posted `finance_transaction_links` with `source_document_type = 'project_commission_obligation'`; live payout acceptance remains a post-merge item.
+
 ## Repository artifacts
 
 Canonical Store migration:
@@ -109,7 +143,8 @@ After merge, production acceptance must:
 6. verify immutable UPDATE/DELETE guards remain active;
 7. verify Admin/Finance commission management and denied roles;
 8. verify event projection ACLs and deterministic order;
-9. rerun Security and Performance Advisors and confirm no PB-5/PB-6-specific blocking finding remains;
-10. confirm zero acceptance residue.
+9. verify canonical Finance payout attribution without introducing a duplicate commission-payment ledger;
+10. rerun Security and Performance Advisors and confirm no PB-5/PB-6-specific blocking finding remains;
+11. confirm zero acceptance residue.
 
 PB-5 production acceptance is independently GREEN; final Project Base plan/roadmap closeout will mark PB-5 and PB-6 complete only after this PB-6 migration and post-merge acceptance pass.
