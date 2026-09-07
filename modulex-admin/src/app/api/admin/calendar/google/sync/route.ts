@@ -1,8 +1,9 @@
 import { jsonError, requirePermission } from "@/lib/auth/admin-api";
+import { flushCalendarOutboxBatch } from "@/lib/google-calendar/bidirectional-sync";
 import {
-  flushCalendarOutboxBatch,
-  syncCompanyCalendarFromGooglePage,
-} from "@/lib/google-calendar/bidirectional-sync";
+  syncCompanyCalendarCurrentFirstPage,
+  type CalendarBootstrapRange,
+} from "@/lib/google-calendar/bootstrap-sync";
 import {
   GoogleCalendarImportError,
   syncImportedGoogleCalendar,
@@ -12,6 +13,26 @@ import { ensureCompanyCalendarWatch } from "@/lib/google-calendar/watch-channels
 import { withApiTiming } from "@/lib/observability/apiTiming";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_BOOTSTRAP_RANGE_MS = 370 * 24 * 60 * 60 * 1000;
+
+function parseBootstrapRange(body: Record<string, unknown>): CalendarBootstrapRange | Response | null {
+  const startRaw = typeof body.bootstrap_start === "string" ? body.bootstrap_start.trim() : "";
+  const endRaw = typeof body.bootstrap_end === "string" ? body.bootstrap_end.trim() : "";
+  if (!startRaw && !endRaw) return null;
+  if (!startRaw || !endRaw) return jsonError("Calendar bootstrap start/end range is required.", 400);
+
+  const start = new Date(startRaw);
+  const end = new Date(endRaw);
+  if (
+    Number.isNaN(start.valueOf())
+    || Number.isNaN(end.valueOf())
+    || start >= end
+    || end.valueOf() - start.valueOf() > MAX_BOOTSTRAP_RANGE_MS
+  ) {
+    return jsonError("Calendar bootstrap start/end range is invalid.", 400);
+  }
+  return { start: start.toISOString(), end: end.toISOString() };
+}
 
 async function handlePost(request: Request) {
   const auth = await requirePermission(request, "calendar.manage");
@@ -22,6 +43,8 @@ async function handlePost(request: Request) {
   const continuationToken = typeof body.continuation_token === "string" && body.continuation_token
     ? body.continuation_token
     : null;
+  const bootstrapRange = parseBootstrapRange(body);
+  if (bootstrapRange instanceof Response) return bootstrapRange;
 
   try {
     if (legacyBindingId) {
@@ -38,8 +61,15 @@ async function handlePost(request: Request) {
 
     // Outbound Modulex changes are flushed once at the start. Provider continuation
     // requests stay focused on one bounded Google page so they cannot grow into a 504.
+    // On first full sync the currently visible range is mirrored first, then the same
+    // continuation walks historical data until Google returns the durable sync token.
     const outbox = continuationToken ? null : await flushCalendarOutboxBatch(25, request.url);
-    const providerPage = await syncCompanyCalendarFromGooglePage("manual", request.url, continuationToken);
+    const providerPage = await syncCompanyCalendarCurrentFirstPage(
+      "manual",
+      request.url,
+      continuationToken,
+      bootstrapRange,
+    );
     const { continuationToken: nextContinuationToken, ...provider } = providerPage;
     let watch_error_code: string | null = null;
     if (provider.complete) {
