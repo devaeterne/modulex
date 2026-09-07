@@ -78,6 +78,7 @@ export type CustomerOrder = {
 
 export type CustomerOrderItem = {
   id: string; order_id: string; product_id: string | null; line_no: number; sku_snapshot: string; product_name_snapshot: string;
+  display_name_override?: string | null;
   quantity: string | number; unit_price: string | number; discount_percent: string | number; discount_amount: string | number;
   product_type_code_snapshot?: string | null; product_type_name_snapshot?: string | null; uom_code_snapshot?: string | null; uom_name_snapshot?: string | null;
   pricing_model_snapshot?: OrderPricingModel | null;
