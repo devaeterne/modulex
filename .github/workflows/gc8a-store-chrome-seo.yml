@@ -7,6 +7,8 @@ on:
       - "modulex-admin/src/components/store/**"
       - "modulex-admin/src/lib/store/**"
       - "modulex-admin/src/app/(admin)/store/**"
+      - "scripts/us-date-format-audit.mjs"
+      - "docs/acceptance/us-date-format-audit.json"
       - ".github/workflows/gc8a-store-chrome-seo.yml"
   pull_request:
     paths:
@@ -14,6 +16,8 @@ on:
       - "modulex-admin/src/components/store/**"
       - "modulex-admin/src/lib/store/**"
       - "modulex-admin/src/app/(admin)/store/**"
+      - "scripts/us-date-format-audit.mjs"
+      - "docs/acceptance/us-date-format-audit.json"
       - ".github/workflows/gc8a-store-chrome-seo.yml"
   workflow_dispatch:
 
@@ -38,6 +42,12 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-store/package-lock.json
       - run: npm ci
+      - name: Store US date format contract
+        run: npm run smoke:us-date-format
+      - name: Inventory and enforce Store US date presentation
+        run: |
+          node ../scripts/us-date-format-audit.mjs --write
+          node ../scripts/us-date-format-audit.mjs --check --scope store
       - run: npm run smoke:public-production
       - run: npm run smoke:secondary-cms-contract
       - run: npm run smoke:gc3-company-domain
