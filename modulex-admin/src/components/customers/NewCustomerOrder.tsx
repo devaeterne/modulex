@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import SummaryRow from "@/components/common/SummaryRow";
@@ -25,6 +25,12 @@ import {
   type OrderTaxRule,
 } from "@/lib/customers/order-domain";
 import { createCustomerOrderWithAdministrativeFee, loadAdministrativeFeeDefault } from "@/lib/customers/order-administrative-fee-domain";
+import {
+  createOrderFromAcceptedProjectProposal,
+  getProjectProposalOrderConversionPreview,
+  mapProposalOrderConversionError,
+  type ProposalOrderConversionPreview,
+} from "@/lib/customers/project-proposal-order-conversion-domain";
 import {
   ORDER_MONEY_DECIMAL,
   ORDER_QUANTITY_DECIMAL,
@@ -96,10 +102,26 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: str
   return <div><Label htmlFor={htmlFor}>{label}</Label>{children}{hint ? <FormHint>{hint}</FormHint> : null}</div>;
 }
 
-export default function NewCustomerOrder({ projectId = null }: { projectId?: string | null }) {
+export default function NewCustomerOrder({
+  projectId = null,
+  proposalRevisionId = null,
+  proposalAreaIds = [],
+}: {
+  projectId?: string | null;
+  proposalRevisionId?: string | null;
+  proposalAreaIds?: string[];
+}) {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const customerId = params.id;
+  const proposalAreaIdsKey = proposalAreaIds.join(",");
+  const selectedProposalAreaIds = useMemo(
+    () => proposalAreaIdsKey.split(",").map((value) => value.trim()).filter(Boolean),
+    [proposalAreaIdsKey],
+  );
+  const hasProposalSource = Boolean(proposalRevisionId || selectedProposalAreaIds.length > 0);
+  const isProposalConversion = Boolean(projectId && proposalRevisionId && selectedProposalAreaIds.length > 0);
+  const conversionKeyRef = useRef<string | null>(null);
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
@@ -109,6 +131,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
   const [products, setProducts] = useState<Product[]>([]);
   const [prices, setPrices] = useState<PriceRow[]>([]);
   const [taxRules, setTaxRules] = useState<TaxRule[]>([]);
+  const [proposalPreview, setProposalPreview] = useState<ProposalOrderConversionPreview | null>(null);
   const [priceGroupId, setPriceGroupId] = useState("");
   const [fulfillmentType, setFulfillmentType] = useState<OrderFulfillmentType>("delivery");
   const [paymentMethodId, setPaymentMethodId] = useState("");
@@ -138,7 +161,17 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     let active = true;
     async function load() {
       try {
-        const [context, profileResult, administrativeFeeDefault] = await Promise.all([loadCreateOrderContext(customerId), getCurrentProfile(), loadAdministrativeFeeDefault()]);
+        if (hasProposalSource && !isProposalConversion) {
+          throw new Error("Proposal conversion requires a Project, accepted Proposal Revision, and selected Proposal Areas.");
+        }
+        const [context, profileResult, administrativeFeeDefault, acceptedPreview] = await Promise.all([
+          loadCreateOrderContext(customerId),
+          getCurrentProfile(),
+          loadAdministrativeFeeDefault(),
+          isProposalConversion && proposalRevisionId
+            ? getProjectProposalOrderConversionPreview(proposalRevisionId)
+            : Promise.resolve(null),
+        ]);
         if (!active) return;
         if (profileResult.error) throw profileResult.error;
         if (!profileResult.profile) throw new Error("User profile could not be loaded.");
@@ -150,6 +183,29 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
         const defaultMethod = loadedMethods.find((method) => method.system_key === "cash") ?? loadedMethods[0] ?? null;
         const defaultGroup = loadedGroups.find((group) => group.id === loadedCustomer.price_group_id) ?? loadedGroups.find((group) => group.is_base_price) ?? loadedGroups[0] ?? null;
 
+        if (acceptedPreview) {
+          if (acceptedPreview.projectId !== projectId || acceptedPreview.customerId !== customerId) {
+            throw new Error("Accepted Proposal source does not belong to this Project/Customer.");
+          }
+          if ((acceptedPreview.currencyCode || "USD").toUpperCase() !== (loadedCustomer.currency_code || "USD").toUpperCase()) {
+            throw new Error(mapProposalOrderConversionError(new Error("PROPOSAL_ORDER_CURRENCY_MISMATCH")));
+          }
+          const selectedSet = new Set(selectedProposalAreaIds);
+          const knownAreaIds = new Set(acceptedPreview.units.flatMap((unit) => unit.areas.map((area) => area.id)));
+          if (selectedProposalAreaIds.some((areaId) => !knownAreaIds.has(areaId))) {
+            throw new Error(mapProposalOrderConversionError(new Error("PROPOSAL_ORDER_AREA_REVISION_MISMATCH")));
+          }
+          for (const unit of acceptedPreview.units) {
+            const selectedCount = unit.areas.filter((area) => selectedSet.has(area.id)).length;
+            if (selectedCount > 0 && selectedCount < unit.areas.length) {
+              throw new Error(mapProposalOrderConversionError(new Error("PROPOSAL_ORDER_PRICING_GROUP_PARTIAL")));
+            }
+            if (selectedCount > 0 && unit.convertedOrderId) {
+              throw new Error(mapProposalOrderConversionError(new Error("PROPOSAL_ORDER_AREA_ALREADY_CONVERTED")));
+            }
+          }
+        }
+
         setCustomer(loadedCustomer);
         setRole(profileResult.profile.role);
         setAddresses(loadedAddresses);
@@ -157,6 +213,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
         setPaymentMethods(loadedMethods);
         setProducts(context.products as Product[]);
         setTaxRules(context.taxRules);
+        setProposalPreview(acceptedPreview);
         setPriceGroupId(defaultGroup?.id || "");
         setFulfillmentType(defaultGroup?.system_key === "pickup_level" ? "pickup" : "delivery");
         setPaymentMethodId(defaultMethod?.id || "");
@@ -164,6 +221,10 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
         setAdministrativeFeePercent(administrativeFeeDefault.toFixed(3));
         setBillingAddressId(loadedAddresses.find((address) => address.is_default_billing)?.id || "");
         setShippingAddressId(loadedAddresses.find((address) => address.is_default_shipping)?.id || "");
+        if (acceptedPreview) {
+          setOrderDiscount("0");
+          setInitialStatus("draft");
+        }
       } catch (error) {
         if (active) setErrorMessage(errorMessage(error, "Unable to prepare order."));
       } finally {
@@ -172,7 +233,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     }
     void load();
     return () => { active = false; };
-  }, [customerId]);
+  }, [customerId, hasProposalSource, isProposalConversion, projectId, proposalRevisionId, selectedProposalAreaIds]);
 
   useEffect(() => {
     const rule = taxRules.find((item) => item.fulfillment_type === fulfillmentType && item.is_active && item.tax_rate !== null);
@@ -203,6 +264,12 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     return () => { active = false; };
   }, [priceGroupId, customer?.currency_code]);
 
+  const selectedProposalAreaIdSet = useMemo(() => new Set(selectedProposalAreaIds), [selectedProposalAreaIds]);
+  const proposalSourceUnits = useMemo(
+    () => proposalPreview?.units.filter((unit) => unit.areas.some((area) => selectedProposalAreaIdSet.has(area.id))) ?? [],
+    [proposalPreview, selectedProposalAreaIdSet],
+  );
+  const proposalAcceptedTotal = proposalSourceUnits.reduce((sum, unit) => sum + unit.acceptedSellAmount, 0);
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const priceMap = useMemo(() => new Map(prices.map((price) => [price.product_id, Number(price.amount)])), [prices]);
   const selectedQuantities = useMemo(() => {
@@ -221,6 +288,21 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
   const currency = customer?.currency_code || "USD";
 
   const preview = useMemo(() => {
+    if (isProposalConversion) {
+      const customerVisibleSell = proposalAcceptedTotal;
+      const feePercent = Math.min(100, Math.max(0, Number(administrativeFeePercent || 0)));
+      const estimatedBaseSell = feePercent >= 0 ? customerVisibleSell / (1 + feePercent / 100) : customerVisibleSell;
+      const estimatedAdministrativeFee = customerVisibleSell - estimatedBaseSell;
+      const tax = customerVisibleSell * Math.max(0, Number(taxRate || 0)) / 100;
+      return {
+        subtotal: customerVisibleSell,
+        baseSell: estimatedBaseSell,
+        administrativeFee: estimatedAdministrativeFee,
+        customerVisibleSell,
+        tax,
+        grandTotal: customerVisibleSell + tax,
+      };
+    }
     let subtotal = 0;
     for (const item of items) {
       const quantity = Number(item.quantity || 0);
@@ -234,7 +316,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     const customerVisibleSell = baseSell + administrativeFee;
     const tax = customerVisibleSell * Math.max(0, Number(taxRate || 0)) / 100;
     return { subtotal, baseSell, administrativeFee, customerVisibleSell, tax, grandTotal: customerVisibleSell + tax };
-  }, [items, priceMap, orderDiscount, taxRate, administrativeFeePercent]);
+  }, [administrativeFeePercent, isProposalConversion, items, orderDiscount, priceMap, proposalAcceptedTotal, taxRate]);
 
   function clearHeaderError(field: Exclude<keyof FieldErrors, "items">) {
     setFieldErrors((current) => ({ ...current, [field]: undefined }));
@@ -329,12 +411,12 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     if (fulfillmentType !== "pickup" && !shippingAddressId) errors.shippingAddressId = "Shipping address is required for delivery.";
 
     const administrativeFee = parseOrderPercent(administrativeFeePercent);
-    const discount = parseOrderMoney(orderDiscount);
+    const discount = parseOrderMoney(isProposalConversion ? "0" : orderDiscount);
     const tax = parseOrderPercent(taxRate);
     if (administrativeFee.error || administrativeFee.value === null) errors.administrativeFeePercent = administrativeFee.error ?? "Enter a valid Administrative Fee.";
     if (discount.error || discount.value === null) errors.orderDiscount = discount.error ?? "Enter a valid order discount.";
     if (tax.error || tax.value === null) errors.taxRate = tax.error ?? "Enter a valid tax rate.";
-    if (isLoadingPrices) {
+    if (isLoadingPrices && !isProposalConversion) {
       setErrorMessage("Prices are still loading.");
       return null;
     }
@@ -432,6 +514,39 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
   async function saveOrder() {
     const header = validateHeader();
     if (!header) return;
+
+    if (isProposalConversion) {
+      if (!customer || !projectId || !proposalRevisionId || !proposalPreview || selectedProposalAreaIds.length === 0) {
+        setErrorMessage("Accepted Proposal conversion context is incomplete. Return to the Proposal and start again.");
+        return;
+      }
+      if (!conversionKeyRef.current) conversionKeyRef.current = crypto.randomUUID();
+      setIsSaving(true);
+      try {
+        const orderId = await createOrderFromAcceptedProjectProposal({
+          revisionId: proposalRevisionId,
+          selectedAreaIds: selectedProposalAreaIds,
+          idempotencyKey: conversionKeyRef.current,
+          priceGroupId,
+          billingAddressId,
+          shippingAddressId,
+          expectedDeliveryDate: expectedDate,
+          customerReference: reference,
+          customerNotes,
+          internalNotes,
+          taxRate: header.taxRate,
+          paymentMethodId,
+          fulfillmentType,
+          administrativeFeePercent: header.administrativeFeePercent,
+        });
+        router.push(`/customers/${customer.id}/orders/${orderId}`);
+      } catch (error) {
+        setErrorMessage(mapProposalOrderConversionError(error));
+        setIsSaving(false);
+      }
+      return;
+    }
+
     const validItems = validateItems(false);
     if (!validItems) return;
     setIsSaving(true);
@@ -445,6 +560,10 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
   }
 
   async function startCountertop() {
+    if (isProposalConversion) {
+      setErrorMessage("Create the Proposal-based Draft first, then add Countertop configuration from the canonical Order.");
+      return;
+    }
     if (!canManageCountertop) return setErrorMessage("You do not have permission to manage customer orders.");
     const header = validateHeader();
     if (!header) return;
@@ -482,31 +601,52 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
   return (
     <div className="space-y-5">
       {errorMessageState ? <Alert variant="error" title="Order action failed" message={errorMessageState} /> : null}
-      {projectId ? <Alert variant="info" title="Project Order" message="This Order will be created inside the selected Project." /> : null}
+      {isProposalConversion && proposalPreview ? (
+        <Alert
+          variant="success"
+          title="Accepted Proposal source"
+          message={`${proposalPreview.proposalNumber} · Revision ${proposalPreview.revisionNo}. Selected accepted scope is locked for initial conversion; the resulting Order will start as Draft.`}
+        />
+      ) : projectId ? <Alert variant="info" title="Project Order" message="This Order will be created inside the selected Project." /> : null}
       {selectedPriceGroup?.requires_approval ? <Alert variant="warning" title="Approval required" message={`${selectedPriceGroup.name} is a restricted price level. Sales orders using it require Admin approval before confirmation.`} /> : null}
 
       <ComponentCard title="Order Information" desc={`${customer.name} · ${customer.customer_code} — choose the commercial, fulfillment and payment context for this order.`} headerAction={<Button variant="outline" onClick={() => router.push(projectId ? `/projects/${projectId}` : `/customers/${customer.id}/orders`)}>{projectId ? "Back to Project" : "Back to Orders"}</Button>}>
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-          <Field label="Price Group" htmlFor="new-order-price-group" hint={fieldErrors.priceGroupId ?? (isLoadingPrices ? "Loading prices…" : undefined)}><Select id="new-order-price-group" error={Boolean(fieldErrors.priceGroupId)} options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} /></Field>
+          <Field label="Price Group" htmlFor="new-order-price-group" hint={fieldErrors.priceGroupId ?? (isLoadingPrices && !isProposalConversion ? "Loading prices…" : undefined)}><Select id="new-order-price-group" error={Boolean(fieldErrors.priceGroupId)} options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} /></Field>
           <Field label="Fulfillment Type" htmlFor="new-order-fulfillment-type" hint={fulfillmentHint}><Select id="new-order-fulfillment-type" options={[{ value: "pickup", label: "Customer Pickup" }, { value: "delivery", label: "Delivery" }, { value: "delivery_installation", label: "Delivery + Installation" }]} value={fulfillmentType} onChange={(value) => { setFulfillmentType(value as OrderFulfillmentType); if (value === "pickup") clearHeaderError("shippingAddressId"); }} /></Field>
           <Field label="Payment Method" htmlFor="new-order-payment-method" hint={fieldErrors.paymentMethodId}><Select id="new-order-payment-method" error={Boolean(fieldErrors.paymentMethodId)} options={paymentMethods.map((method) => ({ value: method.id, label: method.name }))} value={paymentMethodId} onChange={handlePaymentMethodChange} /></Field>
           <Field label="Administrative Fee (%)" htmlFor="new-order-administrative-fee" hint={administrativeFeeHint}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input id="new-order-administrative-fee" type="number" min="0" max="100" step="0.001" value={administrativeFeePercent} error={Boolean(fieldErrors.administrativeFeePercent)} hint={fieldErrors.administrativeFeePercent} onChange={(event) => { clearHeaderError("administrativeFeePercent"); setAdministrativeFeePercent(event.target.value); }} /></div><Button size="sm" variant="outline" onClick={() => { clearHeaderError("administrativeFeePercent"); setAdministrativeFeePercent(administrativeFeeDefaultPercent); }}>Use Company Default</Button></div></Field>
-          <Field label="Initial Status" htmlFor="new-order-initial-status"><Select id="new-order-initial-status" options={[{ value: "draft", label: "Draft" }, { value: "confirmed", label: "Confirmed" }]} value={initialStatus} onChange={(value) => setInitialStatus(value as "draft" | "confirmed")} /></Field>
+          <Field label="Initial Status" htmlFor="new-order-initial-status">{isProposalConversion ? <Input id="new-order-initial-status" value="Draft" disabled /> : <Select id="new-order-initial-status" options={[{ value: "draft", label: "Draft" }, { value: "confirmed", label: "Confirmed" }]} value={initialStatus} onChange={(value) => setInitialStatus(value as "draft" | "confirmed")} />}</Field>
           <Field label="Expected Delivery" htmlFor="new-order-expected-delivery"><DateInput id="new-order-expected-delivery" value={expectedDate} onChange={(event) => setExpectedDate(event)} /></Field>
           <Field label="Customer Reference" htmlFor="new-order-customer-reference"><Input id="new-order-customer-reference" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="PO / reference" /></Field>
           <Field label="Billing Address" htmlFor="new-order-billing-address"><Select id="new-order-billing-address" options={addresses.filter((address) => ["billing", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={billingAddressId} placeholder="None" allowEmpty onChange={setBillingAddressId} /></Field>
           <Field label="Shipping Address" htmlFor="new-order-shipping-address" hint={fieldErrors.shippingAddressId}><Select id="new-order-shipping-address" error={Boolean(fieldErrors.shippingAddressId)} options={addresses.filter((address) => ["shipping", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={shippingAddressId} placeholder="None" allowEmpty onChange={(value) => { clearHeaderError("shippingAddressId"); setShippingAddressId(value); }} /></Field>
-          <Field label={`Order Discount (${currency})`} htmlFor="new-order-discount"><Input id="new-order-discount" inputMode="decimal" value={orderDiscount} error={Boolean(fieldErrors.orderDiscount)} hint={fieldErrors.orderDiscount} onChange={(event) => { clearHeaderError("orderDiscount"); setOrderDiscount(event.target.value); }} /></Field>
+          <Field label={`Order Discount (${currency})`} htmlFor="new-order-discount" hint={isProposalConversion ? "Locked at 0 for the initial conversion so the accepted Proposal scope is not discounted twice." : undefined}><Input id="new-order-discount" inputMode="decimal" value={isProposalConversion ? "0" : orderDiscount} disabled={isProposalConversion} error={Boolean(fieldErrors.orderDiscount)} hint={fieldErrors.orderDiscount} onChange={(event) => { if (!isProposalConversion) { clearHeaderError("orderDiscount"); setOrderDiscount(event.target.value); } }} /></Field>
           <Field label="Tax Rate (%)" htmlFor="new-order-tax-rate"><Input id="new-order-tax-rate" inputMode="decimal" value={taxRate} error={Boolean(fieldErrors.taxRate)} hint={fieldErrors.taxRate} onChange={(event) => { clearHeaderError("taxRate"); setTaxRate(event.target.value); }} /></Field>
         </div>
       </ComponentCard>
 
-      <ComponentCard title="Products" desc="Cabinet products use server Price Group pricing. Countertop and Service use their dedicated order-entry routes." headerAction={<div className="flex flex-wrap justify-end gap-2">{canManageCountertop ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || isLoadingPrices} onClick={startCountertop}>{isStartingCountertop ? "Preparing Draft…" : "Countertop"}</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={() => setIsProductPickerOpen(true)}>Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={openService}>Service</Button></div>}>
+      <ComponentCard
+        title={isProposalConversion ? "Accepted Proposal Scope" : "Products"}
+        desc={isProposalConversion ? "Accepted commercial units are locked for initial conversion. Product-specific detail can be added after the canonical Draft Order exists." : "Cabinet products use server Price Group pricing. Countertop and Service use their dedicated order-entry routes."}
+        headerAction={!isProposalConversion ? <div className="flex flex-wrap justify-end gap-2">{canManageCountertop ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || isLoadingPrices} onClick={startCountertop}>{isStartingCountertop ? "Preparing Draft…" : "Countertop"}</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={() => setIsProductPickerOpen(true)}>Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={openService}>Service</Button></div> : undefined}
+      >
         <TableViewport>
           <Table variant="admin" minWidth="standard">
-            <TableHeader variant="admin"><TableRow>{["Product", "Qty", "Unit Price", "Discount %", "Line Total", ""].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader>
+            <TableHeader variant="admin"><TableRow>{(isProposalConversion ? ["Proposal Scope", "Qty", "Accepted Amount", "Pricing", "Line Total", ""] : ["Product", "Qty", "Unit Price", "Discount %", "Line Total", ""]).map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader>
             <TableBody variant="admin">
-              {items.length === 0 ? <TableStateRow colSpan={6}>No lines yet. Choose Countertop, Cabinet, or Service.</TableStateRow> : items.map((item, index) => {
+              {isProposalConversion ? (
+                proposalSourceUnits.length === 0 ? <TableStateRow colSpan={6}>No accepted Proposal scope could be resolved for this conversion.</TableStateRow> : proposalSourceUnits.map((unit) => (
+                  <TableRow key={unit.unitId}>
+                    <TableCell variant="admin" className="min-w-[320px]"><div className="font-semibold">{unit.label}</div><FormHint>{unit.kind === "pricing_group" ? "Atomic Pricing Group" : "Accepted Area"} · {unit.areas.map((area) => area.areaName).join(", ")}</FormHint></TableCell>
+                    <TableCell variant="admin"><FormHint>1 · fixed</FormHint></TableCell>
+                    <TableCell variant="admin">{money(unit.acceptedSellAmount, currency)}</TableCell>
+                    <TableCell variant="admin"><FormHint>Accepted · locked</FormHint></TableCell>
+                    <TableCell variant="admin" className="font-semibold">{money(unit.acceptedSellAmount, currency)}</TableCell>
+                    <TableCell variant="admin" className="text-right"><FormHint>Locked</FormHint></TableCell>
+                  </TableRow>
+                ))
+              ) : items.length === 0 ? <TableStateRow colSpan={6}>No lines yet. Choose Countertop, Cabinet, or Service.</TableStateRow> : items.map((item, index) => {
                 const product = productMap.get(item.product_id);
                 const isService = item.pricing_model === "manual_service";
                 const price = isService ? Number(item.unit_price ?? 0) : priceMap.get(item.product_id) ?? 0;
@@ -530,11 +670,11 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="xl:col-span-8"><ComponentCard title="Notes" desc="Customer-facing and internal context for this order."><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes" htmlFor="new-order-customer-notes"><TextArea id="new-order-customer-notes" rows={5} value={customerNotes} onChange={setCustomerNotes} /></Field><Field label="Internal Notes" htmlFor="new-order-internal-notes"><TextArea id="new-order-internal-notes" rows={5} value={internalNotes} onChange={setInternalNotes} /></Field></div></ComponentCard></div>
-        <div className="xl:col-span-4"><ComponentCard title="Order Total" desc="Internal preview; customer-facing documents absorb Administrative Fee into line prices."><div className="space-y-3"><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Base Sell" value={money(preview.baseSell, currency)} /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value={money(preview.administrativeFee, currency)} /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button></div></ComponentCard></div>
+        <div className="xl:col-span-4"><ComponentCard title="Order Total" desc={isProposalConversion ? "Accepted customer-visible pre-tax sell is authoritative. Internal base/Administrative Fee cents are derived and verified server-side on save." : "Internal preview; customer-facing documents absorb Administrative Fee into line prices."}><div className="space-y-3">{isProposalConversion ? <><SummaryRow label="Accepted Proposal scope" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Order Discount" value={money(0, currency)} /><SummaryRow label="Base Sell" value="Derived server-side" /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value="Included in accepted sell" /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax estimate" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total estimate" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || !paymentMethodId || proposalSourceUnits.length === 0} onClick={saveOrder}>{isSaving ? "Creating…" : "Create Draft from Proposal"}</Button></> : <><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Base Sell" value={money(preview.baseSell, currency)} /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value={money(preview.administrativeFee, currency)} /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button></>}</div></ComponentCard></div>
       </div>
 
-      <OrderProductPicker isOpen={isProductPickerOpen} onClose={() => setIsProductPickerOpen(false)} products={products} selectedQuantities={selectedQuantities} priceMap={priceMap} onAdd={addProduct} currencyCode={currency} disableWithoutPrice excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]} />
-      <ManualServiceLineModal isOpen={isServiceModalOpen} currencyCode={currency} onClose={() => setIsServiceModalOpen(false)} onSubmit={addServiceLine} />
+      {!isProposalConversion ? <OrderProductPicker isOpen={isProductPickerOpen} onClose={() => setIsProductPickerOpen(false)} products={products} selectedQuantities={selectedQuantities} priceMap={priceMap} onAdd={addProduct} currencyCode={currency} disableWithoutPrice excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]} /> : null}
+      {!isProposalConversion ? <ManualServiceLineModal isOpen={isServiceModalOpen} currencyCode={currency} onClose={() => setIsServiceModalOpen(false)} onSubmit={addServiceLine} /> : null}
     </div>
   );
 }
