@@ -19,12 +19,12 @@ import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, Tabl
 import { PlusIcon } from "@/icons";
 import { hasPermission } from "@/lib/auth/permissions";
 import {
-  createCustomerOrder,
   loadCreateOrderContext,
   loadOrderPrices,
   type OrderPriceRow,
   type OrderTaxRule,
 } from "@/lib/customers/order-domain";
+import { createCustomerOrderWithAdministrativeFee, loadAdministrativeFeeDefault } from "@/lib/customers/order-administrative-fee-domain";
 import {
   ORDER_MONEY_DECIMAL,
   ORDER_QUANTITY_DECIMAL,
@@ -32,7 +32,6 @@ import {
   parseOrderPercent,
   parseOrderQuantity,
 } from "@/lib/customers/order-validation";
-import { createProjectCustomerOrder } from "@/lib/customers/project-domain";
 import type { Customer, CustomerAddress, OrderFulfillmentType, OrderPricingModel, PaymentMethod, PriceGroupLookup } from "@/lib/customers/types";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
 import { calculateDbDecimalBulk, compareDbDecimal } from "@/lib/validation";
@@ -62,14 +61,14 @@ type ValidatedOrderItem = {
 type ValidatedHeader = {
   taxRate: string;
   orderDiscountAmount: string;
-  paymentCommissionPercent: string;
+  administrativeFeePercent: string;
 };
 
 type ItemFieldErrors = Partial<Record<"quantity" | "discount_percent" | "unit_price" | "line_note", string>>;
 type FieldErrors = {
   priceGroupId?: string;
   paymentMethodId?: string;
-  paymentCommissionPercent?: string;
+  administrativeFeePercent?: string;
   shippingAddressId?: string;
   orderDiscount?: string;
   taxRate?: string;
@@ -113,7 +112,8 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
   const [priceGroupId, setPriceGroupId] = useState("");
   const [fulfillmentType, setFulfillmentType] = useState<OrderFulfillmentType>("delivery");
   const [paymentMethodId, setPaymentMethodId] = useState("");
-  const [paymentCommissionPercent, setPaymentCommissionPercent] = useState("0");
+  const [administrativeFeeDefaultPercent, setAdministrativeFeeDefaultPercent] = useState("3.000");
+  const [administrativeFeePercent, setAdministrativeFeePercent] = useState("3.000");
   const [billingAddressId, setBillingAddressId] = useState("");
   const [shippingAddressId, setShippingAddressId] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
@@ -138,7 +138,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     let active = true;
     async function load() {
       try {
-        const [context, profileResult] = await Promise.all([loadCreateOrderContext(customerId), getCurrentProfile()]);
+        const [context, profileResult, administrativeFeeDefault] = await Promise.all([loadCreateOrderContext(customerId), getCurrentProfile(), loadAdministrativeFeeDefault()]);
         if (!active) return;
         if (profileResult.error) throw profileResult.error;
         if (!profileResult.profile) throw new Error("User profile could not be loaded.");
@@ -160,7 +160,8 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
         setPriceGroupId(defaultGroup?.id || "");
         setFulfillmentType(defaultGroup?.system_key === "pickup_level" ? "pickup" : "delivery");
         setPaymentMethodId(defaultMethod?.id || "");
-        setPaymentCommissionPercent(String(defaultMethod?.commission_percent ?? 0));
+        setAdministrativeFeeDefaultPercent(administrativeFeeDefault.toFixed(3));
+        setAdministrativeFeePercent(administrativeFeeDefault.toFixed(3));
         setBillingAddressId(loadedAddresses.find((address) => address.is_default_billing)?.id || "");
         setShippingAddressId(loadedAddresses.find((address) => address.is_default_shipping)?.id || "");
       } catch (error) {
@@ -210,16 +211,11 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     return values;
   }, [items]);
   const selectedPriceGroup = useMemo(() => priceGroups.find((group) => group.id === priceGroupId) ?? null, [priceGroups, priceGroupId]);
-  const selectedPaymentMethod = useMemo(() => paymentMethods.find((method) => method.id === paymentMethodId) ?? null, [paymentMethods, paymentMethodId]);
   const selectedTaxRule = useMemo(() => taxRules.find((rule) => rule.fulfillment_type === fulfillmentType) ?? null, [taxRules, fulfillmentType]);
   const serviceProduct = useMemo(
     () => products.find((product) => product.status === "active" && product.sku === "SERVICE" && product.product_type_code === "SERVICE" && product.pricing_model === "manual_service") ?? null,
     [products],
   );
-  const defaultCommissionValue = String(selectedPaymentMethod?.commission_percent ?? 0);
-  const defaultCommissionPercent = Number(defaultCommissionValue);
-  const appliedCommissionPercent = Number(paymentCommissionPercent || 0);
-  const commissionOverridden = Number.isFinite(appliedCommissionPercent) && Math.abs(appliedCommissionPercent - defaultCommissionPercent) > 0.0001;
   const canManageCountertop = role !== null && hasPermission(role, "orders.manage");
   const isMutating = isSaving || isStartingCountertop;
   const currency = customer?.currency_code || "USD";
@@ -233,13 +229,12 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
       subtotal += quantity * price * (1 - discount / 100);
     }
     const orderDiscountNumber = Math.max(0, Number(orderDiscount || 0));
-    const taxable = Math.max(0, subtotal - orderDiscountNumber);
-    const tax = taxable * Math.max(0, Number(taxRate || 0)) / 100;
-    const orderTotal = taxable + tax;
-    const previewCommissionPercent = Math.min(100, Math.max(0, Number(paymentCommissionPercent || 0)));
-    const paymentCommission = orderTotal * previewCommissionPercent / 100;
-    return { subtotal, tax, orderTotal, paymentCommission, grandTotal: orderTotal + paymentCommission };
-  }, [items, priceMap, orderDiscount, taxRate, paymentCommissionPercent]);
+    const baseSell = Math.max(0, subtotal - orderDiscountNumber);
+    const administrativeFee = Math.round(baseSell * Math.min(100, Math.max(0, Number(administrativeFeePercent || 0))) / 100 * 100) / 100;
+    const customerVisibleSell = baseSell + administrativeFee;
+    const tax = customerVisibleSell * Math.max(0, Number(taxRate || 0)) / 100;
+    return { subtotal, baseSell, administrativeFee, customerVisibleSell, tax, grandTotal: customerVisibleSell + tax };
+  }, [items, priceMap, orderDiscount, taxRate, administrativeFeePercent]);
 
   function clearHeaderError(field: Exclude<keyof FieldErrors, "items">) {
     setFieldErrors((current) => ({ ...current, [field]: undefined }));
@@ -256,7 +251,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     const firstInvalid = [
       errors.priceGroupId ? "new-order-price-group" : null,
       errors.paymentMethodId ? "new-order-payment-method" : null,
-      errors.paymentCommissionPercent ? "new-order-payment-commission" : null,
+      errors.administrativeFeePercent ? "new-order-administrative-fee" : null,
       errors.shippingAddressId ? "new-order-shipping-address" : null,
       errors.orderDiscount ? "new-order-discount" : null,
       errors.taxRate ? "new-order-tax-rate" : null,
@@ -278,10 +273,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
 
   function handlePaymentMethodChange(methodId: string) {
     clearHeaderError("paymentMethodId");
-    clearHeaderError("paymentCommissionPercent");
     setPaymentMethodId(methodId);
-    const method = paymentMethods.find((item) => item.id === methodId);
-    setPaymentCommissionPercent(String(method?.commission_percent ?? 0));
   }
 
   function updateItem(index: number, values: Partial<DraftItem>) {
@@ -336,10 +328,10 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
     if (!paymentMethodId) errors.paymentMethodId = "Payment method is required.";
     if (fulfillmentType !== "pickup" && !shippingAddressId) errors.shippingAddressId = "Shipping address is required for delivery.";
 
-    const commission = parseOrderPercent(paymentCommissionPercent);
+    const administrativeFee = parseOrderPercent(administrativeFeePercent);
     const discount = parseOrderMoney(orderDiscount);
     const tax = parseOrderPercent(taxRate);
-    if (commission.error || commission.value === null) errors.paymentCommissionPercent = commission.error ?? "Enter a valid payment commission.";
+    if (administrativeFee.error || administrativeFee.value === null) errors.administrativeFeePercent = administrativeFee.error ?? "Enter a valid Administrative Fee.";
     if (discount.error || discount.value === null) errors.orderDiscount = discount.error ?? "Enter a valid order discount.";
     if (tax.error || tax.value === null) errors.taxRate = tax.error ?? "Enter a valid tax rate.";
     if (isLoadingPrices) {
@@ -352,11 +344,11 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
       focusFirstInvalid(errors);
       return null;
     }
-    setFieldErrors((current) => ({ ...current, priceGroupId: undefined, paymentMethodId: undefined, paymentCommissionPercent: undefined, shippingAddressId: undefined, orderDiscount: undefined, taxRate: undefined }));
+    setFieldErrors((current) => ({ ...current, priceGroupId: undefined, paymentMethodId: undefined, administrativeFeePercent: undefined, shippingAddressId: undefined, orderDiscount: undefined, taxRate: undefined }));
     return {
       taxRate: tax.value!,
       orderDiscountAmount: discount.value!,
-      paymentCommissionPercent: commission.value!,
+      administrativeFeePercent: administrativeFee.value!,
     };
   }
 
@@ -429,13 +421,12 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
       taxRate: header.taxRate,
       orderDiscountAmount: header.orderDiscountAmount,
       paymentMethodId,
-      paymentCommissionPercent: header.paymentCommissionPercent,
+      administrativeFeePercent: header.administrativeFeePercent,
       initialStatus: status,
       fulfillmentType,
     };
 
-    if (projectId) return createProjectCustomerOrder({ projectId, ...sharedInput });
-    return createCustomerOrder({ customerId: customer.id, ...sharedInput });
+    return createCustomerOrderWithAdministrativeFee({ customerId: customer.id, projectId, ...sharedInput });
   }
 
   async function saveOrder() {
@@ -486,7 +477,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
   const fulfillmentHint = selectedTaxRule?.is_active && selectedTaxRule.tax_rate !== null
     ? `Configured tax rule: ${Number(selectedTaxRule.tax_rate).toFixed(3)}%`
     : "No active tax rule configured for this fulfillment type.";
-  const commissionHint = `Default: ${defaultCommissionPercent.toFixed(2)}%${commissionOverridden ? ` · Override: ${Number(paymentCommissionPercent || 0).toFixed(2)}%` : ""}`;
+  const administrativeFeeHint = `Company default: ${Number(administrativeFeeDefaultPercent).toFixed(3)}% · Internal revenue adjustment; customer documents absorb it into line prices.`;
 
   return (
     <div className="space-y-5">
@@ -498,8 +489,8 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
           <Field label="Price Group" htmlFor="new-order-price-group" hint={fieldErrors.priceGroupId ?? (isLoadingPrices ? "Loading prices…" : undefined)}><Select id="new-order-price-group" error={Boolean(fieldErrors.priceGroupId)} options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} /></Field>
           <Field label="Fulfillment Type" htmlFor="new-order-fulfillment-type" hint={fulfillmentHint}><Select id="new-order-fulfillment-type" options={[{ value: "pickup", label: "Customer Pickup" }, { value: "delivery", label: "Delivery" }, { value: "delivery_installation", label: "Delivery + Installation" }]} value={fulfillmentType} onChange={(value) => { setFulfillmentType(value as OrderFulfillmentType); if (value === "pickup") clearHeaderError("shippingAddressId"); }} /></Field>
-          <Field label="Payment Method" htmlFor="new-order-payment-method" hint={fieldErrors.paymentMethodId}><Select id="new-order-payment-method" error={Boolean(fieldErrors.paymentMethodId)} options={paymentMethods.map((method) => ({ value: method.id, label: `${method.name}${Number(method.commission_percent) > 0 ? ` (+${Number(method.commission_percent).toFixed(2)}%)` : ""}` }))} value={paymentMethodId} onChange={handlePaymentMethodChange} /></Field>
-          <Field label="Applied Commission (%)" htmlFor="new-order-payment-commission" hint={commissionHint}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input id="new-order-payment-commission" type="number" min="0" max="100" step="0.001" value={paymentCommissionPercent} error={Boolean(fieldErrors.paymentCommissionPercent)} hint={fieldErrors.paymentCommissionPercent} onChange={(event) => { clearHeaderError("paymentCommissionPercent"); setPaymentCommissionPercent(event.target.value); }} /></div><Button size="sm" variant="outline" onClick={() => { clearHeaderError("paymentCommissionPercent"); setPaymentCommissionPercent(defaultCommissionValue); }}>Use Default</Button></div></Field>
+          <Field label="Payment Method" htmlFor="new-order-payment-method" hint={fieldErrors.paymentMethodId}><Select id="new-order-payment-method" error={Boolean(fieldErrors.paymentMethodId)} options={paymentMethods.map((method) => ({ value: method.id, label: method.name }))} value={paymentMethodId} onChange={handlePaymentMethodChange} /></Field>
+          <Field label="Administrative Fee (%)" htmlFor="new-order-administrative-fee" hint={administrativeFeeHint}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input id="new-order-administrative-fee" type="number" min="0" max="100" step="0.001" value={administrativeFeePercent} error={Boolean(fieldErrors.administrativeFeePercent)} hint={fieldErrors.administrativeFeePercent} onChange={(event) => { clearHeaderError("administrativeFeePercent"); setAdministrativeFeePercent(event.target.value); }} /></div><Button size="sm" variant="outline" onClick={() => { clearHeaderError("administrativeFeePercent"); setAdministrativeFeePercent(administrativeFeeDefaultPercent); }}>Use Company Default</Button></div></Field>
           <Field label="Initial Status" htmlFor="new-order-initial-status"><Select id="new-order-initial-status" options={[{ value: "draft", label: "Draft" }, { value: "confirmed", label: "Confirmed" }]} value={initialStatus} onChange={(value) => setInitialStatus(value as "draft" | "confirmed")} /></Field>
           <Field label="Expected Delivery" htmlFor="new-order-expected-delivery"><DateInput id="new-order-expected-delivery" value={expectedDate} onChange={(event) => setExpectedDate(event)} /></Field>
           <Field label="Customer Reference" htmlFor="new-order-customer-reference"><Input id="new-order-customer-reference" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="PO / reference" /></Field>
@@ -539,7 +530,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="xl:col-span-8"><ComponentCard title="Notes" desc="Customer-facing and internal context for this order."><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes" htmlFor="new-order-customer-notes"><TextArea id="new-order-customer-notes" rows={5} value={customerNotes} onChange={setCustomerNotes} /></Field><Field label="Internal Notes" htmlFor="new-order-internal-notes"><TextArea id="new-order-internal-notes" rows={5} value={internalNotes} onChange={setInternalNotes} /></Field></div></ComponentCard></div>
-        <div className="xl:col-span-4"><ComponentCard title="Order Total" desc="Preview; the server remains authoritative when the order is saved."><div className="space-y-3"><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Order Total" value={money(preview.orderTotal, currency)} />{preview.paymentCommission > 0 ? <SummaryRow label={`${selectedPaymentMethod?.name || "Payment"} Commission (${Number(paymentCommissionPercent || 0).toFixed(2)}%)`} value={money(preview.paymentCommission, currency)} /> : null}<SummaryRow label="Grand Total" value={money(preview.grandTotal, currency)} strong divider />{commissionOverridden ? <Alert variant="warning" title="Commission override" message={`Payment commission is overridden from ${defaultCommissionPercent.toFixed(2)}% to ${Number(paymentCommissionPercent || 0).toFixed(2)}% for this order only.`} /> : null}<Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button></div></ComponentCard></div>
+        <div className="xl:col-span-4"><ComponentCard title="Order Total" desc="Internal preview; customer-facing documents absorb Administrative Fee into line prices."><div className="space-y-3"><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Base Sell" value={money(preview.baseSell, currency)} /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value={money(preview.administrativeFee, currency)} /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button></div></ComponentCard></div>
       </div>
 
       <OrderProductPicker isOpen={isProductPickerOpen} onClose={() => setIsProductPickerOpen(false)} products={products} selectedQuantities={selectedQuantities} priceMap={priceMap} onAdd={addProduct} currencyCode={currency} disableWithoutPrice excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]} />

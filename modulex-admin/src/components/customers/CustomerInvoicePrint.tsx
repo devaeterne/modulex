@@ -141,7 +141,7 @@ export default function CustomerInvoicePrint() {
       { label: "Subtotal", value: formatMoney(invoice.subtotal) },
       { label: "Discount", value: `-${formatMoney(invoice.discount_amount)}` },
       { label: `Tax (${Number(invoice.tax_rate).toFixed(2)}%)`, value: formatMoney(invoice.tax_amount) },
-      ...(Number(invoice.payment_commission_amount ?? 0) > 0 ? [{ label: `Payment Commission (${Number(invoice.payment_commission_percent).toFixed(2)}%)`, value: formatMoney(invoice.payment_commission_amount) }] : []),
+      ...(Number(invoice.payment_commission_amount ?? 0) > 0 ? [{ label: "Order adjustment", value: formatMoney(invoice.payment_commission_amount) }] : []),
       { label: "Total", value: formatMoney(invoice.total_amount), strong: true },
       { label: "Paid", value: formatMoney(invoice.paid_amount) },
       { label: "Balance Due", value: formatMoney(balance), strong: true },

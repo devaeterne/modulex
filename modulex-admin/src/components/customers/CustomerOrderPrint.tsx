@@ -68,6 +68,7 @@ export default function CustomerOrderPrint() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [order, setOrder] = useState<CustomerOrder | null>(null);
   const [items, setItems] = useState<CustomerOrderItem[]>([]);
+  const [visiblePricing, setVisiblePricing] = useState(new Map<string, { unitPrice: number; lineTotal: number }>());
   const [countertopSummaries, setCountertopSummaries] = useState<CountertopLineSummary[]>([]);
   const [settings, setSettings] = useState<GeneralSettings>(DEFAULT_GENERAL_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,6 +100,10 @@ export default function CustomerOrderPrint() {
       setCustomer(customerResult.data as Customer);
       setOrder(orderResult.data as CustomerOrder);
       setItems(itemRows);
+      const visibleResult = await supabase.rpc("get_customer_order_visible_line_pricing", { p_order_id: params.orderId });
+      if (!visibleResult.error) {
+        setVisiblePricing(new Map(((visibleResult.data ?? []) as Array<{ order_item_id: string; customer_visible_unit_price: number | string; customer_visible_line_total: number | string }>).map((row) => [row.order_item_id, { unitPrice: Number(row.customer_visible_unit_price), lineTotal: Number(row.customer_visible_line_total) }])));
+      }
       if (!settingsResult.error && settingsResult.data) setSettings(settingsResult.data as GeneralSettings);
       setIsLoading(false);
     }
@@ -132,7 +137,6 @@ export default function CustomerOrderPrint() {
       { label: "Billing Address", value: snapshotLines(order.billing_address_snapshot).join(" · ") },
       { label: "Payment", value: order.payment_method_name_snapshot || "—" },
       { label: "Currency", value: currency },
-      ...(Number(order.payment_commission_percent ?? 0) > 0 ? [{ label: "Payment Commission", value: `${Number(order.payment_commission_percent).toFixed(2)}%` }] : []),
       ...(order.customer_reference ? [{ label: "Reference", value: order.customer_reference }] : []),
     ],
     lines: items.map((item) => ({
@@ -141,16 +145,16 @@ export default function CustomerOrderPrint() {
       description: item.display_name_override || item.product_name_snapshot,
       detail: lineDetail(summariesByItemId.get(item.id), item.line_note),
       quantity: String(Number(item.quantity)),
-      unitPrice: formatMoney(item.unit_price),
+      unitPrice: formatMoney(visiblePricing.get(item.id)?.unitPrice ?? item.unit_price),
       discount: `${Number(item.discount_percent).toFixed(1)}%`,
-      total: formatMoney(item.line_total),
+      total: formatMoney(visiblePricing.get(item.id)?.lineTotal ?? item.line_total),
     })),
     totals: [
-      { label: "Subtotal", value: formatMoney(order.subtotal) },
-      { label: "Order Discount", value: `-${formatMoney(order.discount_amount)}` },
+      { label: "Subtotal", value: formatMoney(Number(order.customer_visible_sell_amount ?? 0) + Number(order.discount_amount ?? 0)) },
+      { label: "Discount", value: `-${formatMoney(order.discount_amount)}` },
       { label: `Tax (${Number(order.tax_rate).toFixed(1)}%)`, value: formatMoney(order.tax_amount) },
       { label: "Order Total", value: formatMoney(order.total_amount) },
-      ...(Number(order.payment_commission_amount ?? 0) > 0 ? [{ label: `${order.payment_method_name_snapshot || "Payment"} Commission`, value: formatMoney(order.payment_commission_amount) }] : []),
+      ...(Number(order.payment_commission_amount ?? 0) > 0 ? [{ label: "Order adjustment", value: formatMoney(order.payment_commission_amount) }] : []),
       { label: "Grand Total", value: formatMoney(grandTotal), strong: true },
     ],
     notes: order.customer_notes,
