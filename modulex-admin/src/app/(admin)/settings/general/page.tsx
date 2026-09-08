@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import AdministrativeFeeSettings from "@/components/settings/AdministrativeFeeSettings";
 import GeneralSettingsOverview from "@/components/settings/GeneralSettingsOverview";
 import GoogleCalendarIntegrationLink from "@/components/settings/GoogleCalendarIntegrationLink";
 
@@ -14,6 +15,7 @@ export default function GeneralSettingsPage() {
       <PageBreadcrumb pageTitle="General Settings" />
       <div className="space-y-5">
         <GeneralSettingsOverview />
+        <AdministrativeFeeSettings />
         <GoogleCalendarIntegrationLink />
       </div>
     </div>
