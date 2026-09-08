@@ -1,0 +1,35 @@
+name: Admin Project Proposal P6
+
+on:
+  pull_request:
+    paths:
+      - "modulex-admin/src/components/customers/project-detail/**"
+      - "modulex-admin/src/components/customers/NewCustomerOrder.tsx"
+      - "modulex-admin/src/lib/customers/project-proposal-order-conversion-domain.ts"
+      - "modulex-admin/scripts/project-proposal-order-conversion*.mjs"
+      - "modulex-admin/supabase/migrations/*project_proposal_order_conversion*.sql"
+      - "modulex-store/supabase/migrations/*project_proposal_order_conversion*.sql"
+      - ".github/workflows/admin-project-proposal-p6.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proposal-order-conversion-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: Project Proposal P6 conversion contract
+        run: node scripts/project-proposal-order-conversion-contract.mjs
+      - name: Project Proposal P6 UUID aggregate hotfix contract
+        run: node scripts/project-proposal-order-conversion-uuid-aggregate-contract.mjs
