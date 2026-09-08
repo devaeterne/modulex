@@ -21,6 +21,7 @@ export type GeneralSettings = {
   default_currency: string;
   locale: string;
   timezone: string;
+  administrative_fee_default_percent: number;
   order_document_title: string;
   order_footer_note: string | null;
   invoice_document_title: string;
@@ -52,6 +53,7 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   default_currency: "USD",
   locale: "en-US",
   timezone: "America/New_York",
+  administrative_fee_default_percent: 3,
   order_document_title: "Sales Order / Order Confirmation",
   order_footer_note: null,
   invoice_document_title: "Invoice",

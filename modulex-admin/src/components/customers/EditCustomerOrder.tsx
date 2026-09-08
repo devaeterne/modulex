@@ -26,10 +26,10 @@ import {
   loadEditOrderContext,
   loadOrderPrices,
   removeCountertopOrderItem,
-  updateCustomerOrder,
   type OrderPriceRow,
   type OrderTaxRule,
 } from "@/lib/customers/order-domain";
+import { updateCustomerOrderWithAdministrativeFee } from "@/lib/customers/order-administrative-fee-domain";
 import {
   ORDER_QUANTITY_DECIMAL,
   parseOrderMoney,
@@ -80,7 +80,7 @@ type ItemFieldErrors = Partial<Record<"quantity" | "unit_price" | "discount_perc
 type FieldErrors = {
   priceGroupId?: string;
   paymentMethodId?: string;
-  appliedCommission?: string;
+  administrativeFeePercent?: string;
   shippingAddressId?: string;
   orderDiscount?: string;
   taxRate?: string;
@@ -156,7 +156,7 @@ export default function EditCustomerOrder() {
   const [priceGroupId, setPriceGroupId] = useState("");
   const [fulfillmentType, setFulfillmentType] = useState<OrderFulfillmentType>("delivery");
   const [paymentMethodId, setPaymentMethodId] = useState("");
-  const [appliedCommission, setAppliedCommission] = useState("0");
+  const [administrativeFeePercent, setAdministrativeFeePercent] = useState("0");
   const [billingAddressId, setBillingAddressId] = useState("");
   const [shippingAddressId, setShippingAddressId] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
@@ -201,7 +201,7 @@ export default function EditCustomerOrder() {
         setPriceGroupId(loadedOrder.price_group_id ?? "");
         setFulfillmentType(loadedOrder.fulfillment_type || "delivery");
         setPaymentMethodId(loadedOrder.payment_method_id ?? "");
-        setAppliedCommission(String(loadedOrder.payment_commission_percent ?? 0));
+        setAdministrativeFeePercent(String(loadedOrder.administrative_fee_percent ?? 0));
         setBillingAddressId(loadedOrder.billing_address_id ?? "");
         setShippingAddressId(loadedOrder.shipping_address_id ?? "");
         setExpectedDate(loadedOrder.expected_delivery_date ?? "");
@@ -272,13 +272,12 @@ export default function EditCustomerOrder() {
       subtotal += qty * price * (1 - discount / 100);
     }
     const discountAmount = Math.max(0, Number(orderDiscount || 0));
-    const taxable = Math.max(0, subtotal - discountAmount);
-    const tax = taxable * Math.max(0, Number(taxRate || 0)) / 100;
-    const orderTotal = taxable + tax;
-    const commissionPercent = Math.max(0, Number(appliedCommission || 0));
-    const commission = orderTotal * commissionPercent / 100;
-    return { subtotal, tax, orderTotal, commission, grandTotal: orderTotal + commission };
-  }, [items, productMap, priceValueMap, orderDiscount, taxRate, appliedCommission]);
+    const baseSell = Math.max(0, subtotal - discountAmount);
+    const administrativeFee = Math.round(baseSell * Math.min(100, Math.max(0, Number(administrativeFeePercent || 0))) / 100 * 100) / 100;
+    const customerVisibleSell = baseSell + administrativeFee;
+    const tax = customerVisibleSell * Math.max(0, Number(taxRate || 0)) / 100;
+    return { subtotal, baseSell, administrativeFee, customerVisibleSell, tax, grandTotal: customerVisibleSell + tax };
+  }, [items, productMap, priceValueMap, orderDiscount, taxRate, administrativeFeePercent]);
 
   function clearHeaderError(field: Exclude<keyof FieldErrors, "items">) {
     setFieldErrors((current) => ({ ...current, [field]: undefined }));
@@ -295,7 +294,7 @@ export default function EditCustomerOrder() {
     const firstInvalid = [
       errors.priceGroupId ? "edit-order-price-group" : null,
       errors.paymentMethodId ? "edit-order-payment-method" : null,
-      errors.appliedCommission ? "edit-order-payment-commission" : null,
+      errors.administrativeFeePercent ? "edit-order-administrative-fee" : null,
       errors.shippingAddressId ? "edit-order-shipping-address" : null,
       errors.orderDiscount ? "edit-order-discount" : null,
       errors.taxRate ? "edit-order-tax-rate" : null,
@@ -475,7 +474,7 @@ export default function EditCustomerOrder() {
     }
   }
 
-  function validateRevision(): { items: ValidatedRevisionItem[]; taxRate: string; orderDiscount: string; commission: string } | null {
+  function validateRevision(): { items: ValidatedRevisionItem[]; taxRate: string; orderDiscount: string; administrativeFeePercent: string } | null {
     setErrorMessage(null);
     if (!order || !revisionPolicy?.canEdit) {
       setErrorMessage(revisionPolicy?.reason ?? "This order cannot be revised.");
@@ -491,10 +490,10 @@ export default function EditCustomerOrder() {
     if (!paymentMethodId) errors.paymentMethodId = "Payment method is required.";
     if (fulfillmentType !== "pickup" && !shippingAddressId) errors.shippingAddressId = "Shipping address is required for delivery.";
 
-    const commission = parseOrderPercent(appliedCommission);
+    const administrativeFee = parseOrderPercent(administrativeFeePercent);
     const discount = parseOrderMoney(orderDiscount);
     const tax = parseOrderPercent(taxRate);
-    if (commission.error || commission.value === null) errors.appliedCommission = commission.error ?? "Enter a valid payment commission.";
+    if (administrativeFee.error || administrativeFee.value === null) errors.administrativeFeePercent = administrativeFee.error ?? "Enter a valid Administrative Fee.";
     if (discount.error || discount.value === null) errors.orderDiscount = discount.error ?? "Enter a valid order discount.";
     if (tax.error || tax.value === null) errors.taxRate = tax.error ?? "Enter a valid tax rate.";
 
@@ -550,7 +549,7 @@ export default function EditCustomerOrder() {
     }
 
     setFieldErrors({});
-    return { items: validatedItems, taxRate: tax.value!, orderDiscount: discount.value!, commission: commission.value! };
+    return { items: validatedItems, taxRate: tax.value!, orderDiscount: discount.value!, administrativeFeePercent: administrativeFee.value! };
   }
 
   async function saveRevision() {
@@ -559,7 +558,7 @@ export default function EditCustomerOrder() {
 
     setIsSaving(true);
     try {
-      const revision = await updateCustomerOrder({
+      const revision = await updateCustomerOrderWithAdministrativeFee({
         orderId: order.id,
         items: validated.items,
         priceGroupId,
@@ -572,7 +571,8 @@ export default function EditCustomerOrder() {
         taxRate: validated.taxRate,
         orderDiscountAmount: validated.orderDiscount,
         paymentMethodId,
-        paymentCommissionPercent: validated.commission,
+        paymentCommissionPercent: order.payment_commission_percent ?? 0,
+        administrativeFeePercent: validated.administrativeFeePercent,
         revisionReason,
         fulfillmentType,
       });
@@ -594,9 +594,6 @@ export default function EditCustomerOrder() {
   if (!revisionPolicy.canEdit) {
     return <div className="space-y-5"><ComponentCard title={`Revision Locked · ${order.order_number}`} desc={`${customer.name} · ${revisionPolicy.reason}`} headerAction={<Button variant="outline" onClick={() => router.push(`/customers/${customerId}/orders/${orderId}`)}>Back to Order</Button>}><Alert variant="warning" title="Commercial revision disabled" message={`Commercial revision is disabled for status ${order.status.replaceAll("_", " ")}. Order identity, snapshots and calculated totals remain immutable; status changes continue through the dedicated status workflow.`} /></ComponentCard></div>;
   }
-  const defaultCommissionValue = String(selectedPaymentMethod?.commission_percent ?? 0);
-  const defaultCommission = Number(defaultCommissionValue);
-  const commissionOverridden = Math.abs(Number(appliedCommission || 0) - defaultCommission) > 0.0001;
   const taxHint = selectedTaxRule?.is_active && selectedTaxRule.tax_rate !== null ? `Configured tax rule: ${Number(selectedTaxRule.tax_rate).toFixed(3)}%` : "No active tax rule configured.";
   const editingService = serviceEditIndex === null ? null : items[serviceEditIndex] ?? null;
 
@@ -609,8 +606,8 @@ export default function EditCustomerOrder() {
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
           <Field label="Price Group" htmlFor="edit-order-price-group" hint={fieldErrors.priceGroupId ?? (isLoadingPrices ? "Loading group prices…" : undefined)}><Select id="edit-order-price-group" error={Boolean(fieldErrors.priceGroupId)} options={priceGroups.map((group) => ({ value: group.id, label: `${group.name}${group.requires_approval ? " · Approval" : ""}` }))} value={priceGroupId} onChange={handlePriceGroupChange} /></Field>
           <Field label="Fulfillment Type" htmlFor="edit-order-fulfillment-type" hint={taxHint}><Select id="edit-order-fulfillment-type" options={[{ value: "pickup", label: "Customer Pickup" }, { value: "delivery", label: "Delivery" }, { value: "delivery_installation", label: "Delivery + Installation" }]} value={fulfillmentType} onChange={(value) => handleFulfillmentChange(value as OrderFulfillmentType)} /></Field>
-          <Field label="Payment Method" htmlFor="edit-order-payment-method" hint={fieldErrors.paymentMethodId}><Select id="edit-order-payment-method" error={Boolean(fieldErrors.paymentMethodId)} options={paymentMethods.map((method) => ({ value: method.id, label: method.name }))} value={paymentMethodId} onChange={(id) => { clearHeaderError("paymentMethodId"); clearHeaderError("appliedCommission"); setPaymentMethodId(id); const method = paymentMethods.find((item) => item.id === id); setAppliedCommission(String(method?.commission_percent ?? 0)); }} /></Field>
-          <Field label="Applied Commission (%)" htmlFor="edit-order-payment-commission" hint={`Default ${defaultCommission.toFixed(2)}%${commissionOverridden ? " · Sales override requires approval" : ""}`}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input id="edit-order-payment-commission" inputMode="decimal" value={appliedCommission} error={Boolean(fieldErrors.appliedCommission)} hint={fieldErrors.appliedCommission} onChange={(event) => { clearHeaderError("appliedCommission"); setAppliedCommission(event.target.value); }} /></div><Button size="sm" variant="outline" onClick={() => { clearHeaderError("appliedCommission"); setAppliedCommission(defaultCommissionValue); }}>Use Default</Button></div></Field>
+          <Field label="Payment Method" htmlFor="edit-order-payment-method" hint={fieldErrors.paymentMethodId}><Select id="edit-order-payment-method" error={Boolean(fieldErrors.paymentMethodId)} options={paymentMethods.map((method) => ({ value: method.id, label: method.name }))} value={paymentMethodId} onChange={(id) => { clearHeaderError("paymentMethodId"); setPaymentMethodId(id); }} /></Field>
+          <Field label="Administrative Fee (%)" htmlFor="edit-order-administrative-fee" hint="Order snapshot. Changing it follows the existing revision/approval rules."><Input id="edit-order-administrative-fee" type="number" min="0" max="100" step="0.001" inputMode="decimal" value={administrativeFeePercent} error={Boolean(fieldErrors.administrativeFeePercent)} hint={fieldErrors.administrativeFeePercent} onChange={(event) => { clearHeaderError("administrativeFeePercent"); setAdministrativeFeePercent(event.target.value); }} /></Field>
           <Field label="Expected Delivery" htmlFor="edit-order-expected-delivery"><DateInput id="edit-order-expected-delivery" value={expectedDate} onChange={(event) => setExpectedDate(event)} /></Field>
           <Field label="Customer Reference" htmlFor="edit-order-customer-reference"><Input id="edit-order-customer-reference" value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
           <Field label="Billing Address" htmlFor="edit-order-billing-address"><Select id="edit-order-billing-address" options={addresses.filter((address) => ["billing", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={billingAddressId} placeholder="None" allowEmpty onChange={setBillingAddressId} /></Field>
@@ -692,7 +689,7 @@ export default function EditCustomerOrder() {
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="space-y-5 xl:col-span-8"><ComponentCard title="Notes" desc="Customer-facing and internal context for this revision."><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes" htmlFor="edit-order-customer-notes"><TextArea id="edit-order-customer-notes" rows={5} value={customerNotes} onChange={setCustomerNotes} /></Field><Field label="Internal Notes" htmlFor="edit-order-internal-notes"><TextArea id="edit-order-internal-notes" rows={5} value={internalNotes} onChange={setInternalNotes} /></Field></div></ComponentCard><ComponentCard title="Revision Reason" desc="Record why the commercial order changed."><Field label="Reason" htmlFor="edit-order-revision-reason" hint="Recommended. Sales revisions from Confirmed through Ready for Shipment stay pending until Admin approval; Shipped and later orders are revision-locked."><Input id="edit-order-revision-reason" value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} placeholder="e.g. Quantity changed after customer request" /></Field></ComponentCard></div>
-        <div className="xl:col-span-4"><ComponentCard title="Revised Total" desc="Preview; the server remains authoritative when the revision is saved."><div className="space-y-3"><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Order Total" value={money(preview.orderTotal, currency)} />{preview.commission > 0 ? <SummaryRow label={`Payment Commission (${Number(appliedCommission || 0).toFixed(2)}%)`} value={money(preview.commission, currency)} /> : null}<SummaryRow label="Grand Total" value={money(preview.grandTotal, currency)} strong divider />{commissionOverridden ? <Alert variant="warning" title="Commission override" message={`Payment commission differs from the default ${defaultCommission.toFixed(2)}% and may require approval.`} /> : null}<Button className="w-full" disabled={isSaving || isLoadingPrices || !revisionPolicy.canEdit} onClick={saveRevision}>{isSaving ? "Saving…" : revisionPolicy.mode === "approval" ? "Submit for Approval" : "Save Revision"}</Button></div></ComponentCard></div>
+        <div className="xl:col-span-4"><ComponentCard title="Revised Total" desc="Internal preview; the server remains authoritative when the revision is saved."><div className="space-y-3"><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Base Sell" value={money(preview.baseSell, currency)} /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value={money(preview.administrativeFee, currency)} /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isSaving || isLoadingPrices || !revisionPolicy.canEdit} onClick={saveRevision}>{isSaving ? "Saving…" : revisionPolicy.mode === "approval" ? "Submit for Approval" : "Save Revision"}</Button></div></ComponentCard></div>
       </div>
 
       <OrderProductPicker isOpen={isProductPickerOpen} onClose={() => setIsProductPickerOpen(false)} products={activeProducts} selectedQuantities={selectedQuantities} priceMap={priceMap} onAdd={addProduct} currencyCode={currency} disableWithoutPrice excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]} />

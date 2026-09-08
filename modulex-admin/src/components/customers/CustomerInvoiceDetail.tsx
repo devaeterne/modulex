@@ -313,7 +313,7 @@ export default function CustomerInvoiceDetail() {
               <SummaryRow label="Subtotal" value={formatMoney(invoice.subtotal)} />
               <SummaryRow label="Order discount" value={`-${formatMoney(invoice.discount_amount)}`} />
               <SummaryRow label={`Tax (${Number(invoice.tax_rate).toFixed(2)}%)`} value={formatMoney(invoice.tax_amount)} />
-              {Number(invoice.payment_commission_amount) > 0 ? <SummaryRow label={`Payment commission (${Number(invoice.payment_commission_percent).toFixed(2)}%)`} value={formatMoney(invoice.payment_commission_amount)} /> : null}
+              {Number(invoice.payment_commission_amount) > 0 ? <SummaryRow label="Order adjustment" value={formatMoney(invoice.payment_commission_amount)} /> : null}
               <SummaryRow label="Total" value={formatMoney(invoice.total_amount)} strong divider />
               <SummaryRow label="Paid" value={formatMoney(invoice.paid_amount)} />
               <SummaryRow label="Balance Due" value={formatMoney(balance)} strong />
