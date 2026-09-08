@@ -1,6 +1,9 @@
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const ISO_LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 const US_DATE = /^(\d{2})\.(\d{2})\.(\d{4})$/;
+const US_DATE_TIME = /^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2})$/;
 const INPUT_ERROR = "Enter a date as MM.DD.YYYY.";
+const DATE_TIME_INPUT_ERROR = "Enter a date and time as MM.DD.YYYY HH:MM.";
 
 export type DateInputParseResult =
   | { ok: true; value: string }
@@ -33,6 +36,15 @@ function isCalendarDate(year: number, month: number, day: number) {
     && month <= 12
     && day >= 1
     && day <= daysInMonth(year, month);
+}
+
+function isClockTime(hour: number, minute: number) {
+  return Number.isInteger(hour)
+    && Number.isInteger(minute)
+    && hour >= 0
+    && hour <= 23
+    && minute >= 0
+    && minute <= 59;
 }
 
 function canonicalParts(value: string | null | undefined) {
@@ -68,6 +80,35 @@ export function parseDateInput(value: string): DateInputParseResult {
   const day = Number(dayText);
   if (!isCalendarDate(year, month, day)) return { ok: false, error: INPUT_ERROR };
   return { ok: true, value: `${yearText}-${monthText}-${dayText}` };
+}
+
+export function formatDateTimeInput(value: string | null | undefined): string {
+  if (!value) return "";
+  const match = ISO_LOCAL_DATE_TIME.exec(value.trim());
+  if (!match) return "";
+  const [, yearText, monthText, dayText, hourText, minuteText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!isCalendarDate(year, month, day) || !isClockTime(hour, minute)) return "";
+  return `${monthText}.${dayText}.${yearText} ${hourText}:${minuteText}`;
+}
+
+export function parseDateTimeInput(value: string): DateInputParseResult {
+  const match = US_DATE_TIME.exec(value.trim());
+  if (!match) return { ok: false, error: DATE_TIME_INPUT_ERROR };
+  const [, monthText, dayText, yearText, hourText, minuteText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (!isCalendarDate(year, month, day) || !isClockTime(hour, minute)) {
+    return { ok: false, error: DATE_TIME_INPUT_ERROR };
+  }
+  return { ok: true, value: `${yearText}-${monthText}-${dayText}T${hourText}:${minuteText}` };
 }
 
 function part(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes) {
