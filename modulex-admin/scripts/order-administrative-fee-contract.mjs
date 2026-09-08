@@ -16,11 +16,9 @@ const baseMigration = [
   read("modulex-store/supabase/migrations/20260908150500_customer_order_administrative_fee_defaults.sql"),
   read("modulex-store/supabase/migrations/20260908151000_customer_order_visible_pricing_rpc.sql"),
 ].join("\n");
-const revenueTruthMigration = [
-  read("modulex-store/supabase/migrations/20260908153000_customer_order_administrative_fee_revenue_truth.sql"),
-  read("modulex-store/supabase/migrations/20260908153500_customer_order_administrative_fee_portal_projection.sql"),
-].join("\n");
-const migration = `${baseMigration}\n${revenueTruthMigration}`;
+const revenueTruthMigration = read("modulex-store/supabase/migrations/20260908153000_customer_order_administrative_fee_revenue_truth.sql");
+const portalProjectionMigration = read("modulex-store/supabase/migrations/20260908153500_customer_order_administrative_fee_portal_projection.sql");
+const migration = `${baseMigration}\n${revenueTruthMigration}\n${portalProjectionMigration}`;
 const settingsTypes = read("modulex-admin/src/lib/settings/types.ts");
 const settingsUi = read("modulex-admin/src/components/settings/AdministrativeFeeSettings.tsx");
 const orderTypes = read("modulex-admin/src/lib/customers/types.ts");
@@ -65,8 +63,8 @@ assert.match(revenueTruthMigration, /create\s+or\s+replace\s+function\s+private\
 assert.match(revenueTruthMigration, /update\s+public\.customer_orders[\s\S]{0,800}administrative_fee_percent\s*=\s*v_fee[\s\S]{0,1800}assess_customer_order/i, "Direct Draft revisions must apply Administrative Fee before Sales assessment");
 
 // Dealer pricing is customer-facing: fee must be absorbed into visible lines and internal fee fields never escape.
-assert.match(revenueTruthMigration, /get_store_dealer_order[\s\S]*customer_order_visible_line_pricing/i, "Dealer order pricing must consume the canonical customer-visible line projection");
-assert.doesNotMatch(revenueTruthMigration, /jsonb_build_object\([^;]{0,3000}'administrative_fee_(?:percent|amount)'/i, "Dealer/customer projection must not expose internal Administrative Fee fields");
+assert.match(portalProjectionMigration, /get_store_dealer_order[\s\S]*customer_order_visible_line_pricing/i, "Dealer order pricing must consume the canonical customer-visible line projection");
+assert.doesNotMatch(portalProjectionMigration, /jsonb_build_object\([^;]{0,3000}'administrative_fee_(?:percent|amount)'/i, "Dealer/customer projection must not expose internal Administrative Fee fields");
 
 // Create/edit boundaries use Administrative Fee separately; legacy payment commission is not repurposed.
 assert.match(orderDomain, /administrativeFeePercent/i, "Order domain input must expose Administrative Fee percent");
