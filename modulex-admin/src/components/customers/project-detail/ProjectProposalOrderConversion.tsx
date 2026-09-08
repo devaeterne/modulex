@@ -128,7 +128,7 @@ export default function ProjectProposalOrderConversion({
             <div className="space-y-2">
               <p className="text-sm font-medium">Converted scope</p>
               {preview.units.filter((unit) => unit.convertedOrderId).map((unit) => (
-                <div key={unit.unitId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+                <div key={unit.unitId} className="flex flex-wrap items-center justify-between gap-2 border p-3 text-sm">
                   <span>{unit.label} · {money(unit.acceptedSellAmount, preview.currencyCode)}</span>
                   <Button size="sm" variant="outline" onClick={() => router.push(`/customers/${preview.customerId}/orders/${unit.convertedOrderId}`)}>
                     Open {unit.convertedOrderNumber || "Order"}
@@ -154,7 +154,7 @@ export default function ProjectProposalOrderConversion({
               const selected = selectedUnitIds.has(unit.unitId);
               const group = unit.kind === "pricing_group";
               return (
-                <div key={unit.unitId} className="rounded-lg border p-4">
+                <div key={unit.unitId} className="border p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium">{unit.label}</p>
