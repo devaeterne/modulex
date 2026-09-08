@@ -35,50 +35,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  pr369-date-closeout:
-    if: github.ref == 'refs/heads/feat/us-date-format-standardization-v2' || github.head_ref == 'feat/us-date-format-standardization-v2'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: feat/us-date-format-standardization-v2
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Apply verified PR369 Admin date closeout
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import textwrap
-
-          runner = Path('.github/workflows/pr369-admin-date-fix-runner.yml').read_text()
-          marker = "          python3 - <<'PY'\n"
-          start = runner.index(marker) + len(marker)
-          end = runner.index("\n          PY", start)
-          code = textwrap.dedent(runner[start:end])
-          exec(compile(code, 'pr369-date-closeout.py', 'exec'))
-          PY
-      - name: Verify date contracts before commit
-        run: |
-          npm --prefix modulex-admin run smoke:us-date-format
-          node scripts/us-date-format-audit.mjs --write
-          node scripts/us-date-format-audit.mjs --check --scope admin
-          node modulex-admin/scripts/admin-date-input-contract.mjs
-          git diff --check
-      - name: Commit verified source fixes
-        run: |
-          git config user.name "modulex-ci"
-          git config user.email "modulex-ci@users.noreply.github.com"
-          git add modulex-admin/src/components
-          git diff --cached --check
-          git commit -m "fix(dates): close remaining admin MM.DD.YYYY displays"
-          git push origin HEAD:feat/us-date-format-standardization-v2
-
   admin-ui:
     runs-on: ubuntu-latest
     defaults:
