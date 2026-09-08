@@ -17,6 +17,9 @@ const exists = (file, base = root) => fs.existsSync(path.join(base, file));
 const migrationName = "20260908170000_project_proposal_acceptance_snapshot.sql";
 const adminMigration = `supabase/migrations/${migrationName}`;
 const storeMigration = `modulex-store/supabase/migrations/${migrationName}`;
+const compatibilityMigrationName = "20260908184500_project_proposal_artifact_accepted_baseline_fix.sql";
+const adminCompatibilityMigration = `supabase/migrations/${compatibilityMigrationName}`;
+const storeCompatibilityMigration = `modulex-store/supabase/migrations/${compatibilityMigrationName}`;
 const files = {
   server: "src/lib/customers/project-proposal-artifact-server.ts",
   client: "src/lib/customers/project-proposal-artifact-client.ts",
@@ -29,9 +32,15 @@ const files = {
 
 assert.equal(exists(adminMigration), true, `P5 Admin migration mirror must exist: ${adminMigration}`);
 assert.equal(exists(storeMigration, repoRoot), true, `P5 canonical Store migration must exist: ${storeMigration}`);
+assert.equal(exists(adminCompatibilityMigration), true, `P5 Admin accepted-baseline compatibility migration must exist: ${adminCompatibilityMigration}`);
+assert.equal(exists(storeCompatibilityMigration, repoRoot), true, `P5 canonical Store accepted-baseline compatibility migration must exist: ${storeCompatibilityMigration}`);
+
 const adminSql = read(adminMigration);
 const storeSql = read(storeMigration, repoRoot);
+const adminCompatibilitySql = read(adminCompatibilityMigration);
+const storeCompatibilitySql = read(storeCompatibilityMigration, repoRoot);
 assert.equal(adminSql, storeSql, "P5 Admin migration mirror must be byte-identical to canonical Store migration");
+assert.equal(adminCompatibilitySql, storeCompatibilitySql, "P5 accepted-baseline compatibility Admin mirror must be byte-identical to canonical Store migration");
 
 for (const [name, file] of Object.entries(files)) {
   assert.equal(exists(file), true, `P5 ${name} file must exist: ${file}`);
@@ -50,11 +59,18 @@ for (const sqlToken of [
 assert.match(storeSql, /unique\s*\([^)]*proposal_revision_id[^)]*\)/i, "P5 must enforce one accepted artifact per Proposal Revision");
 assert.match(storeSql, /unique\s*\([^)]*acceptance_id[^)]*\)/i, "P5 must enforce one artifact per acceptance row");
 assert.match(storeSql, /unique\s*\([^)]*customer_document_id[^)]*\)/i, "P5 must not link one canonical document to multiple Proposal artifacts");
-assert.match(storeSql, /revision[^;]*state[^;]*accepted|state[^;]*accepted[^;]*revision/is, "P5 registration must validate accepted Revision state");
-assert.match(storeSql, /accepted_revision_id/i, "P5 registration must validate Proposal accepted_revision_id");
 assert.match(storeSql, /register_customer_document/i, "P5 must reuse the canonical customer document lifecycle");
 assert.match(storeSql, /customer-documents/i, "P5 must reuse the existing customer-documents bucket");
 assert.doesNotMatch(storeSql, /create\s+table[^;]*(?:proposal_documents|proposal_files)/i, "P5 must not create a parallel Proposal document table");
+
+assert.match(storeCompatibilitySql, /create\s+or\s+replace\s+function\s+public\.register_project_proposal_accepted_artifact/i, "P5 compatibility migration must replace the accepted artifact registration RPC");
+assert.match(storeCompatibilitySql, /customer_project_proposal_acceptances/i, "P5 accepted artifact compatibility must validate immutable Acceptance evidence");
+assert.match(storeCompatibilitySql, /v_revision_state\s*<>\s*'accepted'|state\s*=\s*'accepted'/i, "P5 accepted artifact compatibility must require the exact accepted Revision");
+assert.match(storeCompatibilitySql, /v_proposal_status\s*<>\s*'accepted'|status\s*=\s*'accepted'/i, "P5 accepted artifact compatibility must require the accepted Proposal lifecycle state");
+assert.doesNotMatch(storeCompatibilitySql, /accepted_revision_id/i, "P5 compatibility must not depend on the non-canonical customer_project_proposals.accepted_revision_id column");
+assert.match(storeCompatibilitySql, /register_customer_document/i, "P5 compatibility must preserve canonical customer document registration");
+assert.match(storeCompatibilitySql, /pg_advisory_xact_lock/i, "P5 compatibility must preserve duplicate-submit serialization");
+assert.match(storeCompatibilitySql, /revoke\s+all[\s\S]*from\s+public,\s*anon/i, "P5 compatibility must preserve RPC execute hardening");
 
 const server = read(files.server);
 const client = read(files.client);
