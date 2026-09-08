@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import "./order-list-consistency-contract.mjs";
+import "./order-administrative-fee-contract.mjs";
 
 const root = process.cwd();
 const domainPath = path.join(root, "src/lib/customers/order-domain.ts");
