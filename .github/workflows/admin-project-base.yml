@@ -9,6 +9,7 @@ on:
       - "modulex-admin/src/lib/projects/**"
       - "modulex-admin/src/lib/customers/project-*.ts"
       - "modulex-admin/scripts/project-*.mjs"
+      - "modulex-admin/scripts/project-import/**"
       - "modulex-admin/scripts/countertop-sink-fallback-contract.mjs"
       - "modulex-admin/sql/project-*.sql"
       - "modulex-store/supabase/migrations/*project*.sql"
@@ -81,6 +82,10 @@ jobs:
         run: node scripts/project-pb7-performance-hardening-contract.mjs
       - name: Project PB-8 Portal Project projection contract
         run: node scripts/project-pb8-portal-projection-contract.mjs
+      - name: Project PB-9 Historical Excel Import contract
+        run: node scripts/project-pb9-historical-import-contract.mjs
+      - name: Project PB-9 XLSX extractor self-test
+        run: python3 scripts/project-import/project_excel_extract.py --self-test
       - name: Project Proposal Core contract
         run: node scripts/project-proposal-core-contract.mjs
       - name: Countertop Sink fallback contract
