@@ -16,7 +16,7 @@ function readRepo(relativePath) {
 }
 
 const domain = read("src/lib/vendor-catalog/domain.ts");
-const adapters = read("src/lib/vendor-catalog/adapters.ts");
+const adapters = read("src/lib/vendor-catalog/base-adapters.ts");
 const sync = read("src/lib/vendor-catalog/sync.ts");
 const check = read("src/lib/vendor-catalog/check.ts");
 const approval = read("src/lib/vendor-catalog/approval.ts");
