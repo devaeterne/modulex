@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase/client";
 import {
   SYSTEM_ANNOUNCEMENT_KIND_LABELS,
   SYSTEM_ANNOUNCEMENT_ROLES,
+  validateSystemAnnouncementHref,
   type SystemAnnouncement,
   type SystemAnnouncementKind,
 } from "@/lib/system-announcements";
@@ -74,6 +75,12 @@ export default function ProductUpdatesAdminPage() {
 
   async function createAnnouncement(publishNow: boolean) {
     if (!profile || !canManage || !title.trim() || !message.trim()) return;
+    const hrefValidation = validateSystemAnnouncementHref(href);
+    if (hrefValidation.error) {
+      setError(hrefValidation.error);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     const now = publishNow ? new Date().toISOString() : null;
@@ -81,7 +88,7 @@ export default function ProductUpdatesAdminPage() {
       kind,
       title: title.trim(),
       message: message.trim(),
-      href: href.trim() || null,
+      href: hrefValidation.href,
       cta_label: ctaLabel.trim() || null,
       target_roles: targetRoles.length ? targetRoles : null,
       status: publishNow ? "published" : "draft",
@@ -132,7 +139,7 @@ export default function ProductUpdatesAdminPage() {
           </div>
           <div><Label htmlFor="announcement-message">Message</Label><TextArea id="announcement-message" value={message} onChange={setMessage} maxLength={4000} required rows={4} placeholder="Historical Product can now be entered manually." /></div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <div><Label htmlFor="announcement-href">Action URL</Label><Input id="announcement-href" value={href} onChange={(event) => setHref(event.target.value)} placeholder="/customers/orders" pattern="^/.*" /></div>
+            <div><Label htmlFor="announcement-href">Action URL</Label><Input id="announcement-href" value={href} onChange={(event) => setHref(event.target.value)} placeholder="/customers/orders" pattern="^/.*" hint="Internal Modulex path only, for example /customers/orders." /></div>
             <div><Label htmlFor="announcement-cta">Action label</Label><Input id="announcement-cta" value={ctaLabel} onChange={(event) => setCtaLabel(event.target.value)} maxLength={80} placeholder="Go to Orders" /></div>
           </div>
           <fieldset><legend className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>Audience</legend><p className={`mt-1 text-xs ${ADMIN_TEXT_STYLES.muted}`}>No role selected = all users.</p><div className="mt-3 flex flex-wrap gap-2">{SYSTEM_ANNOUNCEMENT_ROLES.map((role) => <Button key={role} type="button" size="sm" variant={targetRoles.includes(role) ? "primary" : "outline"} onClick={() => toggleRole(role)}>{ROLE_LABELS[role]}</Button>)}</div></fieldset>

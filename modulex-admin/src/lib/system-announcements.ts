@@ -41,6 +41,18 @@ export const SYSTEM_ANNOUNCEMENT_ROLES: UserRole[] = [
   "shipping",
 ];
 
+export function validateSystemAnnouncementHref(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return { href: null, error: null };
+  if (!normalized.startsWith("/") || normalized.startsWith("//")) {
+    return {
+      href: null,
+      error: "Action URL must be an internal Modulex path starting with /, for example /customers/orders.",
+    };
+  }
+  return { href: normalized, error: null };
+}
+
 export function isSystemAnnouncementVisibleToRole(
   targetRoles: readonly UserRole[] | null | undefined,
   role: UserRole,
