@@ -296,7 +296,7 @@ begin
       a.area_name as label,
       coalesce(a.direct_sell_amount,0)::numeric(18,2) as accepted_sell_amount,
       jsonb_build_array(jsonb_build_object('id',a.id,'area_name',a.area_name)) as areas,
-      ca.order_id as converted_order_id,
+      cc.order_id as converted_order_id,
       co.order_number as converted_order_number
     from public.customer_project_proposal_areas a
     left join public.customer_project_proposal_order_conversion_areas ca on ca.proposal_area_id=a.id
@@ -444,12 +444,12 @@ begin
     'billing_address_id',p_billing_address_id,
     'shipping_address_id',p_shipping_address_id,
     'expected_delivery_date',p_expected_delivery_date,
-    'customer_reference',nullif(btrim(coalesce(p_customer_reference,'')),''),
-    'customer_notes',nullif(btrim(coalesce(p_customer_notes,'')),''),
-    'internal_notes',nullif(btrim(coalesce(p_internal_notes,'')),''),
+    'customer_reference',nullif(btrim(coalesce(p_customer_reference,'')),'') ,
+    'customer_notes',nullif(btrim(coalesce(p_customer_notes,'')),'') ,
+    'internal_notes',nullif(btrim(coalesce(p_internal_notes,'')),'') ,
     'tax_rate',round(coalesce(p_tax_rate,0),3),
     'payment_method_id',p_payment_method_id,
-    'fulfillment_type',nullif(btrim(coalesce(p_fulfillment_type,'')),''),
+    'fulfillment_type',nullif(btrim(coalesce(p_fulfillment_type,'')),'') ,
     'administrative_fee_percent',v_fee,
     'order_discount_amount',0
   );
