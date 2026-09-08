@@ -16,7 +16,10 @@ const baseMigration = [
   read("modulex-store/supabase/migrations/20260908150500_customer_order_administrative_fee_defaults.sql"),
   read("modulex-store/supabase/migrations/20260908151000_customer_order_visible_pricing_rpc.sql"),
 ].join("\n");
-const revenueTruthMigration = read("modulex-store/supabase/migrations/20260908153000_customer_order_administrative_fee_revenue_truth.sql");
+const revenueTruthMigration = [
+  read("modulex-store/supabase/migrations/20260908153000_customer_order_administrative_fee_revenue_truth.sql"),
+  read("modulex-store/supabase/migrations/20260908153500_customer_order_administrative_fee_portal_projection.sql"),
+].join("\n");
 const migration = `${baseMigration}\n${revenueTruthMigration}`;
 const settingsTypes = read("modulex-admin/src/lib/settings/types.ts");
 const settingsUi = read("modulex-admin/src/components/settings/AdministrativeFeeSettings.tsx");
