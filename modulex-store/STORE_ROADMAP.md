@@ -1,7 +1,7 @@
 # Modulex Store Roadmap
 
 Last reviewed: 2026-09-08
-Main baseline: `0e7d5a66d7334d25660f4a420d8a5333ebb86051`
+Main baseline: `5edf6c2fa1bae6512d9a7e3661ac844402c9fb4b`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 Current Granite migration status: **GC-0 through GC-8 are production-accepted. GC-8B accessibility/performance migration QA closed on 2026-09-02 with fresh production Lighthouse Performance 93 / Accessibility 94 / SEO 100 / LCP 2.950 s / CLS 0 / TBT 39 ms. Residual Store-wide accessibility/Core Web Vitals cleanup remains normal Phase 2.6 debt and does not reopen the completed Granite migration workstream.**
 
@@ -12,11 +12,13 @@ Current Granite migration status: **GC-0 through GC-8 are production-accepted. G
 
 ## Project Base PB-8 cross-roadmap status
 
-- [~] **PB-8 — Portal Project Projection.** Add customer-scoped Project list/detail surfaces for both Customer and Dealer portals using the existing canonical portal context.
-  - Projection is intentionally narrow and derives linked Orders, Shipments/Delivery and Installations from canonical records.
+- [!] **PB-8 — Portal Project Projection live Store closeout is deliberately deferred while Admin is completed first.** The shared DB/RPC projection is already merged and production-verified for the available Customer Portal identity; no Admin/Project Base work should wait on Store deployment.
+  - Projection remains intentionally narrow and derives linked Orders, Shipments/Delivery and Installations from canonical records.
   - Internal cost, margin, commission, vendor, payment-detail, audit, internal notes and Sales Rep identity remain excluded.
   - Dealer Project pages may link to the already-approved Dealer Documents surface; PB-8 does not create Customer Portal document access or a second document ownership model.
-  - Keep `[~]` until owner merge, production migration, customer/dealer isolation and cross-account negative acceptance, Advisor review, Store CI/build and live portal verification are complete.
+  - Fresh production DB acceptance on 2026-09-08 passed Customer own-list/detail, cross-customer fail-closed behavior, leakage checks and RPC ACL checks. Production currently has no active Dealer Portal identity, so a real Dealer runtime isolation smoke remains pending rather than manufacturing persistent test identity data.
+  - Store production is still serving an older artifact; `/account/projects` and `/dealer/projects` therefore remain a future Store deployment/live-smoke gate. Do not treat those 404s as an Admin blocker.
+  - Resume PB-8 Store work only after the owner returns priority to Store: deploy current `modulex-store` to the `oakwell` production project, run Customer/Dealer live Project smoke, then mark PB-8 complete.
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
 
@@ -647,6 +649,7 @@ GC-1 implementation plan: `modulex-store/docs/superpowers/plans/2026-08-29-gc1-s
 
 # Next Action
 
-1. Granite migration **GC-0 through GC-8 is closed**. Keep residual accessibility/performance cleanup in Phase 2.6 without reopening the migration acceptance.
-2. The next Store product package is **Phase 2.2 — Catalog Discovery** when Store implementation resumes; the broader cross-project sequence may handle Admin work first.
-3. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend.
+1. **Owner priority is Admin-first. Do not start new Store implementation while Admin completion work is active.**
+2. When Store work resumes, first close PB-8 live Portal acceptance: deploy the current `modulex-store` artifact to `oakwell`, verify `/account/projects` and `/dealer/projects`, and complete Customer/Dealer isolation smoke. This deferred Store gate does not block Admin Project Base/Proposal work.
+3. After PB-8 live closeout, resume the normal Store product sequence at **Phase 2.2 — Catalog Discovery** unless owner priority changes.
+4. Preserve the permanent architecture boundary: Granite Center remains provenance/migration evidence only, never a runtime content or media backend.
