@@ -98,6 +98,8 @@ const expectedInventory = [
   "src/app/api/admin/google-calendar/projects/[projectId]/route.ts",
   "src/app/api/admin/google-calendar/status/route.ts",
   "src/app/api/admin/products/qr/route.ts",
+  "src/app/api/admin/projects/[projectId]/documents/[artifactId]/download/route.ts",
+  "src/app/api/admin/projects/[projectId]/proposals/[proposalId]/revisions/[revisionId]/accepted-artifact/route.ts",
   "src/app/api/admin/projects/[projectId]/proposals/[proposalId]/revisions/[revisionId]/pdf/route.ts",
   "src/app/api/admin/projects/import/route.ts",
   "src/app/api/admin/store-media/import/route.ts",
@@ -116,7 +118,7 @@ const expectedInventory = [
   "src/app/api/vendor-catalog/vendors/route.ts",
 ].sort();
 
-assert.equal(routeInventory.length, 38, `Expected 38 API route files, found ${routeInventory.length}`);
+assert.equal(routeInventory.length, 40, `Expected 40 API route files, found ${routeInventory.length}`);
 assert.deepEqual(routeInventory, expectedInventory, "API route inventory changed; review timing coverage");
 
 const uninstrumented = [];
