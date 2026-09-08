@@ -103,7 +103,7 @@ jobs:
           path = 'modulex-admin/src/components/hr/EmployeeDirectory.tsx'
           p, text = read(path)
           text = ensure_date_import(text, 'formatDateOnly')
-          text = once(text, '<TableCell variant="admin">{employee.hire_date}</TableCell>', '<TableCell variant="admin">{formatDateOnly(employee.hire_date)}</TableCell>', path)
+          text = once(text, '<TableCell variant="admin">{employee.hire_date || "—"}</TableCell>', '<TableCell variant="admin">{formatDateOnly(employee.hire_date)}</TableCell>', path)
           write(path, text); fixes.append(path)
 
           path = 'modulex-admin/src/components/hr/PayrollManager.tsx'
