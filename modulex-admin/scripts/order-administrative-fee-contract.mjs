@@ -61,6 +61,10 @@ assert.match(revenueTruthMigration, /create\s+or\s+replace\s+function\s+private\
 assert.match(revenueTruthMigration, /create\s+or\s+replace\s+function\s+private\.update_customer_order\([\s\S]*p_administrative_fee_percent[\s\S]*'administrative_fee_percent'\s*,\s*v_fee/i, "Confirmed revision approval identity must include the proposed Administrative Fee");
 assert.match(revenueTruthMigration, /update\s+public\.customer_orders[\s\S]{0,800}administrative_fee_percent\s*=\s*v_fee[\s\S]{0,1800}assess_customer_order/i, "Direct Draft revisions must apply Administrative Fee before Sales assessment");
 
+// Dealer pricing is customer-facing: fee must be absorbed into visible lines and internal fee fields never escape.
+assert.match(revenueTruthMigration, /get_store_dealer_order[\s\S]*customer_order_visible_line_pricing/i, "Dealer order pricing must consume the canonical customer-visible line projection");
+assert.doesNotMatch(revenueTruthMigration, /jsonb_build_object\([^;]{0,3000}'administrative_fee_(?:percent|amount)'/i, "Dealer/customer projection must not expose internal Administrative Fee fields");
+
 // Create/edit boundaries use Administrative Fee separately; legacy payment commission is not repurposed.
 assert.match(orderDomain, /administrativeFeePercent/i, "Order domain input must expose Administrative Fee percent");
 assert.match(orderDomain, /p_administrative_fee_percent/i, "Order domain must send Administrative Fee through the canonical RPC boundary");
