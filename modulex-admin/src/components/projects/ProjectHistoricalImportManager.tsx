@@ -1,6 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Input, { InputNative } from "@/components/form/input/InputField";
+import Alert from "@/components/ui/alert/Alert";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableViewport,
+} from "@/components/ui/table";
+import {
+  ADMIN_SURFACE_CARD,
+  ADMIN_SURFACE_POPOVER,
+  ADMIN_TEXT_STYLES,
+} from "@/components/ui/theme/adminTheme";
 import { formatDateTime } from "@/lib/dates/usDate";
 import { supabase } from "@/lib/supabase/client";
 
@@ -62,6 +81,9 @@ type Inspection = {
   row_count: number;
 };
 
+type StatusValue = ImportRow["mapping_status"] | ImportBatch["status"] | DryRun["status"];
+type BadgeColor = "primary" | "success" | "error" | "warning" | "info" | "light" | "dark";
+
 const PROJECT_STATUSES = [
   ["draft", "Draft"],
   ["quoted", "Quoted"],
@@ -71,6 +93,9 @@ const PROJECT_STATUSES = [
   ["completed", "Completed"],
   ["cancelled", "Cancelled"],
 ] as const;
+
+const PROJECT_STATUS_OPTIONS = PROJECT_STATUSES.map(([value, label]) => ({ value, label }));
+const CHECKBOX_STYLE = "mt-0.5 h-4 w-4 rounded border-gray-300";
 
 function messageFromError(error: unknown) {
   const text = error instanceof Error ? error.message : String(error ?? "Unknown error");
@@ -86,12 +111,18 @@ function money(value: number | null | undefined) {
   }).format(Number(value));
 }
 
-function StatusPill({ status }: { status: ImportRow["mapping_status"] | ImportBatch["status"] | DryRun["status"] }) {
-  const label = status.replaceAll("_", " ");
+function statusColor(status: StatusValue): BadgeColor {
+  if (status === "ready" || status === "committed") return "success";
+  if (status === "invalid" || status === "failed") return "error";
+  if (status === "unresolved" || status === "review") return "warning";
+  return "info";
+}
+
+function StatusPill({ status }: { status: StatusValue }) {
   return (
-    <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium capitalize text-gray-700 dark:bg-white/[0.08] dark:text-gray-300">
-      {label}
-    </span>
+    <Badge size="sm" color={statusColor(status)}>
+      {status.replaceAll("_", " ")}
+    </Badge>
   );
 }
 
@@ -113,6 +144,13 @@ async function requestWithSession(input: BodyInit, contentType?: string) {
 
 function requestJson(body: Record<string, unknown>) {
   return requestWithSession(JSON.stringify(body), "application/json");
+}
+
+function selectOptions(options: LookupOption[], currentId: string, currentLabel: string) {
+  const values = new Map<string, string>();
+  if (currentId) values.set(currentId, currentLabel || "Current match");
+  for (const option of options) values.set(option.id, option.label);
+  return Array.from(values, ([value, label]) => ({ value, label }));
 }
 
 function MappingEditor({
@@ -186,77 +224,86 @@ function MappingEditor({
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-      <p className="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Row mapping</p>
-      <div className="grid gap-3 lg:grid-cols-2">
+    <div className={`${ADMIN_SURFACE_POPOVER} mt-4 p-4`}>
+      <p className={`${ADMIN_TEXT_STYLES.strong} mb-3 text-sm font-semibold`}>Row mapping</p>
+      <div className="grid gap-4 lg:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Customer search</label>
-          <div className="flex gap-2">
-            <input
+          <Label htmlFor={`customer-search-${row.id}`}>Customer search</Label>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <Input
+              id={`customer-search-${row.id}`}
               value={customerQuery}
               onChange={(event) => setCustomerQuery(event.target.value)}
-              className="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              aria-label={`Customer search for row ${row.row_number}`}
+              ariaLabel={`Customer search for row ${row.row_number}`}
             />
-            <button type="button" onClick={() => void lookup("customer")} disabled={busy} className="rounded-lg border border-gray-300 px-3 text-sm dark:border-gray-700">
+            <Button variant="outline" size="sm" onClick={() => void lookup("customer")} disabled={busy}>
               Search
-            </button>
+            </Button>
           </div>
-          {customerOptions.length > 0 ? (
-            <select
-              value={customerId}
-              onChange={(event) => setCustomerId(event.target.value)}
-              className="mt-2 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900"
-              aria-label={`Customer match for row ${row.row_number}`}
-            >
-              <option value="">Select customer</option>
-              {customerOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-            </select>
-          ) : customerId ? <p className="mt-1 text-xs text-gray-500">Existing customer match retained.</p> : null}
+          {(customerOptions.length > 0 || customerId) ? (
+            <div className="mt-2">
+              <Select
+                value={customerId}
+                onChange={setCustomerId}
+                allowEmpty
+                placeholder="Select customer"
+                options={selectOptions(customerOptions, customerId, row.customer ?? "Current customer")}
+                ariaLabel={`Customer match for row ${row.row_number}`}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Sales Rep search</label>
-          <div className="flex gap-2">
-            <input
+          <Label htmlFor={`sales-search-${row.id}`}>Sales Rep search</Label>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <Input
+              id={`sales-search-${row.id}`}
               value={salesQuery}
               onChange={(event) => setSalesQuery(event.target.value)}
-              className="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-              aria-label={`Sales Rep search for row ${row.row_number}`}
+              ariaLabel={`Sales Rep search for row ${row.row_number}`}
             />
-            <button type="button" onClick={() => void lookup("sales_rep")} disabled={busy} className="rounded-lg border border-gray-300 px-3 text-sm dark:border-gray-700">
+            <Button variant="outline" size="sm" onClick={() => void lookup("sales_rep")} disabled={busy}>
               Search
-            </button>
+            </Button>
           </div>
-          {salesOptions.length > 0 ? (
-            <select
-              value={salesRepId}
-              onChange={(event) => setSalesRepId(event.target.value)}
-              className="mt-2 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900"
-              aria-label={`Sales Rep match for row ${row.row_number}`}
-            >
-              <option value="">No Sales Rep</option>
-              {salesOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-            </select>
-          ) : salesRepId ? <p className="mt-1 text-xs text-gray-500">Existing Sales Rep match retained.</p> : null}
+          {(salesOptions.length > 0 || salesRepId) ? (
+            <div className="mt-2">
+              <Select
+                value={salesRepId}
+                onChange={setSalesRepId}
+                allowEmpty
+                placeholder="No Sales Rep"
+                options={selectOptions(salesOptions, salesRepId, row.sales_rep ?? "Current Sales Rep")}
+                ariaLabel={`Sales Rep match for row ${row.row_number}`}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Project status</label>
-          <select value={targetStatus} onChange={(event) => setTargetStatus(event.target.value)} className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900">
-            {PROJECT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
+          <Label htmlFor={`status-${row.id}`}>Project status</Label>
+          <Select
+            id={`status-${row.id}`}
+            value={targetStatus}
+            onChange={setTargetStatus}
+            options={PROJECT_STATUS_OPTIONS}
+          />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Mapping note</label>
-          <input value={note} onChange={(event) => setNote(event.target.value)} className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900" />
+          <Label htmlFor={`mapping-note-${row.id}`}>Mapping note</Label>
+          <Input
+            id={`mapping-note-${row.id}`}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
         </div>
       </div>
-      {error ? <p className="mt-2 text-sm text-error-600">{error}</p> : null}
+      {error ? <div className="mt-3"><Alert variant="error" title="Mapping error" message={error} /></div> : null}
       <div className="mt-3 flex justify-end">
-        <button type="button" disabled={busy} onClick={() => void saveMapping()} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        <Button size="sm" disabled={busy} onClick={() => void saveMapping()}>
           Save Mapping
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -365,18 +412,19 @@ export default function ProjectHistoricalImportManager() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+      <section className={`${ADMIN_SURFACE_CARD} p-5`}>
         <div className="mb-5">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Historical Project Excel Import</h2>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <h2 className={`${ADMIN_TEXT_STYLES.strong} text-lg font-semibold`}>Historical Project Excel Import</h2>
+          <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-sm`}>
             Admin-only PB-9 workflow. Legacy contract prices and Profit Margin remain reconciliation evidence; they never overwrite canonical Project or Finance truth.
           </p>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Workbook (.xlsx)</label>
-            <input
+            <Label htmlFor="historical-project-workbook">Workbook (.xlsx)</Label>
+            <Input
+              id="historical-project-workbook"
               type="file"
               accept=".xlsx"
               onChange={(event) => {
@@ -386,98 +434,112 @@ export default function ProjectHistoricalImportManager() {
                 setDryRun(null);
                 setSelectedSheet("");
               }}
-              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:file:bg-white/[0.08]"
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Project status</label>
-            <select value={defaultStatus} onChange={(event) => setDefaultStatus(event.target.value)} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900">
-              {PROJECT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
+            <Label htmlFor="historical-default-status">Default Project status</Label>
+            <Select
+              id="historical-default-status"
+              value={defaultStatus}
+              onChange={setDefaultStatus}
+              options={PROJECT_STATUS_OPTIONS}
+            />
           </div>
         </div>
 
         {inspection?.sheets.length ? (
           <div className="mt-4 max-w-md">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Worksheet</label>
-            <select value={selectedSheet} onChange={(event) => setSelectedSheet(event.target.value)} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm dark:border-gray-700 dark:bg-gray-900">
-              {inspection.sheets.map((sheet) => <option key={sheet} value={sheet}>{sheet}</option>)}
-            </select>
+            <Label htmlFor="historical-sheet">Worksheet</Label>
+            <Select
+              id="historical-sheet"
+              value={selectedSheet}
+              onChange={setSelectedSheet}
+              options={inspection.sheets.map((sheet) => ({ value: sheet, label: sheet }))}
+            />
           </div>
         ) : null}
 
         <div className="mt-5 flex flex-wrap gap-3">
-          <button type="button" onClick={() => void upload("inspect")} disabled={busy || !file} className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+          <Button variant="outline" size="sm" onClick={() => void upload("inspect")} disabled={busy || !file}>
             Analyze Workbook
-          </button>
-          <button type="button" onClick={() => void upload("stage")} disabled={busy || !file || !inspection} className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+          </Button>
+          <Button size="sm" onClick={() => void upload("stage")} disabled={busy || !file || !inspection}>
             Stage &amp; Dry Run
-          </button>
+          </Button>
         </div>
 
         {inspection ? (
-          <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-white/[0.02] dark:text-gray-400">
-            <strong className="text-gray-800 dark:text-white/90">{inspection.row_count}</strong> importable rows · worksheet <strong className="text-gray-800 dark:text-white/90">{selectedSheet || inspection.sheet}</strong>
+          <div className={`${ADMIN_SURFACE_POPOVER} mt-4 p-4`}>
+            <p className={`${ADMIN_TEXT_STYLES.muted} text-sm`}>
+              <strong className={ADMIN_TEXT_STYLES.strong}>{inspection.row_count}</strong> importable rows · worksheet <strong className={ADMIN_TEXT_STYLES.strong}>{selectedSheet || inspection.sheet}</strong>
+            </p>
           </div>
         ) : null}
-        {error ? <p className="mt-4 rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700 dark:bg-error-500/10 dark:text-error-400">{error}</p> : null}
-        {notice ? <p className="mt-4 rounded-lg bg-success-50 px-4 py-3 text-sm text-success-700 dark:bg-success-500/10 dark:text-success-400">{notice}</p> : null}
+        {error ? <div className="mt-4"><Alert variant="error" title="Import error" message={error} /></div> : null}
+        {notice ? <div className="mt-4"><Alert variant="success" title="Historical import" message={notice} /></div> : null}
       </section>
 
       {review && dryRun ? (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <section className={`${ADMIN_SURFACE_CARD} p-5`}>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Import Review</h2>
+                <h2 className={`${ADMIN_TEXT_STYLES.strong} text-lg font-semibold`}>Import Review</h2>
                 <StatusPill status={review.batch.status} />
               </div>
-              <p className="mt-1 text-sm text-gray-500">{review.batch.source_name} · {review.batch.row_count} rows</p>
+              <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-sm`}>{review.batch.source_name} · {review.batch.row_count} rows</p>
             </div>
             {!committed ? (
-              <button type="button" onClick={() => void runDryRun()} disabled={busy} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium dark:border-gray-700">
+              <Button variant="outline" size="sm" onClick={() => void runDryRun()} disabled={busy}>
                 Run Dry Run
-              </button>
+              </Button>
             ) : null}
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800"><p className="text-xs text-gray-500">Ready</p><p className="mt-1 text-xl font-semibold">{dryRun.ready_count}</p></div>
-            <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800"><p className="text-xs text-gray-500">Unresolved</p><p className="mt-1 text-xl font-semibold">{dryRun.unresolved_count}</p></div>
-            <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800"><p className="text-xs text-gray-500">Invalid</p><p className="mt-1 text-xl font-semibold">{dryRun.invalid_count}</p></div>
-            <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800"><p className="text-xs text-gray-500">Margin evidence rows</p><p className="mt-1 text-xl font-semibold">{dryRun.legacy_profit_margin_evidence_count}</p></div>
+            {[
+              ["Ready", dryRun.ready_count],
+              ["Unresolved", dryRun.unresolved_count],
+              ["Invalid", dryRun.invalid_count],
+              ["Margin evidence rows", dryRun.legacy_profit_margin_evidence_count],
+            ].map(([label, value]) => (
+              <div key={String(label)} className={`${ADMIN_SURFACE_POPOVER} p-4`}>
+                <p className={`${ADMIN_TEXT_STYLES.muted} text-xs`}>{label}</p>
+                <p className={`${ADMIN_TEXT_STYLES.strong} mt-1 text-xl font-semibold`}>{value}</p>
+              </div>
+            ))}
           </div>
 
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
-            <div className="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.02]">
-              <p className="text-xs text-gray-500">Legacy Initial Contract Price total — evidence only</p>
-              <p className="mt-1 font-semibold text-gray-800 dark:text-white/90">{money(dryRun.legacy_initial_contract_price_total)}</p>
+            <div className={`${ADMIN_SURFACE_POPOVER} p-4`}>
+              <p className={`${ADMIN_TEXT_STYLES.muted} text-xs`}>Legacy Initial Contract Price total — evidence only</p>
+              <p className={`${ADMIN_TEXT_STYLES.strong} mt-1 font-semibold`}>{money(dryRun.legacy_initial_contract_price_total)}</p>
             </div>
-            <div className="rounded-xl bg-gray-50 p-4 dark:bg-white/[0.02]">
-              <p className="text-xs text-gray-500">Legacy Price After Change Orders total — evidence only</p>
-              <p className="mt-1 font-semibold text-gray-800 dark:text-white/90">{money(dryRun.legacy_price_after_change_orders_total)}</p>
+            <div className={`${ADMIN_SURFACE_POPOVER} p-4`}>
+              <p className={`${ADMIN_TEXT_STYLES.muted} text-xs`}>Legacy Price After Change Orders total — evidence only</p>
+              <p className={`${ADMIN_TEXT_STYLES.strong} mt-1 font-semibold`}>{money(dryRun.legacy_price_after_change_orders_total)}</p>
             </div>
           </div>
         </section>
       ) : null}
 
       {review && unresolvedRows.length > 0 ? (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Rows Requiring Mapping</h2>
-          <p className="mt-1 text-sm text-gray-500">Resolve customer and Sales Rep matches. Validation errors remain fail-closed.</p>
+        <section className={`${ADMIN_SURFACE_CARD} p-5`}>
+          <h2 className={`${ADMIN_TEXT_STYLES.strong} text-lg font-semibold`}>Rows Requiring Mapping</h2>
+          <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-sm`}>Resolve customer and Sales Rep matches. Validation errors remain fail-closed.</p>
           <div className="mt-4 space-y-4">
             {unresolvedRows.map((row) => (
-              <div key={row.id} className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+              <div key={row.id} className={`${ADMIN_SURFACE_POPOVER} p-4`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-medium text-gray-800 dark:text-white/90">Row {row.row_number} · {row.project_name || "Missing Project Name"}</p>
-                    <p className="mt-1 text-sm text-gray-500">{row.customer || "Missing customer"} · {row.project_address || "No address"}</p>
-                    <p className="mt-1 text-xs text-gray-500">Sales Rep: {row.sales_rep || "—"} · Customer matches: {row.customer_match_count} · Sales matches: {row.sales_rep_match_count}</p>
+                    <p className={`${ADMIN_TEXT_STYLES.strong} font-medium`}>Row {row.row_number} · {row.project_name || "Missing Project Name"}</p>
+                    <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-sm`}>{row.customer || "Missing customer"} · {row.project_address || "No address"}</p>
+                    <p className={`${ADMIN_TEXT_STYLES.muted} mt-1 text-xs`}>Sales Rep: {row.sales_rep || "—"} · Customer matches: {row.customer_match_count} · Sales matches: {row.sales_rep_match_count}</p>
                   </div>
                   <StatusPill status={row.mapping_status} />
                 </div>
                 {row.validation_errors.length > 0 ? (
-                  <p className="mt-3 text-sm text-error-600">Validation: {row.validation_errors.join(", ")}</p>
+                  <div className="mt-3"><Alert variant="error" title="Validation" message={row.validation_errors.join(", ")} /></div>
                 ) : null}
                 <MappingEditor row={row} onSaved={saveMappingRefresh} />
               </div>
@@ -487,56 +549,79 @@ export default function ProjectHistoricalImportManager() {
       ) : null}
 
       {review ? (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Row Summary</h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-gray-200 text-xs uppercase text-gray-500 dark:border-gray-800">
-                <tr><th className="px-3 py-2">Row</th><th className="px-3 py-2">Customer</th><th className="px-3 py-2">Project</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Initial</th><th className="px-3 py-2">After CO</th><th className="px-3 py-2">Margin</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {review.rows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="px-3 py-3">{row.row_number}</td>
-                    <td className="px-3 py-3">{row.customer || "—"}</td>
-                    <td className="px-3 py-3"><div className="font-medium text-gray-800 dark:text-white/90">{row.project_name || "—"}</div><div className="text-xs text-gray-500">{row.project_address || ""}</div></td>
-                    <td className="px-3 py-3"><StatusPill status={row.mapping_status} /></td>
-                    <td className="px-3 py-3">{money(row.legacy_initial_contract_price)}</td>
-                    <td className="px-3 py-3">{money(row.legacy_price_after_change_orders)}</td>
-                    <td className="px-3 py-3">{row.legacy_profit_margin === null ? "—" : `${row.legacy_profit_margin}${row.legacy_profit_margin_unit === "percent" ? "%" : ""}`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section className={`${ADMIN_SURFACE_CARD} p-5`}>
+          <h2 className={`${ADMIN_TEXT_STYLES.strong} text-lg font-semibold`}>Row Summary</h2>
+          <div className="mt-4">
+            <TableViewport>
+              <Table variant="admin" minWidth="standard">
+                <TableHeader variant="admin">
+                  <TableRow>
+                    {['Row', 'Customer', 'Project', 'Status', 'Initial', 'After CO', 'Margin'].map((label) => (
+                      <TableCell key={label} isHeader variant="admin">{label}</TableCell>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody variant="admin">
+                  {review.rows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell variant="admin">{row.row_number}</TableCell>
+                      <TableCell variant="admin">{row.customer || "—"}</TableCell>
+                      <TableCell variant="admin">
+                        <div className={`${ADMIN_TEXT_STYLES.strong} font-medium`}>{row.project_name || "—"}</div>
+                        <div className={`${ADMIN_TEXT_STYLES.muted} text-xs`}>{row.project_address || ""}</div>
+                      </TableCell>
+                      <TableCell variant="admin"><StatusPill status={row.mapping_status} /></TableCell>
+                      <TableCell variant="admin">{money(row.legacy_initial_contract_price)}</TableCell>
+                      <TableCell variant="admin">{money(row.legacy_price_after_change_orders)}</TableCell>
+                      <TableCell variant="admin">{row.legacy_profit_margin === null ? "—" : `${row.legacy_profit_margin}${row.legacy_profit_margin_unit === "percent" ? "%" : ""}`}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableViewport>
           </div>
         </section>
       ) : null}
 
       {review && dryRun && !committed ? (
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <div className="flex items-center gap-2"><h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Commit Import</h2><StatusPill status={dryRun.status} /></div>
-          <p className="mt-2 text-sm text-gray-500">Commit is allowed only when the current Dry Run is ready. Any mapping change invalidates the prior fingerprint.</p>
-          <div className="mt-4 rounded-xl bg-gray-50 p-4 dark:bg-white/[0.02]">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Exact Dry Run fingerprint</p>
-            <code className="mt-2 block break-all text-xs text-gray-800 dark:text-gray-200">{dryRun.fingerprint || "—"}</code>
+        <section className={`${ADMIN_SURFACE_CARD} p-5`}>
+          <div className="flex items-center gap-2">
+            <h2 className={`${ADMIN_TEXT_STYLES.strong} text-lg font-semibold`}>Commit Import</h2>
+            <StatusPill status={dryRun.status} />
           </div>
-          <label className="mt-4 flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
-            <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} disabled={dryRun.status !== "ready"} className="mt-0.5 h-4 w-4 rounded border-gray-300" />
-            I reviewed the row mappings and evidence totals and want to commit this exact Dry Run.
-          </label>
+          <p className={`${ADMIN_TEXT_STYLES.muted} mt-2 text-sm`}>Commit is allowed only when the current Dry Run is ready. Any mapping change invalidates the prior fingerprint.</p>
+          <div className={`${ADMIN_SURFACE_POPOVER} mt-4 p-4`}>
+            <p className={`${ADMIN_TEXT_STYLES.muted} text-xs font-medium uppercase tracking-wide`}>Exact Dry Run fingerprint</p>
+            <code className={`${ADMIN_TEXT_STYLES.strong} mt-2 block break-all text-xs`}>{dryRun.fingerprint || "—"}</code>
+          </div>
+          <div className="mt-4">
+            <Label>
+              <span className="flex items-start gap-3">
+                <InputNative
+                  type="checkbox"
+                  checked={confirmed}
+                  onChange={(event) => setConfirmed(event.target.checked)}
+                  disabled={dryRun.status !== "ready"}
+                  className={CHECKBOX_STYLE}
+                />
+                <span>I reviewed the row mappings and evidence totals and want to commit this exact Dry Run.</span>
+              </span>
+            </Label>
+          </div>
           <div className="mt-4 flex justify-end">
-            <button type="button" onClick={() => void commitImport()} disabled={busy || dryRun.status !== "ready" || !dryRun.fingerprint || !confirmed} className="rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+            <Button onClick={() => void commitImport()} disabled={busy || dryRun.status !== "ready" || !dryRun.fingerprint || !confirmed}>
               Commit Import
-            </button>
+            </Button>
           </div>
         </section>
       ) : null}
 
       {committed ? (
-        <section className="rounded-2xl border border-success-200 bg-success-50 p-5 text-success-800 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-300">
-          <p className="font-semibold">Import committed</p>
-          <p className="mt-1 text-sm">{review.batch.committed_at ? `Committed at ${formatDateTime(review.batch.committed_at)}` : "The batch is committed and cannot be committed again."}</p>
-        </section>
+        <Alert
+          variant="success"
+          title="Import committed"
+          message={review.batch.committed_at ? `Committed at ${formatDateTime(review.batch.committed_at)}` : "The batch is committed and cannot be committed again."}
+        />
       ) : null}
     </div>
   );
