@@ -116,7 +116,7 @@ jobs:
           path = 'modulex-admin/src/components/settings/GoogleCalendarSettings.tsx'
           p, text = read(path)
           text = ensure_date_import(text, 'formatDateTime')
-          text = once(text, 'Last successful provider access: {status.connection.last_success_at}', 'Last successful provider access: {formatDateTime(status.connection.last_success_at)}', path)
+          text = once(text, 'Last successful provider access: {status.connection.last_success_at || "—"}', 'Last successful provider access: {formatDateTime(status.connection.last_success_at)}', path)
           write(path, text); fixes.append(path)
 
           print(f'Applied {len(fixes)} verified Admin date presentation files.')
