@@ -22,6 +22,7 @@ const files = {
   areaModal: "src/components/customers/project-detail/ProjectProposalAreaModal.tsx",
   groups: "src/components/customers/project-detail/ProjectProposalPricingGroups.tsx",
   revisions: "src/components/customers/project-detail/ProjectProposalRevisionHistory.tsx",
+  searchableSelect: "src/components/form/SearchableSelect.tsx",
 };
 
 for (const [name, file] of Object.entries(files)) {
@@ -36,6 +37,7 @@ const areaList = read(files.areaList);
 const areaModal = read(files.areaModal);
 const groups = read(files.groups);
 const revisions = read(files.revisions);
+const searchableSelect = read(files.searchableSelect);
 const ui = `${tab}\n${editor}\n${areaList}\n${areaModal}\n${groups}\n${revisions}`;
 
 assert.match(workspace, /"Overview"\s*,\s*"Proposal"\s*,\s*"Orders"/, "Proposal tab must appear immediately before Orders");
@@ -82,6 +84,11 @@ assert.match(areaModal, /directSellAmount/, "Area editor must support typed dire
 assert.match(areaModal, /pricingGroupId/, "Area editor must support typed Pricing Group assignment");
 assert.match(areaModal, /disabled=.*pricing|pricing.*disabled=/is, "Area editor must make direct/group pricing exclusivity visible in the UI");
 assert.match(areaModal, /internalNotes/, "Area editor must keep Internal Notes as a distinct internal-only field");
+
+assert.match(searchableSelect, /const\s+searchChangeRef\s*=\s*useRef\(onSearchChange\)/, "Remote SearchableSelect must keep the latest search callback in a ref instead of using callback identity as a request trigger");
+assert.match(searchableSelect, /const\s+hasRemoteSearch\s*=\s*Boolean\(onSearchChange\)/, "Remote SearchableSelect must depend on remote-search presence, not callback identity");
+assert.doesNotMatch(searchableSelect, /onSearchChange\(""\)/, "Opening a remote SearchableSelect must not issue a second immediate empty-query request");
+assert.match(searchableSelect, /searchChangeRef\.current\?\.\(query\)/, "Remote SearchableSelect debounce must call the latest callback through the stable ref");
 
 assert.match(groups, /sellAmount/, "Pricing Group UI must edit one authoritative typed group sell amount");
 assert.match(groups, /member|Area/i, "Pricing Group UI must show Area membership without allocating the group price");
