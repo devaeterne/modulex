@@ -59,6 +59,8 @@ assert.match(paginationMigration, /create or replace function private\.get_store
 assert.match(paginationMigration, /count\(\*\)[\s\S]*from\s+public\.customer_projects\s+cp[\s\S]*cp\.customer_id\s*=\s*v_customer_id/i, "total count must remain customer-scoped");
 assert.match(paginationMigration, /'total_count'\s*,\s*v_total_count/i, "pagination RPC must return total_count");
 assert.match(paginationMigration, /limit v_limit offset v_offset/i, "pagination RPC must keep bounded limit/offset semantics");
+assert.match(paginationMigration, /order by\s+cp\.created_at\s+desc\s*,\s*cp\.id\s+desc/i, "page slices must use a unique deterministic tie-breaker");
+assert.match(paginationMigration, /jsonb_agg\s*\(\s*row_data\s+order by\s+created_at\s+desc\s*,\s*project_id\s+desc\s*\)/i, "aggregate order must preserve the deterministic page slice");
 
 const projectsDomain = read("modulex-store/src/lib/portal/projects.ts");
 assert.match(projectsDomain, /requireStorePortalContext\s*\(/, "Project domain must require portal context");
@@ -67,6 +69,7 @@ assert.match(projectsDomain, /get_store_portal_project/, "Project detail must us
 assert.match(projectsDomain, /PortalProjectPage/, "Project list domain must preserve paging metadata");
 assert.match(projectsDomain, /total_count/, "Project list domain must consume server total_count");
 assert.match(projectsDomain, /totalCount/, "Project list domain must expose totalCount to the route");
+assert.match(projectsDomain, /2_147_483_647/, "Project list domain must cap offsets to PostgreSQL integer range before RPC invocation");
 
 const projectList = read("modulex-store/src/components/portal/PortalProjectList.tsx");
 const projectDetail = read("modulex-store/src/components/portal/PortalProjectDetail.tsx");
