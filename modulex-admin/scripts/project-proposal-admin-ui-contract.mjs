@@ -99,3 +99,4 @@ assert.doesNotMatch(ui, /\bbg-(?:red|blue|green|yellow|gray|slate|stone|zinc|neu
 
 console.log("Project Proposal Admin UI contract PASS");
 await import("./project-proposal-lifecycle-ui-contract.mjs");
+await import("./project-proposal-pdf-contract.mjs");
