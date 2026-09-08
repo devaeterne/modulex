@@ -73,6 +73,8 @@ type ProjectsResponse = {
 };
 type ProjectResponse = { ok?: boolean; project?: PortalProjectDetail };
 
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
+
 async function createAuthorizedPortalClient() {
   await requireStorePortalContext();
   return createServerSupabaseClient();
@@ -84,7 +86,7 @@ function nonNegativeInteger(value: unknown, fallback: number) {
 
 export async function getPortalProjects(limit = 25, offset = 0): Promise<PortalProjectPage> {
   const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 25, 100));
-  const safeOffset = Math.max(0, Math.trunc(offset) || 0);
+  const safeOffset = Math.min(POSTGRES_INTEGER_MAX, Math.max(0, Math.trunc(offset) || 0));
   const supabase = await createAuthorizedPortalClient();
   const { data, error } = await supabase.rpc("get_store_portal_projects", {
     p_limit: safeLimit,
