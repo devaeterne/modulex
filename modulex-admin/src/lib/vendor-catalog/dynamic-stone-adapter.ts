@@ -107,12 +107,39 @@ function extractTableProperty(html: string, labels: string[]) {
   return null;
 }
 
+function parseLocalizedPrice(value: string) {
+  const compact = value.replace(/[^0-9.,-]/g, "");
+  if (!compact || !/[0-9]/.test(compact)) return null;
+
+  const negative = compact.startsWith("-");
+  const unsigned = compact.replace(/-/g, "");
+  const lastComma = unsigned.lastIndexOf(",");
+  const lastDot = unsigned.lastIndexOf(".");
+  const separatorIndex = Math.max(lastComma, lastDot);
+
+  let canonical: string;
+  if (separatorIndex < 0) {
+    canonical = unsigned;
+  } else {
+    const fractionalDigits = unsigned.slice(separatorIndex + 1).replace(/[.,]/g, "");
+    if (fractionalDigits.length >= 1 && fractionalDigits.length <= 2) {
+      const integerDigits = unsigned.slice(0, separatorIndex).replace(/[.,]/g, "") || "0";
+      canonical = `${integerDigits}.${fractionalDigits}`;
+    } else {
+      canonical = unsigned.replace(/[.,]/g, "");
+    }
+  }
+
+  const numeric = Number(`${negative ? "-" : ""}${canonical}`);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
 function extractPrice(html: string) {
   const values = [...html.matchAll(/\boe_currency_value\b[^>]*>([\s\S]*?)<\//gi)]
     .map((match) => stripHtml(match[1]))
     .filter((value): value is string => Boolean(value))
-    .map((value) => Number(value.replace(/[^0-9.,-]/g, "").replace(/,/g, "")))
-    .filter((value) => Number.isFinite(value));
+    .map(parseLocalizedPrice)
+    .filter((value): value is number => value !== null);
   return values.at(-1) ?? null;
 }
 
