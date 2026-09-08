@@ -62,7 +62,8 @@ export type Permission =
   | "users.view"
   | "users.manage"
   | "roles.manage"
-  | "system.view";
+  | "system.view"
+  | "updates.view";
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
   "dashboard.view": "View dashboard",
@@ -117,6 +118,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "users.manage": "Create and manage users",
   "roles.manage": "Manage roles & access",
   "system.view": "Use system diagnostics",
+  "updates.view": "View product updates",
 };
 
 const allPermissions = Object.keys(PERMISSION_LABELS) as Permission[];
@@ -152,6 +154,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "inventory.view",
     "reports.view",
     "training.view",
+    "updates.view",
   ],
   finance: [
     "dashboard.view",
@@ -174,6 +177,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "finance.view",
     "finance.manage",
     "training.view",
+    "updates.view",
   ],
   hr: [
     "profile.view",
@@ -181,6 +185,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "personnel.view",
     "personnel.manage",
     "training.view",
+    "updates.view",
   ],
   warehouse: [
     "dashboard.view",
@@ -195,6 +200,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "qr.view",
     "qr.manage",
     "training.view",
+    "updates.view",
   ],
   shipping: [
     "dashboard.view",
@@ -207,6 +213,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "warehouse.view",
     "qr.view",
     "training.view",
+    "updates.view",
   ],
 };
 
@@ -243,6 +250,7 @@ export function isAdminRole(roles: RoleInput) {
 const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Permission }> = [
   { match: (path) => path === "/profile" || path.startsWith("/profile/"), permission: "profile.view" },
   { match: (path) => path === "/requests" || path.startsWith("/requests/"), permission: "requests.view" },
+  { match: (path) => path === "/updates" || path.startsWith("/updates/"), permission: "updates.view" },
   { match: (path) => path === "/training" || path.startsWith("/training/"), permission: "training.view" },
   { match: (path) => path === "/api-test" || path.startsWith("/api-test/"), permission: "system.view" },
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
@@ -296,6 +304,7 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
       path.startsWith("/customers/payment-methods/"),
     permission: "finance.manage",
   },
+  { match: (path) => path === "/settings/general/product-updates" || path.startsWith("/settings/general/product-updates/"), permission: "settings.manage" },
   { match: (path) => path === "/settings" || path.startsWith("/settings/"), permission: "settings.view" },
   { match: (path) => path === "/approvals" || path.startsWith("/approvals/"), permission: "approvals.view" },
   { match: (path) => path.includes("/invoices"), permission: "invoices.view" },
