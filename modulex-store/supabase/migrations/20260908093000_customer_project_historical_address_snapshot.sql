@@ -167,6 +167,7 @@ begin
       update public.customer_projects
       set project_address_snapshot = jsonb_build_object(
             'legacy_text', v_row.source_project_address,
+            'address_line_1', v_row.source_project_address,
             'source', 'historical_excel'
           ),
           updated_by = auth.uid(),
