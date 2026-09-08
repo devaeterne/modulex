@@ -6,10 +6,21 @@ import type { PortalProjectSummary } from "@/lib/portal/projects";
 export default function PortalProjectList({
   projects,
   basePath,
+  page,
+  pageSize,
+  totalCount,
 }: {
   projects: PortalProjectSummary[];
   basePath: string;
+  page: number;
+  pageSize: number;
+  totalCount: number;
 }) {
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const hasPrevious = page > 1;
+  const hasNext = page < totalPages;
+  const pageHref = (targetPage: number) => targetPage <= 1 ? basePath : `${basePath}?page=${targetPage}`;
+
   if (!projects.length) {
     return (
       <PortalEmptyState
@@ -51,6 +62,20 @@ export default function PortalProjectList({
           </tbody>
         </table>
       </div>
+
+      <nav className="d-flex align-items-center justify-content-between gap-3 px-3 py-3" aria-label="Project pagination">
+        {hasPrevious ? (
+          <Link className="portal-link" href={pageHref(page - 1)}>Previous</Link>
+        ) : (
+          <span aria-disabled="true">Previous</span>
+        )}
+        <span className="portal-muted">Page {page} of {totalPages} · {totalCount} projects</span>
+        {hasNext ? (
+          <Link className="portal-link" href={pageHref(page + 1)}>Next</Link>
+        ) : (
+          <span aria-disabled="true">Next</span>
+        )}
+      </nav>
     </div>
   );
 }

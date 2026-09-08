@@ -57,7 +57,20 @@ export type PortalProjectDetail = Omit<PortalProjectSummary, "order_count" | "sh
   installations: PortalProjectInstallation[];
 };
 
-type ProjectsResponse = { ok?: boolean; projects?: PortalProjectSummary[] };
+export type PortalProjectPage = {
+  projects: PortalProjectSummary[];
+  totalCount: number;
+  limit: number;
+  offset: number;
+};
+
+type ProjectsResponse = {
+  ok?: boolean;
+  projects?: PortalProjectSummary[];
+  total_count?: number;
+  limit?: number;
+  offset?: number;
+};
 type ProjectResponse = { ok?: boolean; project?: PortalProjectDetail };
 
 async function createAuthorizedPortalClient() {
@@ -65,16 +78,31 @@ async function createAuthorizedPortalClient() {
   return createServerSupabaseClient();
 }
 
-export async function getPortalProjects(limit = 25, offset = 0): Promise<PortalProjectSummary[]> {
+function nonNegativeInteger(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : fallback;
+}
+
+export async function getPortalProjects(limit = 25, offset = 0): Promise<PortalProjectPage> {
+  const safeLimit = Math.max(1, Math.min(Math.trunc(limit) || 25, 100));
+  const safeOffset = Math.max(0, Math.trunc(offset) || 0);
   const supabase = await createAuthorizedPortalClient();
   const { data, error } = await supabase.rpc("get_store_portal_projects", {
-    p_limit: limit,
-    p_offset: offset,
+    p_limit: safeLimit,
+    p_offset: safeOffset,
   });
   if (error) throw new Error("Unable to load projects.");
+
   const response = data as ProjectsResponse | null;
-  if (!response?.ok || !Array.isArray(response.projects)) return [];
-  return response.projects;
+  if (!response?.ok || !Array.isArray(response.projects)) {
+    return { projects: [], totalCount: 0, limit: safeLimit, offset: safeOffset };
+  }
+
+  return {
+    projects: response.projects,
+    totalCount: nonNegativeInteger(response.total_count, response.projects.length),
+    limit: nonNegativeInteger(response.limit, safeLimit),
+    offset: nonNegativeInteger(response.offset, safeOffset),
+  };
 }
 
 export async function getPortalProject(projectId: string): Promise<PortalProjectDetail | null> {

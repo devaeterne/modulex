@@ -13,6 +13,8 @@ function read(relativePath) {
 
 const migrationPath = "modulex-store/supabase/migrations/20260908024500_customer_project_portal_projection.sql";
 const migration = read(migrationPath);
+const paginationMigrationPath = "modulex-store/supabase/migrations/20260908032000_customer_project_portal_pagination.sql";
+const paginationMigration = read(paginationMigrationPath);
 
 for (const functionName of [
   "private.get_store_portal_projects",
@@ -41,6 +43,7 @@ for (const forbiddenKey of [
 ]) {
   const keyPattern = new RegExp(`['\"]${forbiddenKey}['\"]\\s*,`, "i");
   assert.doesNotMatch(migration, keyPattern, `PB-8 projection must not expose ${forbiddenKey}`);
+  assert.doesNotMatch(paginationMigration, keyPattern, `PB-8 pagination projection must not expose ${forbiddenKey}`);
 }
 
 assert.match(migration, /revoke execute on function public\.get_store_portal_projects\(integer, integer\) from public, anon/i);
@@ -52,24 +55,42 @@ assert.match(migration, /revoke execute on function private\.get_store_portal_pr
 assert.match(migration, /grant execute on function private\.get_store_portal_projects\(integer, integer\) to authenticated/i);
 assert.match(migration, /grant execute on function private\.get_store_portal_project\(uuid\) to authenticated/i);
 
+assert.match(paginationMigration, /create or replace function private\.get_store_portal_projects/i, "pagination must harden the existing scoped list RPC");
+assert.match(paginationMigration, /count\(\*\)[\s\S]*from\s+public\.customer_projects\s+cp[\s\S]*cp\.customer_id\s*=\s*v_customer_id/i, "total count must remain customer-scoped");
+assert.match(paginationMigration, /'total_count'\s*,\s*v_total_count/i, "pagination RPC must return total_count");
+assert.match(paginationMigration, /limit v_limit offset v_offset/i, "pagination RPC must keep bounded limit/offset semantics");
+
 const projectsDomain = read("modulex-store/src/lib/portal/projects.ts");
 assert.match(projectsDomain, /requireStorePortalContext\s*\(/, "Project domain must require portal context");
 assert.match(projectsDomain, /get_store_portal_projects/, "Project list must use the PB-8 RPC");
 assert.match(projectsDomain, /get_store_portal_project/, "Project detail must use the PB-8 RPC");
+assert.match(projectsDomain, /PortalProjectPage/, "Project list domain must preserve paging metadata");
+assert.match(projectsDomain, /total_count/, "Project list domain must consume server total_count");
+assert.match(projectsDomain, /totalCount/, "Project list domain must expose totalCount to the route");
 
 const projectList = read("modulex-store/src/components/portal/PortalProjectList.tsx");
 const projectDetail = read("modulex-store/src/components/portal/PortalProjectDetail.tsx");
 assert.match(projectList, /project_number/);
+assert.match(projectList, /Previous/, "Project list must render previous-page navigation");
+assert.match(projectList, /Next/, "Project list must render next-page navigation");
+assert.match(projectList, /totalCount/, "Project list must use total count to determine navigation bounds");
 assert.match(projectDetail, /Orders/);
 assert.match(projectDetail, /Shipments/);
 assert.match(projectDetail, /Installations/);
 assert.match(projectDetail, /kind\s*===\s*["']dealer["'].*Documents/s, "Documents navigation must remain dealer-only");
 assert.doesNotMatch(projectDetail, /href=["']\/account\/documents["']/, "PB-8 must not invent Customer Portal document access");
 
+const accountProjectsRoute = read("modulex-store/src/app/account/(portal)/projects/page.tsx");
+const dealerProjectsRoute = read("modulex-store/src/app/dealer/(portal)/projects/page.tsx");
+for (const route of [accountProjectsRoute, dealerProjectsRoute]) {
+  assert.match(route, /searchParams/, "Portal Project list routes must consume ?page=");
+  assert.match(route, /getPortalProjects\s*\(\s*PAGE_SIZE\s*,\s*offset\s*\)/, "Portal Project routes must pass paging offset to the RPC domain");
+  assert.match(route, /page={page}/, "Portal Project routes must pass current page to the list UI");
+  assert.match(route, /totalCount={pageData\.totalCount}/, "Portal Project routes must pass server total count to the list UI");
+}
+
 for (const route of [
-  "modulex-store/src/app/account/(portal)/projects/page.tsx",
   "modulex-store/src/app/account/(portal)/projects/[id]/page.tsx",
-  "modulex-store/src/app/dealer/(portal)/projects/page.tsx",
   "modulex-store/src/app/dealer/(portal)/projects/[id]/page.tsx",
 ]) {
   read(route);
