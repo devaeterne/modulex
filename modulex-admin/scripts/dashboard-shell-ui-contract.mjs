@@ -63,8 +63,18 @@ assert.match(
 );
 assert.match(
   dashboard,
-  /new Intl\.DateTimeFormat\(undefined,/,
-  "Dashboard dates must use the runtime locale instead of hardcoded en-US formatting",
+  /import \{ formatDateTime \} from "@\/lib\/dates\/usDate";/,
+  "Dashboard dates must use the shared deterministic MM.DD.YYYY date formatter",
+);
+assert.match(
+  dashboard,
+  /formatDateTime\(/,
+  "Dashboard date rendering must flow through the shared US date contract",
+);
+assert.doesNotMatch(
+  dashboard,
+  /new Intl\.DateTimeFormat\(["']en-US["'],/,
+  "Dashboard must not introduce an isolated hardcoded date formatter",
 );
 
 assert.match(
