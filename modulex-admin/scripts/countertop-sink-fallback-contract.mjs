@@ -10,10 +10,11 @@ const assert = (condition, message) => {
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const migrationPath = "../modulex-store/supabase/migrations/20260903030000_countertop_sink_manual_fallback.sql";
 const faucetMigrationPath = "../modulex-store/supabase/migrations/20260908010000_countertop_faucet_selection.sql";
+const zeroPriceFixMigrationPath = "../modulex-store/supabase/migrations/20260908164000_countertop_sink_zero_price_fallback.sql";
 
 assert(configurator.includes('import SearchableSelect from "@/components/form/SearchableSelect"'), "Countertop Stone/Sink selection must use the shared searchable dropdown primitive");
 assert((configurator.match(/<SearchableSelect/g) ?? []).length >= 2, "Countertop Stone and Sink fields must both render searchable dropdowns");
-assert(configurator.includes('searchPlaceholder="Search stone by name or SKU"'), "Stone search must be discoverable by name/SKU inside its dropdown");
+assert(configurator.includes('searchPlaceholder="Search stone by name or SKU"'), "Sink search must be discoverable by name/SKU inside its dropdown");
 assert(configurator.includes('searchPlaceholder="Search sink by name or SKU"'), "Sink search must be discoverable by name/SKU inside its dropdown");
 assert(configurator.includes("manualSinkPrice"), "Countertop configurator must keep manual Sink fallback price state");
 assert(configurator.includes("Manual sink price fallback"), "Countertop configurator must label the manual Sink fallback clearly");
@@ -36,6 +37,15 @@ assert(migration.includes("manual_sink_price = case"), "Attach RPC must persist 
 assert(migration.includes("update of edge_profile_id, sink_product_id, price_group_id, sqft, edge_linear_ft, slab_quantity, manual_price_per_sqft, manual_sink_price"), "Snapshot trigger must refresh when manual Sink fallback changes");
 assert(migration.includes("revoke all on function public.calculate_countertop_price_with_sink_fallback"), "New public pricing RPC must not inherit PUBLIC execute");
 assert(migration.includes("grant execute on function public.calculate_countertop_price_with_sink_fallback") && migration.includes("to authenticated"), "New public pricing RPC must grant execute only to authenticated callers");
+
+assert(fs.existsSync(path.join(root, zeroPriceFixMigrationPath)), "Zero-valued active Sink prices must have a canonical fallback hardening migration");
+const zeroPriceFixMigration = read(zeroPriceFixMigrationPath);
+assert(zeroPriceFixMigration.includes("create or replace function public.calculate_countertop_price_with_sink_fallback"), "Zero-price hardening must replace the authoritative Sink fallback pricing RPC");
+assert(/pp\.amount\s*>\s*0/i.test(zeroPriceFixMigration), "Zero-price hardening must treat only positive active Sink prices as canonical priced values");
+assert(zeroPriceFixMigration.includes("if v_sink is null and p_manual_sink_price is not null"), "Zero-priced Sinks must be eligible for the supplied manual fallback");
+assert(zeroPriceFixMigration.includes("raise exception 'Sink has no positive active price for this price group. Enter a manual Sink fallback price.'"), "Zero-priced Sinks without a manual fallback must fail closed instead of silently contributing $0");
+assert(zeroPriceFixMigration.includes("revoke all on function public.calculate_countertop_price_with_sink_fallback"), "Zero-price hardening must preserve RPC execute lockdown");
+assert(zeroPriceFixMigration.includes("grant execute on function public.calculate_countertop_price_with_sink_fallback") && zeroPriceFixMigration.includes("to authenticated"), "Zero-price hardening must restore authenticated-only RPC execute");
 
 if (usesFaucetWrapper) {
   assert(fs.existsSync(path.join(root, faucetMigrationPath)), "Faucet pricing wrapper migration is missing");
