@@ -5,6 +5,7 @@ import process from "node:process";
 const root = process.cwd();
 const domainPath = path.join(root, "src/lib/customers/order-domain.ts");
 const readDedupPath = path.join(root, "src/lib/customers/read-dedup.ts");
+const dateTimeInputPath = path.join(root, "src/components/form/DateTimeInput.tsx");
 const installation = fs.readFileSync(path.join(root, "src/components/customers/CreateInstallationFromOrder.tsx"), "utf8");
 const newOrder = fs.readFileSync(path.join(root, "src/components/customers/NewCustomerOrder.tsx"), "utf8");
 const editOrder = fs.readFileSync(path.join(root, "src/components/customers/EditCustomerOrder.tsx"), "utf8");
@@ -20,9 +21,11 @@ function assert(condition, message) {
 
 assert(fs.existsSync(domainPath), "A1.2B must define src/lib/customers/order-domain.ts");
 assert(fs.existsSync(readDedupPath), "Order detail must define the shared customer read dedup adapter");
+assert(fs.existsSync(dateTimeInputPath), "Order installation scheduling must define shared form/DateTimeInput.tsx");
 
 const domain = fs.readFileSync(domainPath, "utf8");
 const readDedup = fs.readFileSync(readDedupPath, "utf8");
+const dateTimeInput = fs.readFileSync(dateTimeInputPath, "utf8");
 
 for (const exportedName of [
   "loadCreateOrderContext",
@@ -72,6 +75,11 @@ assert(domain.includes("loadCustomerOrderRecord(customerId, orderId)"), "order d
 assert(installation.includes('from "@/lib/customers/order-domain"'), "installation scheduling surface must consume the shared order domain adapter");
 assert(installation.includes("loadCustomerOrderRecord(params.id, params.orderId)"), "installation scheduling must reuse the shared order record read");
 assert(!installation.includes('.from("customer_orders")'), "installation scheduling must not issue a second customer_orders read during page mount");
+assert(installation.includes('DateTimeInput from "@/components/form/DateTimeInput"'), "installation scheduling must use the shared DateTimeInput");
+assert(!installation.includes('type="datetime-local"'), "installation scheduling must not expose locale-dependent native datetime-local inputs");
+assert(dateTimeInput.includes("formatDateTimeInput"), "shared DateTimeInput must format canonical local timestamps as MM.DD.YYYY HH:MM");
+assert(dateTimeInput.includes("parseDateTimeInput"), "shared DateTimeInput must parse MM.DD.YYYY HH:MM back to canonical local timestamps");
+assert(dateTimeInput.includes('placeholder = "MM.DD.YYYY HH:MM"'), "shared DateTimeInput must advertise the US date-time format");
 
 assert(domain.includes('.rpc("create_customer_order"'), "order domain adapter must retain create_customer_order as the create boundary");
 assert(domain.includes('.rpc("update_customer_order"'), "order domain adapter must retain update_customer_order as the edit boundary");

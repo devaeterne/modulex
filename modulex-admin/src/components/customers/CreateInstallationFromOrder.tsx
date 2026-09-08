@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
+import DateTimeInput from "@/components/form/DateTimeInput";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
@@ -92,8 +93,8 @@ export default function CreateInstallationFromOrder() {
       {open && installationReady ? <div className="space-y-4">
         {errorMessage ? <Alert variant="error" title="Unable to schedule installation" message={errorMessage} /> : null}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <div><Label>Start</Label><Input type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} /></div>
-          <div><Label>End</Label><Input type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} /></div>
+          <div><Label>Start</Label><DateTimeInput value={startAt} onChange={setStartAt} required ariaLabel="Installation start date and time" /></div>
+          <div><Label>End</Label><DateTimeInput value={endAt} onChange={setEndAt} ariaLabel="Installation end date and time" /></div>
           <div><Label>Assigned User</Label><Select allowEmpty placeholder="Unassigned" options={profiles.map((profile) => ({ value: profile.id, label: profile.full_name || profile.email || profile.id }))} value={assignedTo} onChange={setAssignedTo} /></div>
           <div><Label>Team</Label><Input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Installation team" /></div>
           <div><Label>Contact Name</Label><Input value={contactName} onChange={(e) => setContactName(e.target.value)} /></div>

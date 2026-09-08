@@ -17,6 +17,14 @@ for (const invalid of ["02.29.2027", "02.30.2026", "13.01.2026", "1.2.2026", "20
   assert.deepEqual(dates.parseDateInput(invalid), { ok: false, error: "Enter a date as MM.DD.YYYY." }, invalid);
 }
 
+assert.equal(dates.formatDateTimeInput("2026-09-08T14:35"), "09.08.2026 14:35");
+assert.equal(dates.formatDateTimeInput(""), "");
+assert.deepEqual(dates.parseDateTimeInput("09.08.2026 14:35"), { ok: true, value: "2026-09-08T14:35" });
+assert.deepEqual(dates.parseDateTimeInput("02.29.2028 00:05"), { ok: true, value: "2028-02-29T00:05" });
+for (const invalid of ["02.29.2027 14:35", "09.08.2026 24:00", "09.08.2026 14:60", "2026-09-08T14:35", "09.08.2026", ""]) {
+  assert.deepEqual(dates.parseDateTimeInput(invalid), { ok: false, error: "Enter a date and time as MM.DD.YYYY HH:MM." }, invalid);
+}
+
 assert.equal(
   dates.formatTimestampDate("2026-09-08T01:30:00Z", { timeZone: "America/New_York" }),
   "09.07.2026",
