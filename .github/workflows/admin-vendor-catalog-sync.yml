@@ -13,6 +13,7 @@ on:
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
       - "modulex-admin/scripts/vendor-catalog-adapter-behavior-contract.mjs"
       - "modulex-admin/scripts/dynamic-stone-adapter-contract.mjs"
+      - "modulex-admin/scripts/dynamic-stone-cost-routing-contract.mjs"
       - "modulex-admin/scripts/stone-vendor-catalog-contract.mjs"
       - "modulex-admin/scripts/stone-media-approval-contract.mjs"
       - "modulex-admin/scripts/stone-product-identity-contract.mjs"
@@ -25,6 +26,7 @@ on:
       - "modulex-store/supabase/migrations/*vendor_catalog_sync*.sql"
       - "modulex-store/supabase/migrations/*vendor_catalog_availability*.sql"
       - "modulex-store/supabase/migrations/*stone_vendor_catalog*.sql"
+      - "modulex-store/supabase/migrations/*dynamic_stone*.sql"
       - ".github/workflows/admin-vendor-catalog-sync.yml"
   pull_request:
     paths:
@@ -38,6 +40,7 @@ on:
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
       - "modulex-admin/scripts/vendor-catalog-adapter-behavior-contract.mjs"
       - "modulex-admin/scripts/dynamic-stone-adapter-contract.mjs"
+      - "modulex-admin/scripts/dynamic-stone-cost-routing-contract.mjs"
       - "modulex-admin/scripts/stone-vendor-catalog-contract.mjs"
       - "modulex-admin/scripts/stone-media-approval-contract.mjs"
       - "modulex-admin/scripts/stone-product-identity-contract.mjs"
@@ -50,6 +53,7 @@ on:
       - "modulex-store/supabase/migrations/*vendor_catalog_sync*.sql"
       - "modulex-store/supabase/migrations/*vendor_catalog_availability*.sql"
       - "modulex-store/supabase/migrations/*stone_vendor_catalog*.sql"
+      - "modulex-store/supabase/migrations/*dynamic_stone*.sql"
       - ".github/workflows/admin-vendor-catalog-sync.yml"
   workflow_dispatch:
 
@@ -77,6 +81,7 @@ jobs:
       - run: node scripts/vendor-catalog-sync-contract.mjs
       - run: node scripts/vendor-catalog-adapter-behavior-contract.mjs
       - run: node scripts/dynamic-stone-adapter-contract.mjs
+      - run: node scripts/dynamic-stone-cost-routing-contract.mjs
       - run: node scripts/stone-vendor-catalog-contract.mjs
       - run: node scripts/stone-media-approval-contract.mjs
       - run: node scripts/stone-product-identity-contract.mjs
