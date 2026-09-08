@@ -29,29 +29,42 @@ assert.match(timestamp, /15|3/);
 assert.notEqual(timestamp, "09.07.2026");
 assert.equal(dates.formatDateTime(null), "—");
 
-const DATE_FIELD = /^(?:date|.*_date|.*_on|.*_at|.*Date|.*At)$/;
+const DATE_FIELD = /^(?:date|period_start|period_end|.*_date|.*_on|.*_at|.*Date|.*At)$/;
 const SIMPLE_MEMBER_EXPRESSION = /\{\s*([A-Za-z_$][\w$]*(?:(?:\?\.|\.)[A-Za-z_$][\w$]*)+)\s*(?:(?:\|\||\?\?)\s*(?:"[^"]*"|'[^']*'))?\s*\}/g;
+const STRING_MEMBER_EXPRESSION = /\{\s*String\(\s*([A-Za-z_$][\w$]*(?:(?:\?\.|\.)[A-Za-z_$][\w$]*)+)\s*(?:(?:\|\||\?\?)\s*(?:"[^"]*"|'[^']*'))?\s*\)\s*\}/g;
 
 function rawDateDisplays(source) {
   const findings = [];
-  for (const match of source.matchAll(SIMPLE_MEMBER_EXPRESSION)) {
-    const member = match[1];
-    const field = member.split(/\?\.|\./).at(-1) ?? "";
-    if (!DATE_FIELD.test(field)) continue;
+  const seen = new Set();
 
-    const index = match.index ?? 0;
-    const lastOpenTag = source.lastIndexOf("<", index);
-    const lastClosedTag = source.lastIndexOf(">", index);
-    if (lastClosedTag <= lastOpenTag) continue;
+  for (const expression of [SIMPLE_MEMBER_EXPRESSION, STRING_MEMBER_EXPRESSION]) {
+    expression.lastIndex = 0;
+    for (const match of source.matchAll(expression)) {
+      const member = match[1];
+      const field = member.split(/\?\.|\./).at(-1) ?? "";
+      if (!DATE_FIELD.test(field)) continue;
 
-    findings.push({ member, index });
+      const index = match.index ?? 0;
+      const lastOpenTag = source.lastIndexOf("<", index);
+      const lastClosedTag = source.lastIndexOf(">", index);
+      if (lastClosedTag <= lastOpenTag) continue;
+
+      const key = `${index}:${member}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      findings.push({ member, index });
+    }
   }
-  return findings;
+
+  return findings.sort((left, right) => left.index - right.index || left.member.localeCompare(right.member));
 }
 
 assert.deepEqual(rawDateDisplays('<td>{row.due_date || "—"}</td>').map((item) => item.member), ["row.due_date"]);
 assert.deepEqual(rawDateDisplays('<p>Reviewed · {review.review_date}</p>').map((item) => item.member), ["review.review_date"]);
+assert.deepEqual(rawDateDisplays('<td>{String(row.due_date ?? "—")}</td>').map((item) => item.member), ["row.due_date"]);
+assert.deepEqual(rawDateDisplays('<p>{row.period_start} → {row.period_end}</p>').map((item) => item.member), ["row.period_start", "row.period_end"]);
 assert.deepEqual(rawDateDisplays('<td>{formatDateOnly(row.due_date)}</td>'), []);
+assert.deepEqual(rawDateDisplays('<td>{formatDateOnly(row.period_start)}</td>'), []);
 assert.deepEqual(rawDateDisplays('<DateInput value={row.due_date} onChange={() => {}} />'), []);
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
