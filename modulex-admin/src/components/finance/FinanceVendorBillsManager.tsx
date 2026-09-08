@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates/usDate";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
@@ -429,7 +430,7 @@ export default function FinanceVendorBillsManager() {
                 {loading ? <TableStateRow colSpan={8}>Loading Vendor Bills…</TableStateRow> : bills.length === 0 ? <TableStateRow colSpan={8}>No Vendor Bills match the current filters.</TableStateRow> : bills.map((bill) => (
                   <TableRow key={bill.id}>
                     <TableCell variant="admin"><span className="font-medium">{bill.vendor_name_snapshot}</span><div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{bill.invoice_number}{bill.purchase_order_reference ? ` · PO ${bill.purchase_order_reference}` : ""}</div></TableCell>
-                    <TableCell variant="admin">{bill.invoice_date}</TableCell><TableCell variant="admin">{bill.due_date || "—"}</TableCell>
+                    <TableCell variant="admin">{formatDateOnly(bill.invoice_date)}</TableCell><TableCell variant="admin">{formatDateOnly(bill.due_date)}</TableCell>
                     <TableCell variant="admin" className="text-right font-medium">{money(bill.total_amount, bill.currency_code)}</TableCell>
                     <TableCell variant="admin" className="text-right font-medium">{money(bill.outstanding_amount, bill.currency_code)}</TableCell>
                     <TableCell variant="admin"><Badge color={paymentColor(bill.payment_status)}>{bill.payment_status.replaceAll("_", " ")}</Badge></TableCell>
@@ -450,7 +451,7 @@ export default function FinanceVendorBillsManager() {
             <div className="space-y-5">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Vendor</span><div className="font-medium">{detail.vendor?.display_name ?? String(detail.invoice.vendor_name_snapshot ?? "—")}</div></div>
-                <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Due</span><div className="font-medium">{String(detail.invoice.due_date ?? "—")}</div></div>
+                <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Due</span><div className="font-medium">{formatDateOnly(detail.invoice.due_date)}</div></div>
                 <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Outstanding</span><div className="font-medium">{money(Number(detail.invoice.outstanding_amount ?? 0), String(detail.invoice.currency_code ?? "USD"))}</div></div>
                 <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Base snapshot</span><div className="font-medium">{detail.invoice.base_amount ? money(Number(detail.invoice.base_amount), String(detail.invoice.base_currency_code ?? "USD")) : "Draft"}</div></div>
               </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates/usDate";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
@@ -417,7 +418,7 @@ export default function FinanceExpensesManager() {
                   <TableStateRow colSpan={7}>No Finance expenses match the current filters.</TableStateRow>
                 ) : expenses.map((expense) => (
                   <TableRow key={expense.id}>
-                    <TableCell variant="admin">{expense.expense_date}</TableCell>
+                    <TableCell variant="admin">{formatDateOnly(expense.expense_date)}</TableCell>
                     <TableCell variant="admin">
                       <span className="font-medium">{expense.description}</span>
                       <div className="text-xs">{expense.vendor || "No vendor"}{expense.reference_no ? ` · ${expense.reference_no}` : ""}</div>

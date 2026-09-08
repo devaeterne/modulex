@@ -21,7 +21,7 @@ import {
   type HrEmployee,
   type HrPosition,
 } from "@/lib/hr/types";
-import { formatDateTime } from "@/lib/dates/usDate";
+import { formatDateTime, formatDateOnly } from "@/lib/dates/usDate";
 import DateInput from "@/components/form/DateInput";
 
 type EmployeeForm = {
@@ -325,7 +325,7 @@ export default function EmployeeDirectory() {
                   <TableCell variant="admin">{departmentName(employee.department_id)}</TableCell>
                   <TableCell variant="admin">{positionName(employee.position_id)}</TableCell>
                   <TableCell variant="admin">{managerName(employee.manager_id)}</TableCell>
-                  <TableCell variant="admin">{employee.hire_date || "—"}</TableCell>
+                  <TableCell variant="admin">{formatDateOnly(employee.hire_date)}</TableCell>
                   <TableCell variant="admin"><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void openPayments(employee)}>Payments</Button><Button size="sm" variant="outline" onClick={() => openEdit(employee)}>Edit</Button></div></TableCell>
                 </TableRow>
               ))}

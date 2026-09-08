@@ -23,7 +23,7 @@ import {
   type FinancePayrollObligation,
 } from "@/lib/finance/payroll";
 import { supabase } from "@/lib/supabase/client";
-import { formatTimestampDate } from "@/lib/dates/usDate";
+import { formatTimestampDate, formatDateOnly } from "@/lib/dates/usDate";
 import DateInput from "@/components/form/DateInput";
 
 type Period = {
@@ -347,7 +347,7 @@ export default function PayrollManager() {
   const selectedPeriod = periods.find((period) => period.id === periodId);
   const periodOptions = periods.map((period) => ({
     value: period.id,
-    label: `${period.period_code} · ${period.period_start} → ${period.period_end} · Pay ${period.pay_date}`,
+    label: `${period.period_code} · ${formatDateOnly(period.period_start)} → ${formatDateOnly(period.period_end)} · Pay ${formatDateOnly(period.pay_date)}`,
   }));
   const runOptions = runs
     .filter((run) => !periodId || run.payroll_period_id === periodId)
@@ -494,7 +494,7 @@ export default function PayrollManager() {
           </div>
           {selectedPeriod ? (
             <p className="text-xs">
-              {selectedPeriod.period_code} · {selectedPeriod.status} · Pay date {selectedPeriod.pay_date}
+              {selectedPeriod.period_code} · {selectedPeriod.status} · Pay date {formatDateOnly(selectedPeriod.pay_date)}
             </p>
           ) : null}
           {selectedRun?.status === "paid" ? (

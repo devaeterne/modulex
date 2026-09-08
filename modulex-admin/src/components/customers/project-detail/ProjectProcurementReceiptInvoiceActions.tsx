@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates/usDate";
 import { useState } from "react";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
@@ -186,7 +187,7 @@ export default function ProjectProcurementReceiptInvoiceActions({
 
   const deliveryOptions = deliveryEvents.map((event) => ({
     value: event.id,
-    label: `${event.deliveredDate} — ${event.effectiveQuantity} available to correct`,
+    label: `${formatDateOnly(event.deliveredDate)} — ${event.effectiveQuantity} available to correct`,
   }));
 
   return (

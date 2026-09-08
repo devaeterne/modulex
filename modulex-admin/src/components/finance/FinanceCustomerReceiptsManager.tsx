@@ -23,7 +23,7 @@ import {
   type CustomerReceiptReferenceData,
   type CustomerReceiptRow,
 } from "@/lib/finance/customer-receipts";
-import { formatDateTime } from "@/lib/dates/usDate";
+import { formatDateTime, formatDateOnly } from "@/lib/dates/usDate";
 
 function localDateTimeValue() {
   const now = new Date();
@@ -223,7 +223,7 @@ export default function FinanceCustomerReceiptsManager() {
                     {!customerId ? <TableStateRow colSpan={6}>Select a Customer to load open Invoices.</TableStateRow> : invoices.length === 0 ? <TableStateRow colSpan={6}>No open Invoices are available for this Customer.</TableStateRow> : invoices.map((invoice) => (
                       <TableRow key={invoice.invoice_id}>
                         <TableCell variant="admin"><div className="font-medium">{invoice.invoice_number}</div><div className="text-xs">{invoice.status.replaceAll("_", " ")}{invoice.legacy_unreconciled ? " · legacy payment reconciliation required" : ""}</div></TableCell>
-                        <TableCell variant="admin">{invoice.due_date || "—"}</TableCell>
+                        <TableCell variant="admin">{formatDateOnly(invoice.due_date)}</TableCell>
                         <TableCell variant="admin" className="text-right">{money(invoice.total_amount, invoice.currency_code)}</TableCell>
                         <TableCell variant="admin" className="text-right">{money(invoice.paid_amount, invoice.currency_code)}</TableCell>
                         <TableCell variant="admin" className="text-right font-medium">{money(invoice.balance_amount, invoice.currency_code)}</TableCell>
