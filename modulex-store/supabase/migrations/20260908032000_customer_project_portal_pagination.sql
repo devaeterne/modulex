@@ -29,7 +29,7 @@ begin
   from public.customer_projects cp
   where cp.customer_id = v_customer_id;
 
-  select coalesce(jsonb_agg(row_data order by created_at desc), '[]'::jsonb)
+  select coalesce(jsonb_agg(row_data order by created_at desc, project_id desc), '[]'::jsonb)
   into v_projects
   from (
     select
@@ -67,10 +67,11 @@ begin
             and o.customer_id = v_customer_id
         )
       ) as row_data,
-      cp.created_at
+      cp.created_at,
+      cp.id as project_id
     from public.customer_projects cp
     where cp.customer_id = v_customer_id
-    order by cp.created_at desc
+    order by cp.created_at desc, cp.id desc
     limit v_limit offset v_offset
   ) scoped;
 
