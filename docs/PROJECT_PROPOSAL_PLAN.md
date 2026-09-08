@@ -27,7 +27,7 @@
 - New form/mutation behavior must follow `modulex-admin/docs/ADMIN_VALIDATION_GUIDE.md`: DB/RPC contract first, explicit normalization, duplicate-submit protection, end-to-end authorization, and clear loading/empty/error/permission states.
 - Schema/RPC/grant/RLS changes require Security/Performance Advisor review and production migration only after owner merge unless the user explicitly requests otherwise.
 - Do not broaden Store/Customer Portal/Dealer Portal exposure in the Proposal Core phases. Any later customer-facing proposal surface requires its own explicit package and contract.
-- Current execution baseline for P3: `main` at `0e7d5a66d7334d25660f4a420d8a5333ebb86051` (2026-09-08). P1 is production-accepted, P2 is merged via PR #376, and P3 is isolated in PR #381. Open #369/#380 are US-date standardization/integration work and P3 avoids their ProjectDetailWorkspace surface.
+- Current execution baseline for P5 closeout: `main` at `9adf26fa53779825eac554f50a666287f6fe392c` (2026-09-08). PR #400 is merged, no open PRs were present at closeout verification, Admin production is `READY` on the same SHA, P1–P4 are closed according to the evidence below, and P5 implementation is merged via PR #398 with live signed-in artifact acceptance still pending.
 
 ---
 
@@ -174,7 +174,7 @@ Proposal PDF target sections:
 - terms
 - customer acceptance/signature metadata
 
-Accepted PDF must eventually be stored as an immutable Project document snapshot. The current Project `Documents` tab is still a pending-domain placeholder, so implementation must first map/reuse the canonical Modulex storage/document contract; Proposal must not invent a parallel document-storage system.
+Accepted PDF is stored as an immutable Project document snapshot through the existing canonical `customer_documents` lifecycle and private `customer-documents` bucket. Proposal must not invent a parallel document-storage system.
 
 ---
 
@@ -327,7 +327,7 @@ Columns:
 - `acceptance_method text not null`
 - `signature_text text null`
 - `source_ip` only if current privacy/security architecture explicitly permits it; otherwise omit
-- future canonical Project document reference after Documents contract mapping
+- canonical accepted Project document linkage is provided by P5 through `customer_project_proposal_artifacts`
 - standard created metadata
 
 Rules:
@@ -335,6 +335,21 @@ Rules:
 - append-safe; no browser hard-delete
 - only one effective acceptance for a Revision
 - acceptance transaction locks Revision and transitions Proposal commercial status atomically
+
+### 2.7 `customer_project_proposal_artifacts`
+
+Purpose: immutable linkage from an exact accepted Proposal Revision/Acceptance to the canonical `customer_documents` record created for the persisted accepted PDF.
+
+Rules:
+
+- one artifact per accepted Revision
+- one artifact per acceptance row
+- one Proposal artifact link per canonical customer document
+- registration only through the guarded canonical RPC
+- accepted artifact metadata is immutable
+- stored bytes live in the existing private `customer-documents` bucket
+- `portal_visible=false` initially
+- no parallel Proposal document/storage lifecycle
 
 ---
 
@@ -347,6 +362,8 @@ Reads:
 - `get_project_proposals(project_id)` — Proposal list + current/latest Revision summary.
 - `get_project_proposal(proposal_id)` — Proposal header, Revisions, active/current Revision, Areas, Pricing Groups, derived total.
 - `get_proposal_area_types(include_inactive boolean default false)` — configurable selector data.
+- `get_project_proposal_artifact(...)` — exact accepted artifact metadata.
+- `get_project_proposal_artifacts(project_id)` — Project accepted Proposal document index.
 
 Writes:
 
@@ -360,13 +377,14 @@ Writes:
 - `send_project_proposal_revision(revision_id)`
 - `reject_project_proposal_revision(revision_id, note)`
 - `accept_project_proposal_revision(...)`
+- `register_project_proposal_accepted_artifact(...)` — exact accepted Revision only, canonical customer document registration, idempotent and immutable.
 
 Mutation requirements:
 
 - DB/RPC lifecycle guards are authoritative.
 - All protected writes are role/permission checked at the authoritative boundary.
 - Do not expose service-role credentials to browser code.
-- Duplicate submit must not create duplicate Proposal/Revision/Acceptance records.
+- Duplicate submit must not create duplicate Proposal/Revision/Acceptance/artifact records.
 - Unknown lifecycle transitions fail closed.
 - Commercial numbering/revision increment is concurrency-safe.
 
@@ -376,11 +394,11 @@ Mutation requirements:
 
 ### 4.1 Project Detail integration
 
-Modify `modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx` to insert `Proposal` before `Orders` and render a focused `ProjectProposalTab` component.
+`modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx` owns `Proposal` before `Orders` and renders the focused `ProjectProposalTab` component. `Documents` renders the real `ProjectDocumentsTab` accepted-artifact index introduced by P5.
 
-### 4.2 Proposed focused components
+### 4.2 Focused components
 
-Create under `modulex-admin/src/components/customers/project-detail/`:
+Proposal components under `modulex-admin/src/components/customers/project-detail/` include:
 
 - `ProjectProposalTab.tsx` — orchestration, loading/error/empty/permission states, Proposal/revision summary.
 - `ProjectProposalEditor.tsx` — Proposal header/terms/validity editing for draft Revision.
@@ -388,22 +406,28 @@ Create under `modulex-admin/src/components/customers/project-detail/`:
 - `ProjectProposalAreaModal.tsx` — dynamic optional Area editor using shared Modulex form controls.
 - `ProjectProposalPricingGroups.tsx` — group creation/editing, Area membership visibility, pricing summary.
 - `ProjectProposalRevisionHistory.tsx` — revision lifecycle timeline/actions.
+- `ProjectProposalLifecycleActions.tsx` — Send/New Revision/Reject/Accept plus accepted-snapshot persistence/retry state.
+- `ProjectDocumentsTab.tsx` — canonical accepted Proposal artifact listing and stored-byte download.
 
 Keep files focused. Do not move unrelated ProjectDetailWorkspace behavior during Proposal work.
 
-### 4.3 Domain client
+### 4.3 Domain clients
 
-Create:
+Proposal domain/client responsibilities remain separated from UI rendering:
 
 - `modulex-admin/src/lib/customers/project-proposal-domain.ts`
+- `modulex-admin/src/lib/customers/project-proposal-artifact-client.ts`
+- `modulex-admin/src/lib/customers/project-proposal-artifact-server.ts`
 
 Responsibilities:
 
-- canonical TypeScript Proposal/Revision/Area/Pricing Group types
+- canonical TypeScript Proposal/Revision/Area/Pricing Group/artifact types
 - read wrappers
 - mutation wrappers
 - input normalization helpers specific to Proposal domain
+- P4 customer-safe projection/PDF renderer reuse for P5 persistence
 - no UI rendering
+- no service-role browser bypass
 
 ### 4.4 Area editor behavior
 
@@ -463,12 +487,7 @@ Exit criteria: design decisions above are accepted and this file is on the imple
 
 Status: `[x] PRODUCTION ACCEPTED`
 
-Primary files:
-
-- Create `modulex-admin/sql/project-proposal-core.sql`
-- Create canonical mirrored migration under `modulex-store/supabase/migrations/<timestamp>_project_proposal_core.sql`
-- Create/update focused DB contract tests under the existing Admin Project Base contract location discovered on current main
-- Update `modulex-admin/ADMIN_ROADMAP.md` in the same workstream
+Implementation: PR #370.
 
 Scope:
 
@@ -501,12 +520,7 @@ P1 acceptance:
 
 Status: `[x] MERGED / VERIFIED`
 
-Primary files:
-
-- Create `modulex-admin/src/lib/customers/project-proposal-domain.ts`
-- Create Proposal components listed in section 4.2
-- Modify `modulex-admin/src/components/customers/ProjectDetailWorkspace.tsx`
-- Add focused UI/domain tests using current Admin test conventions
+Implementation: PR #376.
 
 Scope:
 
@@ -535,7 +549,9 @@ P2 acceptance:
 
 ### P3 — Revision / Send / Acceptance UX
 
-Status: `[~] IMPLEMENTATION VERIFIED — PR #381; MERGE + LIVE ACCEPTANCE PENDING`
+Status: `[x] MERGED / PRODUCTION VERIFIED`
+
+Implementation: PR #381.
 
 Scope:
 
@@ -546,7 +562,7 @@ Scope:
 - [x] Accept an exact sent Revision.
 - [x] Freeze accepted Revision controls in UI as well as DB.
 - [x] Reflect Proposal commercial state without overloading Project status.
-- [x] Define conservative Project lifecycle integration: Proposal sent may support Project `quoted`; Proposal accepted may support Project `approved` only through an explicit reviewed transition, not an accidental side effect.
+- [x] Preserve the explicit boundary that Proposal acceptance does not create an Order or silently mutate Project lifecycle.
 
 P3 acceptance:
 
@@ -555,20 +571,30 @@ P3 acceptance:
 - Acceptance points to an exact immutable Revision.
 - Project lifecycle and Proposal lifecycle remain independently auditable.
 
+Closeout evidence:
+
+- PR #381 merged.
+- Current production deployment is a descendant of the P3 merge and is `READY`.
+- Proposal lifecycle contracts are GREEN on the #400/current-main-equivalent tree.
+
 ### P4 — Proposal PDF Rendering
 
-Status: `[ ] NOT STARTED`
+Status: `[x] PRODUCTION ACCEPTED`
+
+Implementation: PR #384.
+
+Merge SHA: `29515c907ca3cc79f49e5a030b5c8e6f36d70ae2`.
 
 Scope:
 
-- [ ] Inspect and reuse current Modulex document/PDF rendering conventions before choosing a library.
-- [ ] Create server-side Proposal PDF rendering from structured Proposal Revision data.
-- [ ] Hide empty optional fields/sections instead of printing blank labels.
-- [ ] Render grouped pricing once per Pricing Group.
-- [ ] Exclude `internal_notes` from all customer-facing output.
-- [ ] Include proposal/revision/date/customer/project/job site/terms/total.
-- [ ] Add preview/download action for authorized Admin users.
-- [ ] Snapshot test/contract the PDF data projection separately from visual rendering.
+- [x] Inspect and reuse current Modulex document/PDF rendering conventions before choosing a library.
+- [x] Create server-side Proposal PDF rendering from structured Proposal Revision data.
+- [x] Hide empty optional fields/sections instead of printing blank labels.
+- [x] Render grouped pricing once per Pricing Group.
+- [x] Exclude internal/readiness/measurement/supplier-internal fields from customer-facing output unless an explicit customer-facing contract exists.
+- [x] Include proposal/revision/date/customer/project/job site/terms/total.
+- [x] Add preview/download action for authorized Admin users.
+- [x] Snapshot/contract the PDF data projection separately from visual rendering.
 
 P4 acceptance:
 
@@ -577,30 +603,58 @@ P4 acceptance:
 - No duplicate grouped price appears.
 - Internal-only notes never appear.
 
+Closeout evidence:
+
+- PR #384 merged and is contained by the current production deployment.
+- Signed-in Preview/Download smoke was manually owned and accepted by the project owner.
+- P4 PDF contract remains GREEN on the #400/current-main-equivalent tree.
+
 ### P5 — Acceptance Snapshot + Project Documents
 
-Status: `[ ] NOT STARTED`
+Status: `[~] IMPLEMENTED / MERGED / PRODUCTION SCHEMA + DEPLOY + CI VERIFIED — SIGNED-IN LIVE ARTIFACT ACCEPTANCE PENDING`
 
-Dependency: map the canonical Modulex storage/document ownership first; current Project Documents tab is intentionally a placeholder.
+Implementation: PR #398.
+
+Merge SHA: `3cf0d62dac1641bdd6674959de9bdb706ab62d2d`.
+
+Closeout evidence: `docs/acceptance/project-proposal-p5-production-closeout.md`.
+
+Canonical ownership is resolved: P5 reuses `public.customer_documents` and the existing private `customer-documents` bucket. No parallel Proposal document/storage system is introduced.
 
 Scope:
 
-- [ ] Inspect existing storage/document contracts and choose canonical Project document reference.
-- [ ] Do not create a second storage system.
-- [ ] Persist the exact accepted rendered Proposal PDF as immutable evidence.
-- [ ] Link acceptance metadata to the exact Revision/document snapshot.
-- [ ] Surface accepted Proposal artifact in Project Documents.
-- [ ] Preserve append-safe audit semantics.
+- [x] Inspect existing storage/document contracts and choose canonical Project document reference.
+- [x] Do not create a second storage system.
+- [x] Persist the exact accepted rendered Proposal PDF as immutable evidence.
+- [x] Link acceptance metadata to the exact Revision/document snapshot.
+- [x] Surface accepted Proposal artifact in Project Documents.
+- [x] Preserve append-safe audit semantics.
+- [x] Store SHA-256/file-size/storage metadata and verify stored bytes on download.
+- [x] Keep persistence retryable/idempotent without rolling back a successful Proposal acceptance.
+- [x] Keep accepted artifact `portal_visible=false` initially.
+- [x] Preserve no-Order/no-Project-lifecycle-mutation boundary.
+- [x] Verify canonical Store migration and Admin mirror are byte-identical.
+- [x] Verify production table/constraints/lifecycle guard/RPC signatures/grants/RLS/Storage boundary.
+- [x] Verify P5 focused contract GREEN through Admin Project Base.
+- [x] Verify current Admin production deployment contains P5 and is `READY`.
+- [ ] Complete signed-in production artifact acceptance using a real accepted Proposal Revision.
 
 P5 acceptance:
 
 - The exact document the customer accepted can be retrieved later.
 - Re-rendering a newer Revision does not change the accepted artifact.
 - Storage permissions do not expose private draft Proposals publicly.
+- Duplicate persistence retry does not create a second artifact/document/object.
+- Download returns the exact stored bytes and verifies stored SHA metadata.
+- Acceptance alone creates zero Orders and does not mutate Project lifecycle.
+
+Current live acceptance gate:
+
+At the 2026-09-08 closeout verification, production contained `0` accepted Proposals, `0` accepted Proposal Revisions, `0` Proposal acceptances, and `0` Proposal artifacts. The remaining signed-in artifact/retry/download smoke therefore cannot be proven safely without creating artificial production business data. Do not fabricate production Proposal/Acceptance state to satisfy this gate.
 
 ### P6 — Proposal → Order Conversion
 
-Status: `[ ] NOT STARTED`
+Status: `[ ] NOT STARTED — BLOCKED ON P5 LIVE ACCEPTANCE`
 
 Scope:
 
@@ -618,6 +672,8 @@ P6 acceptance:
 - Authorized explicit conversion creates canonical Order(s).
 - Repeating the same conversion cannot silently duplicate the same selected scope.
 - Order pricing/lifecycle remains authoritative after conversion.
+
+P6 must not begin until P5's remaining signed-in production artifact acceptance is explicitly completed/accepted.
 
 ### P7 — Operational Readiness Integration (Later Package)
 
@@ -654,6 +710,10 @@ DB / RPC:
 - accepted Revision mutation/delete denied
 - unauthorized read/write denied according to Project role contract
 - anon execute denied for protected RPCs
+- accepted artifact exact-Revision/acceptance linkage
+- duplicate artifact persistence is idempotent
+- artifact lifecycle mutation outside canonical guard denied
+- customer document/Storage boundary remains private and role-scoped
 
 Admin UI:
 
@@ -668,11 +728,14 @@ Admin UI:
 - send/new revision/accept controls by state
 - responsive modal/list behavior
 - internal notes never enter PDF projection
+- accepted snapshot persistence/retry state
+- Project Documents accepted artifact listing/download
 
 Cross-domain regression:
 
 - existing Project tabs unchanged
 - existing Order creation/linking unchanged
+- Proposal acceptance creates no Order
 - Change Orders unchanged
 - Finance/Procurement/Fulfillment projections unchanged
 - Store public catalog unchanged
@@ -686,7 +749,7 @@ For every package:
 
 1. Re-read execution-time `main`, open PRs, `AGENTS.md`, `modulex-admin/ADMIN_ROADMAP.md`, Admin UI Guide, and Validation Guide as relevant.
 2. Create an isolated package branch from current `main`.
-3. Add/update the focused RED contract first.
+3. Add/update the focused RED contract first for executable behavior; documentation-only closeout packages may rely on already-captured implementation RED/GREEN evidence.
 4. Implement the minimum GREEN delta.
 5. Run targeted tests; only then run broad Admin gates required by the changed surface.
 6. Keep canonical Supabase migration mirror byte-identical where shared migration policy requires it.
@@ -701,13 +764,20 @@ For every package:
 
 | Date | Package | Status | Branch / PR | Notes |
 | --- | --- | --- | --- | --- |
-| 2026-09-07 | P0 — Design Lock & Baseline | Planned / documented | `docs/project-proposal-plan` | Current `main` verified at `aaba756e...`; Proposal architecture locked; PR #361 is Calendar-only and non-overlapping. |
+| 2026-09-07 | P0 — Design Lock & Baseline | Planned / documented | `docs/project-proposal-plan` | Initial Proposal architecture locked. |
 | 2026-09-08 | P1 — Proposal Core DB + RBAC + Read Model | Production accepted | PR #370 | Exact merged migrations are live; rollback-safe production acceptance, RBAC/RLS/grants and advisor review completed. |
 | 2026-09-08 | P2 — Project Proposal Admin UI | Merged / verified | PR #376 | Proposal tab, draft editor, Areas, Pricing Groups and authoritative total UI merged; Project Base + Admin UI Foundation green. |
-| 2026-09-08 | P3 — Revision / Send / Acceptance UX | Implementation verified | PR #381 | RED run 34170652759; GREEN Project Base 34170930717 + Admin UI Foundation 34170930765. Merge + signed-in production acceptance pending. |
+| 2026-09-08 | P3 — Revision / Send / Acceptance UX | Merged / production verified | PR #381 | Send/New Revision/Reject/Accept and exact accepted Revision lock are merged; current production contains the implementation and lifecycle contracts remain green. |
+| 2026-09-08 | P4 — Proposal PDF Rendering | Production accepted | PR #384 | Merge `29515c9...`; production contains the renderer; signed-in Preview/Download smoke manually accepted by owner; P4 contract green. |
+| 2026-09-08 | P5 — Acceptance Snapshot + Project Documents | Merged / schema + deploy + CI verified; live smoke pending | PR #398 | Merge `3cf0d62...`; canonical document/storage reuse, production schema/security boundary, byte-identical migration mirror, P5 contract and current deployment verified. Production has no accepted Proposal data, so signed-in artifact/retry/download acceptance remains pending. |
+| 2026-09-08 | P5 — Production closeout evidence | Reviewable docs closeout | `docs/project-proposal-p5-closeout-20260908` | Detailed evidence recorded in `docs/acceptance/project-proposal-p5-production-closeout.md`; no production mutation performed. |
 
 ---
 
 ## 9. Current Next Action
 
-**Current package: P3 — Revision / Send / Acceptance UX.** Implementation and CI are verified in PR #381. Before marking P3 `[x]`, merge the PR after an execution-time main/open-PR recheck, confirm the Admin production deployment contains the merged SHA, and run signed-in Proposal lifecycle smoke. No P3 schema migration is required because the lifecycle RPC boundary was delivered and production-accepted in P1. After that closeout, the next package is **P4 — Proposal PDF Rendering**.
+**Current package: P5 — Acceptance Snapshot + Project Documents production acceptance.** Implementation PR #398 is merged, current production contains it, production schema/security/storage boundaries are verified, the Store/Admin migration mirrors are byte-identical, and the focused P5 contract is GREEN through Admin Project Base. The remaining gate is a signed-in production artifact smoke using a real accepted Proposal Revision. At closeout verification time production had no accepted Proposal/Revision/Acceptance/artifact rows, so this gate must remain pending rather than being satisfied with fabricated production data.
+
+Once a real accepted Proposal Revision exists, verify idempotent snapshot persistence, one canonical `customer_documents` record, one private Storage object, SHA/file-size metadata, Project Documents listing, exact stored-byte download, immutability against newer revisions, customer-safe projection, grouped-price-once behavior, and the no-Order/no-Project-lifecycle-mutation boundary.
+
+**P6 — Proposal → Order Conversion remains NOT STARTED and blocked until P5 live acceptance is explicitly completed.**
