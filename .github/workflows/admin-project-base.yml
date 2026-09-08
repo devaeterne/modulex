@@ -95,5 +95,9 @@ jobs:
         run: node scripts/project-pb9-import-fk-hardening-contract.mjs
       - name: Project Proposal Core contract
         run: node scripts/project-proposal-core-contract.mjs
+      - name: Project Proposal P6 conversion contract
+        run: node scripts/project-proposal-order-conversion-contract.mjs
+      - name: Project Proposal P6 UUID aggregate hotfix contract
+        run: node scripts/project-proposal-order-conversion-uuid-aggregate-contract.mjs
       - name: Countertop Sink fallback contract
         run: node scripts/countertop-sink-fallback-contract.mjs
