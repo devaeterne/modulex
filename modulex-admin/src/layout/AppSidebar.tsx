@@ -41,6 +41,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { icon: <GridIcon />, name: "Dashboard", path: "/", permission: "dashboard.view", exact: true },
   { icon: <PageIcon />, name: "Request Center", path: "/requests", permission: "requests.view", exact: true },
+  { icon: <PageIcon />, name: "What's New", path: "/updates", permission: "updates.view", exact: true },
   {
     icon: <BoxCubeIcon />,
     name: "Products",
@@ -61,7 +62,9 @@ const navItems: NavItem[] = [
       { name: "Pricing Dashboard", path: "/pricing/dashboard", permission: "pricing.view" },
       { name: "Product Prices", path: "/pricing/products", permission: "pricing.view" },
       { name: "Material Bands", path: "/pricing/material-bands", permission: "pricing.view" },
+      { name: "Countertop Configuration", path: "/pricing/countertop", permission: "pricing.manage", exact: true },
       { name: "Countertop Catalog", path: "/pricing/countertop/catalog", permission: "pricing.manage" },
+      { name: "Additional Services", path: "/pricing/countertop/services", permission: "pricing.manage", exact: true },
       { name: "Countertop Setup", path: "/pricing/countertop/settings", permission: "pricing.manage" },
       { name: "Price Groups", path: "/pricing/groups", permission: "pricing.manage" },
     ],
@@ -77,7 +80,14 @@ const navItems: NavItem[] = [
       { name: "Installations", path: "/customers/installations", permission: "installations.view" },
     ],
   },
-  { icon: <PageIcon />, name: "Projects", path: "/projects", permission: "projects.view" },
+  {
+    icon: <PageIcon />,
+    name: "Projects",
+    subItems: [
+      { name: "Project List", path: "/projects", permission: "projects.view", exact: true },
+      { name: "Project Imports", path: "/projects/import", permission: "projects.import", exact: true },
+    ],
+  },
   { icon: <PageIcon />, name: "Calendar", path: "/calendar", permission: "calendar.view" },
   {
     icon: <TableIcon />,
@@ -185,6 +195,7 @@ const managementItems: NavItem[] = [
       { name: "Product Content", path: "/store/products", permission: "store.view", exact: true },
       { name: "Color Options", path: "/store/colors", permission: "store.manage", exact: true },
       { name: "Leads & Dealer Apps", path: "/store/leads", permission: "leads.view", exact: true },
+      { name: "Lead Form Options", path: "/store/leads/form-options", permission: "leads.manage", exact: true },
     ],
   },
   {
@@ -199,6 +210,7 @@ const managementItems: NavItem[] = [
       { name: "Notifications", path: "/settings/general/notifications", permission: "settings.view" },
       { name: "Email Delivery Log", path: "/settings/general/email-notifications", permission: "settings.view" },
       { name: "Google Calendar", path: "/settings/integrations/google-calendar", permission: "settings.view" },
+      { name: "Product Updates", path: "/settings/general/product-updates", permission: "settings.manage", exact: true },
       { name: "Project Participant Roles", path: "/settings/general/project-participant-roles", permission: "settings.view" },
     ],
   },
