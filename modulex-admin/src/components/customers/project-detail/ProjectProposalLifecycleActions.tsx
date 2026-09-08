@@ -9,6 +9,7 @@ import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
+import { ensureAcceptedProjectProposalArtifact } from "@/lib/customers/project-proposal-artifact-client";
 import {
   acceptProjectProposalRevision,
   createProjectProposalRevision,
@@ -42,6 +43,9 @@ export default function ProjectProposalLifecycleActions({
   const [signatureText, setSignatureText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [snapshotBusyRevisionId, setSnapshotBusyRevisionId] = useState<string | null>(null);
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
+  const [snapshotSuccess, setSnapshotSuccess] = useState<string | null>(null);
   const newRevisionKeyRef = useRef<string | null>(null);
 
   const draftRevision = useMemo(
@@ -81,6 +85,30 @@ export default function ProjectProposalLifecycleActions({
     newRevisionKeyRef.current = null;
   }
 
+  async function persistAcceptedSnapshot(revisionId: string) {
+    if (snapshotBusyRevisionId) return false;
+    setSnapshotBusyRevisionId(revisionId);
+    setSnapshotError(null);
+    setSnapshotSuccess(null);
+    try {
+      await ensureAcceptedProjectProposalArtifact({
+        projectId: proposal.projectId,
+        proposalId: proposal.id,
+        revisionId,
+      });
+      setSnapshotSuccess("Immutable accepted Proposal PDF snapshot is available in Project Documents.");
+      return true;
+    } catch (snapshotPersistError) {
+      const detail = snapshotPersistError instanceof Error
+        ? snapshotPersistError.message
+        : "Accepted Proposal PDF snapshot could not be persisted.";
+      setSnapshotError(`Acceptance remains recorded. ${detail}`);
+      return false;
+    } finally {
+      setSnapshotBusyRevisionId(null);
+    }
+  }
+
   async function submitLifecycleAction() {
     if (!activeRevision || !dialog || busy) return;
     setBusy(true);
@@ -108,6 +136,7 @@ export default function ProjectProposalLifecycleActions({
           acceptanceMethod,
           signatureText,
         });
+        await persistAcceptedSnapshot(activeRevision.id);
       }
       setDialog(null);
       setActiveRevision(null);
@@ -143,6 +172,40 @@ export default function ProjectProposalLifecycleActions({
               title={`Revision ${acceptedRevision.revisionNo} accepted`}
               message="The accepted commercial baseline is immutable. Use the Project Change Orders tab for later commercial scope or price changes."
             />
+          ) : null}
+
+          {snapshotError ? (
+            <Alert
+              variant="warning"
+              title="Accepted snapshot needs retry"
+              message={snapshotError}
+            />
+          ) : null}
+
+          {snapshotSuccess ? (
+            <Alert
+              variant="success"
+              title="Accepted snapshot ready"
+              message={snapshotSuccess}
+            />
+          ) : null}
+
+          {acceptedRevision && canManage ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-medium">Accepted Proposal document</p>
+                <p className="mt-1 text-sm">Ensure the exact accepted Revision PDF exists as the immutable canonical Project document. This action is idempotent.</p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void persistAcceptedSnapshot(acceptedRevision.id)}
+                disabled={busy || Boolean(snapshotBusyRevisionId)}
+              >
+                {snapshotBusyRevisionId === acceptedRevision.id ? "Persisting Snapshot…" : "Ensure Accepted Snapshot"}
+              </Button>
+            </div>
           ) : null}
 
           {draftRevision ? (
@@ -295,7 +358,7 @@ export default function ProjectProposalLifecycleActions({
               <Alert
                 variant="warning"
                 title="Acceptance is immutable"
-                message="Acceptance attaches to this exact sent revision. It does not create an Order or change Project lifecycle automatically."
+                message="Acceptance attaches to this exact sent revision. After acceptance, Modulex persists the exact Revision PDF as an immutable Project document. Order creation and Project lifecycle remain separate."
               />
             </div>
           ) : null}

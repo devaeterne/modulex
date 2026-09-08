@@ -6,11 +6,11 @@ import ComponentCard from "@/components/common/ComponentCard";
 import ProjectProgressSummary from "@/components/customers/ProjectProgressSummary";
 import ProjectCalendarTab from "@/components/customers/project-detail/ProjectCalendarTab";
 import ProjectChangeOrdersTab from "@/components/customers/project-detail/ProjectChangeOrdersTab";
+import ProjectDocumentsTab from "@/components/customers/project-detail/ProjectDocumentsTab";
 import ProjectFinanceActuals from "@/components/customers/project-detail/ProjectFinanceActuals";
 import ProjectFinanceTab from "@/components/customers/project-detail/ProjectFinanceTab";
 import ProjectFulfillmentTab from "@/components/customers/project-detail/ProjectFulfillmentTab";
 import ProjectProcurementTab from "@/components/customers/project-detail/ProjectProcurementTab";
-import ProjectPendingDomainTab from "@/components/customers/project-detail/ProjectPendingDomainTab";
 import ProjectParticipantsCommissionPanel from "@/components/customers/project-detail/ProjectParticipantsCommissionPanel";
 import ProjectProposalTab from "@/components/customers/project-detail/ProjectProposalTab";
 import Label from "@/components/form/Label";
@@ -569,10 +569,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
       ) : null}
 
       {activeTab === "Documents" ? (
-        <ProjectPendingDomainTab
-          title="Documents"
-          description="The Project document index will reuse existing Modulex storage/document contracts after they are mapped; no duplicate storage system is created here."
-        />
+        <ProjectDocumentsTab projectId={project.id} />
       ) : null}
 
       {activeTab === "Activity" ? (
