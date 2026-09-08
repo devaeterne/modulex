@@ -39,12 +39,12 @@ permissions:
 
 jobs:
   pr369-date-closeout:
-    if: github.event_name == 'pull_request' && github.head_ref == 'feat/us-date-format-standardization-v2'
+    if: github.ref == 'refs/heads/feat/us-date-format-standardization-v2' || github.head_ref == 'feat/us-date-format-standardization-v2'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: feat/us-date-format-standardization-v2
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
