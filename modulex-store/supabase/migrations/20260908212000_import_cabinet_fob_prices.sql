@@ -173,14 +173,20 @@ declare
   v_target_count integer;
   v_price_count integer;
 begin
-  select count(*), min(id)
-    into v_group_count, v_fob_group_id
+  select count(*)
+    into v_group_count
   from public.price_groups
   where lower(btrim(name)) = 'fob';
 
-  if v_group_count <> 1 or v_fob_group_id is null then
+  if v_group_count <> 1 then
     raise exception 'Expected exactly one FOB price group, found %', v_group_count;
   end if;
+
+  select id
+    into v_fob_group_id
+  from public.price_groups
+  where lower(btrim(name)) = 'fob'
+  limit 1;
 
   update public.price_groups
   set internal_only = true,
