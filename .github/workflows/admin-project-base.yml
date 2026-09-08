@@ -15,6 +15,12 @@ on:
       - "modulex-store/supabase/migrations/*procurement*.sql"
       - "modulex-store/supabase/migrations/*payment*.sql"
       - "modulex-store/supabase/migrations/*commission*.sql"
+      - "modulex-store/src/lib/portal/projects.ts"
+      - "modulex-store/src/components/portal/PortalProject*.tsx"
+      - "modulex-store/src/components/portal/PortalNavigation.tsx"
+      - "modulex-store/src/app/account/(portal)/projects/**"
+      - "modulex-store/src/app/dealer/(portal)/projects/**"
+      - "modulex-store/STORE_ROADMAP.md"
       - "docs/PROJECT_BASE_PLAN.md"
       - "docs/acceptance/*project*.md"
       - "docs/acceptance/*payment*.md"
@@ -73,6 +79,8 @@ jobs:
         run: node scripts/project-pb7-change-orders-contract.mjs
       - name: Project PB-7 performance hardening contract
         run: node scripts/project-pb7-performance-hardening-contract.mjs
+      - name: Project PB-8 Portal Project projection contract
+        run: node scripts/project-pb8-portal-projection-contract.mjs
       - name: Project Proposal Core contract
         run: node scripts/project-proposal-core-contract.mjs
       - name: Countertop Sink fallback contract

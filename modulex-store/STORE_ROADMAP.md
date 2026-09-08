@@ -1,13 +1,22 @@
 # Modulex Store Roadmap
 
-Last reviewed: 2026-09-02
-Main baseline: `ceaa85699120fa3c3ff8b60231fe799199d0a543`
+Last reviewed: 2026-09-08
+Main baseline: `0e7d5a66d7334d25660f4a420d8a5333ebb86051`
 Current phase: **Phase 2.1 — Public Content & CMS Expansion**
 Current Granite migration status: **GC-0 through GC-8 are production-accepted. GC-8B accessibility/performance migration QA closed on 2026-09-02 with fresh production Lighthouse Performance 93 / Accessibility 94 / SEO 100 / LCP 2.950 s / CLS 0 / TBT 39 ms. Residual Store-wide accessibility/Core Web Vitals cleanup remains normal Phase 2.6 debt and does not reopen the completed Granite migration workstream.**
 
 ## Countertop / Stone / Sink cross-roadmap completion
 
 - [x] Customer and Dealer Portal order projections include the sanitized historical countertop snapshot. Production acceptance passed customer/dealer isolation and commercial-only fields; inventory, cost, margin, vendor, override-audit, raw snapshot, and configuration internals remain excluded.
+
+
+## Project Base PB-8 cross-roadmap status
+
+- [~] **PB-8 — Portal Project Projection.** Add customer-scoped Project list/detail surfaces for both Customer and Dealer portals using the existing canonical portal context.
+  - Projection is intentionally narrow and derives linked Orders, Shipments/Delivery and Installations from canonical records.
+  - Internal cost, margin, commission, vendor, payment-detail, audit, internal notes and Sales Rep identity remain excluded.
+  - Dealer Project pages may link to the already-approved Dealer Documents surface; PB-8 does not create Customer Portal document access or a second document ownership model.
+  - Keep `[~]` until owner merge, production migration, customer/dealer isolation and cross-account negative acceptance, Advisor review, Store CI/build and live portal verification are complete.
 
 This document is the operational source of truth for `modulex-store` delivery planning. Keep it current as work progresses. Completed items should be marked `[x]`; blocked items should be marked `[!]` with a short reason.
 

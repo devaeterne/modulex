@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 export const customerPortalNav = [
   ["Overview", "/account"],
+  ["Projects", "/account/projects"],
   ["Orders", "/account/orders"],
   ["Shipments", "/account/shipments"],
   ["Installations", "/account/installations"],
@@ -12,6 +13,7 @@ export const customerPortalNav = [
 
 export const dealerPortalNav = [
   ["Overview", "/dealer"],
+  ["Projects", "/dealer/projects"],
   ["Catalog", "/dealer/catalog"],
   ["Orders", "/dealer/orders"],
   ["Shipments", "/dealer/shipments"],

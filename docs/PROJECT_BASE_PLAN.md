@@ -1,14 +1,14 @@
 # Modulex Project Base — Implementation Plan
 
 Last reviewed: 2026-09-08
-Active branch: `docs/pb7-production-closeout`
+Active branch: `feat/pb8-portal-project-projection`
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
-Current package: **PB-7 Change Orders — COMPLETE / PRODUCTION VERIFIED**
+Current package: **PB-8 Portal Project Projection — IN PROGRESS**
 
-Current status: **PB-1, PB-2, PB-3A, PB-3B, PB-5, PB-6 and PB-7 are completed Project capabilities. PB-4 Project Expenses/Outgoings remains intentionally Finance-owned. PB-7 Change Orders are merged and production-accepted with rollback-only lifecycle/revision-link probes, Sales cost sanitization, additive security/performance hardening and zero acceptance residue.**
+Current status: **PB-1, PB-2, PB-3A, PB-3B, PB-5, PB-6 and PB-7 are completed Project capabilities. PB-4 Project Expenses/Outgoings remains intentionally Finance-owned. PB-8 is implementing a narrow customer-scoped Project projection over canonical Orders, Shipments and Installations without widening internal Finance/Procurement/commission/vendor/audit data.**
 
-Next action: **PB-7 is closed. Continue separately scoped Project work such as Proposal/Portal packages from execution-time current `main`; do not reopen PB-7 implicitly.**
+Next action: **Complete PB-8 TDD/CI, owner merge, production migration and portal isolation acceptance; then begin PB-9 Historical Excel Import from execution-time current `main`.**
 
 This file is the operational source of truth for the Project Base workstream. When asked where Project Base stands, read this file first and report the current package, completed packages, acceptance evidence, blockers and next action.
 
@@ -327,16 +327,17 @@ Customer/sell impact and vendor/cost impact remain separate. Original approved c
 
 ---
 
-## PB-8 — Portal Project Projection `[ ]`
+## PB-8 — Portal Project Projection `[~]`
 
 Only after Admin/DB Project truth is stable:
 
-- narrow sanitized Project projection;
-- strict customer/dealer isolation;
-- no internal cost/margin/commission/vendor/payment-detail/audit leakage;
-- Project → Orders / Shipments / Delivery / Installation / Documents navigation.
+- [~] narrow sanitized Project list/detail projection through the existing Store Portal context;
+- [~] strict customer/dealer isolation by canonical portal `customer_id`;
+- [~] no internal cost/margin/commission/vendor/payment-detail/audit/internal-note/Sales Rep leakage;
+- [~] Project → Orders / Shipments (Delivery) / Installation navigation through canonical linked records;
+- [~] Dealer Project pages may navigate to the existing Dealer-visible Documents surface; Customer Portal gains no new document-read boundary.
 
-Update `modulex-store/STORE_ROADMAP.md` in the same package when this begins.
+`modulex-store/STORE_ROADMAP.md` is updated in the same package. Keep PB-8 `[~]` until owner merge, exact production migration, isolation/leakage acceptance, Advisor review and live portal verification complete.
 
 ---
 
