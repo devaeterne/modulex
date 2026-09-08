@@ -25,6 +25,6 @@ assert.match(notifications, /announcement:/);
 assert.match(notifications, /\/updates/);
 assert.match(publisher, /Publish Now/);
 assert.match(publisher, /No role selected = all users/);
-assert.match(history, /What&apos;s New/);
+assert.match(history, /What(?:&apos;|')s New/);
 
 console.log("system announcements contract: ok");
