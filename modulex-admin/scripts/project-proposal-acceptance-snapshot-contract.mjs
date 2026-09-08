@@ -102,3 +102,4 @@ assert.match(lifecycle, /snapshot|artifact/i, "Accept lifecycle must expose acce
 assert.doesNotMatch(`${server}\n${persistRoute}\n${downloadRoute}`, /create_customer_order|customer_orders.*insert|update_customer_project_status/i, "P5 artifact flow must not create Orders or mutate Project lifecycle");
 
 console.log("Project Proposal P5 acceptance snapshot contract PASS");
+await import("./project-proposal-order-conversion-contract.mjs");
