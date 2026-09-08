@@ -12,6 +12,7 @@ function read(relativePath) {
 }
 
 const migration = read("modulex-store/supabase/migrations/20260908043000_customer_project_historical_import.sql");
+const addressMigration = read("modulex-store/supabase/migrations/20260908093000_customer_project_historical_address_snapshot.sql");
 const extractor = read("modulex-admin/scripts/project-import/project_excel_extract.py");
 const importer = read("modulex-admin/scripts/project-import/historical-project-import.mjs");
 
@@ -57,6 +58,14 @@ assert.doesNotMatch(migration, /insert\s+into\s+public\.customer_projects[\s\S]{
 for (const table of ["customer_project_import_batches", "customer_project_import_rows"]) {
   assert.match(migration, new RegExp(`revoke all on table public\\.${table} from public, anon, authenticated`, "i"), `${table} direct browser DML must be revoked`);
 }
+
+assert.match(addressMigration, /create or replace function private\.prepare_customer_project\s*\(\s*\)/i, "PB-9 address follow-up must harden the canonical Project prepare trigger");
+assert.match(addressMigration, /historical_excel/i, "historical address snapshots must be explicitly marked");
+assert.match(addressMigration, /legacy_text/i, "historical address text must be retained in the Project snapshot");
+assert.match(addressMigration, /current_setting\s*\(\s*['"]modulex\.customer_project_import['"]\s*,\s*true\s*\)/i, "new historical snapshots must require the canonical import context");
+assert.match(addressMigration, /set_config\s*\(\s*['"]modulex\.customer_project_import['"]\s*,\s*['"]on['"]\s*,\s*true\s*\)/i, "commit RPC must enable the historical snapshot context only transaction-locally");
+assert.match(addressMigration, /project_address_snapshot\s*=\s*jsonb_build_object\s*\([\s\S]*['"]legacy_text['"][\s\S]*['"]address_line_1['"][\s\S]*['"]source['"]\s*,\s*['"]historical_excel['"]/i, "commit RPC must preserve legacy text in a snapshot shape existing Project readers can render");
+assert.doesNotMatch(addressMigration, /insert\s+into\s+public\.customer_addresses/i, "PB-9 must not invent canonical Customer Address rows from unstructured legacy text");
 
 for (const header of [
   "Customer",
