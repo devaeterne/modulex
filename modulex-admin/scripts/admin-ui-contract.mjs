@@ -97,4 +97,51 @@ for (const [name, fixture] of Object.entries(fixtures)) {
   }
 }
 
+const sidebarPath = path.join(packageRoot, "src/layout/AppSidebar.tsx");
+const permissionsPath = path.join(packageRoot, "src/lib/auth/permissions.ts");
+const sidebar = fs.readFileSync(sidebarPath, "utf8");
+const permissions = fs.readFileSync(permissionsPath, "utf8");
+
+const requiredSidebarEntries = [
+  ["Project List", "/projects", "projects.view"],
+  ["Project Imports", "/projects/import", "projects.import"],
+  ["Countertop Configuration", "/pricing/countertop", "pricing.manage"],
+  ["Additional Services", "/pricing/countertop/services", "pricing.manage"],
+  ["Lead Form Options", "/store/leads/form-options", "leads.manage"],
+  ["Product Updates", "/settings/general/product-updates", "settings.manage"],
+  ["What's New", "/updates", "updates.view"],
+];
+
+for (const [name, route, permission] of requiredSidebarEntries) {
+  assert.ok(sidebar.includes(`name: "${name}"`), `Sidebar must include ${name}`);
+  assert.ok(sidebar.includes(`path: "${route}"`), `Sidebar must link ${name} to ${route}`);
+  assert.ok(sidebar.includes(`permission: "${permission}"`), `Sidebar must protect ${name} with ${permission}`);
+}
+
+assert.match(
+  permissions,
+  /\| "updates\.view";/,
+  "Permission union must define updates.view",
+);
+assert.match(
+  permissions,
+  /"updates\.view": "View product updates"/,
+  "Permission labels must define updates.view",
+);
+assert.match(
+  permissions,
+  /path === "\/updates"[\s\S]{0,120}permission: "updates\.view"/,
+  "Route access must explicitly protect /updates with updates.view",
+);
+assert.match(
+  permissions,
+  /path === "\/settings\/general\/product-updates"[\s\S]{0,180}permission: "settings\.manage"/,
+  "Product Updates must require settings.manage before the generic settings rule",
+);
+
+for (const role of ["sales", "finance", "hr", "warehouse", "shipping"]) {
+  const roleBlock = permissions.match(new RegExp(`${role}: \\[([\\s\\S]*?)\\n  \\],`))?.[1] ?? "";
+  assert.ok(roleBlock.includes('"updates.view"'), `${role} must be able to view product updates`);
+}
+
 console.log("Admin UI consistency contract: PASS");

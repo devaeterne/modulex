@@ -40,18 +40,22 @@ const sidebarRoutes = [...sidebar.matchAll(/path:\s*"([^"]+)"/g)].map((match) =>
 const uniqueSidebarRoutes = [...new Set(sidebarRoutes)];
 
 expect(sidebarRoutes.length === uniqueSidebarRoutes.length, "Sidebar route paths must be unique");
-expect(uniqueSidebarRoutes.length === 87, `UI-2D expects 87 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
+expect(uniqueSidebarRoutes.length === 93, `UI-2D expects 93 current sidebar routes, found ${uniqueSidebarRoutes.length}`);
 for (const route of uniqueSidebarRoutes) {
   expect(pageRoutes.has(route), `Sidebar route is missing a page.tsx: ${route}`);
 }
 
 for (const route of [
   "/projects",
+  "/projects/import",
+  "/updates",
   "/products/vendor-imports",
   "/products/types",
   "/products/uom",
   "/pricing/material-bands",
+  "/pricing/countertop",
   "/pricing/countertop/catalog",
+  "/pricing/countertop/services",
   "/pricing/countertop/settings",
   "/finance",
   "/finance/transactions",
@@ -66,9 +70,11 @@ for (const route of [
   "/finance/ar-aging",
   "/finance/reports",
   "/settings/integrations/google-calendar",
+  "/settings/general/product-updates",
   "/settings/general/project-participant-roles",
   "/store/cabinet-content",
   "/store/reviews",
+  "/store/leads/form-options",
 ]) {
   expect(uniqueSidebarRoutes.includes(route), `Post-audit sidebar route missing: ${route}`);
 }
