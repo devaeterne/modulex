@@ -70,6 +70,7 @@ export type CustomerOrder = {
   price_group_id: string | null; price_group_name_snapshot: string | null; currency_code: string; fulfillment_type: OrderFulfillmentType;
   payment_method_id: string | null; payment_method_name_snapshot: string | null;
   payment_commission_default_percent: string | number; payment_commission_percent: string | number; payment_commission_amount: string | number; grand_total: string | number;
+  base_sell_amount: string | number; administrative_fee_percent: string | number; administrative_fee_amount: string | number; customer_visible_sell_amount: string | number;
   billing_address_id: string | null; shipping_address_id: string | null; billing_address_snapshot: Record<string, unknown> | null; shipping_address_snapshot: Record<string, unknown> | null;
   customer_reference: string | null; customer_notes: string | null; internal_notes: string | null;
   item_count: number; subtotal: string | number; discount_amount: string | number; tax_rate: string | number; tax_amount: string | number; total_amount: string | number;
@@ -151,6 +152,10 @@ export type CustomerInvoice = {
   tax_amount: string | number;
   payment_commission_percent: string | number;
   payment_commission_amount: string | number;
+  base_sell_amount: string | number;
+  administrative_fee_percent: string | number;
+  administrative_fee_amount: string | number;
+  customer_visible_sell_amount: string | number;
   total_amount: string | number;
   paid_amount: string | number;
   notes: string | null;
