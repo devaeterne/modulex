@@ -1,9 +1,9 @@
 begin;
 
--- Dynamic Stone exposes authenticated dealer pricing. That value is a vendor
--- acquisition cost, not a customer-facing List Price. Keep the historical
--- function/trigger name for compatibility, but route Dynamic Stone to
--- product_costs and preserve the existing List Price behavior for other vendors.
+-- Dynamic Stone exposes authenticated dealer pricing. That value belongs to the
+-- internal Cost price group, never the customer-facing base List Price group.
+-- Keep the historical function/trigger name for compatibility with the existing
+-- approval trigger while making the destination vendor-aware.
 create or replace function private.apply_vendor_list_price_on_approval()
 returns trigger
 language plpgsql
@@ -11,8 +11,8 @@ security definer
 set search_path = pg_catalog, public, private
 as $$
 declare
-  v_base_group_id uuid;
-  v_base_group_count integer;
+  v_target_group_id uuid;
+  v_target_group_count integer;
   v_currency varchar(3);
   v_pricing_model text;
   v_current_id uuid;
@@ -47,88 +47,51 @@ begin
     raise exception 'Approved vendor item references a missing or archived canonical product.';
   end if;
 
-  if new.vendor_code = 'dynamicstone' then
-    perform pg_advisory_xact_lock(
-      hashtextextended(
-        new.canonical_product_id::text || ':cost:' || v_currency,
-        0
-      )
-    );
-
-    select pc.id, pc.amount
-    into v_current_id, v_current_amount
-    from public.product_costs pc
-    where pc.product_id = new.canonical_product_id
-      and pc.currency_code = v_currency
-      and pc.is_active = true
-      and pc.valid_to is null
-    order by pc.valid_from desc
-    limit 1
-    for update;
-
-    if v_current_id is not null
-       and v_current_amount = round(new.vendor_price_reference, 4)
-    then
-      return new;
-    end if;
-
-    if v_current_id is not null then
-      update public.product_costs
-      set is_active = false,
-          valid_to = v_now,
-          updated_by = new.reviewed_by
-      where id = v_current_id;
-    end if;
-
-    insert into public.product_costs (
-      product_id,
-      amount,
-      currency_code,
-      valid_from,
-      valid_to,
-      is_active,
-      note,
-      created_by,
-      updated_by
-    )
-    values (
-      new.canonical_product_id,
-      round(new.vendor_price_reference, 4),
-      v_currency,
-      v_now,
-      null,
-      true,
-      'Dynamic Stone vendor catalog approved cost',
-      new.reviewed_by,
-      new.reviewed_by
-    );
-
-    return new;
-  end if;
-
-  select count(*)
-  into v_base_group_count
-  from public.price_groups
-  where is_base_price = true
-    and is_active = true;
-
-  if v_base_group_count <> 1 then
-    raise exception 'Exactly one active base List Price group is required.';
-  end if;
-
-  select id
-  into v_base_group_id
-  from public.price_groups
-  where is_base_price = true
-    and is_active = true;
-
   if v_pricing_model <> 'price_group' then
     raise exception 'Approved vendor item canonical Product Type does not use Price Group pricing.';
   end if;
 
+  if new.vendor_code = 'dynamicstone' then
+    select count(*)
+    into v_target_group_count
+    from public.price_groups
+    where lower(btrim(name)) = 'cost'
+      and is_active = true
+      and internal_only = true
+      and available_for_orders = false;
+
+    if v_target_group_count <> 1 then
+      raise exception 'Exactly one active internal Cost price group is required for Dynamic Stone.';
+    end if;
+
+    select id
+    into v_target_group_id
+    from public.price_groups
+    where lower(btrim(name)) = 'cost'
+      and is_active = true
+      and internal_only = true
+      and available_for_orders = false;
+  else
+    select count(*)
+    into v_target_group_count
+    from public.price_groups
+    where is_base_price = true
+      and is_active = true;
+
+    if v_target_group_count <> 1 then
+      raise exception 'Exactly one active base List Price group is required.';
+    end if;
+
+    select id
+    into v_target_group_id
+    from public.price_groups
+    where is_base_price = true
+      and is_active = true;
+  end if;
+
   perform pg_advisory_xact_lock(
     hashtextextended(
-      new.canonical_product_id::text || ':' || v_base_group_id::text || ':' || v_currency,
+      new.canonical_product_id::text || ':' || v_target_group_id::text || ':' || v_currency,
       0
     )
   );
@@ -137,7 +100,7 @@ begin
   into v_current_id, v_current_amount
   from public.product_prices pp
   where pp.product_id = new.canonical_product_id
-    and pp.price_group_id = v_base_group_id
+    and pp.price_group_id = v_target_group_id
     and pp.currency_code = v_currency
     and pp.is_active = true
     and pp.valid_to is null
@@ -154,7 +117,8 @@ begin
   if v_current_id is not null then
     update public.product_prices
     set is_active = false,
-        valid_to = v_now
+        valid_to = v_now,
+        updated_by = new.reviewed_by
     where id = v_current_id;
   end if;
 
@@ -171,7 +135,7 @@ begin
   )
   values (
     new.canonical_product_id,
-    v_base_group_id,
+    v_target_group_id,
     round(new.vendor_price_reference, 4),
     v_currency,
     v_now,
@@ -187,46 +151,34 @@ $$;
 
 revoke all on function private.apply_vendor_list_price_on_approval() from public;
 
--- Backfill is intentionally scoped to Dynamic Stone only. This also makes the
--- migration safe if an item is approved between code merge and DB deployment.
+-- Backfill any already-approved Dynamic Stone rows into Cost. At the time this
+-- migration was prepared production had zero approved/linked Dynamic Stone
+-- rows, so this is defensive rather than corrective.
 do $$
 declare
+  v_cost_group_id uuid;
+  v_cost_group_count integer;
   v_now timestamptz := clock_timestamp();
 begin
-  with candidates as (
-    select distinct on (
-      v.canonical_product_id,
-      upper(btrim(v.vendor_currency))
-    )
-      v.canonical_product_id as product_id,
-      round(v.vendor_price_reference, 4) as amount,
-      upper(btrim(v.vendor_currency))::varchar(3) as currency_code,
-      v.reviewed_by
-    from public.vendor_catalog_items v
-    join public.products p on p.id = v.canonical_product_id
-    where v.vendor_code = 'dynamicstone'
-      and v.review_status = 'APPROVED'
-      and v.canonical_product_id is not null
-      and v.vendor_price_reference is not null
-      and v.vendor_price_reference >= 0
-      and upper(btrim(coalesce(v.vendor_currency, ''))) ~ '^[A-Z]{3}$'
-      and p.status <> 'archived'
-    order by
-      v.canonical_product_id,
-      upper(btrim(v.vendor_currency)),
-      v.reviewed_at desc nulls last,
-      v.updated_at desc
-  )
-  update public.product_costs pc
-  set is_active = false,
-      valid_to = v_now,
-      updated_by = c.reviewed_by
-  from candidates c
-  where pc.product_id = c.product_id
-    and pc.currency_code = c.currency_code
-    and pc.is_active = true
-    and pc.valid_to is null
-    and pc.amount is distinct from c.amount;
+  select count(*)
+  into v_cost_group_count
+  from public.price_groups
+  where lower(btrim(name)) = 'cost'
+    and is_active = true
+    and internal_only = true
+    and available_for_orders = false;
+
+  if v_cost_group_count <> 1 then
+    raise exception 'Exactly one active internal Cost price group is required for Dynamic Stone backfill.';
+  end if;
+
+  select id
+  into v_cost_group_id
+  from public.price_groups
+  where lower(btrim(name)) = 'cost'
+    and is_active = true
+    and internal_only = true
+    and available_for_orders = false;
 
   with candidates as (
     select distinct on (
@@ -239,6 +191,7 @@ begin
       v.reviewed_by
     from public.vendor_catalog_items v
     join public.products p on p.id = v.canonical_product_id
+    join public.product_types pt on pt.id = p.product_type_id
     where v.vendor_code = 'dynamicstone'
       and v.review_status = 'APPROVED'
       and v.canonical_product_id is not null
@@ -246,41 +199,81 @@ begin
       and v.vendor_price_reference >= 0
       and upper(btrim(coalesce(v.vendor_currency, ''))) ~ '^[A-Z]{3}$'
       and p.status <> 'archived'
+      and pt.pricing_model = 'price_group'
     order by
       v.canonical_product_id,
       upper(btrim(v.vendor_currency)),
       v.reviewed_at desc nulls last,
       v.updated_at desc
   )
-  insert into public.product_costs (
+  update public.product_prices pp
+  set is_active = false,
+      valid_to = v_now,
+      updated_by = c.reviewed_by
+  from candidates c
+  where pp.product_id = c.product_id
+    and pp.price_group_id = v_cost_group_id
+    and pp.currency_code = c.currency_code
+    and pp.is_active = true
+    and pp.valid_to is null
+    and pp.amount is distinct from c.amount;
+
+  with candidates as (
+    select distinct on (
+      v.canonical_product_id,
+      upper(btrim(v.vendor_currency))
+    )
+      v.canonical_product_id as product_id,
+      round(v.vendor_price_reference, 4) as amount,
+      upper(btrim(v.vendor_currency))::varchar(3) as currency_code,
+      v.reviewed_by
+    from public.vendor_catalog_items v
+    join public.products p on p.id = v.canonical_product_id
+    join public.product_types pt on pt.id = p.product_type_id
+    where v.vendor_code = 'dynamicstone'
+      and v.review_status = 'APPROVED'
+      and v.canonical_product_id is not null
+      and v.vendor_price_reference is not null
+      and v.vendor_price_reference >= 0
+      and upper(btrim(coalesce(v.vendor_currency, ''))) ~ '^[A-Z]{3}$'
+      and p.status <> 'archived'
+      and pt.pricing_model = 'price_group'
+    order by
+      v.canonical_product_id,
+      upper(btrim(v.vendor_currency)),
+      v.reviewed_at desc nulls last,
+      v.updated_at desc
+  )
+  insert into public.product_prices (
     product_id,
+    price_group_id,
     amount,
     currency_code,
     valid_from,
     valid_to,
     is_active,
-    note,
     created_by,
     updated_by
   )
   select
     c.product_id,
+    v_cost_group_id,
     c.amount,
     c.currency_code,
     v_now,
     null,
     true,
-    'Dynamic Stone vendor catalog approved cost',
     c.reviewed_by,
     c.reviewed_by
   from candidates c
   where not exists (
     select 1
-    from public.product_costs pc
-    where pc.product_id = c.product_id
-      and pc.currency_code = c.currency_code
-      and pc.is_active = true
-      and pc.valid_to is null
+    from public.product_prices pp
+    where pp.product_id = c.product_id
+      and pp.price_group_id = v_cost_group_id
+      and pp.currency_code = c.currency_code
+      and pp.is_active = true
+      and pp.valid_to is null
   );
 end;
 $$;
