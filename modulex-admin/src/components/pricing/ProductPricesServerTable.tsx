@@ -888,16 +888,12 @@ export default function ProductPricesServerTable() {
                   id="bulk-price-value"
                   value={bulkValue}
                   onChange={(event) => setBulkValue(event.target.value)}
-                  placeholder={bulkMode === "set_amount" ? "Price" : "Adjustment"}
-                  inputMode="decimal"
+                  placeholder={bulkMode.includes("percent") ? "e.g. 15" : "e.g. 25.00"}
                 />
               </div>
               <div className="flex items-end">
-                <Button
-                  disabled={!selectedIds.size || !bulkValue.trim()}
-                  onClick={() => void applyBulk()}
-                >
-                  Apply Preview
+                <Button className="w-full" disabled={!selectedIds.size} onClick={() => void applyBulk()}>
+                  Preview Bulk Change
                 </Button>
               </div>
             </div>
@@ -907,125 +903,123 @@ export default function ProductPricesServerTable() {
 
       <ComponentCard
         title="Price Group Matrix"
-        desc="Stone/material-band and no-pricing products are intentionally excluded from this matrix."
+        desc="Current USD selling prices. Internal price groups are returned only to Admin and Super Admin by database policy."
       >
-        {isLoading ? (
-          <Alert variant="info" title="Loading product prices" message="Loading the current server page." />
-        ) : (
-          <TableViewport>
-            <Table variant="admin" className="min-w-[1280px]">
-              <TableHeader variant="admin">
+        <TableViewport>
+          <Table variant="admin" minWidth="wide">
+            <TableHeader variant="admin">
+              <TableRow>
+                {canManage ? (
+                  <TableCell isHeader variant="admin">
+                    <Checkbox checked={allPageSelected} onChange={togglePage} label="Select page" />
+                  </TableCell>
+                ) : null}
+                <TableCell isHeader variant="admin">SKU</TableCell>
+                <TableCell isHeader variant="admin">Product</TableCell>
+                <TableCell isHeader variant="admin">Type / UOM</TableCell>
+                <TableCell isHeader variant="admin">Available</TableCell>
+                {groups.map((group) => (
+                  <TableCell key={group.id} isHeader variant="admin">
+                    {group.name}
+                  </TableCell>
+                ))}
+                <TableCell isHeader variant="admin">Status</TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody variant="admin">
+              {isLoading ? (
                 <TableRow>
-                  {canManage ? (
-                    <TableCell isHeader variant="admin">
-                      <Checkbox checked={allPageSelected} onChange={togglePage} />
-                    </TableCell>
-                  ) : null}
-                  <TableCell isHeader variant="admin" className="text-left">SKU</TableCell>
-                  <TableCell isHeader variant="admin" className="text-left">Product</TableCell>
-                  <TableCell isHeader variant="admin" className="text-left">Product Type</TableCell>
-                  <TableCell isHeader variant="admin" className="text-left">Unit of Measure</TableCell>
-                  <TableCell isHeader variant="admin" className="text-right">Stock</TableCell>
-                  {groups.map((group) => (
-                    <TableCell key={group.id} isHeader variant="admin" className="text-left">
-                      {group.name}
-                    </TableCell>
-                  ))}
+                  <TableCell colSpan={tableColumnCount} variant="admin">Loading product prices…</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody variant="admin">
-                {rows.length ? (
-                  rows.map((row) => (
-                    <TableRow key={row.product_id}>
-                      {canManage ? (
-                        <TableCell variant="admin">
-                          <Checkbox
-                            checked={selectedIds.has(row.product_id)}
-                            onChange={() => toggleOne(row.product_id)}
-                          />
+              ) : rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={tableColumnCount} variant="admin">No eligible products found.</TableCell>
+                </TableRow>
+              ) : (
+                rows.map((row) => (
+                  <TableRow key={row.product_id}>
+                    {canManage ? (
+                      <TableCell variant="admin">
+                        <Checkbox
+                          checked={selectedIds.has(row.product_id)}
+                          onChange={() => toggleOne(row.product_id)}
+                          label={`Select ${row.sku}`}
+                        />
+                      </TableCell>
+                    ) : null}
+                    <TableCell variant="admin" className="font-semibold">{row.sku}</TableCell>
+                    <TableCell variant="admin">
+                      <div className="font-medium">{row.product_name}</div>
+                      <div className="text-xs text-gray-500">
+                        {[row.brand, row.category].filter(Boolean).join(" · ") || "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell variant="admin">
+                      <div>{row.product_type_name}</div>
+                      <div className="text-xs text-gray-500">{row.uom_name} ({row.uom_code})</div>
+                    </TableCell>
+                    <TableCell variant="admin">{stock(row.available_stock)}</TableCell>
+                    {groups.map((group) => {
+                      const priceKey = key(row.product_id, group.id);
+                      const value = drafts[priceKey] ?? "";
+                      const changed = normalize(value) !== normalize(originals[priceKey]);
+                      return (
+                        <TableCell key={group.id} variant="admin" className="min-w-[132px]">
+                          {canManage ? (
+                            <div className="space-y-1">
+                              <Input
+                                ariaLabel={`${row.sku} ${group.name} price`}
+                                value={value}
+                                onChange={(event) => setPrice(row.product_id, group.id, event.target.value)}
+                                inputClassName={changed ? "border-warning-400" : ""}
+                              />
+                              {changed ? <span className="text-[11px] text-warning-600">Changed</span> : null}
+                            </div>
+                          ) : (
+                            <span>{money(value)}</span>
+                          )}
                         </TableCell>
-                      ) : null}
-                      <TableCell variant="admin"><strong>{row.sku}</strong></TableCell>
-                      <TableCell variant="admin">
-                        <div className="space-y-1">
-                          <div>{row.product_name}</div>
-                          <small>{[row.brand, row.category].filter(Boolean).join(" • ") || "—"}</small>
-                        </div>
-                      </TableCell>
-                      <TableCell variant="admin">
-                        <Badge color="light" size="sm">
-                          {row.product_type_name} · {row.product_type_code}
-                        </Badge>
-                      </TableCell>
-                      <TableCell variant="admin">
-                        <Badge color="light" size="sm">
-                          {row.uom_name} · {row.uom_code}
-                        </Badge>
-                      </TableCell>
-                      <TableCell variant="admin" className="text-right">
-                        {stock(row.available_stock)}
-                      </TableCell>
-                      {groups.map((group) => {
-                        const priceKey = key(row.product_id, group.id);
-                        const value = drafts[priceKey] ?? "";
-                        const parsed = parseDbDecimal(value, PRICE_DECIMAL);
-                        return (
-                          <TableCell key={group.id} variant="admin">
-                            {canManage ? (
-                              <div className="w-36">
-                                <Input
-                                  value={value}
-                                  onChange={(event) => setPrice(row.product_id, group.id, event.target.value)}
-                                  inputMode="decimal"
-                                  error={Boolean(value.trim() && parsed.error)}
-                                />
-                              </div>
-                            ) : (
-                              <span>{value ? money(value) : "—"}</span>
-                            )}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell variant="admin" colSpan={tableColumnCount} className="text-center">
-                      No Price Group products match the current filters.
+                      );
+                    })}
+                    <TableCell variant="admin">
+                      <Badge color={row.product_status === "active" ? "success" : "light"}>
+                        {row.product_status}
+                      </Badge>
                     </TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableViewport>
-        )}
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableViewport>
       </ComponentCard>
 
-      <ComponentCard title="Pagination" desc={`Page ${page} of ${totalPages}`}>
-        <div className="flex flex-wrap gap-2">
+      <ComponentCard title="Pagination" desc={`Showing ${start}–${end} of ${totalCount}`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button
             variant="outline"
-            disabled={page <= 1 || isLoading || dirtyCount > 0}
+            disabled={page <= 1 || dirtyCount > 0}
             onClick={() => applyNavigation(() => setPage((value) => Math.max(1, value - 1)))}
           >
             Previous
           </Button>
-          {visiblePages.map((value) => (
-            <Button
-              key={value}
-              variant={value === page ? "primary" : "outline"}
-              disabled={dirtyCount > 0}
-              onClick={() => applyNavigation(() => setPage(value))}
-            >
-              {value}
-            </Button>
-          ))}
+          <div className="flex flex-wrap justify-center gap-2">
+            {visiblePages.map((value) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={value === page ? "primary" : "outline"}
+                disabled={dirtyCount > 0}
+                onClick={() => applyNavigation(() => setPage(value))}
+              >
+                {value}
+              </Button>
+            ))}
+          </div>
           <Button
             variant="outline"
-            disabled={page >= totalPages || isLoading || dirtyCount > 0}
-            onClick={() =>
-              applyNavigation(() => setPage((value) => Math.min(totalPages, value + 1)))
-            }
+            disabled={page >= totalPages || dirtyCount > 0}
+            onClick={() => applyNavigation(() => setPage((value) => Math.min(totalPages, value + 1)))}
           >
             Next
           </Button>
