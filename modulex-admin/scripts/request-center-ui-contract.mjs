@@ -16,7 +16,8 @@ const schema = read("docs/REQUEST_CENTER_SCHEMA.sql");
 const packageJson = JSON.parse(read("package.json"));
 
 expect(center.includes('hasPermission(profile?.roles, "requests.manage")'), "Request Center must honor all assigned roles");
-expect(center.includes("new Intl.DateTimeFormat(undefined"), "Request dates must use the runtime locale");
+expect(center.includes('import { formatDateTime } from "@/lib/dates/usDate"'), "Request dates must use the shared deterministic MM.DD.YYYY formatter");
+expect(center.includes("formatDateTime(value)"), "Request date rendering must flow through the shared US date contract");
 expect(!center.includes("setError(profileError?.message"), "Profile errors must not be exposed raw");
 expect(!center.includes("setError(requestError.message)"), "Request load errors must not be exposed raw");
 expect(!center.includes("setError(createError.message)"), "Create RPC errors must not be exposed raw");
