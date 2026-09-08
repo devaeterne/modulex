@@ -64,7 +64,7 @@ jobs:
           path = 'modulex-admin/src/components/finance/FinanceCustomerReceiptsManager.tsx'
           p, text = read(path)
           text = ensure_date_import(text, 'formatDateOnly')
-          text = once(text, '<TableCell variant="admin">{invoice.due_date}</TableCell>', '<TableCell variant="admin">{formatDateOnly(invoice.due_date)}</TableCell>', path)
+          text = once(text, '<TableCell variant="admin">{invoice.due_date || "—"}</TableCell>', '<TableCell variant="admin">{formatDateOnly(invoice.due_date)}</TableCell>', path)
           write(path, text); fixes.append(path)
 
           path = 'modulex-admin/src/components/finance/FinanceExpensesManager.tsx'
