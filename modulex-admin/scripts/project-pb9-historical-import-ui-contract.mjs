@@ -8,25 +8,29 @@ const read = (relative) => fs.readFileSync(path.join(ROOT, relative), "utf8");
 const exists = (relative) => fs.existsSync(path.join(ROOT, relative));
 
 const pagePath = "src/app/(admin)/projects/import/page.tsx";
+const shortcutPath = "src/components/projects/ProjectHistoricalImportShortcut.tsx";
 const managerPath = "src/components/projects/ProjectHistoricalImportManager.tsx";
 const apiPath = "src/app/api/admin/projects/import/route.ts";
 const serverPath = "src/lib/projects/historical-import-server.ts";
 const workbookPath = "src/lib/projects/historical-import-workbook.ts";
 
-for (const file of [pagePath, managerPath, apiPath, serverPath, workbookPath]) {
+for (const file of [pagePath, shortcutPath, managerPath, apiPath, serverPath, workbookPath]) {
   assert.equal(exists(file), true, `PB-9 Admin import surface is missing ${file}`);
 }
 
+const projectsPage = read("src/app/(admin)/projects/page.tsx");
 const page = read(pagePath);
+const shortcut = read(shortcutPath);
 const manager = read(managerPath);
 const api = read(apiPath);
 const server = read(serverPath);
 const workbook = read(workbookPath);
 const permissions = read("src/lib/auth/permissions.ts");
-const sidebar = read("src/layout/AppSidebar.tsx");
 
 assert.match(permissions, /"projects\.import"/, "Historical imports need a dedicated projects.import permission");
-assert.match(sidebar, /Historical Import[\s\S]*\/projects\/import[\s\S]*projects\.import/, "Projects navigation must expose Historical Import only to projects.import actors");
+assert.match(permissions, /\/projects\/import[\s\S]*projects\.import/, "The Historical Import route must be protected by projects.import before general Project routes");
+assert.match(projectsPage, /ProjectHistoricalImportShortcut/, "Projects workspace must expose an Admin-only Historical Import entrypoint");
+assert.match(shortcut, /projects\.import[\s\S]*\/projects\/import/, "Historical Import shortcut must be hidden without projects.import");
 assert.match(page, /ProjectHistoricalImportManager/, "Historical Import page must render the PB-9 manager");
 assert.match(manager, /accept=["']\.xlsx|accept:\s*\{[^}]*xlsx/s, "Upload UI must accept XLSX workbooks");
 assert.match(manager, /Dry Run/i, "UI must expose an explicit dry-run step");
