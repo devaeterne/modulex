@@ -42,6 +42,8 @@ For audited files, the gate rejects native `button`, `input`, `select`, `textare
 
 Admin route pages must keep the shared breadcrumb/page-header convention. Feature files must not use strict-disable comments or local suppression flags. If the gate identifies a legitimate missing visual state, extend the reviewed shared primitive/token API and its contract instead of bypassing the checker.
 
+For a behavior-only mechanical migration of legacy feature markup, the canonical shared owner may expose a typed native-compatible adapter when changing DOM or event semantics would create unrelated product risk. Such adapters must live under the reviewed shared primitive roots, add no feature-specific behavior or appearance, and preserve the original native contract. Legacy appearance moved by that migration must be referenced through a reviewed shared theme token such as `ADMIN_COMPAT_APPEARANCE`; raw route-local appearance utilities remain forbidden. This is a migration compatibility path, not a strict-gate exemption: new feature UI should continue to use the canonical semantic primitives and variants above.
+
 The checker has deterministic self-tests through `npm run smoke:admin-ui-strict:self-test`. Pull-request CI resolves the merge-base against the base branch; push CI uses the pushed commit range when available. `ADMIN_UI_STRICT_FILES` and `ADMIN_UI_STRICT_BASE_REF` are available for deterministic local/scoped runs.
 
 ## Semantic variants and states

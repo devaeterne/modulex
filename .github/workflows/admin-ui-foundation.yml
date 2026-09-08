@@ -5,6 +5,8 @@ on:
     paths:
       - "AGENTS.md"
       - "docs/CI_WORKFLOW_ARCHITECTURE.md"
+      - "docs/acceptance/us-date-format-audit.json"
+      - "scripts/us-date-format-audit.mjs"
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
@@ -17,6 +19,8 @@ on:
     paths:
       - "AGENTS.md"
       - "docs/CI_WORKFLOW_ARCHITECTURE.md"
+      - "docs/acceptance/us-date-format-audit.json"
+      - "scripts/us-date-format-audit.mjs"
       - "modulex-admin/AdminUICheck.md"
       - "modulex-admin/docs/ADMIN_UI_GUIDE.md"
       - "modulex-admin/**"
@@ -49,6 +53,22 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
+      - name: Dry-run fail-closed Admin US date migration
+        run: node scripts/us-date-migrate.mjs
+      - name: US date audit scanner self-test
+        run: node ../scripts/us-date-format-audit.mjs --self-test
+      - name: Inventory current date usage
+        run: |
+          node ../scripts/us-date-format-audit.mjs --write
+          cat ../docs/acceptance/us-date-format-audit.json
+      - name: Enforce Admin US date presentation migration
+        run: node ../scripts/us-date-format-audit.mjs --check --scope admin
+      - name: Admin US date format contract
+        run: npm run smoke:us-date-format
+      - name: Store US date format contract
+        run: npm --prefix ../modulex-store run smoke:us-date-format
+      - name: Shared Admin DateInput contract
+        run: node scripts/admin-date-input-contract.mjs
       - name: CI workflow architecture contract
         run: npm run smoke:ci-workflow-architecture
       - name: API timing contract
@@ -64,7 +84,23 @@ jobs:
       - name: Admin UI strict changed-file gate
         env:
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
-        run: npm run smoke:admin-ui-strict
+        run: |
+          set -o pipefail
+          npm run smoke:admin-ui-strict 2>&1 | tee admin-ui-strict.log
+      - name: Collect Admin UI strict source diagnostics
+        if: failure()
+        run: |
+          awk -F: '/^src\// { print $1 }' admin-ui-strict.log | sort -u > admin-ui-strict-files.txt
+          tar -czf admin-ui-strict-sources.tgz -T admin-ui-strict-files.txt
+      - name: Upload Admin UI strict diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-strict-diagnostics
+          path: |
+            modulex-admin/admin-ui-strict.log
+            modulex-admin/admin-ui-strict-files.txt
+            modulex-admin/admin-ui-strict-sources.tgz
       - run: npm run smoke:countertop-ui
       - run: npm run smoke:countertop-domain
       - run: node scripts/countertop-material-band-selection-contract.mjs

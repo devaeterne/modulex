@@ -29,6 +29,8 @@ import {
 } from "@/lib/customers/project-domain";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import { formatTimestampDate } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 type CustomerOption = { id: string; name: string; sales_rep_id: string | null };
 type ProfileOption = { id: string; full_name: string | null; email: string | null; role: string; is_active: boolean };
@@ -65,7 +67,7 @@ function badgeColor(status: ProjectStatus): "primary" | "success" | "warning" | 
 
 function displayDate(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+  return formatTimestampDate(value);
 }
 
 function mergeSelectedRows<T extends { id: string }>(nextRows: T[], previousRows: T[], selectedIds: string[]) {
@@ -316,7 +318,7 @@ export default function ProjectsWorkspace() {
             </div>
             <div>
               <Label htmlFor="project-target-date">Target date</Label>
-              <Input id="project-target-date" type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} />
+              <DateInput id="project-target-date" value={targetDate} onChange={(event) => setTargetDate(event)} />
             </div>
           </div>
           <div className="flex justify-end">

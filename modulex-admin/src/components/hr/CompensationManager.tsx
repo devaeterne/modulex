@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
+import DateInput from "@/components/form/DateInput";
 
 type Employee = {
   employee_id: string;
@@ -763,11 +764,10 @@ export default function CompensationManager() {
 
               <div>
                 <Label htmlFor="comp-effective-date">Effective date</Label>
-                <Input
+                <DateInput
                   id="comp-effective-date"
-                  type="date"
                   value={effectiveFrom}
-                  onChange={(event) => setEffectiveFrom(event.target.value)}
+                  onChange={(event) => setEffectiveFrom(event)}
                   disabled={controlsDisabled}
                   required
                 />
@@ -831,11 +831,10 @@ export default function CompensationManager() {
 
               <div>
                 <Label htmlFor="variable-date">Effective date</Label>
-                <Input
+                <DateInput
                   id="variable-date"
-                  type="date"
                   value={earningDate}
-                  onChange={(event) => setEarningDate(event.target.value)}
+                  onChange={(event) => setEarningDate(event)}
                   disabled={controlsDisabled}
                   required
                 />
@@ -887,11 +886,10 @@ export default function CompensationManager() {
                 </div>
                 <div>
                   <Label htmlFor="advance-date">Effective date</Label>
-                  <Input
+                  <DateInput
                     id="advance-date"
-                    type="date"
                     value={advanceDate}
-                    onChange={(event) => setAdvanceDate(event.target.value)}
+                    onChange={(event) => setAdvanceDate(event)}
                     disabled={controlsDisabled}
                     required
                   />
@@ -1002,11 +1000,10 @@ export default function CompensationManager() {
 
               <div>
                 <Label htmlFor="deduction-effective-date">Effective date</Label>
-                <Input
+                <DateInput
                   id="deduction-effective-date"
-                  type="date"
                   value={deductionStart}
-                  onChange={(event) => setDeductionStart(event.target.value)}
+                  onChange={(event) => setDeductionStart(event)}
                   disabled={controlsDisabled}
                   required
                 />

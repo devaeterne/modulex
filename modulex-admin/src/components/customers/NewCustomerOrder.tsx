@@ -36,6 +36,7 @@ import { createProjectCustomerOrder } from "@/lib/customers/project-domain";
 import type { Customer, CustomerAddress, OrderFulfillmentType, OrderPricingModel, PaymentMethod, PriceGroupLookup } from "@/lib/customers/types";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
 import { calculateDbDecimalBulk, compareDbDecimal } from "@/lib/validation";
+import DateInput from "@/components/form/DateInput";
 
 type Product = OrderPickerProduct;
 type PriceRow = OrderPriceRow;
@@ -500,7 +501,7 @@ export default function NewCustomerOrder({ projectId = null }: { projectId?: str
           <Field label="Payment Method" hint={fieldErrors.paymentMethodId}><Select id="new-order-payment-method" error={Boolean(fieldErrors.paymentMethodId)} options={paymentMethods.map((method) => ({ value: method.id, label: `${method.name}${Number(method.commission_percent) > 0 ? ` (+${Number(method.commission_percent).toFixed(2)}%)` : ""}` }))} value={paymentMethodId} onChange={handlePaymentMethodChange} /></Field>
           <Field label="Applied Commission (%)" hint={commissionHint}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input id="new-order-payment-commission" type="number" min="0" max="100" step="0.001" value={paymentCommissionPercent} error={Boolean(fieldErrors.paymentCommissionPercent)} hint={fieldErrors.paymentCommissionPercent} onChange={(event) => { clearHeaderError("paymentCommissionPercent"); setPaymentCommissionPercent(event.target.value); }} /></div><Button size="sm" variant="outline" onClick={() => { clearHeaderError("paymentCommissionPercent"); setPaymentCommissionPercent(defaultCommissionValue); }}>Use Default</Button></div></Field>
           <Field label="Initial Status"><Select options={[{ value: "draft", label: "Draft" }, { value: "confirmed", label: "Confirmed" }]} value={initialStatus} onChange={(value) => setInitialStatus(value as "draft" | "confirmed")} /></Field>
-          <Field label="Expected Delivery"><Input type="date" value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} /></Field>
+          <Field label="Expected Delivery"><DateInput value={expectedDate} onChange={(event) => setExpectedDate(event)} /></Field>
           <Field label="Customer Reference"><Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="PO / reference" /></Field>
           <Field label="Billing Address"><Select options={addresses.filter((address) => ["billing", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={billingAddressId} placeholder="None" allowEmpty onChange={setBillingAddressId} /></Field>
           <Field label="Shipping Address" hint={fieldErrors.shippingAddressId}><Select id="new-order-shipping-address" error={Boolean(fieldErrors.shippingAddressId)} options={addresses.filter((address) => ["shipping", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={shippingAddressId} placeholder="None" allowEmpty onChange={(value) => { clearHeaderError("shippingAddressId"); setShippingAddressId(value); }} /></Field>

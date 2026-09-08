@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { downloadCsv } from "@/lib/reports/csv";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type ReportTab = "products" | "locations";
 type ProductStatusFilter = "all" | "low" | "out" | "reserved" | "ok";
@@ -75,7 +76,7 @@ function productState(row: ProductStockRow) {
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 export default function InventoryReport() {

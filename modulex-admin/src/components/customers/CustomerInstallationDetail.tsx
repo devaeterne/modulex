@@ -11,6 +11,7 @@ import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { authenticatedFetch } from "@/lib/auth/authenticated-fetch";
 import { supabase } from "@/lib/supabase/client";
 import type { CustomerInstallation, CustomerInstallationStatus } from "@/lib/customers/installation-types";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 const INSTALLATION_STATUS_TRANSITIONS: Record<CustomerInstallationStatus, CustomerInstallationStatus[]> = {
   scheduled: ["confirmed", "cancelled"],
@@ -30,7 +31,7 @@ function titleCase(value: string) {
 
 function dateTime(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function statusColor(status: CustomerInstallationStatus) {

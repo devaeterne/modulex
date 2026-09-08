@@ -50,6 +50,7 @@ import type {
   PriceGroupLookup,
 } from "@/lib/customers/types";
 import { calculateDbDecimalBulk, compareDbDecimal } from "@/lib/validation";
+import DateInput from "@/components/form/DateInput";
 
 type Product = OrderPickerProduct;
 type PriceRow = OrderPriceRow;
@@ -610,7 +611,7 @@ export default function EditCustomerOrder() {
           <Field label="Fulfillment Type" hint={taxHint}><Select options={[{ value: "pickup", label: "Customer Pickup" }, { value: "delivery", label: "Delivery" }, { value: "delivery_installation", label: "Delivery + Installation" }]} value={fulfillmentType} onChange={(value) => handleFulfillmentChange(value as OrderFulfillmentType)} /></Field>
           <Field label="Payment Method" hint={fieldErrors.paymentMethodId}><Select id="edit-order-payment-method" error={Boolean(fieldErrors.paymentMethodId)} options={paymentMethods.map((method) => ({ value: method.id, label: method.name }))} value={paymentMethodId} onChange={(id) => { clearHeaderError("paymentMethodId"); clearHeaderError("appliedCommission"); setPaymentMethodId(id); const method = paymentMethods.find((item) => item.id === id); setAppliedCommission(String(method?.commission_percent ?? 0)); }} /></Field>
           <Field label="Applied Commission (%)" hint={`Default ${defaultCommission.toFixed(2)}%${commissionOverridden ? " · Sales override requires approval" : ""}`}><div className="flex gap-2"><div className="min-w-0 flex-1"><Input id="edit-order-payment-commission" inputMode="decimal" value={appliedCommission} error={Boolean(fieldErrors.appliedCommission)} hint={fieldErrors.appliedCommission} onChange={(event) => { clearHeaderError("appliedCommission"); setAppliedCommission(event.target.value); }} /></div><Button size="sm" variant="outline" onClick={() => { clearHeaderError("appliedCommission"); setAppliedCommission(defaultCommissionValue); }}>Use Default</Button></div></Field>
-          <Field label="Expected Delivery"><Input type="date" value={expectedDate} onChange={(event) => setExpectedDate(event.target.value)} /></Field>
+          <Field label="Expected Delivery"><DateInput value={expectedDate} onChange={(event) => setExpectedDate(event)} /></Field>
           <Field label="Customer Reference"><Input value={reference} onChange={(event) => setReference(event.target.value)} /></Field>
           <Field label="Billing Address"><Select options={addresses.filter((address) => ["billing", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={billingAddressId} placeholder="None" allowEmpty onChange={setBillingAddressId} /></Field>
           <Field label="Shipping Address" hint={fieldErrors.shippingAddressId}><Select id="edit-order-shipping-address" error={Boolean(fieldErrors.shippingAddressId)} options={addresses.filter((address) => ["shipping", "both"].includes(address.address_type)).map((address) => ({ value: address.id, label: `${address.address_name} — ${address.city}` }))} value={shippingAddressId} placeholder="None" allowEmpty onChange={(value) => { clearHeaderError("shippingAddressId"); setShippingAddressId(value); }} /></Field>

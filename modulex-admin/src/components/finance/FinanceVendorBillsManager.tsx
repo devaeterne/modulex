@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates/usDate";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
@@ -31,6 +32,7 @@ import {
   type VendorBillListItem,
   type VendorBillPaymentStatus,
 } from "@/lib/finance/vendorBills";
+import DateInput from "@/components/form/DateInput";
 
 const statusOptions = [
   { value: "draft", label: "Draft" },
@@ -364,8 +366,8 @@ export default function FinanceVendorBillsManager() {
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div><Label htmlFor="bill-vendor">Vendor</Label><Select id="bill-vendor" options={vendorOptions} value={vendorId} onChange={setVendorId} placeholder="Select canonical Vendor" required disabled={Boolean(editingId)} /></div>
               <div><Label htmlFor="bill-number">Bill number</Label><Input id="bill-number" value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} required /></div>
-              <div><Label htmlFor="bill-date">Bill date</Label><Input id="bill-date" type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} required /></div>
-              <div><Label htmlFor="bill-due">Due date</Label><Input id="bill-due" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} required /></div>
+              <div><Label htmlFor="bill-date">Bill date</Label><DateInput id="bill-date" value={invoiceDate} onChange={(event) => setInvoiceDate(event)} required /></div>
+              <div><Label htmlFor="bill-due">Due date</Label><DateInput id="bill-due" value={dueDate} onChange={(event) => setDueDate(event)} required /></div>
               <div><Label htmlFor="bill-total">Total</Label><Input id="bill-total" type="number" min="0.0001" step="0.0001" value={amount} onChange={(event) => setAmount(event.target.value)} required /></div>
               <div><Label htmlFor="bill-currency">Currency</Label><Input id="bill-currency" maxLength={3} value={currencyCode} onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())} required /></div>
               <div><Label htmlFor="bill-po">PO / Vendor Order</Label><Input id="bill-po" value={purchaseOrderReference} onChange={(event) => setPurchaseOrderReference(event.target.value)} /></div>
@@ -413,7 +415,7 @@ export default function FinanceVendorBillsManager() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div><Label htmlFor="bill-filter-vendor">Vendor</Label><Select id="bill-filter-vendor" options={vendorOptions} value={vendorFilter} onChange={setVendorFilter} placeholder="All Vendors" allowEmpty /></div>
             <div><Label htmlFor="bill-filter-status">Status</Label><Select id="bill-filter-status" options={statusOptions} value={statusFilter} onChange={setStatusFilter} placeholder="All statuses" allowEmpty /></div>
-            <div><Label htmlFor="bill-filter-due">Due before</Label><Input id="bill-filter-due" type="date" value={dueBefore} onChange={(event) => setDueBefore(event.target.value)} /></div>
+            <div><Label htmlFor="bill-filter-due">Due before</Label><DateInput id="bill-filter-due" value={dueBefore} onChange={(event) => setDueBefore(event)} /></div>
             <div><Label htmlFor="bill-filter-search">Search</Label><Input id="bill-filter-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Vendor, bill, reference" /></div>
             <div><Label htmlFor="bill-filter-project">Project ID</Label><Input id="bill-filter-project" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} /></div>
             <div><Label htmlFor="bill-filter-order">Order ID</Label><Input id="bill-filter-order" value={orderFilter} onChange={(event) => setOrderFilter(event.target.value)} /></div>
@@ -428,7 +430,7 @@ export default function FinanceVendorBillsManager() {
                 {loading ? <TableStateRow colSpan={8}>Loading Vendor Bills…</TableStateRow> : bills.length === 0 ? <TableStateRow colSpan={8}>No Vendor Bills match the current filters.</TableStateRow> : bills.map((bill) => (
                   <TableRow key={bill.id}>
                     <TableCell variant="admin"><span className="font-medium">{bill.vendor_name_snapshot}</span><div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{bill.invoice_number}{bill.purchase_order_reference ? ` · PO ${bill.purchase_order_reference}` : ""}</div></TableCell>
-                    <TableCell variant="admin">{bill.invoice_date}</TableCell><TableCell variant="admin">{bill.due_date || "—"}</TableCell>
+                    <TableCell variant="admin">{formatDateOnly(bill.invoice_date)}</TableCell><TableCell variant="admin">{formatDateOnly(bill.due_date)}</TableCell>
                     <TableCell variant="admin" className="text-right font-medium">{money(bill.total_amount, bill.currency_code)}</TableCell>
                     <TableCell variant="admin" className="text-right font-medium">{money(bill.outstanding_amount, bill.currency_code)}</TableCell>
                     <TableCell variant="admin"><Badge color={paymentColor(bill.payment_status)}>{bill.payment_status.replaceAll("_", " ")}</Badge></TableCell>
@@ -449,7 +451,7 @@ export default function FinanceVendorBillsManager() {
             <div className="space-y-5">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Vendor</span><div className="font-medium">{detail.vendor?.display_name ?? String(detail.invoice.vendor_name_snapshot ?? "—")}</div></div>
-                <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Due</span><div className="font-medium">{String(detail.invoice.due_date ?? "—")}</div></div>
+                <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Due</span><div className="font-medium">{formatDateOnly(detail.invoice.due_date)}</div></div>
                 <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Outstanding</span><div className="font-medium">{money(Number(detail.invoice.outstanding_amount ?? 0), String(detail.invoice.currency_code ?? "USD"))}</div></div>
                 <div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Base snapshot</span><div className="font-medium">{detail.invoice.base_amount ? money(Number(detail.invoice.base_amount), String(detail.invoice.base_currency_code ?? "USD")) : "Draft"}</div></div>
               </div>

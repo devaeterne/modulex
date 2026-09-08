@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates/usDate";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
@@ -24,6 +25,7 @@ import {
   type PaymentScheduleReferenceData,
   type PaymentScheduleStatus,
 } from "@/lib/finance/paymentSchedule";
+import DateInput from "@/components/form/DateInput";
 
 const statusOptions = [
   { value: "planned", label: "Planned" },
@@ -241,11 +243,11 @@ export default function FinancePaymentScheduleManager() {
           <form onSubmit={submit} className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <div className="xl:col-span-2"><Label htmlFor="schedule-bill">Vendor Bill</Label><Select id="schedule-bill" options={billOptions} value={invoiceId} onChange={chooseBill} placeholder="Select open Vendor Bill" disabled={Boolean(editingId)} required /></div>
-              <div><Label htmlFor="schedule-date">Scheduled date</Label><Input id="schedule-date" type="date" value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)} required /></div>
+              <div><Label htmlFor="schedule-date">Scheduled date</Label><DateInput id="schedule-date" value={scheduledDate} onChange={(event) => setScheduledDate(event)} required /></div>
               <div><Label htmlFor="schedule-amount">Planned amount</Label><Input id="schedule-amount" type="number" min="0.0001" step="0.0001" value={plannedAmount} onChange={(event) => setPlannedAmount(event.target.value)} required /></div>
               <div><Label htmlFor="schedule-method">Payment Method</Label><Select id="schedule-method" options={methodOptions} value={paymentMethodId} onChange={setPaymentMethodId} placeholder="Optional method" allowEmpty /></div>
               <div><Label htmlFor="schedule-account">Source account</Label><Select id="schedule-account" options={accountOptions} value={sourceAccountId} onChange={setSourceAccountId} placeholder="Optional account" allowEmpty /></div>
-              {selectedBill ? <><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Due date</span><div className="font-medium">{selectedBill.due_date || "Not set"}</div></div><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Outstanding / Unscheduled</span><div className="font-medium">{money(selectedBill.outstanding_amount, selectedBill.currency_code)} / {money(selectedBill.unscheduled_amount, selectedBill.currency_code)}</div></div></> : null}
+              {selectedBill ? <><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Due date</span><div className="font-medium">{selectedBill.due_date ? formatDateOnly(selectedBill.due_date) : "Not set"}</div></div><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Outstanding / Unscheduled</span><div className="font-medium">{money(selectedBill.outstanding_amount, selectedBill.currency_code)} / {money(selectedBill.unscheduled_amount, selectedBill.currency_code)}</div></div></> : null}
             </div>
             <div><Label htmlFor="schedule-notes">Notes</Label><TextArea id="schedule-notes" value={notes} onChange={setNotes} rows={2} /></div>
             {editingId ? <div><Label htmlFor="schedule-cancel-reason">Cancel reason</Label><Input id="schedule-cancel-reason" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} placeholder="Required only when cancelling" /></div> : null}
@@ -262,8 +264,8 @@ export default function FinancePaymentScheduleManager() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <div><Label htmlFor="schedule-filter-vendor">Vendor</Label><Select id="schedule-filter-vendor" options={vendorOptions} value={vendorFilter} onChange={setVendorFilter} placeholder="All Vendors" allowEmpty /></div>
             <div><Label htmlFor="schedule-filter-status">Status</Label><Select id="schedule-filter-status" options={statusOptions} value={statusFilter} onChange={setStatusFilter} placeholder="All statuses" allowEmpty /></div>
-            <div><Label htmlFor="schedule-date-from">Scheduled from</Label><Input id="schedule-date-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></div>
-            <div><Label htmlFor="schedule-date-to">Scheduled to</Label><Input id="schedule-date-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></div>
+            <div><Label htmlFor="schedule-date-from">Scheduled from</Label><DateInput id="schedule-date-from" value={dateFrom} onChange={(event) => setDateFrom(event)} /></div>
+            <div><Label htmlFor="schedule-date-to">Scheduled to</Label><DateInput id="schedule-date-to" value={dateTo} onChange={(event) => setDateTo(event)} /></div>
             <div><Label htmlFor="schedule-search">Search</Label><Input id="schedule-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Vendor, bill, notes" /></div>
           </div>
           <div className="flex flex-wrap gap-3"><Button variant="outline" disabled={loading || busy} onClick={() => void load(0)}>Apply Filters</Button><Button variant="ghost" disabled={loading || busy} onClick={() => void load(offset)}>Retry / Refresh</Button></div>
@@ -275,8 +277,8 @@ export default function FinancePaymentScheduleManager() {
                 {loading ? <TableStateRow colSpan={9}>Loading Payment Schedule…</TableStateRow> : rows.length === 0 ? <TableStateRow colSpan={9}>No planned Vendor payments match the current filters.</TableStateRow> : rows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell variant="admin"><span className="font-medium">{row.vendor_name}</span><div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{row.invoice_number}</div></TableCell>
-                    <TableCell variant="admin">{row.due_date || "—"}</TableCell>
-                    <TableCell variant="admin" className="font-medium">{row.scheduled_payment_date}</TableCell>
+                    <TableCell variant="admin">{formatDateOnly(row.due_date)}</TableCell>
+                    <TableCell variant="admin" className="font-medium">{formatDateOnly(row.scheduled_payment_date)}</TableCell>
                     <TableCell variant="admin" className="text-right font-medium">{money(row.planned_amount, row.currency_code)}</TableCell>
                     <TableCell variant="admin" className="text-right">{money(row.outstanding_amount, row.currency_code)}</TableCell>
                     <TableCell variant="admin" className="text-right">{money(row.scheduled_remaining_amount, row.currency_code)}</TableCell>

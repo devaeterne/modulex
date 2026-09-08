@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
 import { supabase } from "@/lib/supabase/client";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 const inputClass =
   "h-11 w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 transition-colors focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:disabled:bg-white/[0.03] dark:disabled:text-gray-500";
@@ -30,11 +31,7 @@ function getInitials(fullName: string | null, email: string | null) {
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
 
-  return new Intl.DateTimeFormat("en", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(new Date(value));
+  return formatTimestampDate(value);
 }
 
 export default function CorporateProfile() {

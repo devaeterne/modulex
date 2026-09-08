@@ -2,32 +2,32 @@ import React from "react";
 
 interface TextareaProps {
   id?: string;
-  placeholder?: string; // Placeholder text
-  rows?: number; // Number of rows
-  value?: string; // Current value
-  onChange?: (value: string) => void; // Change handler
-  className?: string; // Additional CSS classes
-  disabled?: boolean; // Disabled state
+  placeholder?: string;
+  rows?: number;
+  value?: string;
+  onChange?: (value: string) => void;
+  className?: string;
+  disabled?: boolean;
   required?: boolean;
   minLength?: number;
   maxLength?: number;
-  error?: boolean; // Error state
-  hint?: string; // Hint text to display
+  error?: boolean;
+  hint?: string;
 }
 
 const TextArea: React.FC<TextareaProps> = ({
   id,
-  placeholder = "Enter your message", // Default placeholder
-  rows = 3, // Default number of rows
-  value = "", // Default value
-  onChange, // Callback for changes
-  className = "", // Additional custom styles
-  disabled = false, // Disabled state
+  placeholder = "Enter your message",
+  rows = 3,
+  value = "",
+  onChange,
+  className = "",
+  disabled = false,
   required = false,
   minLength,
   maxLength,
-  error = false, // Error state
-  hint = "", // Default hint text
+  error = false,
+  hint = "",
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (onChange) {
@@ -71,5 +71,13 @@ const TextArea: React.FC<TextareaProps> = ({
     </div>
   );
 };
+
+/** Behavior-preserving adapter used only while migrating legacy feature markup. */
+export const TextAreaNative = React.forwardRef<
+  HTMLTextAreaElement,
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>
+>(function TextAreaNative(props, ref) {
+  return <textarea ref={ref} {...props} />;
+});
 
 export default TextArea;

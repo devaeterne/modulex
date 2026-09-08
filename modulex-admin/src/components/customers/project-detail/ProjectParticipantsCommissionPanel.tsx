@@ -42,18 +42,19 @@ import {
   type ProjectParticipantCandidate,
   type ProjectParticipantRole,
 } from "@/lib/customers/project-participants-commission-domain";
+import { formatDateTime, formatTimestampDate } from "@/lib/dates/usDate";
 
 type Props = { projectId: string };
 type BadgeColor = "success" | "warning" | "error" | "info" | "light" | "primary";
 
 function displayDate(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+  return formatTimestampDate(value);
 }
 
 function displayDateTime(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function money(value: number, currencyCode: string) {

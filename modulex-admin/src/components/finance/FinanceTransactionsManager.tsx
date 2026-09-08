@@ -32,6 +32,7 @@ import {
   type FinanceTransactionStatus,
 } from "@/lib/finance/core";
 import { saveEmployeePaymentDraft } from "@/lib/finance/payroll";
+import { formatDateTime, formatDateOnly } from "@/lib/dates/usDate";
 
 const kindOptions = [
   { value: "employee_payment", label: "Employee payment" },
@@ -163,7 +164,7 @@ export default function FinanceTransactionsManager() {
   const destinationOptions = useMemo(() => activeAccounts.filter((account) => !sourceAccountId || account.currency_code === currencyCode).map((account) => ({ value: account.id, label: `${account.name} · ${account.currency_code}` })), [activeAccounts, sourceAccountId, currencyCode]);
   const categoryOptions = useMemo(() => categories.filter((category) => category.is_active && (kind !== "expense" || category.category_type === "expense")).map((category) => ({ value: category.id, label: `${category.code} · ${category.name}` })), [categories, kind]);
   const employeeOptions = useMemo(() => employees.map((employee) => ({ value: employee.employee_id, label: `${employee.full_name} · ${employee.employee_number}${employee.employment_status === "active" ? "" : ` · ${employee.employment_status}`}` })), [employees]);
-  const payrollItemOptions = useMemo(() => payrollItems.map((item) => ({ value: item.payroll_item_id, label: `${item.period_code} · Pay ${item.pay_date} · ${money(item.remaining_amount, currencyCode)} remaining` })), [currencyCode, payrollItems]);
+  const payrollItemOptions = useMemo(() => payrollItems.map((item) => ({ value: item.payroll_item_id, label: `${item.period_code} · Pay ${formatDateOnly(item.pay_date)} · ${money(item.remaining_amount, currencyCode)} remaining` })), [currencyCode, payrollItems]);
   const totalCount = Number(transactions[0]?.total_count ?? 0);
 
   function chooseKind(value: string) {
@@ -393,7 +394,7 @@ export default function FinanceTransactionsManager() {
             <TableBody variant="admin">
               {transactions.length === 0 ? <TableStateRow colSpan={8}>No Finance transactions match this view.</TableStateRow> : transactions.map((transaction) => (
                 <TableRow key={transaction.id}>
-                  <TableCell variant="admin">{new Date(transaction.transaction_at).toLocaleString()}</TableCell>
+                  <TableCell variant="admin">{formatDateTime(transaction.transaction_at)}</TableCell>
                   <TableCell variant="admin">{transaction.transaction_kind.replaceAll("_", " ")}</TableCell>
                   <TableCell variant="admin"><div>{transaction.source_account_name ? `From: ${transaction.source_account_name}` : ""}</div><div>{transaction.destination_account_name ? `To: ${transaction.destination_account_name}` : ""}</div></TableCell>
                   <TableCell variant="admin">{transaction.reference_no || "—"}</TableCell>

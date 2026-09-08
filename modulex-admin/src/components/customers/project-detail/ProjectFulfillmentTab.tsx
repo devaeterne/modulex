@@ -22,6 +22,7 @@ import {
   type ProjectFulfillmentOrder,
   type ProjectFulfillmentResult,
 } from "@/lib/customers/project-fulfillment-domain";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 type BadgeColor = "primary" | "success" | "warning" | "error" | "info" | "light";
 
@@ -31,7 +32,7 @@ function label(value: string) {
 
 function date(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+  return formatTimestampDate(value);
 }
 
 function statusColor(value: string): BadgeColor {

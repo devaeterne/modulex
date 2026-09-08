@@ -25,6 +25,7 @@ import {
   type FinanceCategoryType,
   type FinanceFxRate,
 } from "@/lib/finance/core";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 const accountTypeOptions = [
   { value: "bank", label: "Bank" },
@@ -245,7 +246,7 @@ export default function FinanceAccountsManager() {
         </ComponentCard>
 
         <ComponentCard title="Recent FX Observations">
-          <TableViewport><Table variant="admin"><TableHeader variant="admin"><TableRow><TableCell isHeader variant="admin">Pair</TableCell><TableCell isHeader variant="admin">Rate</TableCell><TableCell isHeader variant="admin">Source</TableCell><TableCell isHeader variant="admin">Observed</TableCell></TableRow></TableHeader><TableBody variant="admin">{rates.length === 0 ? <TableStateRow colSpan={4}>No FX observations.</TableStateRow> : rates.slice(0, 20).map((item) => <TableRow key={item.id}><TableCell variant="admin">{item.from_currency}/{item.to_currency}</TableCell><TableCell variant="admin">{Number(item.rate).toFixed(6)}</TableCell><TableCell variant="admin">{item.rate_source}</TableCell><TableCell variant="admin">{new Date(item.observed_at).toLocaleString()}</TableCell></TableRow>)}</TableBody></Table></TableViewport>
+          <TableViewport><Table variant="admin"><TableHeader variant="admin"><TableRow><TableCell isHeader variant="admin">Pair</TableCell><TableCell isHeader variant="admin">Rate</TableCell><TableCell isHeader variant="admin">Source</TableCell><TableCell isHeader variant="admin">Observed</TableCell></TableRow></TableHeader><TableBody variant="admin">{rates.length === 0 ? <TableStateRow colSpan={4}>No FX observations.</TableStateRow> : rates.slice(0, 20).map((item) => <TableRow key={item.id}><TableCell variant="admin">{item.from_currency}/{item.to_currency}</TableCell><TableCell variant="admin">{Number(item.rate).toFixed(6)}</TableCell><TableCell variant="admin">{item.rate_source}</TableCell><TableCell variant="admin">{formatDateTime(item.observed_at)}</TableCell></TableRow>)}</TableBody></Table></TableViewport>
         </ComponentCard>
       </div>
     </div>

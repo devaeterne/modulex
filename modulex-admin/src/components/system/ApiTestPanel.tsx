@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type CheckStatus = "idle" | "running" | "pass" | "fail";
 
@@ -148,7 +149,7 @@ export default function ApiTestPanel() {
     }
 
     setResults(nextResults);
-    setLastRunAt(new Date().toLocaleString());
+    setLastRunAt(formatDateTime(new Date()));
     setRunning(false);
   }
 

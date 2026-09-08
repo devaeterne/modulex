@@ -1,6 +1,7 @@
 "use client";
 
 import StoreIcon from "@/components/StoreIcon";
+import DateInput from "@/components/form/DateInput";
 import { FormEvent, useMemo, useRef, useState } from "react";
 import type { StoreLeadFormOption, StoreLeadRequestKind, StoreLeadType } from "@/lib/store/leads/types";
 import { captureSessionAttribution, getSessionAttribution } from "@/lib/analytics/attribution";
@@ -22,6 +23,7 @@ export default function LeadForm({ type, formOptions = [] }: LeadFormProps) {
   const [documents, setDocuments] = useState<File[]>([]);
   const [documentType, setDocumentType] = useState<DocumentType>("other");
   const [requestKind, setRequestKind] = useState<StoreLeadRequestKind>("general_inquiry");
+  const [preferredConsultationDate, setPreferredConsultationDate] = useState("");
   const started = useRef(false);
   const dealer = type === "dealer_application";
   const projectConsultation = !dealer && requestKind === "project_consultation";
@@ -115,6 +117,7 @@ export default function LeadForm({ type, formOptions = [] }: LeadFormProps) {
       setDocuments([]);
       setDocumentType("other");
       setRequestKind("general_inquiry");
+      setPreferredConsultationDate("");
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to submit your request.");
     } finally { setSubmitting(false); }
@@ -144,7 +147,7 @@ export default function LeadForm({ type, formOptions = [] }: LeadFormProps) {
           <div className="form-group"><label htmlFor="project-city">Project City</label><input id="project-city" name="project_city" type="text" maxLength={160} autoComplete="address-level2" /></div>
           <div className="form-group"><label htmlFor="project-postal-code">Project ZIP / Postal Code</label><input id="project-postal-code" name="project_postal_code" type="text" maxLength={32} autoComplete="postal-code" /></div>
         </div>
-        <div className="form-group"><label htmlFor="preferred-consultation-date">Preferred Consultation Date</label><input id="preferred-consultation-date" name="preferred_consultation_date" type="date" /><small className="d-block mt-2">This is a preferred date only. We will confirm availability when we respond.</small></div>
+        <div className="form-group"><label htmlFor="preferred-consultation-date">Preferred Consultation Date</label><DateInput id="preferred-consultation-date" name="preferred_consultation_date" value={preferredConsultationDate} onChange={setPreferredConsultationDate} /><small className="d-block mt-2">Use MM.DD.YYYY. This is a preferred date only. We will confirm availability when we respond.</small></div>
       </> : null}
       {dealer ? <>
         <div className="form-row">

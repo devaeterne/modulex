@@ -23,6 +23,7 @@ import {
   type CustomerReceiptReferenceData,
   type CustomerReceiptRow,
 } from "@/lib/finance/customer-receipts";
+import { formatDateTime, formatDateOnly } from "@/lib/dates/usDate";
 
 function localDateTimeValue() {
   const now = new Date();
@@ -222,7 +223,7 @@ export default function FinanceCustomerReceiptsManager() {
                     {!customerId ? <TableStateRow colSpan={6}>Select a Customer to load open Invoices.</TableStateRow> : invoices.length === 0 ? <TableStateRow colSpan={6}>No open Invoices are available for this Customer.</TableStateRow> : invoices.map((invoice) => (
                       <TableRow key={invoice.invoice_id}>
                         <TableCell variant="admin"><div className="font-medium">{invoice.invoice_number}</div><div className="text-xs">{invoice.status.replaceAll("_", " ")}{invoice.legacy_unreconciled ? " · legacy payment reconciliation required" : ""}</div></TableCell>
-                        <TableCell variant="admin">{invoice.due_date || "—"}</TableCell>
+                        <TableCell variant="admin">{formatDateOnly(invoice.due_date)}</TableCell>
                         <TableCell variant="admin" className="text-right">{money(invoice.total_amount, invoice.currency_code)}</TableCell>
                         <TableCell variant="admin" className="text-right">{money(invoice.paid_amount, invoice.currency_code)}</TableCell>
                         <TableCell variant="admin" className="text-right font-medium">{money(invoice.balance_amount, invoice.currency_code)}</TableCell>
@@ -260,7 +261,7 @@ export default function FinanceCustomerReceiptsManager() {
             <TableBody variant="admin">
               {receipts.length === 0 ? <TableStateRow colSpan={8}>No Customer Receipts match this view.</TableStateRow> : receipts.map((receipt) => (
                 <TableRow key={receipt.transaction_id}>
-                  <TableCell variant="admin">{new Date(receipt.transaction_at).toLocaleString()}</TableCell>
+                  <TableCell variant="admin">{formatDateTime(receipt.transaction_at)}</TableCell>
                   <TableCell variant="admin"><div className="font-medium">{receipt.customer_name || "Unknown Customer"}</div><div className="text-xs">{receipt.customer_code || "—"}</div></TableCell>
                   <TableCell variant="admin">{receipt.destination_account_name || "—"}</TableCell>
                   <TableCell variant="admin">{receipt.reference_no || "—"}</TableCell>

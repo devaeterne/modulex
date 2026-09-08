@@ -1,12 +1,8 @@
 import Link from "next/link";
 import PortalEmptyState from "@/components/portal/PortalEmptyState";
 import PortalStatusBadge from "@/components/portal/PortalStatusBadge";
+import { formatDateTime } from "@/lib/dates/usDate";
 import type { PortalInstallationSummary } from "@/lib/portal/fulfillment";
-
-function formatDateTime(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
 
 export default function PortalInstallationList({ installations, basePath }: { installations: PortalInstallationSummary[]; basePath: string }) {
   if (!installations.length) return <PortalEmptyState title="No installations yet" description="Scheduled Oakwell installation activity will appear here." />;

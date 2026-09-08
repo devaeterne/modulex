@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/lib/dates/usDate";
 import { useCallback, useEffect, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import Label from "@/components/form/Label";
@@ -211,7 +212,7 @@ export default function GoogleCalendarSettings() {
             Connected account: {status.connection.provider_account_email || "—"}
           </p>
           <p className="text-sm">
-            Last successful provider access: {status.connection.last_success_at || "—"}
+            Last successful provider access: {formatDateTime(status.connection.last_success_at)}
           </p>
           <p className="text-sm">
             Last error: {status.connection.last_error_code || "—"}

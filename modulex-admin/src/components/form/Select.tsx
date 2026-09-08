@@ -115,4 +115,12 @@ const Select: React.FC<SelectProps> = ({
   );
 };
 
+/** Behavior-preserving adapter used only while migrating legacy feature markup. */
+export const SelectNative = React.forwardRef<
+  HTMLSelectElement,
+  React.SelectHTMLAttributes<HTMLSelectElement>
+>(function SelectNative(props, ref) {
+  return <select ref={ref} {...props} />;
+});
+
 export default Select;

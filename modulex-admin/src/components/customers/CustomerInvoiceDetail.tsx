@@ -18,6 +18,7 @@ import { DEFAULT_GENERAL_SETTINGS, type GeneralSettings } from "@/lib/settings/t
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { compareDbDecimal, parseDbDecimal } from "@/lib/validation";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 type LedgerAwareInvoice = CustomerInvoice & { ledger_managed?: boolean };
 
@@ -33,9 +34,9 @@ function money(value: string | number | null | undefined, currency = "USD", loca
 function date(value: string | null | undefined, locale = "en-US", timezone = "UTC") {
   if (!value) return "—";
   try {
-    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: timezone }).format(new Date(value));
+    return formatTimestampDate(value, { timeZone: timezone });
   } catch {
-    return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
+    return formatTimestampDate(value);
   }
 }
 

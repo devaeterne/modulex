@@ -4,15 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminCalendarWorkspace from "@/components/calendar/AdminCalendarWorkspace";
 import CalendarEventEditorModal, { type CalendarEditorEvent } from "@/components/calendar/CalendarEventEditorModal";
 import ComponentCard from "@/components/common/ComponentCard";
+import DateInput from "@/components/form/DateInput";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
-import Input from "@/components/form/input/InputField";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { authenticatedFetch } from "@/lib/auth/authenticated-fetch";
 import { getCustomerProject, updateCustomerProjectSchedule, type CustomerProject } from "@/lib/customers/project-domain";
+import { formatDateOnly, formatDateTime } from "@/lib/dates/usDate";
 import { supabase } from "@/lib/supabase/client";
 
 type InstallationOption = {
@@ -40,14 +41,11 @@ type CompanyStatus = {
 };
 
 function displayDateTime(value: string | null) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.valueOf())) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return formatDateTime(value);
 }
 
 function displayEventTime(event: SnapshotEvent) {
-  if (event.all_day) return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(`${event.start.slice(0, 10)}T00:00:00`));
+  if (event.all_day) return formatDateOnly(event.start.slice(0, 10));
   return displayDateTime(event.start);
 }
 
@@ -175,18 +173,18 @@ export default function ProjectCalendarTab({ projectId, canManage }: { projectId
         {canManage ? (
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div><Label htmlFor={`project-calendar-start-${projectId}`}>Start Date</Label><Input id={`project-calendar-start-${projectId}`} type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} disabled={busy} /></div>
-              <div><Label htmlFor={`project-calendar-target-${projectId}`}>Target Completion Date</Label><Input id={`project-calendar-target-${projectId}`} type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} disabled={busy} /></div>
-              <div><Label htmlFor={`project-calendar-delivery-${projectId}`}>Planned Delivery Date</Label><Input id={`project-calendar-delivery-${projectId}`} type="date" value={plannedDeliveryDate} onChange={(event) => setPlannedDeliveryDate(event.target.value)} disabled={busy} /></div>
+              <div><Label htmlFor={`project-calendar-start-${projectId}`}>Start Date</Label><DateInput id={`project-calendar-start-${projectId}`} value={startDate} onChange={setStartDate} disabled={busy} /></div>
+              <div><Label htmlFor={`project-calendar-target-${projectId}`}>Target Completion Date</Label><DateInput id={`project-calendar-target-${projectId}`} value={targetDate} onChange={setTargetDate} disabled={busy} /></div>
+              <div><Label htmlFor={`project-calendar-delivery-${projectId}`}>Planned Delivery Date</Label><DateInput id={`project-calendar-delivery-${projectId}`} value={plannedDeliveryDate} onChange={setPlannedDeliveryDate} disabled={busy} /></div>
               <div><Label htmlFor={`project-calendar-primary-${projectId}`}>Primary Installation</Label><Select id={`project-calendar-primary-${projectId}`} options={installationOptions} value={primaryInstallationId} onChange={setPrimaryInstallationId} placeholder="No Primary Installation" allowEmpty disabled={busy} /></div>
             </div>
             <Button disabled={busy} onClick={() => void saveSchedule()}>{busy ? "Saving…" : "Save Project Schedule"}</Button>
           </div>
         ) : (
           <div className={`grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4 ${ADMIN_TEXT_STYLES.body}`}>
-            <p><strong className={ADMIN_TEXT_STYLES.strong}>Start:</strong> {project.start_date || "—"}</p>
-            <p><strong className={ADMIN_TEXT_STYLES.strong}>Target:</strong> {project.target_date || "—"}</p>
-            <p><strong className={ADMIN_TEXT_STYLES.strong}>Planned Delivery:</strong> {project.planned_delivery_date || "—"}</p>
+            <p><strong className={ADMIN_TEXT_STYLES.strong}>Start:</strong> {formatDateOnly(project.start_date)}</p>
+            <p><strong className={ADMIN_TEXT_STYLES.strong}>Target:</strong> {formatDateOnly(project.target_date)}</p>
+            <p><strong className={ADMIN_TEXT_STYLES.strong}>Planned Delivery:</strong> {formatDateOnly(project.planned_delivery_date)}</p>
             <p><strong className={ADMIN_TEXT_STYLES.strong}>Primary Installation:</strong> {installations.find((item) => item.id === project.primary_installation_id)?.installation_number || "—"}</p>
           </div>
         )}

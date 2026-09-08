@@ -29,6 +29,8 @@ import {
   getCustomerReceiptReferenceData,
   type CustomerReceiptCustomerOption,
 } from "@/lib/finance/customer-receipts";
+import { formatTimestampDate } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 const pageSize = 50;
 
@@ -71,7 +73,7 @@ function money(value: number | null, currency: string) {
 function dateLabel(value: string | null) {
   if (!value) return "—";
   const normalized = value.length > 10 ? value : `${value.slice(0, 10)}T12:00:00`;
-  return new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" }).format(new Date(normalized));
+  return formatTimestampDate(normalized);
 }
 
 function bucketColor(bucket: ArAgingBucket | null) {
@@ -292,7 +294,7 @@ export default function FinanceArAgingManager() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div>
             <Label htmlFor="ar-aging-as-of">As of date</Label>
-            <Input id="ar-aging-as-of" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
+            <DateInput id="ar-aging-as-of" value={asOf} onChange={(event) => setAsOf(event)} />
           </div>
           <div>
             <Label htmlFor="ar-aging-customer">Customer</Label>

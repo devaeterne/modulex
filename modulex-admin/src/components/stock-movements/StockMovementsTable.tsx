@@ -20,6 +20,7 @@ import {
 import { hasPermission } from "@/lib/auth/permissions";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type MovementType =
   | "in"
@@ -59,10 +60,7 @@ type BadgeColor = "primary" | "success" | "error" | "warning" | "info" | "light"
 type MovementModalMode = "details" | "reverse";
 
 const numberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+const dateFormatter = { format: (value: string | Date) => formatDateTime(value) };
 
 const formatNumber = (value: number | string | null | undefined) =>
   numberFormatter.format(Number(value ?? 0));

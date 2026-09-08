@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import type { LeadAssignee, StoreLead, StoreLeadActivity, StoreLeadStatus } from "@/lib/store/leads";
+import { formatDateTime, formatTimestampDate } from "@/lib/dates/usDate";
 
 const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
 const textareaClass = `${inputClass} h-auto min-h-32`;
@@ -32,13 +33,13 @@ type DealerConversionResult = {
 
 function formatDate(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function formatDateOnly(value: string | null) {
   if (!value) return "—";
   const parsed = new Date(`${value}T00:00:00Z`);
-  return Number.isNaN(parsed.getTime()) ? value : new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(parsed);
+  return Number.isNaN(parsed.getTime()) ? value : formatTimestampDate(parsed, { timeZone: "UTC" });
 }
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {

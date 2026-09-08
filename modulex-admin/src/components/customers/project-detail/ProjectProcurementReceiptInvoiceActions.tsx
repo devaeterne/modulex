@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateOnly } from "@/lib/dates/usDate";
 import { useState } from "react";
 import Label from "@/components/form/Label";
 import Select from "@/components/form/Select";
@@ -21,6 +22,7 @@ import {
   loadProjectProcurementDeliveryEvents,
   type ProjectProcurementDeliveryEvent,
 } from "@/lib/customers/project-procurement-deliveries";
+import DateInput from "@/components/form/DateInput";
 
 type Props = {
   requirement: ProjectProcurementRequirement;
@@ -185,7 +187,7 @@ export default function ProjectProcurementReceiptInvoiceActions({
 
   const deliveryOptions = deliveryEvents.map((event) => ({
     value: event.id,
-    label: `${event.deliveredDate} — ${event.effectiveQuantity} available to correct`,
+    label: `${formatDateOnly(event.deliveredDate)} — ${event.effectiveQuantity} available to correct`,
   }));
 
   return (
@@ -217,7 +219,7 @@ export default function ProjectProcurementReceiptInvoiceActions({
           <div className="pr-12"><h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Record Delivery</h3><p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>Delivery updates Project procurement receipt status only. It does not create warehouse stock.</p></div>
           <div className="grid gap-4 md:grid-cols-2">
             <div><Label htmlFor={`received-qty-${requirement.id}`}>Received Quantity</Label><Input id={`received-qty-${requirement.id}`} type="number" min="0" step="0.0001" value={receivedQuantity} onChange={(event) => setReceivedQuantity(event.target.value)} /></div>
-            <div><Label htmlFor={`delivery-date-${requirement.id}`}>Delivery Date</Label><Input id={`delivery-date-${requirement.id}`} type="date" value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} /></div>
+            <div><Label htmlFor={`delivery-date-${requirement.id}`}>Delivery Date</Label><DateInput id={`delivery-date-${requirement.id}`} value={deliveryDate} onChange={(event) => setDeliveryDate(event)} /></div>
             <div className="md:col-span-2"><Label htmlFor={`delivery-notes-${requirement.id}`}>Notes</Label><Input id={`delivery-notes-${requirement.id}`} value={deliveryNotes} onChange={(event) => setDeliveryNotes(event.target.value)} /></div>
           </div>
           <div className="flex justify-end gap-3"><Button variant="outline" disabled={saving} onClick={() => setReceiptTarget(null)}>Cancel</Button><Button disabled={saving || Number(receivedQuantity) <= 0 || !deliveryDate} onClick={() => void saveReceipt()}>{saving ? "Saving…" : "Record Delivery"}</Button></div>
@@ -244,7 +246,7 @@ export default function ProjectProcurementReceiptInvoiceActions({
           <div className="pr-12"><h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Add Vendor Invoice</h3><p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>Vendor Invoice Total is the whole vendor invoice. Invoice Cost is only the amount allocated to this Project/product. Payment status stays in Finance.</p></div>
           <div className="grid gap-4 md:grid-cols-2">
             <div><Label htmlFor={`invoice-no-${requirement.id}`}>Invoice No</Label><Input id={`invoice-no-${requirement.id}`} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} /></div>
-            <div><Label htmlFor={`invoice-date-${requirement.id}`}>Invoice Date</Label><Input id={`invoice-date-${requirement.id}`} type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></div>
+            <div><Label htmlFor={`invoice-date-${requirement.id}`}>Invoice Date</Label><DateInput id={`invoice-date-${requirement.id}`} value={invoiceDate} onChange={(event) => setInvoiceDate(event)} /></div>
             <div><Label htmlFor={`invoice-total-${requirement.id}`}>Vendor Invoice Total</Label><Input id={`invoice-total-${requirement.id}`} type="number" min="0" step="0.01" value={invoiceTotal} onChange={(event) => setInvoiceTotal(event.target.value)} /></div>
             <div><Label htmlFor={`invoice-currency-${requirement.id}`}>Currency</Label><Input id={`invoice-currency-${requirement.id}`} maxLength={3} value={invoiceCurrency} onChange={(event) => setInvoiceCurrency(event.target.value.toUpperCase())} /></div>
             <div><Label htmlFor={`invoiced-qty-${requirement.id}`}>Invoiced Quantity</Label><Input id={`invoiced-qty-${requirement.id}`} type="number" min="0" step="0.0001" value={invoicedQuantity} onChange={(event) => setInvoicedQuantity(event.target.value)} /></div>

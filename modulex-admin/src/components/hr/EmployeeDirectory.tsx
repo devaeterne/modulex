@@ -21,6 +21,8 @@ import {
   type HrEmployee,
   type HrPosition,
 } from "@/lib/hr/types";
+import { formatDateTime, formatDateOnly } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 type EmployeeForm = {
   first_name: string;
@@ -323,7 +325,7 @@ export default function EmployeeDirectory() {
                   <TableCell variant="admin">{departmentName(employee.department_id)}</TableCell>
                   <TableCell variant="admin">{positionName(employee.position_id)}</TableCell>
                   <TableCell variant="admin">{managerName(employee.manager_id)}</TableCell>
-                  <TableCell variant="admin">{employee.hire_date || "—"}</TableCell>
+                  <TableCell variant="admin">{formatDateOnly(employee.hire_date)}</TableCell>
                   <TableCell variant="admin"><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => void openPayments(employee)}>Payments</Button><Button size="sm" variant="outline" onClick={() => openEdit(employee)}>Edit</Button></div></TableCell>
                 </TableRow>
               ))}
@@ -344,7 +346,7 @@ export default function EmployeeDirectory() {
                 <Field label="Work Email"><Input type="email" value={form.work_email} onChange={(event) => setForm({ ...form, work_email: event.target.value })} /></Field>
                 <Field label="Personal Email"><Input type="email" value={form.personal_email} onChange={(event) => setForm({ ...form, personal_email: event.target.value })} /></Field>
                 <Field label="Phone"><Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></Field>
-                <Field label="Date of Birth"><Input type="date" value={form.date_of_birth} onChange={(event) => setForm({ ...form, date_of_birth: event.target.value })} /></Field>
+                <Field label="Date of Birth"><DateInput value={form.date_of_birth} onChange={(event) => setForm({ ...form, date_of_birth: event })} /></Field>
               </div>
             </FormSection>
 
@@ -352,12 +354,12 @@ export default function EmployeeDirectory() {
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Field label="Status"><Select options={statusOptions} value={form.employment_status} onChange={(value) => setForm({ ...form, employment_status: value as EmploymentStatus })} /></Field>
                 <Field label="Employment Type"><Select options={employmentTypeOptions} value={form.employment_type} onChange={(value) => setForm({ ...form, employment_type: value as EmploymentType })} /></Field>
-                <Field label="Hire Date"><Input type="date" value={form.hire_date} onChange={(event) => setForm({ ...form, hire_date: event.target.value })} /></Field>
+                <Field label="Hire Date"><DateInput value={form.hire_date} onChange={(event) => setForm({ ...form, hire_date: event })} /></Field>
                 <Field label="Department"><Select options={departmentOptions} value={form.department_id} allowEmpty placeholder="No department" onChange={(value) => setForm({ ...form, department_id: value, position_id: positions.find((position) => position.id === form.position_id && (!value || position.department_id === value)) ? form.position_id : "" })} /></Field>
                 <Field label="Position"><Select options={positionOptions} value={form.position_id} allowEmpty placeholder="No position" onChange={(value) => setForm({ ...form, position_id: value })} /></Field>
                 <Field label="Manager"><Select options={managerOptions} value={form.manager_id} allowEmpty placeholder="No manager" onChange={(value) => setForm({ ...form, manager_id: value })} /></Field>
                 <Field label="Work Location"><Input value={form.work_location} onChange={(event) => setForm({ ...form, work_location: event.target.value })} /></Field>
-                <Field label="Termination Date"><Input type="date" value={form.termination_date} onChange={(event) => setForm({ ...form, termination_date: event.target.value })} /></Field>
+                <Field label="Termination Date"><DateInput value={form.termination_date} onChange={(event) => setForm({ ...form, termination_date: event })} /></Field>
                 <Field label="Termination Reason"><Input value={form.termination_reason} onChange={(event) => setForm({ ...form, termination_reason: event.target.value })} /></Field>
               </div>
             </FormSection>
@@ -389,7 +391,7 @@ export default function EmployeeDirectory() {
               <TableBody variant="admin">
                 {paymentsLoading ? <TableStateRow colSpan={6}>Loading Finance payment history...</TableStateRow> : payments.length === 0 ? <TableStateRow colSpan={6}>No posted Finance payments are linked to this employee.</TableStateRow> : payments.map((payment) => (
                   <TableRow key={`${payment.transaction_id}-${payment.payroll_item_id ?? "employee"}`}>
-                    <TableCell variant="admin">{new Date(payment.transaction_at).toLocaleString()}</TableCell>
+                    <TableCell variant="admin">{formatDateTime(payment.transaction_at)}</TableCell>
                     <TableCell variant="admin"><div className="font-medium">{payment.reference_no || payment.transaction_kind.replaceAll("_", " ")}</div><div className="text-xs">{payment.transaction_id}</div></TableCell>
                     <TableCell variant="admin">{payment.period_code || "—"}</TableCell>
                     <TableCell variant="admin">{payment.source_account_name || "—"}</TableCell>

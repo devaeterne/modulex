@@ -1,6 +1,7 @@
 import Link from "next/link";
 import PortalEmptyState from "@/components/portal/PortalEmptyState";
 import PortalPageHeader from "@/components/portal/PortalPageHeader";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 import { getDealerDocuments } from "@/lib/portal/dealer";
 
 function formatBytes(value: number | null) {
@@ -36,7 +37,7 @@ export default async function DealerDocumentsPage() {
                 {document.description ? <p className="portal-muted">{document.description}</p> : null}
                 <div className="portal-document-meta">
                   <span>{formatBytes(document.file_size_bytes)}</span>
-                  <span>{new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(document.created_at))}</span>
+                  <span>{formatTimestampDate(document.created_at)}</span>
                 </div>
               </div>
               <Link className="portal-button portal-button--secondary" href={`/dealer/documents/${document.id}/download`}>

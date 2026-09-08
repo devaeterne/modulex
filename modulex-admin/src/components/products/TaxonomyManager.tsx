@@ -18,6 +18,7 @@ import {
   TableViewport,
 } from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 type TaxonomyStatus = "active" | "inactive";
 type TaxonomyRow = {
@@ -237,7 +238,7 @@ export default function TaxonomyManager({ entityLabel, entityLabelPlural, tableN
                     </TableCell>
                     <TableCell variant="admin"><Link className="font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400" href={`/products?${tableName === "product_brands" ? "brand" : "category"}=${row.id}`}>{row.product_count ?? 0}</Link></TableCell>
                     <TableCell variant="admin"><Badge color={row.status === "active" ? "success" : "light"} size="sm">{row.status === "active" ? "Active" : "Inactive"}</Badge></TableCell>
-                    <TableCell variant="admin" className="text-gray-500 dark:text-gray-400">{new Date(row.updated_at).toLocaleDateString()}</TableCell>
+                    <TableCell variant="admin" className="text-gray-500 dark:text-gray-400">{formatTimestampDate(row.updated_at)}</TableCell>
                     <TableCell variant="admin"><div className="flex justify-end gap-2">{editingId === row.id ? <><Button size="sm" onClick={() => void saveEdit(row)} disabled={savingId === row.id}>Save</Button><Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditingName(""); }}>Cancel</Button></> : <><Button size="sm" variant="outline" onClick={() => { setEditingId(row.id); setEditingName(row.name); }}>Edit</Button><Button size="sm" variant="outline" onClick={() => void toggleStatus(row)} disabled={savingId === row.id}>{row.status === "active" ? "Deactivate" : "Activate"}</Button><Button size="sm" variant="outline" onClick={() => setPendingDelete(row)} disabled={savingId === row.id}>Delete</Button></>}</div></TableCell>
                   </TableRow>
                 ))}

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type NotificationRow = {
   id: string;
@@ -36,7 +37,7 @@ function label(value: string) {
 
 function dateTime(value: string | null) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 export default function EmailNotificationQueueManager() {

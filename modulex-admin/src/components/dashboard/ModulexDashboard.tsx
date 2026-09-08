@@ -16,6 +16,7 @@ import {
   TableRow,
   TableViewport,
 } from "@/components/ui/table";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type DashboardKpis = {
   total_products: number;
@@ -74,10 +75,7 @@ const numberFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
 });
 
-const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
-});
+const dateTimeFormatter = { format: (value: string | Date) => formatDateTime(value) };
 
 let dashboardLoadPromise: Promise<DashboardLoadResult> | null = null;
 

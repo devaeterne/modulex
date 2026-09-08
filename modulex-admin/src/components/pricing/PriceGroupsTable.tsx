@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { hasPermission } from "@/lib/auth/permissions";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 type PriceGroup = {
   id: string;
@@ -957,11 +958,7 @@ export default function PriceGroupsTable() {
                           {/* Updated */}
 
                           <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(
-                              group.updated_at
-                            ).toLocaleDateString(
-                              "en-US"
-                            )}
+                            {formatTimestampDate(group.updated_at)}
                           </td>
 
                           {/* Actions */}

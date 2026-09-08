@@ -8,6 +8,7 @@ import type {
   CustomerInstallation,
   CustomerInstallationStatus,
 } from "@/lib/customers/installation-types";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type Row = CustomerInstallation & {
   customer_name?: string | null;
@@ -35,10 +36,7 @@ function dateTime(value: string | null | undefined) {
     return "—";
   }
 
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function statusClass(status: CustomerInstallationStatus) {

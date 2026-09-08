@@ -27,6 +27,7 @@ import type {
   CustomerOrderStatus,
   CustomerOrderStatusHistory,
 } from "@/lib/customers/types";
+import { formatDateTime, formatTimestampDate } from "@/lib/dates/usDate";
 
 const STATUSES: CustomerOrderStatus[] = [
   "draft",
@@ -55,12 +56,12 @@ function money(value: string | number | null | undefined, currency = "USD") {
 
 function date(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value));
+  return formatTimestampDate(value);
 }
 
 function dateTime(value: string | null | undefined) {
   if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 function titleCase(value: string) {

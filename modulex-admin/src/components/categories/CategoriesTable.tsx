@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { formatTimestampDate } from "@/lib/dates/usDate";
 
 type CategoryStatus = "active" | "inactive";
 
@@ -322,9 +323,7 @@ export default function CategoriesTable() {
                         </td>
 
                         <td className="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(category.updated_at).toLocaleDateString(
-                            "en-US"
-                          )}
+                          {formatTimestampDate(category.updated_at)}
                         </td>
 
                         <td className="px-5 py-4">

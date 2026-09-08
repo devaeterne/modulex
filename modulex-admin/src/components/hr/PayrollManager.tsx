@@ -23,6 +23,8 @@ import {
   type FinancePayrollObligation,
 } from "@/lib/finance/payroll";
 import { supabase } from "@/lib/supabase/client";
+import { formatTimestampDate, formatDateOnly } from "@/lib/dates/usDate";
+import DateInput from "@/components/form/DateInput";
 
 type Period = {
   id: string;
@@ -345,7 +347,7 @@ export default function PayrollManager() {
   const selectedPeriod = periods.find((period) => period.id === periodId);
   const periodOptions = periods.map((period) => ({
     value: period.id,
-    label: `${period.period_code} · ${period.period_start} → ${period.period_end} · Pay ${period.pay_date}`,
+    label: `${period.period_code} · ${formatDateOnly(period.period_start)} → ${formatDateOnly(period.period_end)} · Pay ${formatDateOnly(period.pay_date)}`,
   }));
   const runOptions = runs
     .filter((run) => !periodId || run.payroll_period_id === periodId)
@@ -428,17 +430,16 @@ export default function PayrollManager() {
               </Field>
             </div>
             <Field label="Start">
-              <Input type="date" value={start} onChange={(event) => setStart(event.target.value)} required />
+              <DateInput value={start} onChange={(event) => setStart(event)} required />
             </Field>
             <Field label="End">
-              <Input type="date" value={end} onChange={(event) => setEnd(event.target.value)} required />
+              <DateInput value={end} onChange={(event) => setEnd(event)} required />
             </Field>
             <div className="md:col-span-2">
               <Field label="Pay date">
-                <Input
-                  type="date"
+                <DateInput
                   value={payDate}
-                  onChange={(event) => setPayDate(event.target.value)}
+                  onChange={(event) => setPayDate(event)}
                   required
                 />
               </Field>
@@ -493,7 +494,7 @@ export default function PayrollManager() {
           </div>
           {selectedPeriod ? (
             <p className="text-xs">
-              {selectedPeriod.period_code} · {selectedPeriod.status} · Pay date {selectedPeriod.pay_date}
+              {selectedPeriod.period_code} · {selectedPeriod.status} · Pay date {formatDateOnly(selectedPeriod.pay_date)}
             </p>
           ) : null}
           {selectedRun?.status === "paid" ? (
@@ -591,7 +592,7 @@ export default function PayrollManager() {
                         </Badge>
                         {settlement.latest_payment_at ? (
                           <div className="mt-1 text-xs">
-                            {new Date(settlement.latest_payment_at).toLocaleDateString()}
+                            {formatTimestampDate(settlement.latest_payment_at)}
                           </div>
                         ) : null}
                       </TableCell>
