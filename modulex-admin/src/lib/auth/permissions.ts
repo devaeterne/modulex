@@ -28,6 +28,7 @@ export type Permission =
   | "customers.manage"
   | "projects.view"
   | "projects.manage"
+  | "projects.import"
   | "calendar.view"
   | "calendar.manage"
   | "project_payments.view"
@@ -81,6 +82,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "customers.manage": "Manage customer records",
   "projects.view": "View customer projects",
   "projects.manage": "Create & change customer projects",
+  "projects.import": "Import historical customer projects",
   "calendar.view": "View Admin calendars & schedules",
   "calendar.manage": "Manage Admin calendars, owners & Google bindings",
   "project_payments.view": "View Project customer collection status",
@@ -246,6 +248,7 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/roles" || path.startsWith("/roles/"), permission: "roles.manage" },
   { match: (path) => path === "/users" || path.startsWith("/users/"), permission: "users.view" },
   { match: (path) => path === "/calendar" || path.startsWith("/calendar/"), permission: "calendar.view" },
+  { match: (path) => path === "/projects/import" || path.startsWith("/projects/import/"), permission: "projects.import" },
   { match: (path) => path === "/projects" || path.startsWith("/projects/"), permission: "projects.view" },
   { match: (path) => path === "/store/leads", permission: "leads.view" },
   { match: (path) => path.startsWith("/store/leads/"), permission: "leads.manage" },
