@@ -12,6 +12,7 @@ import Button from "@/components/ui/button/Button";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { hasPermission } from "@/lib/auth/permissions";
+import { formatDateOnly } from "@/lib/dates/usDate";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import {
   clearVendorPaymentInstrument,
@@ -456,7 +457,7 @@ export default function FinanceVendorPaymentsManager() {
               <TableHeader variant="admin"><TableRow><TableCell isHeader variant="admin">Bill allocation</TableCell><TableCell isHeader variant="admin">Bill date</TableCell><TableCell isHeader variant="admin">Due</TableCell><TableCell isHeader variant="admin" className="text-right">Amount</TableCell></TableRow></TableHeader>
               <TableBody variant="admin">
                 {detail.bill_allocations.length === 0 ? <TableStateRow colSpan={4}>No bill allocation. This Vendor Payment is currently Unapplied.</TableStateRow> : detail.bill_allocations.map((allocation, index) => (
-                  <TableRow key={String(allocation.id ?? index)}><TableCell variant="admin">{String(allocation.invoice_number ?? allocation.invoice_id ?? "—")}</TableCell><TableCell variant="admin">{String(allocation.invoice_date ?? "—")}</TableCell><TableCell variant="admin">{String(allocation.due_date ?? "—")}</TableCell><TableCell variant="admin" className="text-right">{money(Number(allocation.amount_delta ?? 0), String(detail.transaction.currency_code || "USD"))}</TableCell></TableRow>
+                  <TableRow key={String(allocation.id ?? index)}><TableCell variant="admin">{String(allocation.invoice_number ?? allocation.invoice_id ?? "—")}</TableCell><TableCell variant="admin">{formatDateOnly(typeof allocation.invoice_date === "string" ? allocation.invoice_date : null)}</TableCell><TableCell variant="admin">{formatDateOnly(typeof allocation.due_date === "string" ? allocation.due_date : null)}</TableCell><TableCell variant="admin" className="text-right">{money(Number(allocation.amount_delta ?? 0), String(detail.transaction.currency_code || "USD"))}</TableCell></TableRow>
                 ))}
               </TableBody>
             </Table>
