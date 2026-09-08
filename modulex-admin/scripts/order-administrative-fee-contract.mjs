@@ -11,11 +11,13 @@ function read(relativePath) {
   return fs.readFileSync(absolute, "utf8");
 }
 
-const migration = [
+const baseMigration = [
   read("modulex-store/supabase/migrations/20260908150000_customer_order_administrative_fee.sql"),
   read("modulex-store/supabase/migrations/20260908150500_customer_order_administrative_fee_defaults.sql"),
   read("modulex-store/supabase/migrations/20260908151000_customer_order_visible_pricing_rpc.sql"),
 ].join("\n");
+const revenueTruthMigration = read("modulex-store/supabase/migrations/20260908153000_customer_order_administrative_fee_revenue_truth.sql");
+const migration = `${baseMigration}\n${revenueTruthMigration}`;
 const settingsTypes = read("modulex-admin/src/lib/settings/types.ts");
 const settingsUi = read("modulex-admin/src/components/settings/AdministrativeFeeSettings.tsx");
 const orderTypes = read("modulex-admin/src/lib/customers/types.ts");
@@ -45,6 +47,19 @@ assert.match(migration, /base_sell_amount[\s\S]{0,1400}administrative_fee_amount
 assert.match(migration, /customer_order_visible_line_pricing/i, "Migration must expose one canonical customer-visible line-pricing helper/projection");
 assert.match(migration, /line_no/i, "Visible-line allocation must use stable line order");
 assert.match(migration, /base_allocated_cents|fee_allocated_cents/i, "Visible-line allocation must explicitly handle deterministic cent remainder");
+
+// Revenue/profitability truth must use Base Sell + Administrative Fee, never tax or the legacy payment adjustment.
+assert.match(revenueTruthMigration, /get_customer_project_financial_summary[\s\S]*customer_visible_sell_amount/i, "Project financial summary must use fee-inclusive pre-tax sell revenue");
+assert.match(revenueTruthMigration, /assess_customer_order[\s\S]*customer_visible_sell_amount/i, "Order margin assessment must use fee-inclusive pre-tax sell revenue");
+assert.match(revenueTruthMigration, /get_customer_project_change_order_summary[\s\S]*customer_visible_sell_amount/i, "Change Order canonical revenue must include Administrative Fee");
+assert.match(revenueTruthMigration, /link_customer_project_change_order_revision[\s\S]*customer_visible_sell_amount/i, "Change Order revision deltas must read the Administrative Fee sell snapshot");
+assert.match(revenueTruthMigration, /order_snapshot\s*\?\s*'customer_visible_sell_amount'/i, "Historical revision snapshots must fall back safely when the new sell snapshot field is absent");
+assert.doesNotMatch(revenueTruthMigration, /project_commission_scope_basis|project_commission_gross_profit_basis/i, "Administrative Fee revenue hardening must not reinterpret the PB-6 employee commission ledger");
+
+// Explicit overrides must be present before Sales assessment and before approval-key identity is built.
+assert.match(revenueTruthMigration, /create\s+or\s+replace\s+function\s+private\.create_customer_order\([\s\S]*p_administrative_fee_percent[\s\S]*create_customer_order_core[\s\S]*administrative_fee_percent\s*=\s*v_fee[\s\S]*assess_customer_order/i, "Create & Confirm must apply the explicit Administrative Fee before Sales risk assessment");
+assert.match(revenueTruthMigration, /create\s+or\s+replace\s+function\s+private\.update_customer_order\([\s\S]*p_administrative_fee_percent[\s\S]*'administrative_fee_percent'\s*,\s*v_fee/i, "Confirmed revision approval identity must include the proposed Administrative Fee");
+assert.match(revenueTruthMigration, /update\s+public\.customer_orders[\s\S]{0,800}administrative_fee_percent\s*=\s*v_fee[\s\S]{0,1800}assess_customer_order/i, "Direct Draft revisions must apply Administrative Fee before Sales assessment");
 
 // Create/edit boundaries use Administrative Fee separately; legacy payment commission is not repurposed.
 assert.match(orderDomain, /administrativeFeePercent/i, "Order domain input must expose Administrative Fee percent");
