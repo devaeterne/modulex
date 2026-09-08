@@ -11,6 +11,7 @@ on:
       - "modulex-admin/sql/vendor-catalog-sync*.sql"
       - "modulex-admin/sql/stone-vendor-catalog-foundation.sql"
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
+      - "modulex-admin/scripts/vendor-catalog-adapter-behavior-contract.mjs"
       - "modulex-admin/scripts/dynamic-stone-adapter-contract.mjs"
       - "modulex-admin/scripts/stone-vendor-catalog-contract.mjs"
       - "modulex-admin/scripts/stone-media-approval-contract.mjs"
@@ -35,6 +36,7 @@ on:
       - "modulex-admin/sql/vendor-catalog-sync*.sql"
       - "modulex-admin/sql/stone-vendor-catalog-foundation.sql"
       - "modulex-admin/scripts/vendor-catalog-sync-contract.mjs"
+      - "modulex-admin/scripts/vendor-catalog-adapter-behavior-contract.mjs"
       - "modulex-admin/scripts/dynamic-stone-adapter-contract.mjs"
       - "modulex-admin/scripts/stone-vendor-catalog-contract.mjs"
       - "modulex-admin/scripts/stone-media-approval-contract.mjs"
@@ -73,6 +75,7 @@ jobs:
           cache-dependency-path: modulex-admin/package-lock.json
       - run: npm ci
       - run: node scripts/vendor-catalog-sync-contract.mjs
+      - run: node scripts/vendor-catalog-adapter-behavior-contract.mjs
       - run: node scripts/dynamic-stone-adapter-contract.mjs
       - run: node scripts/stone-vendor-catalog-contract.mjs
       - run: node scripts/stone-media-approval-contract.mjs
