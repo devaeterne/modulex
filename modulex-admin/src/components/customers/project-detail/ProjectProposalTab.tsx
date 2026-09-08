@@ -235,7 +235,12 @@ export default function ProjectProposalTab({ projectId }: { projectId: string })
             canManage={editable}
             onChanged={refreshSelected}
           />
-          <ProjectProposalRevisionHistory revisions={proposal.revisions} />
+          <ProjectProposalRevisionHistory
+            projectId={projectId}
+            proposalId={proposal.id}
+            proposalNumber={proposal.proposalNumber}
+            revisions={proposal.revisions}
+          />
         </>
       ) : (
         <ComponentCard title="Proposal Revision" desc="The selected Proposal has no readable Revision.">
