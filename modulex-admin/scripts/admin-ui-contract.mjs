@@ -144,4 +144,67 @@ for (const role of ["sales", "finance", "hr", "warehouse", "shipping"]) {
   assert.ok(roleBlock.includes('"updates.view"'), `${role} must be able to view product updates`);
 }
 
+function assertOrdered(source, labels, context) {
+  let previous = -1;
+  for (const label of labels) {
+    const current = source.indexOf(`name: "${label}"`, previous + 1);
+    assert.ok(current >= 0, `${context} must include ${label}`);
+    assert.ok(current > previous, `${context} must keep ${label} in the intended position`);
+    previous = current;
+  }
+}
+
+const operationsBlock = sidebar.split("const managementItems")[0];
+const managementBlock = sidebar.split("const managementItems")[1]?.split("function filterItems")[0] ?? "";
+
+assertOrdered(
+  operationsBlock,
+  ["Dashboard", "Customers", "Projects", "Calendar", "Products", "Pricing", "Inventory", "Warehouse", "QR Operations", "Request Center", "What's New"],
+  "Operations navigation",
+);
+assertOrdered(
+  managementBlock,
+  ["Finance", "Personnel", "Reports", "Store", "Users", "General Settings"],
+  "Management navigation",
+);
+
+const semanticIcons = [
+  ["Dashboard", "GridIcon"],
+  ["Customers", "GroupIcon"],
+  ["Projects", "FolderIcon"],
+  ["Calendar", "CalenderIcon"],
+  ["Products", "BoxCubeIcon"],
+  ["Pricing", "DollarLineIcon"],
+  ["Inventory", "BoxIconLine"],
+  ["Warehouse", "BoxIcon"],
+  ["QR Operations", "BoltIcon"],
+  ["Request Center", "TaskIcon"],
+  ["What's New", "ShootingStarIcon"],
+  ["Finance", "DollarLineIcon"],
+  ["Personnel", "UserCircleIcon"],
+  ["Reports", "PieChartIcon"],
+  ["Store", "PageIcon"],
+  ["Users", "UserIcon"],
+  ["General Settings", "GridIcon"],
+];
+
+for (const [name, icon] of semanticIcons) {
+  assert.match(
+    sidebar,
+    new RegExp(`icon: <${icon} \\/>[\\s\\S]{0,120}name: "${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}"`),
+    `${name} must use ${icon}`,
+  );
+}
+
+assertOrdered(
+  operationsBlock,
+  ["Pricing Dashboard", "Product Prices", "Price Groups", "Material Bands", "Countertop Configuration", "Countertop Catalog", "Additional Services", "Countertop Setup"],
+  "Pricing navigation",
+);
+assertOrdered(
+  managementBlock,
+  ["Site Content", "Company", "Pages", "Cabinet Content", "Product Content", "Color Options", "Projects", "Media Library", "Reviews", "Leads & Dealer Apps", "Lead Form Options", "Marketing & Analytics"],
+  "Store navigation",
+);
+
 console.log("Admin UI consistency contract: PASS");
