@@ -49,29 +49,34 @@ export default function SearchableSelect({
 }: SearchableSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchChangeRef = useRef(onSearchChange);
   const listboxId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const hasRemoteSearch = Boolean(onSearchChange);
+
+  useEffect(() => {
+    searchChangeRef.current = onSearchChange;
+  }, [onSearchChange]);
 
   const selected = options.find((option) => option.value === value);
   const filteredOptions = useMemo(() => {
-    if (onSearchChange) return options;
+    if (hasRemoteSearch) return options;
     const normalized = query.trim().toLowerCase();
     if (!normalized) return options;
     return options.filter((option) => option.label.toLowerCase().includes(normalized));
-  }, [onSearchChange, options, query]);
+  }, [hasRemoteSearch, options, query]);
 
   useEffect(() => {
     if (!isOpen) return;
     searchRef.current?.focus();
-    if (onSearchChange) onSearchChange("");
-  }, [isOpen, onSearchChange]);
+  }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !onSearchChange) return;
-    const timeout = window.setTimeout(() => onSearchChange(query), 250);
+    if (!isOpen || !hasRemoteSearch) return;
+    const timeout = window.setTimeout(() => searchChangeRef.current?.(query), 250);
     return () => window.clearTimeout(timeout);
-  }, [isOpen, onSearchChange, query]);
+  }, [hasRemoteSearch, isOpen, query]);
 
   useEffect(() => {
     if (!isOpen) return;
