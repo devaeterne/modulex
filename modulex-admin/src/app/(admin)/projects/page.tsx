@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ProjectsWorkspace from "@/components/customers/ProjectsWorkspace";
+import ProjectHistoricalImportShortcut from "@/components/projects/ProjectHistoricalImportShortcut";
 
 export const metadata: Metadata = {
   title: "Projects | Modulex Admin",
@@ -11,6 +12,7 @@ export default function ProjectsPage() {
   return (
     <div>
       <PageBreadcrumb pageTitle="Projects" />
+      <ProjectHistoricalImportShortcut />
       <ProjectsWorkspace />
     </div>
   );
