@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatDateTime } from "@/lib/dates/usDate";
 import { supabase } from "@/lib/supabase/client";
 
 type LookupOption = { id: string; label: string };
@@ -534,7 +535,7 @@ export default function ProjectHistoricalImportManager() {
       {committed ? (
         <section className="rounded-2xl border border-success-200 bg-success-50 p-5 text-success-800 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-300">
           <p className="font-semibold">Import committed</p>
-          <p className="mt-1 text-sm">{review.batch.committed_at ? `Committed at ${review.batch.committed_at}` : "The batch is committed and cannot be committed again."}</p>
+          <p className="mt-1 text-sm">{review.batch.committed_at ? `Committed at ${formatDateTime(review.batch.committed_at)}` : "The batch is committed and cannot be committed again."}</p>
         </section>
       ) : null}
     </div>
