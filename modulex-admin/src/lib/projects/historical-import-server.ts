@@ -46,6 +46,24 @@ async function rpc(
   return data as JsonRecord;
 }
 
+export function inspectHistoricalProjectWorkbook(input: {
+  bytes: Buffer;
+  sheet?: string | null;
+  defaultStatus: string;
+}) {
+  const defaultStatus = ensureStatus(input.defaultStatus);
+  const extraction = extractHistoricalProjectWorkbook(input.bytes, {
+    sheet: input.sheet,
+    defaultStatus,
+  });
+  return {
+    sheet: extraction.sheet,
+    sheets: extraction.sheets,
+    headers: extraction.headers,
+    row_count: extraction.rows.length,
+  };
+}
+
 export async function stageHistoricalProjectWorkbook(input: {
   accessToken: string;
   sourceName: string;
