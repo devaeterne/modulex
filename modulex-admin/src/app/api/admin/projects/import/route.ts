@@ -2,6 +2,7 @@ import { jsonError, requirePermission } from "@/lib/auth/admin-api";
 import {
   commitHistoricalProjectImport,
   dryRunHistoricalProjectImport,
+  inspectHistoricalProjectWorkbook,
   lookupHistoricalProjectImportCandidates,
   mapHistoricalProjectImportRow,
   reviewHistoricalProjectImport,
@@ -52,9 +53,23 @@ async function handleMultipart(request: Request, token: string) {
   if (file.size <= 0) throw new Error("PROJECT_IMPORT_EMPTY_WORKBOOK");
   if (file.size > MAX_WORKBOOK_BYTES) throw new Error("PROJECT_IMPORT_WORKBOOK_TOO_LARGE");
 
+  const mode = String(form.get("mode") ?? "stage").trim().toLowerCase();
   const defaultStatus = requiredText(form.get("default_status"), "PROJECT_IMPORT_STATUS_REQUIRED");
   const sheetValue = String(form.get("sheet") ?? "").trim();
   const bytes = Buffer.from(await file.arrayBuffer());
+
+  if (mode === "inspect") {
+    return response({
+      ok: true,
+      inspection: inspectHistoricalProjectWorkbook({
+        bytes,
+        sheet: sheetValue || null,
+        defaultStatus,
+      }),
+    });
+  }
+  if (mode !== "stage") throw new Error("PROJECT_IMPORT_UPLOAD_MODE_INVALID");
+
   const result = await stageHistoricalProjectWorkbook({
     accessToken: token,
     sourceName: file.name,
