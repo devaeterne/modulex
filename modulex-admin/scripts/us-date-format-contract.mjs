@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,13 +44,13 @@ function rawDateDisplays(source) {
     const lastClosedTag = source.lastIndexOf(">", index);
     if (lastClosedTag <= lastOpenTag) continue;
 
-    findings.push(member);
+    findings.push({ member, index });
   }
   return findings;
 }
 
-assert.deepEqual(rawDateDisplays('<td>{row.due_date || "—"}</td>'), ["row.due_date"]);
-assert.deepEqual(rawDateDisplays('<p>Reviewed · {review.review_date}</p>'), ["review.review_date"]);
+assert.deepEqual(rawDateDisplays('<td>{row.due_date || "—"}</td>').map((item) => item.member), ["row.due_date"]);
+assert.deepEqual(rawDateDisplays('<p>Reviewed · {review.review_date}</p>').map((item) => item.member), ["review.review_date"]);
 assert.deepEqual(rawDateDisplays('<td>{formatDateOnly(row.due_date)}</td>'), []);
 assert.deepEqual(rawDateDisplays('<DateInput value={row.due_date} onChange={() => {}} />'), []);
 
@@ -70,20 +70,26 @@ async function walk(directory) {
     if (!entry.isFile() || !/\.(?:tsx|jsx)$/.test(entry.name)) continue;
 
     const source = await readFile(absolutePath, "utf8");
-    for (const member of rawDateDisplays(source)) {
-      const expressionIndex = source.indexOf(member);
-      const line = expressionIndex === -1 ? 1 : source.slice(0, expressionIndex).split(/\r?\n/).length;
-      rawFindings.push(`${path.relative(root, absolutePath)}:${line} ${member}`);
+    for (const finding of rawDateDisplays(source)) {
+      const line = source.slice(0, finding.index).split(/\r?\n/).length;
+      rawFindings.push({ path: path.relative(root, absolutePath).replaceAll("\\", "/"), line, member: finding.member });
     }
   }
 }
 
 for (const presentationRoot of presentationRoots) await walk(presentationRoot);
 
+if (rawFindings.length) {
+  const diagnostics = rawFindings
+    .map((finding) => `${finding.path}:${finding.line}:1 [raw-date-display] ${finding.member} must use a shared MM.DD.YYYY formatter`)
+    .join("\n");
+  await writeFile(path.join(root, "admin-ui-strict.log"), `${diagnostics}\n`, "utf8");
+}
+
 assert.deepEqual(
   rawFindings,
   [],
-  `Human-facing date fields must use shared MM.DD.YYYY formatters instead of rendering canonical values directly:\n${rawFindings.join("\n")}`,
+  `Human-facing date fields must use shared MM.DD.YYYY formatters instead of rendering canonical values directly:\n${rawFindings.map((finding) => `${finding.path}:${finding.line} ${finding.member}`).join("\n")}`,
 );
 
 console.log("PASS: Admin deterministic US date format contract");
