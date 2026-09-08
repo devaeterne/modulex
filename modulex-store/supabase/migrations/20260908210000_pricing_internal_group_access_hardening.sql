@@ -2,9 +2,13 @@
 -- Order/Project commercial selection paths must use only non-internal price groups.
 
 update public.price_groups
-set internal_only = true
+set internal_only = true,
+    available_for_orders = false
 where lower(btrim(name)) in ('cost', 'fob')
-  and internal_only is distinct from true;
+  and (
+    internal_only is distinct from true
+    or available_for_orders is distinct from false
+  );
 
 drop policy if exists price_groups_select_internal on public.price_groups;
 create policy price_groups_select_internal
