@@ -21,6 +21,7 @@ const permissions = read("src/lib/auth/permissions.ts");
 const sidebar = read("src/layout/AppSidebar.tsx");
 const projectDomain = read("src/lib/customers/project-domain.ts");
 const projectProgressDomain = read("src/lib/customers/project-progress.ts");
+const administrativeFeeOrderDomain = read("src/lib/customers/order-administrative-fee-domain.ts");
 const projectsPage = read("src/app/(admin)/projects/page.tsx");
 const projectsWorkspace = read("src/components/customers/ProjectsWorkspace.tsx");
 const projectDetailPage = read("src/app/(admin)/projects/[id]/page.tsx");
@@ -62,7 +63,12 @@ assert(projectDetailPage.includes("PageBreadCrumb"), "Project detail must use th
 assert(projectDetail.includes("projectId="), "Project detail must launch new Orders with Project context");
 assert(newOrderPage.includes("searchParams"), "New Order page must accept Project query context");
 assert(newOrderPage.includes("projectId={projectId}"), "New Order page must pass projectId into the shared Order form");
-assert(newOrder.includes("createProjectCustomerOrder"), "New Order must use the Project-aware create boundary when projectId is present");
+assert(
+  newOrder.includes("createCustomerOrderWithAdministrativeFee") &&
+    administrativeFeeOrderDomain.includes("input.projectId") &&
+    administrativeFeeOrderDomain.includes('.rpc("create_project_customer_order"'),
+  "New Order must preserve the Project-aware create boundary when projectId is present"
+);
 assert(newOrder.includes("projectId?: string | null"), "New Order form must accept an optional projectId without breaking standalone creation");
 assert(orderDetailPage.includes("CustomerOrderProjectLink"), "Order detail must expose its Project when linked");
 
