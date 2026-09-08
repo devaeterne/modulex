@@ -64,7 +64,7 @@ assert.match(addressMigration, /historical_excel/i, "historical address snapshot
 assert.match(addressMigration, /legacy_text/i, "historical address text must be retained in the Project snapshot");
 assert.match(addressMigration, /current_setting\s*\(\s*['"]modulex\.customer_project_import['"]\s*,\s*true\s*\)/i, "new historical snapshots must require the canonical import context");
 assert.match(addressMigration, /set_config\s*\(\s*['"]modulex\.customer_project_import['"]\s*,\s*['"]on['"]\s*,\s*true\s*\)/i, "commit RPC must enable the historical snapshot context only transaction-locally");
-assert.match(addressMigration, /project_address_snapshot\s*=\s*jsonb_build_object\s*\([\s\S]*['"]legacy_text['"][\s\S]*['"]source['"]\s*,\s*['"]historical_excel['"]/i, "commit RPC must persist the legacy address snapshot instead of silently losing it");
+assert.match(addressMigration, /project_address_snapshot\s*=\s*jsonb_build_object\s*\([\s\S]*['"]legacy_text['"][\s\S]*['"]address_line_1['"][\s\S]*['"]source['"]\s*,\s*['"]historical_excel['"]/i, "commit RPC must preserve legacy text in a snapshot shape existing Project readers can render");
 assert.doesNotMatch(addressMigration, /insert\s+into\s+public\.customer_addresses/i, "PB-9 must not invent canonical Customer Address rows from unstructured legacy text");
 
 for (const header of [
