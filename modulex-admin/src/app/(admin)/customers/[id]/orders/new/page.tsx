@@ -10,14 +10,27 @@ export const metadata: Metadata = {
 export default async function NewCustomerOrderPage({
   searchParams,
 }: {
-  searchParams: Promise<{ projectId?: string }>;
+  searchParams: Promise<{
+    projectId?: string;
+    proposalRevisionId?: string;
+    proposalAreaIds?: string;
+  }>;
 }) {
-  const { projectId = null } = await searchParams;
+  const {
+    projectId = null,
+    proposalRevisionId = null,
+    proposalAreaIds = "",
+  } = await searchParams;
+  const selectedProposalAreaIds = proposalAreaIds.split(",").map((value) => value.trim()).filter(Boolean);
 
   return (
     <div>
       <PageBreadcrumb pageTitle="New Customer Order" />
-      <NewCustomerOrder projectId={projectId} />
+      <NewCustomerOrder
+        projectId={projectId}
+        proposalRevisionId={proposalRevisionId}
+        proposalAreaIds={selectedProposalAreaIds}
+      />
     </div>
   );
 }
