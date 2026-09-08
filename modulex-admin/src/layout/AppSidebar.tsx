@@ -6,16 +6,23 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
+  BoltIcon,
   BoxCubeIcon,
+  BoxIcon,
+  BoxIconLine,
+  CalenderIcon,
   ChevronDownIcon,
+  DollarLineIcon,
+  FolderIcon,
   GridIcon,
+  GroupIcon,
   HorizontaLDots,
-  ListIcon,
   PageIcon,
   PieChartIcon,
-  TableIcon,
+  ShootingStarIcon,
+  TaskIcon,
   UserCircleIcon,
-  DollarLineIcon,
+  UserIcon,
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
@@ -40,8 +47,26 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { icon: <GridIcon />, name: "Dashboard", path: "/", permission: "dashboard.view", exact: true },
-  { icon: <PageIcon />, name: "Request Center", path: "/requests", permission: "requests.view", exact: true },
-  { icon: <PageIcon />, name: "What's New", path: "/updates", permission: "updates.view", exact: true },
+  {
+    icon: <GroupIcon />,
+    name: "Customers",
+    subItems: [
+      { name: "Dashboard", path: "/customers/dashboard", permission: "customers.view" },
+      { name: "Customer List", path: "/customers", permission: "customers.view", exact: true },
+      { name: "Orders", path: "/customers/orders", permission: "orders.view" },
+      { name: "Shipments", path: "/customers/shipments", permission: "shipments.view" },
+      { name: "Installations", path: "/customers/installations", permission: "installations.view" },
+    ],
+  },
+  {
+    icon: <FolderIcon />,
+    name: "Projects",
+    subItems: [
+      { name: "Project List", path: "/projects", permission: "projects.view", exact: true },
+      { name: "Project Imports", path: "/projects/import", permission: "projects.import", exact: true },
+    ],
+  },
+  { icon: <CalenderIcon />, name: "Calendar", path: "/calendar", permission: "calendar.view" },
   {
     icon: <BoxCubeIcon />,
     name: "Products",
@@ -61,36 +86,16 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Pricing Dashboard", path: "/pricing/dashboard", permission: "pricing.view" },
       { name: "Product Prices", path: "/pricing/products", permission: "pricing.view" },
+      { name: "Price Groups", path: "/pricing/groups", permission: "pricing.manage" },
       { name: "Material Bands", path: "/pricing/material-bands", permission: "pricing.view" },
       { name: "Countertop Configuration", path: "/pricing/countertop", permission: "pricing.manage", exact: true },
       { name: "Countertop Catalog", path: "/pricing/countertop/catalog", permission: "pricing.manage" },
       { name: "Additional Services", path: "/pricing/countertop/services", permission: "pricing.manage", exact: true },
       { name: "Countertop Setup", path: "/pricing/countertop/settings", permission: "pricing.manage" },
-      { name: "Price Groups", path: "/pricing/groups", permission: "pricing.manage" },
     ],
   },
   {
-    icon: <UserCircleIcon />,
-    name: "Customers",
-    subItems: [
-      { name: "Dashboard", path: "/customers/dashboard", permission: "customers.view" },
-      { name: "Customer List", path: "/customers", permission: "customers.view", exact: true },
-      { name: "Orders", path: "/customers/orders", permission: "orders.view" },
-      { name: "Shipments", path: "/customers/shipments", permission: "shipments.view" },
-      { name: "Installations", path: "/customers/installations", permission: "installations.view" },
-    ],
-  },
-  {
-    icon: <PageIcon />,
-    name: "Projects",
-    subItems: [
-      { name: "Project List", path: "/projects", permission: "projects.view", exact: true },
-      { name: "Project Imports", path: "/projects/import", permission: "projects.import", exact: true },
-    ],
-  },
-  { icon: <PageIcon />, name: "Calendar", path: "/calendar", permission: "calendar.view" },
-  {
-    icon: <TableIcon />,
+    icon: <BoxIconLine />,
     name: "Inventory",
     subItems: [
       { name: "Stock Overview", path: "/inventory", permission: "inventory.view" },
@@ -99,7 +104,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    icon: <ListIcon />,
+    icon: <BoxIcon />,
     name: "Warehouse",
     subItems: [
       { name: "Warehouses", path: "/warehouses", permission: "warehouse.view" },
@@ -108,7 +113,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    icon: <PageIcon />,
+    icon: <BoltIcon />,
     name: "QR Operations",
     subItems: [
       { name: "QR Labels", path: "/qr-labels", permission: "qr.view" },
@@ -116,29 +121,11 @@ const navItems: NavItem[] = [
       { name: "Shelf Inventory", path: "/shelf-inventory", permission: "qr.manage" },
     ],
   },
+  { icon: <TaskIcon />, name: "Request Center", path: "/requests", permission: "requests.view", exact: true },
+  { icon: <ShootingStarIcon />, name: "What's New", path: "/updates", permission: "updates.view", exact: true },
 ];
 
 const managementItems: NavItem[] = [
-  {
-    icon: <UserCircleIcon />,
-    name: "Personnel",
-    subItems: [
-      { name: "Overview", path: "/personnel", permission: "personnel.view", exact: true },
-      { name: "Employees", path: "/personnel/employees", permission: "personnel.view", new: true },
-      { name: "Attendance", path: "/personnel/attendance", permission: "personnel.view" },
-      { name: "Leave & PTO", path: "/personnel/leave", permission: "personnel.view" },
-      { name: "Compensation", path: "/personnel/compensation", permission: "personnel.view" },
-      { name: "Payroll", path: "/personnel/payroll", permission: "personnel.view" },
-      { name: "Benefits", path: "/personnel/benefits", permission: "personnel.view" },
-      { name: "Documents", path: "/personnel/documents", permission: "personnel.view" },
-      { name: "Compliance & Emergency", path: "/personnel/compliance", permission: "personnel.view" },
-      { name: "Onboarding & Offboarding", path: "/personnel/lifecycle", permission: "personnel.view" },
-      { name: "Performance", path: "/personnel/performance", permission: "personnel.view" },
-      { name: "HR Reports", path: "/personnel/reports", permission: "personnel.view" },
-      { name: "Departments", path: "/personnel/departments", permission: "personnel.manage" },
-      { name: "Positions", path: "/personnel/positions", permission: "personnel.manage" },
-    ],
-  },
   {
     icon: <DollarLineIcon />,
     name: "Finance",
@@ -165,19 +152,31 @@ const managementItems: NavItem[] = [
     ],
   },
   {
+    icon: <UserCircleIcon />,
+    name: "Personnel",
+    subItems: [
+      { name: "Overview", path: "/personnel", permission: "personnel.view", exact: true },
+      { name: "Employees", path: "/personnel/employees", permission: "personnel.view", new: true },
+      { name: "Attendance", path: "/personnel/attendance", permission: "personnel.view" },
+      { name: "Leave & PTO", path: "/personnel/leave", permission: "personnel.view" },
+      { name: "Compensation", path: "/personnel/compensation", permission: "personnel.view" },
+      { name: "Payroll", path: "/personnel/payroll", permission: "personnel.view" },
+      { name: "Benefits", path: "/personnel/benefits", permission: "personnel.view" },
+      { name: "Documents", path: "/personnel/documents", permission: "personnel.view" },
+      { name: "Compliance & Emergency", path: "/personnel/compliance", permission: "personnel.view" },
+      { name: "Onboarding & Offboarding", path: "/personnel/lifecycle", permission: "personnel.view" },
+      { name: "Performance", path: "/personnel/performance", permission: "personnel.view" },
+      { name: "HR Reports", path: "/personnel/reports", permission: "personnel.view" },
+      { name: "Departments", path: "/personnel/departments", permission: "personnel.manage" },
+      { name: "Positions", path: "/personnel/positions", permission: "personnel.manage" },
+    ],
+  },
+  {
     icon: <PieChartIcon />,
     name: "Reports",
     subItems: [
       { name: "Inventory Reports", path: "/reports/inventory", permission: "reports.view" },
       { name: "Movement Reports", path: "/reports/movements", permission: "reports.view" },
-    ],
-  },
-  {
-    icon: <UserCircleIcon />,
-    name: "Users",
-    subItems: [
-      { name: "User Management", path: "/users", permission: "users.view" },
-      { name: "Roles & Access", path: "/roles", permission: "roles.manage" },
     ],
   },
   {
@@ -188,14 +187,22 @@ const managementItems: NavItem[] = [
       { name: "Company", path: "/store/company", permission: "store.manage", exact: true },
       { name: "Pages", path: "/store/pages", permission: "store.manage", exact: true },
       { name: "Cabinet Content", path: "/store/cabinet-content", permission: "store.manage", exact: true },
-      { name: "Reviews", path: "/store/reviews", permission: "store.manage", exact: true },
-      { name: "Projects", path: "/store/projects", permission: "store.manage", exact: true },
-      { name: "Media Library", path: "/store/media", permission: "store.manage", exact: true },
-      { name: "Marketing & Analytics", path: "/store/marketing", permission: "store.manage", exact: true },
       { name: "Product Content", path: "/store/products", permission: "store.view", exact: true },
       { name: "Color Options", path: "/store/colors", permission: "store.manage", exact: true },
+      { name: "Projects", path: "/store/projects", permission: "store.manage", exact: true },
+      { name: "Media Library", path: "/store/media", permission: "store.manage", exact: true },
+      { name: "Reviews", path: "/store/reviews", permission: "store.manage", exact: true },
       { name: "Leads & Dealer Apps", path: "/store/leads", permission: "leads.view", exact: true },
       { name: "Lead Form Options", path: "/store/leads/form-options", permission: "leads.manage", exact: true },
+      { name: "Marketing & Analytics", path: "/store/marketing", permission: "store.manage", exact: true },
+    ],
+  },
+  {
+    icon: <UserIcon />,
+    name: "Users",
+    subItems: [
+      { name: "User Management", path: "/users", permission: "users.view" },
+      { name: "Roles & Access", path: "/roles", permission: "roles.manage" },
     ],
   },
   {

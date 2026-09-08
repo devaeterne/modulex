@@ -6,7 +6,7 @@ const read = (relativePath) => {
   const source = fs.readFileSync(path.join(root, relativePath), "utf8");
   if (relativePath !== "src/layout/AppSidebar.tsx") return source;
   return source.replace(
-    /\n\s*\{ icon: <PageIcon \/>, name: "Calendar", path: "\/calendar", permission: "calendar\.view" \},/,
+    /\n\s*\{ icon: <[A-Za-z0-9]+Icon \/>, name: "Calendar", path: "\/calendar", permission: "calendar\.view" \},/,
     "",
   );
 };

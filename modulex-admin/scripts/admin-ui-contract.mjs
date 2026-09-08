@@ -34,11 +34,6 @@ function isSharedAppearanceOwner(file) {
   return sharedAppearancePrefixes.some((prefix) => file?.startsWith(prefix));
 }
 
-// Shared UI/form/common primitives are the reviewed owners of reusable
-// appearance. Feature/route code remains subject to the appearance guardrails.
-// Preserve legacy table shells when a changed line edits an existing table
-// without introducing another shell. A new shell still fails once its count
-// increases.
 function baselineAwareAddedText() {
   const chunks = diff.split(/^diff --git /m).slice(1);
   return chunks.map((chunk) => {
@@ -53,8 +48,6 @@ function baselineAwareAddedText() {
       baseline = execFileSync("git", ["-C", repoRoot, "show", `origin/main:${file}`], { encoding: "utf8" });
       current = fs.readFileSync(path.join(repoRoot, file), "utf8");
     } catch {
-      // New feature files have no baseline; still enforce button/component
-      // guardrails, while table viewport migration remains incremental.
       return tableShellPatterns.reduce((text, pattern) => text.replace(pattern, ""), addedChunk);
     }
     if (tableShellPatterns.every((pattern) => {
@@ -118,30 +111,77 @@ for (const [name, route, permission] of requiredSidebarEntries) {
   assert.ok(sidebar.includes(`permission: "${permission}"`), `Sidebar must protect ${name} with ${permission}`);
 }
 
-assert.match(
-  permissions,
-  /\| "updates\.view";/,
-  "Permission union must define updates.view",
-);
-assert.match(
-  permissions,
-  /"updates\.view": "View product updates"/,
-  "Permission labels must define updates.view",
-);
-assert.match(
-  permissions,
-  /path === "\/updates"[\s\S]{0,120}permission: "updates\.view"/,
-  "Route access must explicitly protect /updates with updates.view",
-);
-assert.match(
-  permissions,
-  /path === "\/settings\/general\/product-updates"[\s\S]{0,180}permission: "settings\.manage"/,
-  "Product Updates must require settings.manage before the generic settings rule",
-);
+assert.match(permissions, /\| "updates\.view";/, "Permission union must define updates.view");
+assert.match(permissions, /"updates\.view": "View product updates"/, "Permission labels must define updates.view");
+assert.match(permissions, /path === "\/updates"[\s\S]{0,120}permission: "updates\.view"/, "Route access must explicitly protect /updates with updates.view");
+assert.match(permissions, /path === "\/settings\/general\/product-updates"[\s\S]{0,180}permission: "settings\.manage"/, "Product Updates must require settings.manage before the generic settings rule");
 
 for (const role of ["sales", "finance", "hr", "warehouse", "shipping"]) {
   const roleBlock = permissions.match(new RegExp(`${role}: \\[([\\s\\S]*?)\\n  \\],`))?.[1] ?? "";
   assert.ok(roleBlock.includes('"updates.view"'), `${role} must be able to view product updates`);
 }
+
+function assertOrdered(source, labels, context) {
+  let previous = -1;
+  for (const label of labels) {
+    const current = source.indexOf(`name: "${label}"`, previous + 1);
+    assert.ok(current >= 0, `${context} must include ${label}`);
+    assert.ok(current > previous, `${context} must keep ${label} in the intended position`);
+    previous = current;
+  }
+}
+
+const operationsBlock = sidebar.split("const managementItems")[0];
+const managementBlock = sidebar.split("const managementItems")[1]?.split("function filterItems")[0] ?? "";
+
+assertOrdered(
+  operationsBlock,
+  ["Dashboard", "Customers", "Projects", "Calendar", "Products", "Pricing", "Inventory", "Warehouse", "QR Operations", "Request Center", "What's New"],
+  "Operations navigation",
+);
+assertOrdered(
+  managementBlock,
+  ["Finance", "Personnel", "Reports", "Store", "Users", "General Settings"],
+  "Management navigation",
+);
+
+const semanticIcons = [
+  ["Dashboard", "GridIcon"],
+  ["Customers", "GroupIcon"],
+  ["Projects", "FolderIcon"],
+  ["Calendar", "CalenderIcon"],
+  ["Products", "BoxCubeIcon"],
+  ["Pricing", "DollarLineIcon"],
+  ["Inventory", "BoxIconLine"],
+  ["Warehouse", "BoxIcon"],
+  ["QR Operations", "BoltIcon"],
+  ["Request Center", "TaskIcon"],
+  ["What's New", "ShootingStarIcon"],
+  ["Finance", "DollarLineIcon"],
+  ["Personnel", "UserCircleIcon"],
+  ["Reports", "PieChartIcon"],
+  ["Store", "PageIcon"],
+  ["Users", "UserIcon"],
+  ["General Settings", "GridIcon"],
+];
+
+for (const [name, icon] of semanticIcons) {
+  assert.match(
+    sidebar,
+    new RegExp(`icon: <${icon} \\/>[\\s\\S]{0,120}name: "${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}"`),
+    `${name} must use ${icon}`,
+  );
+}
+
+assertOrdered(
+  operationsBlock,
+  ["Pricing Dashboard", "Product Prices", "Price Groups", "Material Bands", "Countertop Configuration", "Countertop Catalog", "Additional Services", "Countertop Setup"],
+  "Pricing navigation",
+);
+assertOrdered(
+  managementBlock,
+  ["Site Content", "Company", "Pages", "Cabinet Content", "Product Content", "Color Options", "Projects", "Media Library", "Reviews", "Leads & Dealer Apps", "Lead Form Options", "Marketing & Analytics"],
+  "Store navigation",
+);
 
 console.log("Admin UI consistency contract: PASS");
