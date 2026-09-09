@@ -131,6 +131,22 @@ check("Finance-sensitive route rules remain protected", () => {
   assert.equal(requiredPermissionForPath("/customers/payment-methods"), "finance.manage");
 });
 
+check("Sales & Production report remains Finance-only", () => {
+  const path = "/reports/sales-production";
+  assert.equal(requiredPermissionForPath(path), "finance.view");
+  assert.equal(canAccessPath("finance", path), true);
+  assert.equal(canAccessPath("admin", path), true);
+  assert.equal(canAccessPath("super_admin", path), true);
+  assert.equal(canAccessPath("sales", path), false);
+  assert.equal(canAccessPath("hr", path), false);
+  assert.equal(canAccessPath("warehouse", path), false);
+  assert.equal(canAccessPath("shipping", path), false);
+  assert.match(
+    sidebarSource,
+    /name:\s*"Sales & Production"\s*,\s*path:\s*"\/reports\/sales-production"\s*,\s*permission:\s*"finance\.view"/,
+  );
+});
+
 check("Personnel and low-stock routes map to their dedicated permissions", () => {
   assert.equal(requiredPermissionForPath("/personnel/employees"), "personnel.view");
   assert.equal(requiredPermissionForPath("/personnel/departments"), "personnel.manage");
