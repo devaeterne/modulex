@@ -192,7 +192,9 @@ export default function SalesProductionReport() {
           variant="error"
           title="Sales & Production report unavailable"
           message={error}
-          action={<Button size="sm" variant="outline" onClick={() => void loadReport()}>Retry</Button>}
+          showLink
+          linkHref="/reports/sales-production"
+          linkText="Reload report"
         />
       ) : null}
 
