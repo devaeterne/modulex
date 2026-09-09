@@ -4,14 +4,19 @@ import { resolve } from "node:path";
 
 const root = process.cwd();
 const migrationsDir = resolve(root, "../modulex-store/supabase/migrations");
-const migrationName = readdirSync(migrationsDir)
+const migrationNames = readdirSync(migrationsDir)
+  .filter((name) => name.includes("dynamic_stone") && name.endsWith(".sql"))
+  .sort();
+const routingMigrationName = migrationNames
   .filter((name) => name.endsWith("_dynamic_stone_cost_routing.sql"))
-  .sort()
   .at(-1);
 
-assert.ok(migrationName, "Dynamic Stone cost routing migration must exist");
+assert.ok(routingMigrationName, "Dynamic Stone cost routing migration must exist");
 
-const sql = readFileSync(resolve(migrationsDir, migrationName), "utf8");
+const sql = readFileSync(resolve(migrationsDir, routingMigrationName), "utf8");
+const allDynamicStoneSql = migrationNames
+  .map((name) => readFileSync(resolve(migrationsDir, name), "utf8"))
+  .join("\n\n");
 
 assert.match(sql, /new\.vendor_code\s*=\s*'dynamicstone'/i);
 assert.match(sql, /lower\(btrim\(name\)\)\s*=\s*'cost'/i);
@@ -32,5 +37,20 @@ assert.ok(baseLookup > dynamicBranch);
 // Other vendors retain the base List Price route.
 assert.match(sql, /is_base_price\s*=\s*true/i);
 assert.match(sql, /insert\s+into\s+public\.product_prices/i);
+
+// Approved + linked Dynamic Stone rows must refresh Cost whenever a later vendor sync changes
+// the normalized vendor price or currency. Otherwise already-approved products keep stale Cost.
+assert.match(
+  allDynamicStoneSql,
+  /after\s+update\s+of\s+[\s\S]*?vendor_price_reference[\s\S]*?vendor_currency[\s\S]*?on\s+public\.vendor_catalog_items/i
+);
+assert.match(
+  allDynamicStoneSql,
+  /new\.review_status\s*=\s*'APPROVED'[\s\S]*?new\.canonical_product_id\s+is\s+not\s+null/i
+);
+assert.match(
+  allDynamicStoneSql,
+  /old\.vendor_price_reference\s+is\s+distinct\s+from\s+new\.vendor_price_reference/i
+);
 
 console.log("dynamic stone Cost price-group routing contract: ok");
