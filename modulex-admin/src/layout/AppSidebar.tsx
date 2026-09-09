@@ -175,6 +175,7 @@ const managementItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Reports",
     subItems: [
+      { name: "Sales & Production", path: "/reports/sales-production", permission: "finance.view", new: true },
       { name: "Inventory Reports", path: "/reports/inventory", permission: "reports.view" },
       { name: "Movement Reports", path: "/reports/movements", permission: "reports.view" },
     ],

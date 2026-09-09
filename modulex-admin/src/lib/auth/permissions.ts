@@ -336,6 +336,7 @@ const ROUTE_RULES: Array<{ match: (pathname: string) => boolean; permission: Per
   { match: (path) => path === "/warehouses" || path.startsWith("/warehouses/") || path === "/zones" || path.startsWith("/zones/") || path === "/locations" || path.startsWith("/locations/"), permission: "warehouse.view" },
   { match: (path) => path === "/qr-labels" || path.startsWith("/qr-labels/"), permission: "qr.view" },
   { match: (path) => path === "/scan" || path.startsWith("/scan/") || path === "/shelf-inventory" || path.startsWith("/shelf-inventory/"), permission: "qr.manage" },
+  { match: (path) => path === "/reports/sales-production" || path.startsWith("/reports/sales-production/"), permission: "finance.view" },
   { match: (path) => path === "/reports" || path.startsWith("/reports/"), permission: "reports.view" },
   { match: (path) => path === "/", permission: "dashboard.view" },
 ];
