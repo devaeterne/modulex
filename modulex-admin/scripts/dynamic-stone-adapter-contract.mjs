@@ -93,7 +93,8 @@ const adapter = new DynamicStoneAdapter({
         <main id="product_detail">
           <h1>PrimaSink HM-3018ADA 30 x 18 Single bowl Handmade Kitchen Sink</h1>
           <meta name="description" content="ADA single bowl handmade kitchen sink" />
-          <span class="oe_currency_value">129,50</span>
+          <span class="oe_price">$ <span class="oe_currency_value">129,50</span></span>
+          <del class="text-muted">$ <span class="oe_currency_value">161,88</span></del>
           <table>
             <tr><td>Model</td><td>HM-3018ADA</td></tr>
             <tr><td>Brand</td><td>PrimaSink</td></tr>
