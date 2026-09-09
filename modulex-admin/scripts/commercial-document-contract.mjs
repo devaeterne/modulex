@@ -57,6 +57,13 @@ if (exists("src/components/documents/CommercialDocument.tsx")) {
   expect(component.includes("const showDiscount = document.lines.some((item) => Boolean(item.discount.trim()));"), "CommercialDocument must derive discount-column visibility from non-empty line discounts");
   expect(/showDiscount\s*\?\s*<TableCell[^>]*>Discount<\/TableCell>\s*:\s*null/.test(component), "A4 preview/print must hide the Discount header when no line has a discount");
   expect(/showDiscount\s*\?\s*<TableCell[^>]*>\{item\.discount\}<\/TableCell>\s*:\s*null/.test(component), "A4 preview/print must hide the Discount cells when the discount column is absent");
+  expect(component.includes("commercial-document-header"), "CommercialDocument print must expose a stable header layout hook");
+  expect(component.includes("commercial-document-title-meta"), "CommercialDocument print must expose a stable title/meta layout hook");
+  expect(component.includes("commercial-document-parties"), "CommercialDocument print must expose a stable party layout hook");
+  expect(component.includes(".commercial-document-header { grid-template-columns: 1.05fr 0.9fr 0.9fr !important;"), "Print must force the desktop three-column header on A4 regardless of responsive viewport breakpoints");
+  expect(component.includes(".commercial-document-title-meta { grid-template-columns: 1fr auto !important;"), "Print must force the desktop title/meta layout on A4");
+  expect(component.includes(".commercial-document-parties-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important;"), "Print must keep bill-to, ship-to and document information in three columns");
+  expect(component.includes(".commercial-document-parties-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important;"), "Print must keep two-column party layouts intact");
 }
 
 const adminTheme = read("src/components/ui/theme/adminTheme.ts");
@@ -109,6 +116,10 @@ if (exists("src/lib/documents/pdf.ts")) {
   expect(pdf.includes("const showDiscount = document.lines.some((item) => Boolean(item.discount.trim()));"), "Downloaded PDF must derive discount-column visibility from non-empty line discounts");
   expect(pdf.includes("renderTableHeader(tableY, showDiscount)"), "Downloaded PDF must render its Discount header conditionally");
   expect(pdf.includes("renderLine(item, rowY, showDiscount)"), "Downloaded PDF must render line Discount values conditionally");
+  expect(pdf.includes("function skuRows(item: CommercialDocumentLine)"), "Downloaded PDF must wrap long SKUs into bounded rows");
+  expect(pdf.includes("splitLongToken(item.sku"), "Downloaded PDF SKU wrapping must split long unbroken Stone/Countertop SKU tokens");
+  expect(pdf.includes("const skuCount = Math.max(1, skuRows(item).length);"), "Downloaded PDF row height must account for wrapped SKU rows");
+  expect(pdf.includes("skus.forEach((row, index) =>"), "Downloaded PDF must render wrapped SKU rows separately instead of overflowing into Description");
 }
 
 const canonicalSqlPath = "sql/commercial-document-branding.sql";
