@@ -39,14 +39,24 @@ assert.match(sql, /is_base_price\s*=\s*true/i);
 assert.match(sql, /insert\s+into\s+public\.product_prices/i);
 
 // Approved + linked Dynamic Stone rows must refresh Cost whenever a later vendor sync changes
-// the normalized vendor price or currency. Otherwise already-approved products keep stale Cost.
+// the normalized vendor price or currency. The generic sync marks changed items PENDING, so the
+// price-refresh branch must key off OLD approval state rather than NEW approval state.
 assert.match(
   allDynamicStoneSql,
   /after\s+update\s+of\s+[\s\S]*?vendor_price_reference[\s\S]*?vendor_currency[\s\S]*?on\s+public\.vendor_catalog_items/i
 );
+
+// Initial approval/link propagation remains intact.
 assert.match(
   allDynamicStoneSql,
   /new\.review_status\s*=\s*'APPROVED'[\s\S]*?new\.canonical_product_id\s+is\s+not\s+null/i
+);
+
+// Later Dynamic Stone price syncs must still update Cost even when the sync transitions the
+// review state from APPROVED to PENDING because the normalized snapshot changed.
+assert.match(
+  allDynamicStoneSql,
+  /old\.review_status\s*=\s*'APPROVED'[\s\S]*?new\.vendor_code\s*=\s*'dynamicstone'[\s\S]*?new\.canonical_product_id\s+is\s+not\s+null/i
 );
 assert.match(
   allDynamicStoneSql,
