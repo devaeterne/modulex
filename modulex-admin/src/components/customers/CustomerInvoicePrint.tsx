@@ -103,6 +103,7 @@ export default function CustomerInvoicePrint() {
   const formatMoney = (value: string | number | null | undefined) => money(value, currency, locale);
   const formatDate = (value: string | null | undefined) => date(value, locale, timezone);
   const balance = Math.max(Number(invoice.total_amount ?? 0) - Number(invoice.paid_amount ?? 0), 0);
+  const discountAmount = Number(invoice.discount_amount ?? 0);
   const summariesByOrderItemId = new Map(countertopSummaries.map((summary) => [summary.orderItemId, summary]));
   const billTo = [
     customer.name,
@@ -125,7 +126,6 @@ export default function CustomerInvoicePrint() {
     information: [
       { label: "Order", value: invoice.order_number_snapshot || "—" },
       { label: "Reference", value: invoice.customer_reference || "—" },
-      { label: "Currency", value: currency },
     ],
     lines: items.map((item) => ({
       lineNo: String(item.line_no),
@@ -134,12 +134,12 @@ export default function CustomerInvoicePrint() {
       detail: lineDetail(item.order_item_id ? summariesByOrderItemId.get(item.order_item_id) : undefined, item.line_note),
       quantity: String(Number(item.quantity)),
       unitPrice: formatMoney(item.unit_price),
-      discount: `${Number(item.discount_percent).toFixed(2)}%`,
+      discount: Number(item.discount_percent) > 0 ? `${Number(item.discount_percent).toFixed(2)}%` : "",
       total: formatMoney(item.line_total),
     })),
     totals: [
       { label: "Subtotal", value: formatMoney(invoice.subtotal) },
-      { label: "Discount", value: `-${formatMoney(invoice.discount_amount)}` },
+      ...(discountAmount > 0 ? [{ label: "Discount", value: `-${formatMoney(discountAmount)}` }] : []),
       { label: `Tax (${Number(invoice.tax_rate).toFixed(2)}%)`, value: formatMoney(invoice.tax_amount) },
       ...(Number(invoice.payment_commission_amount ?? 0) > 0 ? [{ label: "Order adjustment", value: formatMoney(invoice.payment_commission_amount) }] : []),
       { label: "Total", value: formatMoney(invoice.total_amount), strong: true },
