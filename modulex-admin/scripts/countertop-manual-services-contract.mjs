@@ -11,6 +11,9 @@ const migration = migrationExists ? read(migrationPath) : "";
 const faucetCompatPath = "../modulex-store/supabase/migrations/20260909200500_countertop_faucet_zero_price_compat.sql";
 const faucetCompatExists = fs.existsSync(path.join(root, faucetCompatPath));
 const faucetCompat = faucetCompatExists ? read(faucetCompatPath) : "";
+const snapshotCompatPath = "../modulex-store/supabase/migrations/20260909201000_countertop_multi_snapshot_compat.sql";
+const snapshotCompatExists = fs.existsSync(path.join(root, snapshotCompatPath));
+const snapshotCompat = snapshotCompatExists ? read(snapshotCompatPath) : "";
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const references = read("src/components/countertop/CountertopReferenceManager.tsx");
 const summary = read("src/lib/customers/countertop-summary.ts");
@@ -40,6 +43,10 @@ assert(migration.includes("current_user_has_any_role"), "Countertop mutations mu
 assert(migration.includes("security definer") && migration.includes("security invoker"), "Countertop security boundary must remain explicit");
 assert(faucetCompatExists, "Faucet zero-price legacy compatibility migration must exist");
 assert(faucetCompat.includes("v_type <> 'sink' or pp.amount > 0"), "Only Sink must require a positive Product Price; Faucet must preserve legacy active zero-price behavior");
+assert(snapshotCompatExists, "Multi-fixture snapshot compatibility migration must exist");
+for (const token of ["trg_countertop_multi_snapshot_restore", "pricing_snapshot->'fixtures'", "manual_per_order", "Service already exists."]) {
+  assert(snapshotCompat.includes(token), `Multi-fixture snapshot compatibility contract missing: ${token}`);
+}
 
 for (const token of [
   "Material Cost (optional)", "materialCost", "manual_unit_price", "price_entry_mode",
