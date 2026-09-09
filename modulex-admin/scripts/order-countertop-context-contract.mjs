@@ -21,8 +21,8 @@ assert(/disabled=\{!canCalculate\}/.test(configurator), "Calculate price must be
 assert(configurator.includes("Inherited from the saved order"), "Countertop price group must be explained as inherited from the saved order");
 assert(configurator.includes('import Label from "@/components/form/Label"') && configurator.includes("<Label>"), "Countertop field labels must use the shared theme-aware Label primitive");
 assert(configurator.includes("products(id,name,sku,status)"), "Stone discovery must read Product lifecycle status");
-assert(configurator.includes('product.status !== "active"'), "Inactive Stone products must not appear in Order configuration");
-assert(configurator.includes('.eq("available_for_orders", true).eq("internal_only", false)'), "Countertop pricing context must only expose order-eligible commercial price groups");
+assert(/product\.status\s*!==\s*["']active["']/.test(configurator), "Inactive Stone products must not appear in Order configuration");
+assert(configurator.includes('.eq("available_for_orders",true).eq("internal_only",false)') || configurator.includes('.eq("available_for_orders", true).eq("internal_only", false)'), "Countertop pricing context must only expose order-eligible commercial price groups");
 
 assert(fs.existsSync(path.join(root, catalogRoutePath)), "Countertop Catalog route must exist");
 assert(fs.existsSync(path.join(root, catalogManagerPath)), "Countertop Catalog manager must exist");
