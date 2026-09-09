@@ -30,6 +30,7 @@ import {
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 const PAGE_SIZE = 50;
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
 type ReportTab = "overview" | "collections" | "jobs";
 
@@ -80,9 +81,12 @@ function number(value: number, maximumFractionDigits = 2) {
 }
 
 function monthLabel(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date);
+  const match = /^(\d{4})-(\d{2})-\d{2}$/.exec(value.trim());
+  if (!match) return value;
+  const year = match[1];
+  const monthIndex = Number(match[2]) - 1;
+  const month = MONTH_LABELS[monthIndex];
+  return month ? `${month} ${year}` : value;
 }
 
 function paymentLabel(status: SalesProductionPaymentStatus) {
