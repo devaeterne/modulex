@@ -76,6 +76,22 @@ function wrap(value: string, maxChars: number) {
   return rows;
 }
 
+function splitLongToken(value: string, maxChars: number) {
+  const cleaned = clean(value);
+  if (!cleaned) return [];
+  const rows: string[] = [];
+  let remaining = cleaned;
+  while (remaining.length > maxChars) {
+    const candidate = remaining.slice(0, maxChars + 1);
+    const hyphen = candidate.lastIndexOf("-");
+    const cut = hyphen >= 5 ? hyphen + 1 : maxChars;
+    rows.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut);
+  }
+  if (remaining) rows.push(remaining);
+  return rows;
+}
+
 function cropWhiteMargins(source: HTMLCanvasElement) {
   const context = source.getContext("2d");
   if (!context) return source;
@@ -206,6 +222,10 @@ function renderTableHeader(y: number, showDiscount: boolean) {
   return commands;
 }
 
+function skuRows(item: CommercialDocumentLine) {
+  return splitLongToken(item.sku, 14).slice(0, 3);
+}
+
 function descriptionRows(item: CommercialDocumentLine) {
   return wrap(item.description, 42).slice(0, 2);
 }
@@ -219,17 +239,22 @@ function detailRows(item: CommercialDocumentLine) {
 }
 
 function rowHeight(item: CommercialDocumentLine) {
+  const skuCount = Math.max(1, skuRows(item).length);
   const descriptionCount = Math.max(1, descriptionRows(item).length);
   const details = detailRows(item).length;
-  return Math.max(29, 13 + descriptionCount * 10 + details * 9);
+  const primaryRows = Math.max(skuCount, descriptionCount);
+  return Math.max(29, 13 + primaryRows * 10 + details * 9);
 }
 
 function renderLine(item: CommercialDocumentLine, y: number, showDiscount: boolean) {
   const height = rowHeight(item);
+  const skus = skuRows(item);
   const descriptions = descriptionRows(item);
   const details = detailRows(item);
   let commands = text(item.lineNo, MARGIN + 2, y, 7.5);
-  commands += text(item.sku, MARGIN + 22, y, 7.5, true);
+  skus.forEach((row, index) => {
+    commands += text(row, MARGIN + 22, y - index * 10, 7.5, true);
+  });
 
   const visibleDescriptions = descriptions.length ? descriptions : [""];
   visibleDescriptions.forEach((row, index) => {

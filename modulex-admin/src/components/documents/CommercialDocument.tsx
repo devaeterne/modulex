@@ -66,7 +66,15 @@ export default function CommercialDocument({ document, settings }: Props) {
         @page { size: A4 portrait; margin: 0; }
         @media print {
           html, body { background: #fff !important; }
-          .commercial-document-sheet { width: 210mm !important; min-height: 297mm !important; margin: 0 !important; box-shadow: none !important; }
+          .commercial-document-sheet { width: 210mm !important; min-height: 297mm !important; margin: 0 !important; box-shadow: none !important; box-sizing: border-box !important; }
+          .commercial-document-header { grid-template-columns: 1.05fr 0.9fr 0.9fr !important; align-items: center !important; }
+          .commercial-document-secondary-logo { justify-content: center !important; }
+          .commercial-document-primary-logo { justify-content: flex-end !important; }
+          .commercial-document-title-meta { grid-template-columns: 1fr auto !important; align-items: start !important; }
+          .commercial-document-title-meta-side { text-align: right !important; }
+          .commercial-document-parties-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+          .commercial-document-parties-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .commercial-document-info-right { text-align: right !important; }
           .commercial-document-table thead { display: table-header-group; }
           .commercial-document-table tr, .commercial-document-totals, .commercial-document-signatures { break-inside: avoid; page-break-inside: avoid; }
         }
@@ -85,24 +93,24 @@ export default function CommercialDocument({ document, settings }: Props) {
       </div>
 
       <article className={`commercial-document-sheet mx-auto min-h-[297mm] w-full max-w-[210mm] px-[12mm] py-[11mm] ${ADMIN_DOCUMENT_STYLES.sheet}`}>
-        <header className={`grid grid-cols-1 gap-6 border-b pb-6 sm:grid-cols-[1.05fr_0.9fr_0.9fr] sm:items-center ${ADMIN_DOCUMENT_STYLES.borderStrong}`}>
+        <header className={`commercial-document-header grid grid-cols-1 gap-6 border-b pb-6 sm:grid-cols-[1.05fr_0.9fr_0.9fr] sm:items-center ${ADMIN_DOCUMENT_STYLES.borderStrong}`}>
           <div className={`text-xs leading-[1.55] ${ADMIN_DOCUMENT_STYLES.companyText}`}>
             {addressLines.map((line, index) => <p key={`${line}-${index}`} className={index === 0 ? `font-semibold ${ADMIN_DOCUMENT_STYLES.companyStrong}` : ""}>{line}</p>)}
           </div>
           <div className="commercial-document-secondary-logo flex h-24 items-center justify-start sm:justify-center">
             {centerLogo ? <img src={centerLogo} alt={secondaryLogo ? "Secondary brand logo" : `${settings.company_name} primary logo`} className="max-h-24 max-w-[188px] origin-center scale-[1.652] object-contain" /> : <span className={`text-lg font-semibold tracking-tight ${ADMIN_DOCUMENT_STYLES.logoFallback}`}>{settings.company_name}</span>}
           </div>
-          <div className="flex min-h-16 items-center justify-start sm:justify-end">
+          <div className="commercial-document-primary-logo flex min-h-16 items-center justify-start sm:justify-end">
             {rightLogo ? <img src={rightLogo} alt={`${settings.company_name} primary logo`} className="max-h-16 max-w-[170px] object-contain" /> : null}
           </div>
         </header>
 
-        <section className={`grid gap-6 border-b py-6 sm:grid-cols-[1fr_auto] sm:items-start ${ADMIN_DOCUMENT_STYLES.borderSoft}`}>
+        <section className={`commercial-document-title-meta grid gap-6 border-b py-6 sm:grid-cols-[1fr_auto] sm:items-start ${ADMIN_DOCUMENT_STYLES.borderSoft}`}>
           <div>
             <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${ADMIN_DOCUMENT_STYLES.kicker}`}>{document.kind}</p>
             <h1 className={`mt-1 text-2xl font-semibold tracking-tight ${ADMIN_DOCUMENT_STYLES.title}`}>{document.title}</h1>
           </div>
-          <div className="min-w-[220px] sm:text-right">
+          <div className="commercial-document-title-meta-side min-w-[220px] sm:text-right">
             <p className={`text-xl font-bold tracking-tight ${ADMIN_DOCUMENT_STYLES.title}`}>{document.number}</p>
             <div className={`mt-2 space-y-1 text-xs ${ADMIN_DOCUMENT_STYLES.meta}`}>
               {document.meta.map((entry) => <p key={entry.label}><span className={`font-medium ${ADMIN_DOCUMENT_STYLES.metaLabel}`}>{entry.label}:</span> {entry.value}</p>)}
@@ -110,10 +118,10 @@ export default function CommercialDocument({ document, settings }: Props) {
           </div>
         </section>
 
-        <section className={`grid gap-8 border-b py-6 ${ADMIN_DOCUMENT_STYLES.borderSoft} ${document.shipTo ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+        <section className={`commercial-document-parties ${document.shipTo ? "commercial-document-parties-3" : "commercial-document-parties-2"} grid gap-8 border-b py-6 ${ADMIN_DOCUMENT_STYLES.borderSoft} ${document.shipTo ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           <PartyBlock party={document.billTo} />
           {document.shipTo ? <PartyBlock party={document.shipTo} /> : null}
-          <div className={document.shipTo ? "" : "sm:text-right"}>
+          <div className={document.shipTo ? "" : "commercial-document-info-right sm:text-right"}>
             <p className={`text-xs font-semibold uppercase tracking-[0.14em] ${ADMIN_DOCUMENT_STYLES.kicker}`}>Document Information</p>
             <div className={`mt-2 space-y-1 text-xs leading-5 ${ADMIN_DOCUMENT_STYLES.partyText}`}>
               {(document.information ?? []).map((entry) => <p key={entry.label}><span className={`font-medium ${ADMIN_DOCUMENT_STYLES.infoStrong}`}>{entry.label}:</span> {entry.value}</p>)}
