@@ -10,6 +10,7 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
+import ProgressBar from "@/components/ui/progress/ProgressBar";
 import {
   Table,
   TableBody,
@@ -214,8 +215,8 @@ function RankedBars({
               </div>
               <span className={`shrink-0 font-medium ${ADMIN_TEXT_STYLES.strong}`}>{item.valueText}</span>
             </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-              <div className="h-full rounded-full bg-brand-500" style={{ width: `${width}%` }} />
+            <div className="mt-2">
+              <ProgressBar value={width} label={`${item.label} relative value`} />
             </div>
           </div>
         );
@@ -474,10 +475,11 @@ export default function SalesProductionReport() {
             {loading ? (
               <p className={`py-8 text-center text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading attention items…</p>
             ) : (report?.attention.length ?? 0) === 0 ? (
-              <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-4 dark:border-success-500/30 dark:bg-success-500/10">
-                <p className="font-medium text-success-700 dark:text-success-300">No jobs currently need attention</p>
-                <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>No open or overdue receivable, missing salesperson, or missing location is present under the selected filters.</p>
-              </div>
+              <Alert
+                variant="success"
+                title="No jobs currently need attention"
+                message="No open or overdue receivable, missing salesperson, or missing location is present under the selected filters."
+              />
             ) : (
               <TableViewport>
                 <Table variant="admin" minWidth="wide">
