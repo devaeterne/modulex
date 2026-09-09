@@ -8,6 +8,9 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const migrationPath = "../modulex-store/supabase/migrations/20260909193000_countertop_manual_services_material_cost.sql";
 const migrationExists = fs.existsSync(path.join(root, migrationPath));
 const migration = migrationExists ? read(migrationPath) : "";
+const faucetCompatPath = "../modulex-store/supabase/migrations/20260909200500_countertop_faucet_zero_price_compat.sql";
+const faucetCompatExists = fs.existsSync(path.join(root, faucetCompatPath));
+const faucetCompat = faucetCompatExists ? read(faucetCompatPath) : "";
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const references = read("src/components/countertop/CountertopReferenceManager.tsx");
 const summary = read("src/lib/customers/countertop-summary.ts");
@@ -35,6 +38,8 @@ assert(migration.includes("alter column material_price_band_id drop not null"), 
 assert(migration.includes("join public.countertop_stone_types st") && migration.includes("st.is_active"), "Manual Stone pricing must fail closed on an invalid/inactive Stone Type");
 assert(migration.includes("current_user_has_any_role"), "Countertop mutations must preserve role authorization");
 assert(migration.includes("security definer") && migration.includes("security invoker"), "Countertop security boundary must remain explicit");
+assert(faucetCompatExists, "Faucet zero-price legacy compatibility migration must exist");
+assert(faucetCompat.includes("v_type <> 'sink' or pp.amount > 0"), "Only Sink must require a positive Product Price; Faucet must preserve legacy active zero-price behavior");
 
 for (const token of [
   "Material Cost (optional)", "materialCost", "manual_unit_price", "price_entry_mode",
