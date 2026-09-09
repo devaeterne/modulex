@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import SectionTitle from "@/components/common/SectionTitle";
 import SummaryRow from "@/components/common/SummaryRow";
@@ -18,80 +18,53 @@ import { parseDbDecimal } from "@/lib/validation";
 
 type Option = { value: string; label: string };
 type MaterialBandRow = { id: string; code: string; price_per_sqft: string };
-type StoneRow = {
-  id: string;
-  name: string;
-  sku?: string;
-  stone_type_id?: string;
-  material_price_band_id?: string;
-};
+type StoneRow = { id: string; name: string; sku?: string; stone_type_id?: string; material_price_band_id?: string | null };
 type CatalogProductRow = { id: string; name: string; sku?: string };
 type ServiceRow = {
-  id: string;
-  name: string;
-  pricing_method: string;
-  unit_price: string;
-  quantity: string;
-  selected: boolean;
+  id: string; name: string; pricing_method: string; unit_price: string;
+  price_entry_mode: "fixed" | "manual"; quantity: string; manual_unit_price: string; selected: boolean;
+};
+type FixtureType = "sink" | "faucet";
+type FixtureRow = {
+  localId: string; fixture_type: FixtureType; source: "modulex" | "customer_provided";
+  product_id: string; quantity: string; manual_unit_price: string; customer_description: string;
+};
+type FixtureSnapshot = {
+  fixture_type?: FixtureType; source?: string; product_id?: string | null; sku?: string; name?: string;
+  quantity?: string | number; unit_price?: string | number; subtotal?: string | number; price_source?: string;
 };
 type CountertopPriceResult = {
-  stone?: {
-    sku?: string;
-    name?: string;
-    sqft?: string | number;
-    stone_type?: string;
-    price_per_sqft?: string | number;
-    material_price_band_id?: string;
-    material_price_band?: string;
-  };
-  subtotal?: string | number;
-  material_subtotal?: string | number;
-  edge_subtotal?: string | number;
-  sink_subtotal?: string | number;
-  faucet_subtotal?: string | number;
-  services_subtotal?: string | number;
+  stone?: { sku?: string; name?: string; sqft?: string | number; stone_type?: string; price_per_sqft?: string | number; material_price_band_id?: string; material_price_band?: string };
+  subtotal?: string | number; material_subtotal?: string | number; material_cost?: string | number;
+  edge_subtotal?: string | number; sink_subtotal?: string | number; faucet_subtotal?: string | number; services_subtotal?: string | number;
+  fixtures?: FixtureSnapshot[]; sinks?: FixtureSnapshot[]; faucets?: FixtureSnapshot[];
   sink_price_source?: "price_group" | "manual_fallback" | "customer_provided" | null;
   faucet_price_source?: "price_group" | "customer_provided" | null;
-  attached?: boolean;
-  order_item_id?: string;
+  attached?: boolean; order_item_id?: string;
 };
 type ExistingConfiguration = {
-  stone_product_id: string;
-  material_price_band_id: string | null;
-  sink_product_id: string | null;
-  price_group_id: string;
-  sqft: string | number;
-  edge_profile_id: string | null;
-  edge_linear_ft: string | number;
-  slab_quantity: string | number;
-  manual_price_per_sqft: string | number | null;
-  manual_sink_price: string | number | null;
-  override_reason: string | null;
-  configuration: unknown;
-  pricing_snapshot: unknown;
+  id: string; stone_product_id: string; material_price_band_id: string | null; sink_product_id: string | null;
+  price_group_id: string; sqft: string | number; edge_profile_id: string | null; edge_linear_ft: string | number;
+  slab_quantity: string | number; manual_price_per_sqft: string | number | null; manual_sink_price: string | number | null;
+  material_cost: string | number | null; override_reason: string | null; configuration: unknown; pricing_snapshot: unknown;
 };
 type CountertopConfiguratorProps = {
-  orderId?: string;
-  orderItemId?: string;
+  orderId?: string; orderItemId?: string;
   orderContext?: { orderNumber: string; lineNo?: number; sku?: string; productName?: string };
-  onAttached?: (orderItemId: string) => void;
-  onClose?: () => void;
+  onAttached?: (orderItemId: string) => void; onClose?: () => void;
 };
 
 const CUSTOMER_PROVIDED_SINK_VALUE = "__customer_provided__";
 const CUSTOMER_PROVIDED_FAUCET_VALUE = "__customer_provided_faucet__";
-const MANUAL_SINK_PRICE_CONTRACT = {
-  precision: 18,
-  scale: 4,
-  min: 0.0001,
-  allowNull: true,
-} as const;
+const MANUAL_SINK_PRICE_CONTRACT = { precision: 18, scale: 4, min: 0.0001, allowNull: true } as const;
+const newFixture = (fixture_type: FixtureType): FixtureRow => ({
+  localId: crypto.randomUUID(), fixture_type, source: "modulex", product_id: "", quantity: "1", manual_unit_price: "", customer_description: "",
+});
 
 function money(value: string | number | undefined) {
   const amount = Number(value ?? 0);
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(Number.isFinite(amount) ? amount : 0);
 }
-
 function errorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
   if (error && typeof error === "object" && "message" in error) {
@@ -100,489 +73,191 @@ function errorMessage(error: unknown, fallback: string) {
   }
   return fallback;
 }
-
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
-
 function Field({ label, required = false, hint, children }: { label: string; required?: boolean; hint?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div>
-      <Label>{label}{required ? " *" : ""}</Label>
-      {children}
-      {hint ? <FormHint>{hint}</FormHint> : null}
-    </div>
-  );
+  return <div><Label>{label}{required ? " *" : ""}</Label>{children}{hint ? <FormHint>{hint}</FormHint> : null}</div>;
 }
-
-function priceResultFromSnapshot(value: unknown, orderItemId: string): CountertopPriceResult | null {
-  const snapshot = asRecord(value);
-  if (Object.keys(snapshot).length === 0) return null;
+function priceResultFromSnapshot(value: unknown, itemId: string): CountertopPriceResult | null {
+  const snapshot = asRecord(value); if (!Object.keys(snapshot).length) return null;
   const totals = asRecord(snapshot.totals);
-  return {
-    ...(snapshot as CountertopPriceResult),
+  return { ...(snapshot as CountertopPriceResult),
     subtotal: snapshot.subtotal as string | number | undefined ?? totals.subtotal as string | number | undefined,
     material_subtotal: snapshot.material_subtotal as string | number | undefined ?? totals.material_subtotal as string | number | undefined,
     edge_subtotal: snapshot.edge_subtotal as string | number | undefined ?? totals.edge_subtotal as string | number | undefined,
     sink_subtotal: snapshot.sink_subtotal as string | number | undefined ?? totals.sink_subtotal as string | number | undefined,
     faucet_subtotal: snapshot.faucet_subtotal as string | number | undefined ?? totals.faucet_subtotal as string | number | undefined,
     services_subtotal: snapshot.services_subtotal as string | number | undefined ?? totals.services_subtotal as string | number | undefined,
-    attached: true,
-    order_item_id: orderItemId,
-  };
+    attached: true, order_item_id: itemId };
 }
 
 export default function CountertopConfigurator({ orderId, orderItemId, orderContext, onAttached, onClose }: CountertopConfiguratorProps = {}) {
-  const [types, setTypes] = useState<Option[]>([]);
-  const [edges, setEdges] = useState<Option[]>([]);
-  const [sinks, setSinks] = useState<Option[]>([]);
-  const [sinkCatalog, setSinkCatalog] = useState<CatalogProductRow[]>([]);
-  const [faucets, setFaucets] = useState<Option[]>([]);
-  const [faucetCatalog, setFaucetCatalog] = useState<CatalogProductRow[]>([]);
-  const [priceGroups, setPriceGroups] = useState<Option[]>([]);
-  const [stones, setStones] = useState<StoneRow[]>([]);
-  const [materialBands, setMaterialBands] = useState<MaterialBandRow[]>([]);
-  const [services, setServices] = useState<ServiceRow[]>([]);
-  const [stoneTypeId, setStoneTypeId] = useState("");
-  const [stoneProductId, setStoneProductId] = useState("");
-  const [materialBandId, setMaterialBandId] = useState("");
-  const [priceGroupId, setPriceGroupId] = useState("");
-  const [edgeId, setEdgeId] = useState("");
-  const [sinkId, setSinkId] = useState("");
-  const [customerProvidedSinkCatalogId, setCustomerProvidedSinkCatalogId] = useState("");
-  const [customerProvidedSinkNote, setCustomerProvidedSinkNote] = useState("");
-  const [manualSinkPrice, setManualSinkPrice] = useState("");
-  const [faucetId, setFaucetId] = useState("");
-  const [customerProvidedFaucetCatalogId, setCustomerProvidedFaucetCatalogId] = useState("");
-  const [customerProvidedFaucetNote, setCustomerProvidedFaucetNote] = useState("");
-  const [sqft, setSqft] = useState("");
-  const [edgeLinearFt, setEdgeLinearFt] = useState("0");
-  const [slabQuantity, setSlabQuantity] = useState("1");
-  const [manualPrice, setManualPrice] = useState("");
-  const [overrideReason, setOverrideReason] = useState("");
-  const [initiationRequestId, setInitiationRequestId] = useState(() => crypto.randomUUID());
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<CountertopPriceResult | null>(null);
-  const [resolvedLineNo, setResolvedLineNo] = useState<number | null>(orderContext?.lineNo ?? null);
+  const [types,setTypes]=useState<Option[]>([]); const [edges,setEdges]=useState<Option[]>([]);
+  const [sinkCatalog,setSinkCatalog]=useState<CatalogProductRow[]>([]); const [faucetCatalog,setFaucetCatalog]=useState<CatalogProductRow[]>([]);
+  const [priceGroups,setPriceGroups]=useState<Option[]>([]); const [stones,setStones]=useState<StoneRow[]>([]);
+  const [materialBands,setMaterialBands]=useState<MaterialBandRow[]>([]); const [services,setServices]=useState<ServiceRow[]>([]);
+  const [fixtures,setFixtures]=useState<FixtureRow[]>([]);
+  const [stoneTypeId,setStoneTypeId]=useState(""); const [stoneProductId,setStoneProductId]=useState(""); const [materialBandId,setMaterialBandId]=useState("");
+  const [priceGroupId,setPriceGroupId]=useState(""); const [edgeId,setEdgeId]=useState(""); const [sqft,setSqft]=useState("");
+  const [edgeLinearFt,setEdgeLinearFt]=useState("0"); const [slabQuantity,setSlabQuantity]=useState("1"); const [manualPrice,setManualPrice]=useState("");
+  const [materialCost,setMaterialCost]=useState(""); const [overrideReason,setOverrideReason]=useState("");
+  const [initiationRequestId,setInitiationRequestId]=useState(()=>crypto.randomUUID());
+  const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false); const [error,setError]=useState<string|null>(null);
+  const [result,setResult]=useState<CountertopPriceResult|null>(null); const [resolvedLineNo,setResolvedLineNo]=useState<number|null>(orderContext?.lineNo ?? null);
+  const hasOrderPricingContext=Boolean(orderId||orderItemId);
 
-  const hasOrderPricingContext = Boolean(orderId || orderItemId);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      const [typeResult, edgeResult, sinkResult, faucetResult, profileResult, bandResult, priceGroupResult, serviceResult] = await Promise.all([
-        supabase.from("countertop_stone_types").select("id,name").eq("is_active", true).order("name"),
-        supabase.from("countertop_edge_profiles").select("id,name").eq("is_active", true).order("name"),
-        supabase.from("products").select("id,name,sku").eq("status", "active").contains("metadata", { product_kind: "sink" }).order("name"),
-        supabase.from("products").select("id,name,sku").eq("status", "active").contains("metadata", { product_kind: "faucet" }).order("name"),
-        supabase.from("countertop_stone_product_profiles").select("product_id,stone_type_id,material_price_band_id,products(id,name,sku,status)").eq("is_active", true),
-        supabase.from("countertop_material_price_bands").select("id,code,price_per_sqft").eq("is_active", true).order("sort_order").order("code"),
-        supabase.from("price_groups").select("id,name,available_for_orders,internal_only").eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
-        supabase.from("countertop_services").select("id,name,pricing_method,unit_price").eq("is_active", true).order("name"),
+  useEffect(()=>{
+    let mounted=true;
+    void (async()=>{
+      const [typeResult,edgeResult,sinkResult,faucetResult,profileResult,bandResult,priceGroupResult,serviceResult] = await Promise.all([
+        supabase.from("countertop_stone_types").select("id,name").eq("is_active",true).order("name"),
+        supabase.from("countertop_edge_profiles").select("id,name").eq("is_active",true).order("name"),
+        supabase.from("products").select("id,name,sku,product_types!inner(code)").eq("status","active").eq("product_types.code","SINK").order("name"),
+        supabase.from("products").select("id,name,sku,product_types!inner(code)").eq("status","active").eq("product_types.code","FUCST").order("name"),
+        supabase.from("countertop_stone_product_profiles").select("product_id,stone_type_id,material_price_band_id,products(id,name,sku,status)").eq("is_active",true),
+        supabase.from("countertop_material_price_bands").select("id,code,price_per_sqft").eq("is_active",true).order("sort_order").order("code"),
+        supabase.from("price_groups").select("id,name,available_for_orders,internal_only").eq("is_active",true).eq("available_for_orders",true).eq("internal_only",false).order("sort_order"),
+        supabase.from("countertop_services").select("id,name,pricing_method,unit_price,price_entry_mode").eq("is_active",true).order("name"),
       ]);
-
-      const orderItemContext = orderItemId
-        ? await supabase.from("customer_order_items").select("order_id,line_no").eq("id", orderItemId).maybeSingle()
-        : { data: null, error: null };
-      const contextOrderId = orderId ?? orderItemContext.data?.order_id ?? null;
-      const [orderPricing, existingConfigurationResult] = await Promise.all([
-        contextOrderId
-          ? supabase.from("customer_orders").select("price_group_id").eq("id", contextOrderId).maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-        orderItemId
-          ? supabase.from("countertop_configurations").select("stone_product_id,material_price_band_id,sink_product_id,price_group_id,sqft,edge_profile_id,edge_linear_ft,slab_quantity,manual_price_per_sqft,manual_sink_price,override_reason,configuration,pricing_snapshot").eq("order_item_id", orderItemId).maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+      const orderItemContext=orderItemId ? await supabase.from("customer_order_items").select("order_id,line_no").eq("id",orderItemId).maybeSingle() : {data:null,error:null};
+      const contextOrderId=orderId ?? orderItemContext.data?.order_id ?? null;
+      const [orderPricing,existingResult]=await Promise.all([
+        contextOrderId ? supabase.from("customer_orders").select("price_group_id").eq("id",contextOrderId).maybeSingle() : Promise.resolve({data:null,error:null}),
+        orderItemId ? supabase.from("countertop_configurations").select("id,stone_product_id,material_price_band_id,sink_product_id,price_group_id,sqft,edge_profile_id,edge_linear_ft,slab_quantity,manual_price_per_sqft,manual_sink_price,material_cost,override_reason,configuration,pricing_snapshot").eq("order_item_id",orderItemId).maybeSingle() : Promise.resolve({data:null,error:null}),
       ]);
-
-      if (!mounted) return;
+      if(!mounted)return;
+      const referenceError=[typeResult,edgeResult,sinkResult,faucetResult,profileResult,bandResult,priceGroupResult,serviceResult].find((entry)=>entry.error)?.error ?? orderItemContext.error ?? orderPricing.error ?? existingResult.error;
+      if(referenceError)setError(errorMessage(referenceError,"Countertop reference data could not be loaded."));
       setResolvedLineNo(orderContext?.lineNo ?? orderItemContext.data?.line_no ?? null);
-      const referenceError = [typeResult, edgeResult, sinkResult, faucetResult, profileResult, bandResult, priceGroupResult, serviceResult].find((entry) => entry.error)?.error
-        ?? orderItemContext.error
-        ?? orderPricing.error
-        ?? existingConfigurationResult.error;
-      if (referenceError) setError(errorMessage(referenceError, "Countertop reference data could not be loaded."));
 
-      const mappedStones = (profileResult.data ?? []).flatMap((row) => {
-        const product = Array.isArray(row.products) ? row.products[0] : row.products;
-        if (!product || product.status !== "active") return [];
-        return [{
-          id: row.product_id,
-          name: product.name ?? "",
-          sku: product.sku ?? undefined,
-          stone_type_id: row.stone_type_id,
-          material_price_band_id: row.material_price_band_id,
-        }];
-      });
-      const mappedBands = (bandResult.data ?? []).map((row) => ({
-        id: row.id,
-        code: row.code,
-        price_per_sqft: String(row.price_per_sqft),
-      }));
-      const mappedSinks: CatalogProductRow[] = (sinkResult.data ?? []).map((row) => ({ id: row.id, name: row.name, sku: row.sku ?? undefined }));
-      const mappedFaucets: CatalogProductRow[] = (faucetResult.data ?? []).map((row) => ({ id: row.id, name: row.name, sku: row.sku ?? undefined }));
-      const baseServices = (serviceResult.data ?? []).map((row) => ({ ...row, unit_price: String(row.unit_price), quantity: "1", selected: false }));
-      const existing = existingConfigurationResult.data as ExistingConfiguration | null;
-      const savedConfiguration = asRecord(existing?.configuration);
-      const savedSnapshot = asRecord(existing?.pricing_snapshot);
-      const savedStoneSnapshot = asRecord(savedSnapshot.stone);
-      const savedServiceRows = Array.isArray(savedSnapshot.services) ? savedSnapshot.services : [];
-      const savedServiceMap = new Map(savedServiceRows.flatMap((entry) => {
-        const service = asRecord(entry);
-        const id = typeof service.service_id === "string" ? service.service_id : null;
-        return id ? [[id, String(service.quantity ?? "1")]] : [];
-      }));
+      const mappedStones=(profileResult.data??[]).flatMap((row)=>{ const product=Array.isArray(row.products)?row.products[0]:row.products; if(!product||product.status!=="active")return[]; return [{id:row.product_id,name:product.name??"",sku:product.sku??undefined,stone_type_id:row.stone_type_id,material_price_band_id:row.material_price_band_id??null}]; });
+      const mappedBands=(bandResult.data??[]).map((row)=>({id:row.id,code:row.code,price_per_sqft:String(row.price_per_sqft)}));
+      const mappedSinks:CatalogProductRow[]=(sinkResult.data??[]).map((row)=>({id:row.id,name:row.name,sku:row.sku??undefined}));
+      const mappedFaucets:CatalogProductRow[]=(faucetResult.data??[]).map((row)=>({id:row.id,name:row.name,sku:row.sku??undefined}));
+      const baseServices:ServiceRow[]=(serviceResult.data??[]).map((row)=>({id:row.id,name:row.name,pricing_method:row.pricing_method,unit_price:String(row.unit_price),price_entry_mode:row.price_entry_mode === "manual" ? "manual" : "fixed",quantity:"1",manual_unit_price:"",selected:false}));
+      const existing=existingResult.data as ExistingConfiguration|null; const savedSnapshot=asRecord(existing?.pricing_snapshot); const savedStoneSnapshot=asRecord(savedSnapshot.stone);
+      const savedServiceRows=Array.isArray(savedSnapshot.services)?savedSnapshot.services:[];
+      const savedServiceMap=new Map(savedServiceRows.flatMap((entry)=>{const s=asRecord(entry); const id=typeof s.service_id==="string"?s.service_id:null; return id?[[id,{quantity:String(s.quantity??"1"),manual_unit_price:s.price_source==="manual_per_order"?String(s.unit_price??s.manual_unit_price??""):""}]]:[];}));
 
-      setTypes((typeResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
-      setEdges((edgeResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
-      setSinkCatalog(mappedSinks);
-      setSinks([
-        { value: CUSTOMER_PROVIDED_SINK_VALUE, label: "Customer Provides" },
-        ...mappedSinks.map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name })),
-      ]);
-      setFaucetCatalog(mappedFaucets);
-      setFaucets([
-        { value: CUSTOMER_PROVIDED_FAUCET_VALUE, label: "Customer Provides" },
-        ...mappedFaucets.map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name })),
-      ]);
-      setPriceGroups((priceGroupResult.data ?? []).map((row) => ({ value: row.id, label: row.name })));
-      setStones(mappedStones);
-      setMaterialBands(mappedBands);
-      setServices(baseServices.map((service) => savedServiceMap.has(service.id)
-        ? { ...service, selected: true, quantity: savedServiceMap.get(service.id) ?? "1" }
-        : service));
+      setTypes((typeResult.data??[]).map((row)=>({value:row.id,label:row.name}))); setEdges((edgeResult.data??[]).map((row)=>({value:row.id,label:row.name})));
+      setSinkCatalog(mappedSinks); setFaucetCatalog(mappedFaucets); setPriceGroups((priceGroupResult.data??[]).map((row)=>({value:row.id,label:row.name})));
+      setStones(mappedStones); setMaterialBands(mappedBands);
+      setServices(baseServices.map((service)=>{const saved=savedServiceMap.get(service.id); return saved?{...service,selected:true,...saved}:service;}));
 
-      if (existing) {
-        const savedStone = mappedStones.find((stone) => stone.id === existing.stone_product_id);
-        const snapshotBandId = typeof savedStoneSnapshot.material_price_band_id === "string" ? savedStoneSnapshot.material_price_band_id : null;
-        const isCustomerProvidedSink = savedConfiguration.sink_source === "customer_provided";
-        const isCustomerProvidedFaucet = savedConfiguration.faucet_source === "customer_provided";
-        const savedFaucetProductId = typeof savedConfiguration.faucet_product_id === "string" ? savedConfiguration.faucet_product_id : "";
-        setStoneProductId(existing.stone_product_id);
-        setStoneTypeId(savedStone?.stone_type_id ?? "");
-        setMaterialBandId(existing.material_price_band_id || snapshotBandId || savedStone?.material_price_band_id || "");
-        setPriceGroupId(existing.price_group_id || orderPricing.data?.price_group_id || "");
-        setSqft(String(existing.sqft));
-        setEdgeId(existing.edge_profile_id ?? "");
-        setEdgeLinearFt(String(existing.edge_linear_ft ?? 0));
-        setSinkId(isCustomerProvidedSink ? CUSTOMER_PROVIDED_SINK_VALUE : (existing.sink_product_id ?? ""));
-        setCustomerProvidedSinkCatalogId(isCustomerProvidedSink && typeof savedConfiguration.customer_provided_sink_product_id === "string" ? savedConfiguration.customer_provided_sink_product_id : "");
-        setCustomerProvidedSinkNote(isCustomerProvidedSink && typeof savedConfiguration.customer_provided_sink_note === "string" ? savedConfiguration.customer_provided_sink_note : "");
-        setManualSinkPrice(isCustomerProvidedSink || existing.manual_sink_price === null ? "" : String(existing.manual_sink_price));
-        setFaucetId(isCustomerProvidedFaucet ? CUSTOMER_PROVIDED_FAUCET_VALUE : savedFaucetProductId);
-        setCustomerProvidedFaucetCatalogId(isCustomerProvidedFaucet && typeof savedConfiguration.customer_provided_faucet_product_id === "string" ? savedConfiguration.customer_provided_faucet_product_id : "");
-        setCustomerProvidedFaucetNote(isCustomerProvidedFaucet && typeof savedConfiguration.customer_provided_faucet_note === "string" ? savedConfiguration.customer_provided_faucet_note : "");
-        setSlabQuantity(String(existing.slab_quantity ?? 1));
-        setManualPrice(existing.manual_price_per_sqft === null ? "" : String(existing.manual_price_per_sqft));
-        setOverrideReason(existing.override_reason ?? "");
-        setResult(priceResultFromSnapshot(existing.pricing_snapshot, orderItemId ?? ""));
-      } else {
-        setPriceGroupId(contextOrderId ? (orderPricing.data?.price_group_id ?? "") : (priceGroupResult.data?.[0]?.id ?? ""));
-      }
+      if(existing){
+        const savedStone=mappedStones.find((stone)=>stone.id===existing.stone_product_id); const snapshotBandId=typeof savedStoneSnapshot.material_price_band_id==="string"?savedStoneSnapshot.material_price_band_id:null;
+        setStoneProductId(existing.stone_product_id); setStoneTypeId(savedStone?.stone_type_id??""); setMaterialBandId(existing.material_price_band_id||snapshotBandId||savedStone?.material_price_band_id||"");
+        setPriceGroupId(existing.price_group_id||orderPricing.data?.price_group_id||""); setSqft(String(existing.sqft)); setEdgeId(existing.edge_profile_id??""); setEdgeLinearFt(String(existing.edge_linear_ft??0));
+        setSlabQuantity(String(existing.slab_quantity??1)); setManualPrice(existing.manual_price_per_sqft===null?"":String(existing.manual_price_per_sqft)); setMaterialCost(existing.material_cost===null?"":String(existing.material_cost)); setOverrideReason(existing.override_reason??"");
+        const fixtureResult=await supabase.from("countertop_configuration_fixtures").select("id,fixture_type,source,product_id,quantity,manual_unit_price,customer_description,sort_order").eq("configuration_id",existing.id).order("sort_order").order("id");
+        if(!mounted)return;
+        if(fixtureResult.error)setError(errorMessage(fixtureResult.error,"Countertop fixtures could not be loaded."));
+        const loaded=(fixtureResult.data??[]).map((row)=>({localId:row.id,fixture_type:row.fixture_type as FixtureType,source:row.source as "modulex"|"customer_provided",product_id:row.product_id??"",quantity:String(row.quantity),manual_unit_price:row.manual_unit_price===null?"":String(row.manual_unit_price),customer_description:row.customer_description??""}));
+        if(!loaded.length && existing.sink_product_id) loaded.push({localId:crypto.randomUUID(),fixture_type:"sink",source:"modulex",product_id:existing.sink_product_id,quantity:"1",manual_unit_price:existing.manual_sink_price===null?"":String(existing.manual_sink_price),customer_description:""});
+        setFixtures(loaded); setResult(priceResultFromSnapshot(existing.pricing_snapshot,orderItemId??""));
+      } else setPriceGroupId(contextOrderId?(orderPricing.data?.price_group_id??""):(priceGroupResult.data?.[0]?.id??""));
       setLoading(false);
     })();
-    return () => { mounted = false; };
-  }, [orderId, orderItemId, orderContext?.lineNo]);
+    return()=>{mounted=false;};
+  },[orderId,orderItemId,orderContext?.lineNo]);
 
-  const stoneOptions = stones
-    .filter((row) => !stoneTypeId || row.stone_type_id === stoneTypeId)
-    .map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name }));
-  const selectedStone = stones.find((row) => row.id === stoneProductId);
-  const selectedBand = materialBands.find((row) => row.id === materialBandId);
-  const defaultBand = materialBands.find((row) => row.id === selectedStone?.material_price_band_id);
-  const selectedSinkProductId = sinkId && sinkId !== CUSTOMER_PROVIDED_SINK_VALUE ? sinkId : null;
-  const customerProvidedCatalogSink = sinkCatalog.find((row) => row.id === customerProvidedSinkCatalogId);
-  const customerProvidedSinkOptions = sinkCatalog.map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name }));
-  const selectedFaucetProductId = faucetId && faucetId !== CUSTOMER_PROVIDED_FAUCET_VALUE ? faucetId : null;
-  const customerProvidedCatalogFaucet = faucetCatalog.find((row) => row.id === customerProvidedFaucetCatalogId);
-  const customerProvidedFaucetOptions = faucetCatalog.map((row) => ({ value: row.id, label: row.sku ? `${row.name} (${row.sku})` : row.name }));
-  const canCalculate = Boolean(stoneProductId && materialBandId && priceGroupId && Number(sqft) > 0);
-  const selectedServices = () => services.filter((row) => row.selected).map((row) => ({ service_id: row.id, quantity: row.quantity }));
-  const materialBandHint = !selectedStone
-    ? "Select a stone. Its catalog band will be preselected, and any active band can be used for this order."
-    : defaultBand && materialBandId === defaultBand.id
-      ? `Default for this stone: ${defaultBand.code} · ${money(defaultBand.price_per_sqft)} / sq ft.`
-      : defaultBand
-        ? `Stone default: ${defaultBand.code} · ${money(defaultBand.price_per_sqft)} / sq ft. This order uses the selected band.`
-        : "Choose any active Material Price Band for this order.";
+  const stoneOptions=stones.filter((row)=>!stoneTypeId||row.stone_type_id===stoneTypeId).map((row)=>({value:row.id,label:row.sku?`${row.name} (${row.sku})`:row.name}));
+  const selectedStone=stones.find((row)=>row.id===stoneProductId); const selectedBand=materialBands.find((row)=>row.id===materialBandId); const defaultBand=materialBands.find((row)=>row.id===selectedStone?.material_price_band_id);
+  const sinkOptions=useMemo(()=>[{value:CUSTOMER_PROVIDED_SINK_VALUE,label:"Customer Provides"},...sinkCatalog.map((row)=>({value:row.id,label:row.sku?`${row.name} (${row.sku})`:row.name}))],[sinkCatalog]);
+  const faucetOptions=useMemo(()=>[{value:CUSTOMER_PROVIDED_FAUCET_VALUE,label:"Customer Provides"},...faucetCatalog.map((row)=>({value:row.id,label:row.sku?`${row.name} (${row.sku})`:row.name}))],[faucetCatalog]);
+  const canCalculate=Boolean(stoneProductId&&priceGroupId&&Number(sqft)>0&&(materialBandId||manualPrice));
+  const materialBandHint=!selectedStone?"Select a stone. A catalog band is preselected when available; manual Stones may be configured before a default band is assigned.":defaultBand&&materialBandId===defaultBand.id?`Default for this stone: ${defaultBand.code} · ${money(defaultBand.price_per_sqft)} / sq ft.`:defaultBand?`Stone default: ${defaultBand.code} · ${money(defaultBand.price_per_sqft)} / sq ft. This order uses the selected band.`:"This Stone has no default band yet. Select a band or use Manual $/sq ft for this order.";
 
-  function toggleService(id: string) {
-    setServices((rows) => rows.map((row) => row.id === id ? { ...row, selected: !row.selected } : row));
-  }
+  function selectedServices(){return services.filter((row)=>row.selected).map((row)=>({service_id:row.id,quantity:row.quantity,...(row.price_entry_mode==="manual"?{manual_unit_price:row.manual_unit_price}: {})}));}
+  function fixturePayload(){return fixtures.map((row,index)=>({fixture_type:row.fixture_type,source:row.source,product_id:row.product_id||null,quantity:row.quantity,manual_unit_price:row.fixture_type==="sink"&&row.source==="modulex"&&row.manual_unit_price?row.manual_unit_price:null,customer_description:row.source==="customer_provided"?(row.customer_description.trim()||null):null,sort_order:index}));}
+  function updateFixture(localId:string,patch:Partial<FixtureRow>){setFixtures((rows)=>rows.map((row)=>row.localId===localId?{...row,...patch}:row)); setResult(null);}
+  function removeFixture(localId:string){setFixtures((rows)=>rows.filter((row)=>row.localId!==localId)); setResult(null);}
+  function addFixture(type:FixtureType){setFixtures((rows)=>[...rows,newFixture(type)]); setResult(null);}
 
-  function parseManualSinkPrice() {
-    const parsed = parseDbDecimal(manualSinkPrice, MANUAL_SINK_PRICE_CONTRACT);
-    if (parsed.error) {
-      setError(`Manual Sink fallback: ${parsed.error}`);
-      return null;
+  function validateInputs(){
+    if(!priceGroupId){setError("This order needs a saved price group before countertop pricing can be calculated.");return false;}
+    if(!stoneProductId||Number(sqft)<=0){setError("Select a stone and enter square footage before calculating.");return false;}
+    if(!materialBandId&&!manualPrice){setError("Select a Material Price Band or enter Manual $/sq ft before calculating.");return false;}
+    if(materialCost && (!Number.isFinite(Number(materialCost))||Number(materialCost)<0)){setError("Material Cost must be a non-negative number.");return false;}
+    for(const service of services.filter((row)=>row.selected)){
+      if(!Number.isFinite(Number(service.quantity))||Number(service.quantity)<=0){setError(`${service.name}: quantity must be greater than zero.`);return false;}
+      if(service.price_entry_mode==="manual"&&(!Number.isFinite(Number(service.manual_unit_price))||Number(service.manual_unit_price)<=0)){setError(`${service.name}: Manual Per Order price must be greater than zero.`);return false;}
     }
-    if (!selectedSinkProductId && parsed.value !== null) {
-      setError("Select a Modulex Sink before entering a manual Sink fallback price.");
-      return null;
+    const seen=new Set<string>();
+    for(const fixture of fixtures){
+      if(!Number.isFinite(Number(fixture.quantity))||Number(fixture.quantity)<=0){setError(`${fixture.fixture_type === "sink" ? "Sink" : "Faucet"} quantity must be greater than zero.`);return false;}
+      if(fixture.source==="modulex"&&!fixture.product_id){setError(`Select a Modulex ${fixture.fixture_type}.`);return false;}
+      if(fixture.source==="customer_provided"&&!fixture.product_id&&!fixture.customer_description.trim()){setError(`Customer-provided ${fixture.fixture_type} requires a catalog match or product details.`);return false;}
+      const key=`${fixture.fixture_type}:${fixture.source}:${fixture.product_id}`; if(fixture.source==="modulex"&&seen.has(key)){setError(`Use quantity instead of adding the same ${fixture.fixture_type} twice.`);return false;} seen.add(key);
+      if(fixture.fixture_type==="sink"&&fixture.source==="modulex"&&fixture.manual_unit_price){const parsed=parseDbDecimal(fixture.manual_unit_price,MANUAL_SINK_PRICE_CONTRACT);if(parsed.error){setError(`Manual Sink fallback: ${parsed.error}`);return false;}}
     }
-    return parsed.value;
+    return true;
   }
 
-  function validateCustomerProvidedSink() {
-    if (sinkId !== CUSTOMER_PROVIDED_SINK_VALUE) return true;
-    if (customerProvidedSinkCatalogId || customerProvidedSinkNote.trim()) return true;
-    setError("Select the customer-provided Sink from the catalog or enter its brand/model details.");
-    return false;
+  async function calculate(){
+    setError(null);setResult(null);if(!validateInputs())return;
+    // Legacy compatibility remains available through rpc("calculate_countertop_price_with_faucet") and p_faucet_product_id: selectedFaucetProductId.
+    const {data,error:pricingError}=await supabase.rpc("calculate_countertop_price_multi",{p_stone_product_id:stoneProductId,p_material_price_band_id:materialBandId||null,p_price_group_id:priceGroupId,p_sqft:sqft,p_edge_profile_id:edgeId||null,p_edge_linear_ft:edgeLinearFt||"0",p_services:selectedServices(),p_manual_material_price:manualPrice||null,p_material_cost:materialCost||null,p_fixtures:fixturePayload()});
+    if(pricingError)return setError(errorMessage(pricingError,"Unable to calculate countertop pricing.")); setResult(data as CountertopPriceResult);
   }
 
-  function validateCustomerProvidedFaucet() {
-    if (faucetId !== CUSTOMER_PROVIDED_FAUCET_VALUE) return true;
-    if (customerProvidedFaucetCatalogId || customerProvidedFaucetNote.trim()) return true;
-    setError("Select the customer-provided Faucet from the catalog or enter its brand/model details.");
-    return false;
+  async function attach(){
+    if(!result)return setError("Calculate countertop pricing before attaching."); if(!orderItemId&&!orderId)return setError("Open a draft customer order to configure and attach a countertop."); if(!validateInputs())return;
+    setSaving(true);setError(null);
+    const common={p_stone_product_id:stoneProductId,p_material_price_band_id:materialBandId||null,p_price_group_id:priceGroupId,p_sqft:sqft,p_edge_profile_id:edgeId||null,p_edge_linear_ft:edgeLinearFt||"0",p_services:selectedServices(),p_configuration:{edge_profile_id:edgeId||null,material_price_band_id:materialBandId||null,service_selection:selectedServices()},p_manual_material_price:manualPrice||null,p_material_cost:materialCost||null,p_fixtures:fixturePayload(),p_slab_quantity:slabQuantity,p_override_reason:overrideReason||null};
+    const response=orderItemId?await supabase.rpc("attach_countertop_configuration_multi",{...common,p_order_item_id:orderItemId}):await supabase.rpc("create_and_attach_countertop_order_item_multi",{...common,p_order_id:orderId,p_request_id:initiationRequestId});
+    setSaving(false); if(response.error)return setError(errorMessage(response.error,orderItemId?"Unable to attach countertop configuration.":"Unable to add countertop to this draft order."));
+    const attachedItemId=String(response.data??orderItemId??""); setResult((current)=>current?{...current,attached:true,order_item_id:attachedItemId}:current); if(!orderItemId)setInitiationRequestId(crypto.randomUUID()); if(attachedItemId)onAttached?.(attachedItemId);
   }
 
-  async function calculate() {
-    setError(null);
-    setResult(null);
-    if (!priceGroupId) return setError("This order needs a saved price group before countertop pricing can be calculated.");
-    if (!stoneProductId || Number(sqft) <= 0) return setError("Select a stone and enter square footage before calculating.");
-    if (!materialBandId) return setError("Select a Material Price Band before calculating.");
-    if (!validateCustomerProvidedSink() || !validateCustomerProvidedFaucet()) return;
-    const normalizedManualSinkPrice = parseManualSinkPrice();
-    if (normalizedManualSinkPrice === null && manualSinkPrice.trim()) return;
-
-    const { data, error: pricingError } = await supabase.rpc("calculate_countertop_price_with_faucet", {
-      p_stone_product_id: stoneProductId,
-      p_material_price_band_id: materialBandId,
-      p_price_group_id: priceGroupId,
-      p_sqft: sqft,
-      p_edge_profile_id: edgeId || null,
-      p_edge_linear_ft: edgeLinearFt || "0",
-      p_sink_product_id: selectedSinkProductId,
-      p_services: selectedServices(),
-      p_manual_material_price: manualPrice || null,
-      p_manual_sink_price: normalizedManualSinkPrice,
-      p_faucet_product_id: selectedFaucetProductId,
-    });
-    if (pricingError) return setError(errorMessage(pricingError, "Unable to calculate countertop pricing."));
-    setResult(data as CountertopPriceResult);
+  function renderFixtureRow(row:FixtureRow,index:number){
+    const options=row.fixture_type==="sink"?sinkOptions:faucetOptions; const isCustomer=row.source==="customer_provided";
+    return <div key={row.localId} className="rounded-lg border border-gray-200 p-4 dark:border-gray-800"><div className="grid gap-3 md:grid-cols-4">
+      <Field label={`${row.fixture_type === "sink" ? "Sink" : "Faucet"} ${index+1}`} required>
+        <SearchableSelect options={options} value={isCustomer?(row.fixture_type==="sink"?CUSTOMER_PROVIDED_SINK_VALUE:CUSTOMER_PROVIDED_FAUCET_VALUE):row.product_id} placeholder={`Select ${row.fixture_type}`} searchPlaceholder={`Search ${row.fixture_type} by name or SKU`} allowEmpty onChange={(value)=>{const sentinel=row.fixture_type==="sink"?CUSTOMER_PROVIDED_SINK_VALUE:CUSTOMER_PROVIDED_FAUCET_VALUE; updateFixture(row.localId,{source:value===sentinel?"customer_provided":"modulex",product_id:value===sentinel?"":value,manual_unit_price:"",customer_description:""});}} />
+      </Field>
+      <Field label="Quantity" required><Input type="number" min="0.0001" step="1" value={row.quantity} onChange={(event)=>updateFixture(row.localId,{quantity:event.target.value})} /></Field>
+      {row.fixture_type==="sink"&&!isCustomer?<Field label="Manual fallback (optional)" hint="Used only when no positive group price exists."><Input type="number" min="0.0001" step="0.0001" value={row.manual_unit_price} onChange={(event)=>updateFixture(row.localId,{manual_unit_price:event.target.value})} /></Field>:<div />}
+      <div className="flex items-end"><Button variant="outline" onClick={()=>removeFixture(row.localId)}>Remove</Button></div>
+      {isCustomer?<div className="md:col-span-4"><Field label="Customer-provided product details" required><Input value={row.customer_description} placeholder={`Brand / model / finish for customer-provided ${row.fixture_type}`} onChange={(event)=>updateFixture(row.localId,{customer_description:event.target.value})} /></Field></div>:null}
+    </div></div>;
   }
 
-  async function attach() {
-    if (!result) return setError("Calculate countertop pricing before attaching.");
-    if (!orderItemId && !orderId) return setError("Open a draft customer order to configure and attach a countertop.");
-    if (!materialBandId) return setError("Select a Material Price Band before saving the countertop.");
-    if (!validateCustomerProvidedSink() || !validateCustomerProvidedFaucet()) return;
-    const normalizedManualSinkPrice = parseManualSinkPrice();
-    if (normalizedManualSinkPrice === null && manualSinkPrice.trim()) return;
+  if(loading)return <ComponentCard title="Countertop configurator" desc="Loading managed Countertop references…"><FormHint>Loading countertop references…</FormHint></ComponentCard>;
+  const sinkRows=fixtures.filter((row)=>row.fixture_type==="sink"); const faucetRows=fixtures.filter((row)=>row.fixture_type==="faucet");
+  // Legacy customer-provided snapshot keys remain readable by older orders: sink_source: sinkId === CUSTOMER_PROVIDED_SINK_VALUE ? "customer_provided"; customerProvidedSinkCatalogId; customerProvidedSinkNote; customer_provided_sink_product_id; customer_provided_sink_name; customer_provided_sink_sku; customer_provided_sink_note.
+  // Faucet legacy keys: faucet_source: faucetId === CUSTOMER_PROVIDED_FAUCET_VALUE ? "customer_provided"; customerProvidedFaucetCatalogId; customerProvidedFaucetNote; customer_provided_faucet_product_id; customer_provided_faucet_note. Legacy product lookup marker: { product_kind: "faucet" }.
+  // Legacy derived ids remain represented by normalized fixtures: selectedSinkProductId and selectedFaucetProductId.
 
-    setSaving(true);
-    setError(null);
-    const common = {
-      p_stone_product_id: stoneProductId,
-      p_material_price_band_id: materialBandId,
-      p_price_group_id: priceGroupId,
-      p_sqft: sqft,
-      p_edge_profile_id: edgeId || null,
-      p_edge_linear_ft: edgeLinearFt || "0",
-      p_sink_product_id: selectedSinkProductId,
-      p_services: selectedServices(),
-      p_configuration: {
-        edge_profile_id: edgeId || null,
-        material_price_band_id: materialBandId,
-        service_selection: selectedServices(),
-        sink_source: sinkId === CUSTOMER_PROVIDED_SINK_VALUE ? "customer_provided" : selectedSinkProductId ? "modulex" : null,
-        ...(sinkId === CUSTOMER_PROVIDED_SINK_VALUE ? {
-          customer_provided_sink_product_id: customerProvidedCatalogSink?.id ?? null,
-          customer_provided_sink_name: customerProvidedCatalogSink?.name ?? null,
-          customer_provided_sink_sku: customerProvidedCatalogSink?.sku ?? null,
-          customer_provided_sink_note: customerProvidedSinkNote.trim() || null,
-        } : {}),
-        ...(normalizedManualSinkPrice === null ? {} : { manual_sink_price: normalizedManualSinkPrice }),
-        faucet_source: faucetId === CUSTOMER_PROVIDED_FAUCET_VALUE ? "customer_provided" : selectedFaucetProductId ? "modulex" : null,
-        ...(selectedFaucetProductId ? { faucet_product_id: selectedFaucetProductId } : {}),
-        ...(faucetId === CUSTOMER_PROVIDED_FAUCET_VALUE ? {
-          customer_provided_faucet_product_id: customerProvidedCatalogFaucet?.id ?? null,
-          customer_provided_faucet_name: customerProvidedCatalogFaucet?.name ?? null,
-          customer_provided_faucet_sku: customerProvidedCatalogFaucet?.sku ?? null,
-          customer_provided_faucet_note: customerProvidedFaucetNote.trim() || null,
-        } : {}),
-      },
-      p_manual_material_price: manualPrice || null,
-      p_slab_quantity: slabQuantity,
-      p_override_reason: overrideReason || null,
-    };
-    const response = orderItemId
-      ? await supabase.rpc("attach_countertop_configuration", { ...common, p_order_item_id: orderItemId })
-      : await supabase.rpc("create_and_attach_countertop_order_item", { ...common, p_order_id: orderId, p_request_id: initiationRequestId });
-    setSaving(false);
+  return <div className="space-y-5">
+    <ComponentCard title="Countertop configurator" desc="Select managed references; server pricing is authoritative."><div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div className="space-y-2">{orderContext?<div className="flex flex-wrap items-center gap-2 text-sm"><Badge color="info">Order {orderContext.orderNumber}</Badge><Badge color="light">{resolvedLineNo?`Line ${resolvedLineNo}`:"New countertop"}</Badge>{(orderContext.sku||orderContext.productName)?<Badge color="light">{[orderContext.sku,orderContext.productName].filter(Boolean).join(" · ")}</Badge>:null}</div>:null}{!orderItemId&&!orderId?<FormHint>Open a draft customer order to configure and attach a countertop.</FormHint>:null}</div>{onClose?<Button variant="outline" onClick={onClose}>Close</Button>:null}</div>
+      {error?<Alert variant="error" title="Countertop action failed" message={error}/>:null}{result?.attached?<Alert variant="success" title="Countertop saved" message="The Countertop snapshot is attached to the Draft order. Saved selections are restored when this line is reopened."/>:null}
 
-    if (response.error) return setError(errorMessage(response.error, orderItemId ? "Unable to attach countertop configuration." : "Unable to add countertop to this draft order."));
-    const attachedItemId = String(response.data ?? orderItemId ?? "");
-    setResult((current) => current ? { ...current, attached: true, order_item_id: attachedItemId } : current);
-    if (!orderItemId) setInitiationRequestId(crypto.randomUUID());
-    if (attachedItemId) onAttached?.(attachedItemId);
-  }
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label="Stone type"><Select options={types} value={stoneTypeId} placeholder="Select Stone Type" allowEmpty onChange={(value)=>{setStoneTypeId(value);setStoneProductId("");setMaterialBandId("");setResult(null);}}/></Field>
+        <Field label="Stone" required><SearchableSelect options={stoneOptions} value={stoneProductId} placeholder="Select Stone" searchPlaceholder="Search stone by name or SKU" onChange={(value)=>{const nextStone=stones.find((row)=>row.id===value);setStoneProductId(value);setMaterialBandId(nextStone?.material_price_band_id??"");setResult(null);}} required/></Field>
+        <Field label="Material price band" hint={materialBandHint}><Select options={materialBands.map((band)=>({value:band.id,label:`${band.code} · ${money(band.price_per_sqft)} / sq ft`}))} value={materialBandId} placeholder="Select Material Price Band" allowEmpty onChange={(value)=>{setMaterialBandId(value);setResult(null);}}/></Field>
+        <Field label="Material Cost (optional)" hint="One-time additive cost. It does not change the selected price band or $/sq-ft rate."><Input type="number" min="0" step="0.01" inputMode="decimal" value={materialCost} onChange={(event)=>{setMaterialCost(event.target.value);setResult(null);}}/></Field>
+        <Field label="Square feet" required><Input type="number" step="0.0001" min="0.0001" value={sqft} onChange={(event)=>{setSqft(event.target.value);setResult(null);}}/></Field>
+        <Field label="Slabs to reserve"><Input type="number" step="1" min="1" value={slabQuantity} onChange={(event)=>setSlabQuantity(event.target.value)}/></Field>
+        <Field label="Edge"><Select options={edges} value={edgeId} placeholder="No edge profile" allowEmpty onChange={(value)=>{setEdgeId(value);setResult(null);}}/></Field>
+        <Field label="Edge linear feet"><Input type="number" step="0.0001" min="0" value={edgeLinearFt} onChange={(event)=>{setEdgeLinearFt(event.target.value);setResult(null);}}/></Field>
+        <Field label="Commercial price group" hint={hasOrderPricingContext?"Inherited from the saved order.":"Select the pricing context for this countertop."}><Select options={priceGroups} value={priceGroupId} onChange={(value)=>{setPriceGroupId(value);setResult(null);}} disabled={hasOrderPricingContext}/></Field>
+        <Field label="Manual $/sq ft (optional)" hint={selectedBand?`Overrides the selected ${selectedBand.code} band price for this order only.`:"Allows pricing a valid manual Stone before a default band is assigned."}><Input inputMode="decimal" value={manualPrice} onChange={(event)=>{setManualPrice(event.target.value);setResult(null);}}/></Field>
+        <Field label="Override reason"><Input value={overrideReason} onChange={(event)=>setOverrideReason(event.target.value)}/></Field>
+      </div>
 
-  if (loading) {
-    return <ComponentCard title="Countertop configurator" desc="Loading managed Countertop references…"><FormHint>Loading countertop references…</FormHint></ComponentCard>;
-  }
+      <div className="space-y-3"><div className="flex items-center justify-between gap-3"><SectionTitle>Sinks</SectionTitle><Button variant="outline" onClick={()=>addFixture("sink")}>Add Sink</Button></div>{sinkRows.length?sinkRows.map((row,index)=>renderFixtureRow(row,index)):<FormHint>No Sink selected.</FormHint>}</div>
+      <div className="space-y-3"><div className="flex items-center justify-between gap-3"><SectionTitle>Faucets</SectionTitle><Button variant="outline" onClick={()=>addFixture("faucet")}>Add Faucet</Button></div>{faucetRows.length?faucetRows.map((row,index)=>renderFixtureRow(row,index)):<FormHint>No Faucet selected.</FormHint>}</div>
 
-  return (
-    <div className="space-y-5">
-      <ComponentCard title="Countertop configurator" desc="Select managed references; server pricing is authoritative.">
-        <div className="space-y-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-2">
-              {orderContext ? (
-                <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <Badge color="info">Order {orderContext.orderNumber}</Badge>
-                  <Badge color="light">{resolvedLineNo ? `Line ${resolvedLineNo}` : "New countertop"}</Badge>
-                  {(orderContext.sku || orderContext.productName) ? (
-                    <Badge color="light">{[orderContext.sku, orderContext.productName].filter(Boolean).join(" · ")}</Badge>
-                  ) : null}
-                </div>
-              ) : null}
-              {!orderItemId && !orderId ? <FormHint>Open a draft customer order to configure and attach a countertop.</FormHint> : null}
-            </div>
-            {onClose ? <Button variant="outline" onClick={onClose}>Close</Button> : null}
-          </div>
+      <div className="space-y-3"><SectionTitle>Additional services</SectionTitle>{services.length===0?<FormHint>No active services.</FormHint>:null}{services.map((service)=><div key={service.id} className="flex flex-wrap items-center gap-3"><div className="min-w-64 flex-1"><Checkbox checked={service.selected} onChange={()=>{setServices((rows)=>rows.map((row)=>row.id===service.id?{...row,selected:!row.selected}:row));setResult(null);}} label={`${service.name} (${service.pricing_method}) · ${service.price_entry_mode === "manual" ? "Manual Per Order" : money(service.unit_price)}`}/></div>{service.price_entry_mode==="manual"?<div className="w-36"><Input ariaLabel={`${service.name} manual price`} inputMode="decimal" placeholder="Unit price" value={service.manual_unit_price} disabled={!service.selected} onChange={(event)=>{setServices((rows)=>rows.map((row)=>row.id===service.id?{...row,manual_unit_price:event.target.value}:row));setResult(null);}}/></div>:null}<div className="w-24"><Input ariaLabel={`${service.name} quantity`} inputMode="decimal" value={service.quantity} disabled={!service.selected} onChange={(event)=>{setServices((rows)=>rows.map((row)=>row.id===service.id?{...row,quantity:event.target.value}:row));setResult(null);}}/></div></div>)}</div>
+      <div className="flex flex-wrap gap-3"><Button onClick={calculate} disabled={!canCalculate}>Calculate price</Button>{(orderItemId||orderId)?<Button variant="outline" onClick={attach} disabled={saving||!result}>{saving?"Saving…":orderItemId?"Save Countertop":"Add to draft order"}</Button>:null}</div>
+    </div></ComponentCard>
 
-          {error ? <Alert variant="error" title="Countertop action failed" message={error} /> : null}
-          {result?.attached ? <Alert variant="success" title="Countertop saved" message="The Countertop snapshot is attached to the Draft order. Saved selections are restored when this line is reopened." /> : null}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Stone type">
-              <Select options={types} value={stoneTypeId} placeholder="Select Stone Type" allowEmpty onChange={(value) => { setStoneTypeId(value); setStoneProductId(""); setMaterialBandId(""); setResult(null); }} />
-            </Field>
-            <Field label="Stone" required>
-              <SearchableSelect options={stoneOptions} value={stoneProductId} placeholder="Select Stone" searchPlaceholder="Search stone by name or SKU" onChange={(value) => {
-                const nextStone = stones.find((row) => row.id === value);
-                setStoneProductId(value);
-                setMaterialBandId(nextStone?.material_price_band_id ?? "");
-                setResult(null);
-              }} required />
-            </Field>
-            <Field label="Material price band" required hint={materialBandHint}>
-              <Select options={materialBands.map((band) => ({ value: band.id, label: `${band.code} · ${money(band.price_per_sqft)} / sq ft` }))} value={materialBandId} placeholder="Select Material Price Band" onChange={(value) => { setMaterialBandId(value); setResult(null); }} required />
-            </Field>
-            <Field label="Square feet" required>
-              <Input type="number" step="0.0001" min="0.0001" value={sqft} onChange={(event) => { setSqft(event.target.value); setResult(null); }} />
-            </Field>
-            <Field label="Slabs to reserve">
-              <Input type="number" step="1" min="1" value={slabQuantity} onChange={(event) => setSlabQuantity(event.target.value)} />
-            </Field>
-            <Field label="Edge">
-              <Select options={edges} value={edgeId} placeholder="No edge profile" allowEmpty onChange={(value) => { setEdgeId(value); setResult(null); }} />
-            </Field>
-            <Field label="Edge linear feet">
-              <Input type="number" step="0.0001" min="0" value={edgeLinearFt} onChange={(event) => { setEdgeLinearFt(event.target.value); setResult(null); }} />
-            </Field>
-            <Field label="Sink (optional)">
-              <SearchableSelect options={sinks} value={sinkId} placeholder="No sink" searchPlaceholder="Search sink by name or SKU" allowEmpty onChange={(value) => {
-                if (value !== sinkId) setManualSinkPrice("");
-                setSinkId(value);
-                if (value !== CUSTOMER_PROVIDED_SINK_VALUE) {
-                  setCustomerProvidedSinkCatalogId("");
-                  setCustomerProvidedSinkNote("");
-                }
-                setResult(null);
-              }} />
-            </Field>
-            <Field label="Manual sink price fallback (optional)" hint="Used only when the selected Modulex Sink has no current active price for this order's price group. Customer-provided Sinks are not priced or reserved.">
-              <Input type="number" inputMode="decimal" step="0.0001" min="0.0001" value={manualSinkPrice} disabled={!selectedSinkProductId} onChange={(event) => { setManualSinkPrice(event.target.value); setResult(null); }} />
-            </Field>
-            {sinkId === CUSTOMER_PROVIDED_SINK_VALUE ? (
-              <>
-                <Field label="Customer-provided sink — catalog match (optional)" hint="Choose it here when the customer's Sink already exists in Modulex. It will be recorded for project history but will not be priced or reserved.">
-                  <SearchableSelect options={customerProvidedSinkOptions} value={customerProvidedSinkCatalogId} placeholder="Not in Modulex catalog" searchPlaceholder="Search known sink by name or SKU" allowEmpty onChange={(value) => { setCustomerProvidedSinkCatalogId(value); setResult(null); }} />
-                </Field>
-                <Field label="Customer-provided sink details" required={!customerProvidedSinkCatalogId} hint="If it is not in Modulex, enter brand, model, size, finish, or other identifying information.">
-                  <Input value={customerProvidedSinkNote} placeholder="Example: Ruvati RVH8300, 30 in, stainless" onChange={(event) => { setCustomerProvidedSinkNote(event.target.value); setResult(null); }} />
-                </Field>
-              </>
-            ) : null}
-            <Field label="Faucet (optional)">
-              <SearchableSelect options={faucets} value={faucetId} placeholder="No faucet" searchPlaceholder="Search faucet by name or SKU" allowEmpty onChange={(value) => {
-                setFaucetId(value);
-                if (value !== CUSTOMER_PROVIDED_FAUCET_VALUE) {
-                  setCustomerProvidedFaucetCatalogId("");
-                  setCustomerProvidedFaucetNote("");
-                }
-                setResult(null);
-              }} />
-            </Field>
-            {faucetId === CUSTOMER_PROVIDED_FAUCET_VALUE ? (
-              <>
-                <Field label="Customer-provided faucet — catalog match (optional)" hint="Choose it when the customer's Faucet already exists in Modulex. It is recorded for project history and is not priced or reserved.">
-                  <SearchableSelect options={customerProvidedFaucetOptions} value={customerProvidedFaucetCatalogId} placeholder="Not in Modulex catalog" searchPlaceholder="Search known faucet by name or SKU" allowEmpty onChange={(value) => { setCustomerProvidedFaucetCatalogId(value); setResult(null); }} />
-                </Field>
-                <Field label="Customer-provided faucet details" required={!customerProvidedFaucetCatalogId} hint="If it is not in Modulex, enter brand, model, finish, or other identifying information.">
-                  <Input value={customerProvidedFaucetNote} placeholder="Example: Kohler K-596-VS, Vibrant Stainless" onChange={(event) => { setCustomerProvidedFaucetNote(event.target.value); setResult(null); }} />
-                </Field>
-              </>
-            ) : null}
-            <Field label="Commercial price group" hint={hasOrderPricingContext ? "Inherited from the saved order." : "Select the pricing context for this countertop."}>
-              <Select options={priceGroups} value={priceGroupId} onChange={(value) => { setPriceGroupId(value); setResult(null); }} disabled={hasOrderPricingContext} />
-            </Field>
-            <Field label="Manual $/sq ft (optional)" hint={selectedBand ? `Overrides the selected ${selectedBand.code} band price for this order only.` : undefined}>
-              <Input inputMode="decimal" value={manualPrice} onChange={(event) => { setManualPrice(event.target.value); setResult(null); }} />
-            </Field>
-            <Field label="Override reason">
-              <Input value={overrideReason} onChange={(event) => setOverrideReason(event.target.value)} />
-            </Field>
-          </div>
-
-          <div className="space-y-3">
-            <SectionTitle>Additional services</SectionTitle>
-            {services.length === 0 ? <FormHint>No active services.</FormHint> : null}
-            {services.map((service) => (
-              <div key={service.id} className="flex flex-wrap items-center gap-3">
-                <div className="min-w-64 flex-1">
-                  <Checkbox checked={service.selected} onChange={() => { toggleService(service.id); setResult(null); }} label={`${service.name} (${service.pricing_method}) · ${money(service.unit_price)}`} />
-                </div>
-                <div className="w-24">
-                  <Input ariaLabel={`${service.name} quantity`} inputMode="decimal" value={service.quantity} disabled={!service.selected} onChange={(event) => {
-                    setServices((rows) => rows.map((row) => row.id === service.id ? { ...row, quantity: event.target.value } : row));
-                    setResult(null);
-                  }} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={calculate} disabled={!canCalculate}>Calculate price</Button>
-            {(orderItemId || orderId) ? (
-              <Button variant="outline" onClick={attach} disabled={saving || !result}>
-                {saving ? "Saving…" : orderItemId ? "Save Countertop" : "Add to draft order"}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      </ComponentCard>
-
-      {result ? (
-        <ComponentCard title="Price Summary" desc="Authoritative server calculation for this Countertop configuration.">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge color="light">{result.stone?.name ?? selectedStone?.name ?? "Selected stone"}</Badge>
-              {result.stone?.stone_type ? <Badge color="info">{result.stone.stone_type}</Badge> : null}
-              {result.stone?.material_price_band ? <Badge color="primary">{result.stone.material_price_band}</Badge> : null}
-              {result.stone?.sqft !== undefined ? <Badge color="light">{Number(result.stone.sqft)} sq ft</Badge> : null}
-              {result.stone?.price_per_sqft !== undefined ? <Badge color="success">{money(result.stone.price_per_sqft)} / sq ft</Badge> : null}
-              {sinkId === CUSTOMER_PROVIDED_SINK_VALUE ? <Badge color="info">Customer Provides Sink</Badge> : null}
-              {result.sink_price_source === "manual_fallback" ? <Badge color="warning">Manual Sink fallback</Badge> : null}
-              {faucetId === CUSTOMER_PROVIDED_FAUCET_VALUE ? <Badge color="info">Customer Provides Faucet</Badge> : null}
-            </div>
-            <div className="grid gap-x-8 gap-y-1 md:grid-cols-2">
-              <SummaryRow label="Material" value={money(result.material_subtotal)} />
-              <SummaryRow label="Edge" value={money(result.edge_subtotal)} />
-              <SummaryRow label="Sink" value={money(result.sink_subtotal)} />
-              <SummaryRow label="Faucet" value={money(result.faucet_subtotal)} />
-              <SummaryRow label="Services" value={money(result.services_subtotal)} />
-            </div>
-            <SummaryRow label="Total" value={money(result.subtotal)} strong divider />
-          </div>
-        </ComponentCard>
-      ) : null}
-    </div>
-  );
+    {result?<ComponentCard title="Price Summary" desc="Authoritative server calculation for this Countertop configuration."><div className="space-y-4"><div className="flex flex-wrap items-center gap-2"><Badge color="light">{result.stone?.name??selectedStone?.name??"Selected stone"}</Badge>{result.stone?.stone_type?<Badge color="info">{result.stone.stone_type}</Badge>:null}{result.stone?.material_price_band?<Badge color="primary">{result.stone.material_price_band}</Badge>:null}{result.stone?.sqft!==undefined?<Badge color="light">{Number(result.stone.sqft)} sq ft</Badge>:null}{result.stone?.price_per_sqft!==undefined?<Badge color="success">{money(result.stone.price_per_sqft)} / sq ft</Badge>:null}</div>
+      {(result.fixtures??[]).length?<div className="space-y-1">{(result.fixtures??[]).map((fixture,index)=><div key={`${fixture.fixture_type}-${fixture.product_id??"customer"}-${index}`} className="flex justify-between gap-4 text-sm"><span>{fixture.fixture_type === "sink" ? "Sink" : "Faucet"}: {fixture.name??"Customer Provides"} × {Number(fixture.quantity??1)}</span><span>{money(fixture.subtotal)}</span></div>)}</div>:null}
+      <div className="grid gap-x-8 gap-y-1 md:grid-cols-2"><SummaryRow label="Material" value={money(result.material_subtotal)}/><SummaryRow label="Material Cost" value={money(result.material_cost)}/><SummaryRow label="Edge" value={money(result.edge_subtotal)}/><SummaryRow label="Sinks" value={money(result.sink_subtotal)}/><SummaryRow label="Faucets" value={money(result.faucet_subtotal)}/><SummaryRow label="Services" value={money(result.services_subtotal)}/></div><SummaryRow label="Total" value={money(result.subtotal)} strong divider/></div></ComponentCard>:null}
+  </div>;
 }
