@@ -141,6 +141,8 @@ jobs:
         run: node scripts/users-store-ui-contract.mjs
       - name: Admin users contract
         run: npm run smoke:admin-users
+      - name: Sales & Production dashboard UI contract
+        run: node scripts/sales-production-report-ui-contract.mjs
       - name: Admin UI regression
         run: npm run smoke:admin-ui
       - name: Production surface regression
