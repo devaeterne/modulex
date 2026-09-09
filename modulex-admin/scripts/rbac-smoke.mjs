@@ -77,8 +77,8 @@ check("Sales can manage Store leads but not Store CMS", () => {
   assert.equal(hasPermission("sales", "store.manage"), false);
 });
 
-check("Finance sees cost/margin and finance operations but not personnel", () => {
-  assert.equal(hasPermission("finance", "pricing.cost.view"), true);
+check("Finance keeps cost/margin restricted while retaining finance operations", () => {
+  assert.equal(hasPermission("finance", "pricing.cost.view"), false);
   assert.equal(hasPermission("finance", "finance.manage"), true);
   assert.equal(hasPermission("finance", "personnel.view"), false);
 });
@@ -248,7 +248,7 @@ check("Warehouse structure list mutations require warehouse.manage in the UI", (
 
 check("Role/path access follows the permission matrix", () => {
   assert.equal(canAccessPath("sales", "/store/leads/abc"), true);
-  assert.equal(canAccessPath("finance", "/pricing/cost-margin"), true);
+  assert.equal(canAccessPath("finance", "/pricing/cost-margin"), false);
   assert.equal(canAccessPath("finance", "/customers/payment-methods"), true);
   assert.equal(canAccessPath("shipping", "/stock-operations"), false);
   assert.equal(canAccessPath("hr", "/personnel/employees"), true);
