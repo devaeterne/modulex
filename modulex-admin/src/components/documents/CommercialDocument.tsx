@@ -89,7 +89,7 @@ export default function CommercialDocument({ document, settings }: Props) {
             {addressLines.map((line, index) => <p key={`${line}-${index}`} className={index === 0 ? `font-semibold ${ADMIN_DOCUMENT_STYLES.companyStrong}` : ""}>{line}</p>)}
           </div>
           <div className="commercial-document-secondary-logo flex h-24 items-center justify-start sm:justify-center">
-            {centerLogo ? <img src={centerLogo} alt={secondaryLogo ? "Secondary brand logo" : `${settings.company_name} primary logo`} className="max-h-24 max-w-[188px] origin-center scale-[1.18] object-contain" /> : <span className={`text-lg font-semibold tracking-tight ${ADMIN_DOCUMENT_STYLES.logoFallback}`}>{settings.company_name}</span>}
+            {centerLogo ? <img src={centerLogo} alt={secondaryLogo ? "Secondary brand logo" : `${settings.company_name} primary logo`} className="max-h-24 max-w-[188px] origin-center scale-[1.652] object-contain" /> : <span className={`text-lg font-semibold tracking-tight ${ADMIN_DOCUMENT_STYLES.logoFallback}`}>{settings.company_name}</span>}
           </div>
           <div className="flex min-h-16 items-center justify-start sm:justify-end">
             {rightLogo ? <img src={rightLogo} alt={`${settings.company_name} primary logo`} className="max-h-16 max-w-[170px] object-contain" /> : null}
