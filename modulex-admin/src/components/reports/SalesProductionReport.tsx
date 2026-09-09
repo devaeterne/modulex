@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import type { ApexOptions } from "apexcharts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import DateInput from "@/components/form/DateInput";
@@ -26,7 +28,17 @@ import {
   type SalesProductionReportFilters,
 } from "@/lib/reports/salesProduction";
 
+const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 const PAGE_SIZE = 50;
+
+type ReportTab = "overview" | "collections" | "jobs";
+
+type RankedBarItem = {
+  label: string;
+  value: number;
+  valueText: string;
+  meta?: string;
+};
 
 function dateValue(date: Date) {
   const year = date.getFullYear();
@@ -67,6 +79,12 @@ function number(value: number, maximumFractionDigits = 2) {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits }).format(value);
 }
 
+function monthLabel(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(date);
+}
+
 function paymentLabel(status: SalesProductionPaymentStatus) {
   switch (status) {
     case "not_invoiced":
@@ -93,17 +111,118 @@ const PAYMENT_COLORS: Record<
   paid: "success",
 };
 
-function Metric({ title, value, helper }: { title: string; value: string; helper: string }) {
+function Metric({ title, value }: { title: string; value: string }) {
   return (
     <ComponentCard title={title}>
       <p className={`text-2xl font-semibold ${ADMIN_TEXT_STYLES.strong}`}>{value}</p>
-      <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{helper}</p>
     </ComponentCard>
+  );
+}
+
+function SalesTrendChart({
+  rows,
+  loading,
+}: {
+  rows: SalesProductionReportData["trend"];
+  loading: boolean;
+}) {
+  if (loading) {
+    return <div className={`flex h-[260px] items-center justify-center text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading sales trend…</div>;
+  }
+  if (rows.length === 0) {
+    return <div className={`flex h-[260px] items-center justify-center text-sm ${ADMIN_TEXT_STYLES.muted}`}>No jobs match this reporting period.</div>;
+  }
+  if (rows.some((row) => row.sales === null)) {
+    return (
+      <div className={`flex h-[260px] items-center justify-center px-6 text-center text-sm ${ADMIN_TEXT_STYLES.muted}`}>
+        Sales trend is unavailable while the selected period contains mixed currencies.
+      </div>
+    );
+  }
+
+  const currency = rows[0]?.currency_code ?? "USD";
+  const options: ApexOptions = {
+    chart: {
+      fontFamily: "Outfit, sans-serif",
+      toolbar: { show: false },
+      zoom: { enabled: false },
+      foreColor: "#667085",
+    },
+    dataLabels: { enabled: false },
+    stroke: { curve: "smooth", width: 3 },
+    fill: {
+      type: "gradient",
+      gradient: { opacityFrom: 0.28, opacityTo: 0.04, stops: [0, 95, 100] },
+    },
+    markers: { size: 4 },
+    grid: { strokeDashArray: 4 },
+    xaxis: {
+      categories: rows.map((row) => monthLabel(row.period_start)),
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+    },
+    yaxis: {
+      labels: {
+        formatter: (value) => new Intl.NumberFormat("en-US", {
+          notation: "compact",
+          maximumFractionDigits: 1,
+        }).format(value),
+      },
+    },
+    tooltip: {
+      y: { formatter: (value) => money(value, currency) },
+    },
+  };
+  const series = [{ name: "Sales", data: rows.map((row) => row.sales ?? 0) }];
+
+  return <ReactApexChart options={options} series={series} type="area" height={260} />;
+}
+
+function RankedBars({
+  items,
+  loading,
+  emptyText,
+}: {
+  items: RankedBarItem[];
+  loading: boolean;
+  emptyText: string;
+}) {
+  if (loading) {
+    return <p className={`py-8 text-center text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading…</p>;
+  }
+  if (items.length === 0) {
+    return <p className={`py-8 text-center text-sm ${ADMIN_TEXT_STYLES.muted}`}>{emptyText}</p>;
+  }
+
+  const visibleItems = items.slice(0, 6);
+  const maxValue = Math.max(...visibleItems.map((item) => item.value), 0);
+
+  return (
+    <div className="space-y-5">
+      {visibleItems.map((item) => {
+        const width = maxValue > 0 ? Math.max((item.value / maxValue) * 100, 2) : 0;
+        return (
+          <div key={item.label}>
+            <div className="flex items-start justify-between gap-4 text-sm">
+              <div className="min-w-0">
+                <p className={`truncate font-medium ${ADMIN_TEXT_STYLES.strong}`}>{item.label}</p>
+                {item.meta ? <p className={`mt-0.5 text-xs ${ADMIN_TEXT_STYLES.muted}`}>{item.meta}</p> : null}
+              </div>
+              <span className={`shrink-0 font-medium ${ADMIN_TEXT_STYLES.strong}`}>{item.valueText}</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+              <div className="h-full rounded-full bg-brand-500" style={{ width: `${width}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
 export default function SalesProductionReport() {
   const initialFilters = useMemo(defaultFilters, []);
+  const [activeTab, setActiveTab] = useState<ReportTab>("overview");
   const [draftFrom, setDraftFrom] = useState(initialFilters.from ?? "");
   const [draftTo, setDraftTo] = useState(initialFilters.to ?? "");
   const [draftSalesRepId, setDraftSalesRepId] = useState("");
@@ -157,6 +276,43 @@ export default function SalesProductionReport() {
     [],
   );
 
+  const salespersonBars = useMemo<RankedBarItem[]>(
+    () => (report?.salespeople ?? []).map((row) => ({
+      label: row.salesperson_name,
+      value: row.sales ?? 0,
+      valueText: money(row.sales, row.currency_code),
+      meta: `${number(row.jobs, 0)} jobs · ${number(row.sqft)} sq. ft.`,
+    })).sort((a, b) => b.value - a.value),
+    [report],
+  );
+  const materialBars = useMemo<RankedBarItem[]>(
+    () => (report?.materials ?? []).map((row) => ({
+      label: row.material,
+      value: row.sqft,
+      valueText: `${number(row.sqft)} sq. ft.`,
+      meta: `${number(row.jobs, 0)} jobs`,
+    })).sort((a, b) => b.value - a.value),
+    [report],
+  );
+  const locationBars = useMemo<RankedBarItem[]>(
+    () => (report?.locations ?? []).map((row) => ({
+      label: row.location,
+      value: row.sales ?? 0,
+      valueText: money(row.sales, row.currency_code),
+      meta: `${number(row.jobs, 0)} jobs · ${number(row.sqft)} sq. ft.`,
+    })).sort((a, b) => b.value - a.value),
+    [report],
+  );
+  const paymentBars = useMemo<RankedBarItem[]>(
+    () => (report?.payment_statuses ?? []).map((row) => ({
+      label: paymentLabel(row.status),
+      value: row.jobs,
+      valueText: `${number(row.jobs, 0)} jobs`,
+      meta: `Balance ${money(row.open_balance, row.currency_code)}`,
+    })).sort((a, b) => b.value - a.value),
+    [report],
+  );
+
   function applyFilters() {
     setFilters({
       from: draftFrom || null,
@@ -186,7 +342,7 @@ export default function SalesProductionReport() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {error ? (
         <Alert
           variant="error"
@@ -206,11 +362,14 @@ export default function SalesProductionReport() {
         />
       ) : null}
 
-      <ComponentCard
-        title="Report Filters"
-        desc="Order date drives the reporting period. Salesperson uses Project assignment first and Customer assignment as fallback."
-      >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div role="tablist" aria-label="Sales & Production report views" className="flex flex-wrap gap-2">
+        <Button size="sm" variant={activeTab === "overview" ? "primary" : "outline"} role="tab" aria-selected={activeTab === "overview"} onClick={() => setActiveTab("overview")}>Overview</Button>
+        <Button size="sm" variant={activeTab === "collections" ? "primary" : "outline"} role="tab" aria-selected={activeTab === "collections"} onClick={() => setActiveTab("collections")}>Collections</Button>
+        <Button size="sm" variant={activeTab === "jobs" ? "primary" : "outline"} role="tab" aria-selected={activeTab === "jobs"} onClick={() => setActiveTab("jobs")}>Jobs</Button>
+      </div>
+
+      <ComponentCard title="Filters" desc="Order date drives the reporting period. Filters stay active while you move between report views.">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <div>
             <Label htmlFor="sales-production-from">From</Label>
             <DateInput id="sales-production-from" value={draftFrom} onChange={setDraftFrom} />
@@ -221,283 +380,185 @@ export default function SalesProductionReport() {
           </div>
           <div>
             <Label htmlFor="sales-production-salesperson">Salesperson</Label>
-            <Select
-              id="sales-production-salesperson"
-              value={draftSalesRepId}
-              options={salespersonOptions}
-              allowEmpty
-              placeholder="All salespeople"
-              onChange={setDraftSalesRepId}
-            />
+            <Select id="sales-production-salesperson" value={draftSalesRepId} options={salespersonOptions} allowEmpty placeholder="All salespeople" onChange={setDraftSalesRepId} />
           </div>
           <div>
             <Label htmlFor="sales-production-material">Material</Label>
-            <Select
-              id="sales-production-material"
-              value={draftMaterial}
-              options={materialOptions}
-              allowEmpty
-              placeholder="All materials"
-              onChange={setDraftMaterial}
-            />
+            <Select id="sales-production-material" value={draftMaterial} options={materialOptions} allowEmpty placeholder="All materials" onChange={setDraftMaterial} />
           </div>
           <div>
             <Label htmlFor="sales-production-location">Location</Label>
-            <Select
-              id="sales-production-location"
-              value={draftLocation}
-              options={locationOptions}
-              allowEmpty
-              placeholder="All locations"
-              onChange={setDraftLocation}
-            />
+            <Select id="sales-production-location" value={draftLocation} options={locationOptions} allowEmpty placeholder="All locations" onChange={setDraftLocation} />
           </div>
           <div>
             <Label htmlFor="sales-production-payment">Payment Status</Label>
-            <Select
-              id="sales-production-payment"
-              value={draftPaymentStatus}
-              options={paymentOptions}
-              allowEmpty
-              placeholder="All payment statuses"
-              onChange={setDraftPaymentStatus}
-            />
+            <Select id="sales-production-payment" value={draftPaymentStatus} options={paymentOptions} allowEmpty placeholder="All payment statuses" onChange={setDraftPaymentStatus} />
           </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button onClick={applyFilters} disabled={loading}>Apply Filters</Button>
-          <Button variant="outline" onClick={clearFilters} disabled={loading}>Reset</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={applyFilters} disabled={loading}>Apply Filters</Button>
+          <Button size="sm" variant="outline" onClick={clearFilters} disabled={loading}>Reset</Button>
         </div>
       </ComponentCard>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        <Metric title="Sales" value={money(summary?.sales ?? null, currency)} helper="Canonical pre-tax customer-visible revenue" />
-        <Metric title="Jobs" value={number(summary?.jobs ?? 0, 0)} helper="Non-cancelled Orders in the period" />
-        <Metric title="Sq. Ft." value={number(summary?.sqft ?? 0)} helper="Countertop configuration area" />
-        <Metric title="Avg Ticket" value={money(summary?.avg_ticket ?? null, currency)} helper="Sales divided by Jobs" />
-        <Metric title="Open Balance" value={money(summary?.open_balance ?? null, currency)} helper="Issued Invoice receivable truth" />
-        <Metric title="Jobs With Balance" value={number(summary?.jobs_with_balance ?? 0, 0)} helper={`${summary?.needs_attention ?? 0} job(s) need attention`} />
-      </div>
+      {activeTab === "overview" ? (
+        <div role="tabpanel" aria-label="Overview" className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+            <Metric title="Sales" value={money(summary?.sales ?? null, currency)} />
+            <Metric title="Jobs" value={number(summary?.jobs ?? 0, 0)} />
+            <Metric title="Sq. Ft." value={number(summary?.sqft ?? 0)} />
+            <Metric title="Avg Ticket" value={money(summary?.avg_ticket ?? null, currency)} />
+            <Metric title="Open Balance" value={money(summary?.open_balance ?? null, currency)} />
+            <Metric title="Jobs With Balance" value={number(summary?.jobs_with_balance ?? 0, 0)} />
+          </div>
 
-      <ComponentCard title="Sales Trend" desc="Monthly order volume, canonical sales and countertop square footage.">
-        <TableViewport>
-          <Table variant="admin" minWidth="wide">
-            <TableHeader variant="admin">
-              <TableRow>
-                <TableCell isHeader variant="admin">Month</TableCell>
-                <TableCell isHeader variant="admin">Sales</TableCell>
-                <TableCell isHeader variant="admin">Jobs</TableCell>
-                <TableCell isHeader variant="admin">Sq. Ft.</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody variant="admin">
-              {loading ? <TableStateRow colSpan={4}>Loading sales trend…</TableStateRow> : null}
-              {!loading && (report?.trend.length ?? 0) === 0 ? <TableStateRow colSpan={4}>No jobs match this reporting period.</TableStateRow> : null}
-              {report?.trend.map((row) => (
-                <TableRow key={row.period_start}>
-                  <TableCell variant="admin">{formatDateOnly(row.period_start)}</TableCell>
-                  <TableCell variant="admin">{money(row.sales, row.currency_code)}</TableCell>
-                  <TableCell variant="admin">{number(row.jobs, 0)}</TableCell>
-                  <TableCell variant="admin">{number(row.sqft)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableViewport>
-      </ComponentCard>
+          <ComponentCard title="Sales Trend" desc="Monthly canonical sales for the selected reporting period.">
+            <SalesTrendChart rows={report?.trend ?? []} loading={loading} />
+          </ComponentCard>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <ComponentCard title="Salesperson Performance" desc="Project salesperson assignment is preferred; Customer assignment is the fallback.">
-          <TableViewport>
-            <Table variant="admin" minWidth="wide">
-              <TableHeader variant="admin">
-                <TableRow>
-                  <TableCell isHeader variant="admin">Salesperson</TableCell>
-                  <TableCell isHeader variant="admin">Sales</TableCell>
-                  <TableCell isHeader variant="admin">Jobs</TableCell>
-                  <TableCell isHeader variant="admin">Sq. Ft.</TableCell>
-                  <TableCell isHeader variant="admin">Open Balance</TableCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody variant="admin">
-                {loading ? <TableStateRow colSpan={5}>Loading salesperson performance…</TableStateRow> : null}
-                {!loading && (report?.salespeople.length ?? 0) === 0 ? <TableStateRow colSpan={5}>No salesperson activity in this period.</TableStateRow> : null}
-                {report?.salespeople.map((row) => (
-                  <TableRow key={row.sales_rep_id ?? "unassigned"}>
-                    <TableCell variant="admin">{row.salesperson_name}</TableCell>
-                    <TableCell variant="admin">{money(row.sales, row.currency_code)}</TableCell>
-                    <TableCell variant="admin">{number(row.jobs, 0)}</TableCell>
-                    <TableCell variant="admin">{number(row.sqft)}</TableCell>
-                    <TableCell variant="admin">{money(row.open_balance, row.currency_code)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableViewport>
-        </ComponentCard>
-
-        <ComponentCard title="Material Mix" desc="Stone type and square footage from canonical Countertop configurations.">
-          <TableViewport>
-            <Table variant="admin">
-              <TableHeader variant="admin">
-                <TableRow>
-                  <TableCell isHeader variant="admin">Material</TableCell>
-                  <TableCell isHeader variant="admin">Jobs</TableCell>
-                  <TableCell isHeader variant="admin">Sq. Ft.</TableCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody variant="admin">
-                {loading ? <TableStateRow colSpan={3}>Loading material mix…</TableStateRow> : null}
-                {!loading && (report?.materials.length ?? 0) === 0 ? <TableStateRow colSpan={3}>No countertop material exists for these jobs.</TableStateRow> : null}
-                {report?.materials.map((row) => (
-                  <TableRow key={row.material}>
-                    <TableCell variant="admin">{row.material}</TableCell>
-                    <TableCell variant="admin">{number(row.jobs, 0)}</TableCell>
-                    <TableCell variant="admin">{number(row.sqft)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableViewport>
-        </ComponentCard>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <ComponentCard title="Territory / Location" desc="Project address is preferred, then Order shipping and billing snapshots.">
-          <TableViewport>
-            <Table variant="admin" minWidth="wide">
-              <TableHeader variant="admin">
-                <TableRow>
-                  <TableCell isHeader variant="admin">Location</TableCell>
-                  <TableCell isHeader variant="admin">Sales</TableCell>
-                  <TableCell isHeader variant="admin">Jobs</TableCell>
-                  <TableCell isHeader variant="admin">Sq. Ft.</TableCell>
-                  <TableCell isHeader variant="admin">Open Balance</TableCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody variant="admin">
-                {loading ? <TableStateRow colSpan={5}>Loading territory performance…</TableStateRow> : null}
-                {!loading && (report?.locations.length ?? 0) === 0 ? <TableStateRow colSpan={5}>No locations match the filters.</TableStateRow> : null}
-                {report?.locations.map((row) => (
-                  <TableRow key={row.location}>
-                    <TableCell variant="admin">{row.location}</TableCell>
-                    <TableCell variant="admin">{money(row.sales, row.currency_code)}</TableCell>
-                    <TableCell variant="admin">{number(row.jobs, 0)}</TableCell>
-                    <TableCell variant="admin">{number(row.sqft)}</TableCell>
-                    <TableCell variant="admin">{money(row.open_balance, row.currency_code)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableViewport>
-        </ComponentCard>
-
-        <ComponentCard title="Payment Status" desc="Only issued/partial/overdue/paid Invoice rows contribute receivable balances. Draft Invoices are not treated as debt.">
-          <TableViewport>
-            <Table variant="admin">
-              <TableHeader variant="admin">
-                <TableRow>
-                  <TableCell isHeader variant="admin">Status</TableCell>
-                  <TableCell isHeader variant="admin">Jobs</TableCell>
-                  <TableCell isHeader variant="admin">Open Balance</TableCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody variant="admin">
-                {loading ? <TableStateRow colSpan={3}>Loading payment status…</TableStateRow> : null}
-                {!loading && (report?.payment_statuses.length ?? 0) === 0 ? <TableStateRow colSpan={3}>No payment status data is available.</TableStateRow> : null}
-                {report?.payment_statuses.map((row) => (
-                  <TableRow key={row.status}>
-                    <TableCell variant="admin"><Badge color={PAYMENT_COLORS[row.status]}>{paymentLabel(row.status)}</Badge></TableCell>
-                    <TableCell variant="admin">{number(row.jobs, 0)}</TableCell>
-                    <TableCell variant="admin">{money(row.open_balance, row.currency_code)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableViewport>
-        </ComponentCard>
-      </div>
-
-      <ComponentCard title="Needs Attention" desc="Outstanding/overdue receivables, missing salesperson assignments and missing locations are surfaced without inventing workflow statuses.">
-        <TableViewport>
-          <Table variant="admin" minWidth="wide">
-            <TableHeader variant="admin">
-              <TableRow>
-                <TableCell isHeader variant="admin">Order</TableCell>
-                <TableCell isHeader variant="admin">Customer</TableCell>
-                <TableCell isHeader variant="admin">Date</TableCell>
-                <TableCell isHeader variant="admin">Salesperson</TableCell>
-                <TableCell isHeader variant="admin">Status</TableCell>
-                <TableCell isHeader variant="admin">Open Balance</TableCell>
-                <TableCell isHeader variant="admin">Reason</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody variant="admin">
-              {loading ? <TableStateRow colSpan={7}>Loading attention items…</TableStateRow> : null}
-              {!loading && (report?.attention.length ?? 0) === 0 ? <TableStateRow colSpan={7}>No jobs currently need attention under these rules.</TableStateRow> : null}
-              {report?.attention.map((row) => (
-                <TableRow key={row.order_id}>
-                  <TableCell variant="admin">{row.order_number}</TableCell>
-                  <TableCell variant="admin">{row.customer_name}</TableCell>
-                  <TableCell variant="admin">{formatDateOnly(row.order_date)}</TableCell>
-                  <TableCell variant="admin">{row.salesperson_name}</TableCell>
-                  <TableCell variant="admin"><Badge color={PAYMENT_COLORS[row.payment_status]}>{paymentLabel(row.payment_status)}</Badge></TableCell>
-                  <TableCell variant="admin">{money(row.open_balance, row.currency_code)}</TableCell>
-                  <TableCell variant="admin">{row.reasons.join(" · ")}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableViewport>
-      </ComponentCard>
-
-      <ComponentCard title="Job Detail" desc="Order-level source detail. Project data is enrichment only, so legacy/non-Project Orders remain visible.">
-        <TableViewport>
-          <Table variant="admin" minWidth="wide">
-            <TableHeader variant="admin">
-              <TableRow>
-                <TableCell isHeader variant="admin">Date</TableCell>
-                <TableCell isHeader variant="admin">Order</TableCell>
-                <TableCell isHeader variant="admin">Project</TableCell>
-                <TableCell isHeader variant="admin">Customer</TableCell>
-                <TableCell isHeader variant="admin">Salesperson</TableCell>
-                <TableCell isHeader variant="admin">Location</TableCell>
-                <TableCell isHeader variant="admin">Material</TableCell>
-                <TableCell isHeader variant="admin">Sq. Ft.</TableCell>
-                <TableCell isHeader variant="admin">Sales</TableCell>
-                <TableCell isHeader variant="admin">Payment</TableCell>
-                <TableCell isHeader variant="admin">Open Balance</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody variant="admin">
-              {loading ? <TableStateRow colSpan={11}>Loading job detail…</TableStateRow> : null}
-              {!loading && (report?.rows.length ?? 0) === 0 ? <TableStateRow colSpan={11}>No jobs match the selected filters.</TableStateRow> : null}
-              {report?.rows.map((row) => (
-                <TableRow key={row.order_id}>
-                  <TableCell variant="admin">{formatDateOnly(row.order_date)}</TableCell>
-                  <TableCell variant="admin">{row.order_number}</TableCell>
-                  <TableCell variant="admin">{row.project_number || "—"}</TableCell>
-                  <TableCell variant="admin">{row.customer_name}</TableCell>
-                  <TableCell variant="admin">{row.salesperson_name}</TableCell>
-                  <TableCell variant="admin">{row.location}</TableCell>
-                  <TableCell variant="admin">{row.material_types.length ? row.material_types.join(", ") : "—"}</TableCell>
-                  <TableCell variant="admin">{number(row.sqft)}</TableCell>
-                  <TableCell variant="admin">{money(row.sales_amount, row.currency_code)}</TableCell>
-                  <TableCell variant="admin"><Badge color={PAYMENT_COLORS[row.payment_status]}>{paymentLabel(row.payment_status)}</Badge></TableCell>
-                  <TableCell variant="admin">{money(row.open_balance, row.currency_code)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableViewport>
-        <div className={`flex flex-wrap items-center justify-between gap-3 text-sm ${ADMIN_TEXT_STYLES.muted}`}>
-          <span>{totalCount} job(s) · showing {totalCount === 0 ? 0 : offset + 1}–{Math.min(offset + PAGE_SIZE, totalCount)}</span>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={loading || offset === 0} onClick={() => changePage(offset - PAGE_SIZE)}>Previous</Button>
-            <Button size="sm" variant="outline" disabled={loading || offset + PAGE_SIZE >= totalCount} onClick={() => changePage(offset + PAGE_SIZE)}>Next</Button>
+          <div className="grid gap-5 xl:grid-cols-2">
+            <ComponentCard title="Salesperson Performance" desc="Sales ranking with jobs and countertop square footage.">
+              <RankedBars items={salespersonBars} loading={loading} emptyText="No salesperson activity in this period." />
+            </ComponentCard>
+            <ComponentCard title="Material Mix" desc="Countertop square footage by canonical stone type.">
+              <RankedBars items={materialBars} loading={loading} emptyText="No countertop material exists for these jobs." />
+            </ComponentCard>
+            <ComponentCard title="Territory / Location" desc="Sales by Project address, with Order address fallback.">
+              <RankedBars items={locationBars} loading={loading} emptyText="No locations match the filters." />
+            </ComponentCard>
+            <ComponentCard title="Payment Snapshot" desc="Job count by authoritative invoice payment state.">
+              <RankedBars items={paymentBars} loading={loading} emptyText="No payment status data is available." />
+            </ComponentCard>
           </div>
         </div>
-      </ComponentCard>
+      ) : null}
+
+      {activeTab === "collections" ? (
+        <div role="tabpanel" aria-label="Collections" className="space-y-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Metric title="Open Balance" value={money(summary?.open_balance ?? null, currency)} />
+            <Metric title="Jobs With Balance" value={number(summary?.jobs_with_balance ?? 0, 0)} />
+            <Metric title="Needs Attention" value={number(summary?.needs_attention ?? 0, 0)} />
+          </div>
+
+          <ComponentCard title="Payment Status" desc="Issued, partially paid, overdue and paid Invoice rows provide receivable truth. Draft Invoices are not debt.">
+            <TableViewport>
+              <Table variant="admin">
+                <TableHeader variant="admin">
+                  <TableRow>
+                    <TableCell isHeader variant="admin">Status</TableCell>
+                    <TableCell isHeader variant="admin">Jobs</TableCell>
+                    <TableCell isHeader variant="admin">Open Balance</TableCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody variant="admin">
+                  {loading ? <TableStateRow colSpan={3}>Loading payment status…</TableStateRow> : null}
+                  {!loading && (report?.payment_statuses.length ?? 0) === 0 ? <TableStateRow colSpan={3}>No payment status data is available.</TableStateRow> : null}
+                  {report?.payment_statuses.map((row) => (
+                    <TableRow key={row.status}>
+                      <TableCell variant="admin"><Badge color={PAYMENT_COLORS[row.status]}>{paymentLabel(row.status)}</Badge></TableCell>
+                      <TableCell variant="admin">{number(row.jobs, 0)}</TableCell>
+                      <TableCell variant="admin">{money(row.open_balance, row.currency_code)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableViewport>
+          </ComponentCard>
+
+          <ComponentCard title="Needs Attention" desc="Outstanding receivables and missing salesperson/location data are surfaced here without inventing workflow statuses.">
+            {loading ? (
+              <p className={`py-8 text-center text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading attention items…</p>
+            ) : (report?.attention.length ?? 0) === 0 ? (
+              <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-4 dark:border-success-500/30 dark:bg-success-500/10">
+                <p className="font-medium text-success-700 dark:text-success-300">No jobs currently need attention</p>
+                <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>No open or overdue receivable, missing salesperson, or missing location is present under the selected filters.</p>
+              </div>
+            ) : (
+              <TableViewport>
+                <Table variant="admin" minWidth="wide">
+                  <TableHeader variant="admin">
+                    <TableRow>
+                      <TableCell isHeader variant="admin">Order</TableCell>
+                      <TableCell isHeader variant="admin">Customer</TableCell>
+                      <TableCell isHeader variant="admin">Date</TableCell>
+                      <TableCell isHeader variant="admin">Salesperson</TableCell>
+                      <TableCell isHeader variant="admin">Status</TableCell>
+                      <TableCell isHeader variant="admin">Open Balance</TableCell>
+                      <TableCell isHeader variant="admin">Reason</TableCell>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody variant="admin">
+                    {report?.attention.map((row) => (
+                      <TableRow key={row.order_id}>
+                        <TableCell variant="admin">{row.order_number}</TableCell>
+                        <TableCell variant="admin">{row.customer_name}</TableCell>
+                        <TableCell variant="admin">{formatDateOnly(row.order_date)}</TableCell>
+                        <TableCell variant="admin">{row.salesperson_name}</TableCell>
+                        <TableCell variant="admin"><Badge color={PAYMENT_COLORS[row.payment_status]}>{paymentLabel(row.payment_status)}</Badge></TableCell>
+                        <TableCell variant="admin">{money(row.open_balance, row.currency_code)}</TableCell>
+                        <TableCell variant="admin">{row.reasons.join(" · ")}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableViewport>
+            )}
+          </ComponentCard>
+        </div>
+      ) : null}
+
+      {activeTab === "jobs" ? (
+        <div role="tabpanel" aria-label="Jobs">
+          <ComponentCard title="Job Detail" desc="Order-level source detail. Project data is enrichment only, so legacy and non-Project Orders remain visible.">
+            <TableViewport>
+              <Table variant="admin" minWidth="wide">
+                <TableHeader variant="admin">
+                  <TableRow>
+                    <TableCell isHeader variant="admin">Date</TableCell>
+                    <TableCell isHeader variant="admin">Order</TableCell>
+                    <TableCell isHeader variant="admin">Project</TableCell>
+                    <TableCell isHeader variant="admin">Customer</TableCell>
+                    <TableCell isHeader variant="admin">Salesperson</TableCell>
+                    <TableCell isHeader variant="admin">Location</TableCell>
+                    <TableCell isHeader variant="admin">Material</TableCell>
+                    <TableCell isHeader variant="admin">Sq. Ft.</TableCell>
+                    <TableCell isHeader variant="admin">Sales</TableCell>
+                    <TableCell isHeader variant="admin">Payment</TableCell>
+                    <TableCell isHeader variant="admin">Open Balance</TableCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody variant="admin">
+                  {loading ? <TableStateRow colSpan={11}>Loading job detail…</TableStateRow> : null}
+                  {!loading && (report?.rows.length ?? 0) === 0 ? <TableStateRow colSpan={11}>No jobs match the selected filters.</TableStateRow> : null}
+                  {report?.rows.map((row) => (
+                    <TableRow key={row.order_id}>
+                      <TableCell variant="admin">{formatDateOnly(row.order_date)}</TableCell>
+                      <TableCell variant="admin">{row.order_number}</TableCell>
+                      <TableCell variant="admin">{row.project_number || "—"}</TableCell>
+                      <TableCell variant="admin">{row.customer_name}</TableCell>
+                      <TableCell variant="admin">{row.salesperson_name}</TableCell>
+                      <TableCell variant="admin">{row.location}</TableCell>
+                      <TableCell variant="admin">{row.material_types.length ? row.material_types.join(", ") : "—"}</TableCell>
+                      <TableCell variant="admin">{number(row.sqft)}</TableCell>
+                      <TableCell variant="admin">{money(row.sales_amount, row.currency_code)}</TableCell>
+                      <TableCell variant="admin"><Badge color={PAYMENT_COLORS[row.payment_status]}>{paymentLabel(row.payment_status)}</Badge></TableCell>
+                      <TableCell variant="admin">{money(row.open_balance, row.currency_code)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableViewport>
+            <div className={`flex flex-wrap items-center justify-between gap-3 text-sm ${ADMIN_TEXT_STYLES.muted}`}>
+              <span>{totalCount} job(s) · showing {totalCount === 0 ? 0 : offset + 1}–{Math.min(offset + PAGE_SIZE, totalCount)}</span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" disabled={loading || offset === 0} onClick={() => changePage(offset - PAGE_SIZE)}>Previous</Button>
+                <Button size="sm" variant="outline" disabled={loading || offset + PAGE_SIZE >= totalCount} onClick={() => changePage(offset + PAGE_SIZE)}>Next</Button>
+              </div>
+            </div>
+          </ComponentCard>
+        </div>
+      ) : null}
     </div>
   );
 }
