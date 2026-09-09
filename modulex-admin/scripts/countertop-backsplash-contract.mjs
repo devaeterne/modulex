@@ -50,9 +50,6 @@ for (const token of [
   "const BACKSPLASH_HEIGHT_OPTIONS",
   "Full Height",
   "Add Backsplash",
-  "Linear feet",
-  "Full height (inches)",
-  "Polished top edge",
   "countertop_configuration_backsplashes",
   "backsplashPayload",
   "p_backsplashes:backsplashPayload()",
@@ -62,7 +59,27 @@ for (const token of [
 for (let height = 1; height <= 10; height += 1)
   assert(configurator.includes(`label: \"${height}\\\"\"`), `Backsplash selector must expose ${height} inch height`);
 
-assert(configurator.includes("setBacksplashes((rows)=>[...rows,newBacksplash()])"), "Configurator must support adding multiple backsplash rows");
+for (const token of [
+  'import { Modal } from "@/components/ui/modal"',
+  "backsplashModalOpen",
+  "backsplashDraft",
+  "backsplashEditingId",
+  "openNewBacksplashModal",
+  "openEditBacksplashModal",
+  "saveBacksplashModal",
+  "<Modal",
+  "Add Backsplash",
+  "Edit Backsplash",
+  "Actual height (inches)",
+  "Calculated Area",
+  "Backsplash Total",
+]) assert(configurator.includes(token), `Backsplash modal UX contract missing: ${token}`);
+
+assert(configurator.includes("openEditBacksplashModal(row)"), "Existing backsplash rows must reopen in the same modal for Edit Order");
+assert(configurator.includes("openNewBacksplashModal"), "New Order must open the shared backsplash modal from Add Backsplash");
+assert(configurator.includes("No backsplash added."), "Empty backsplash state must stay compact on the main configurator");
+assert(configurator.includes("Edit") && configurator.includes("Remove"), "Compact backsplash summary rows must expose Edit and Remove actions");
+assert(!configurator.includes("function renderBacksplashRow"), "Backsplash measurement inputs must not remain inline on the main configurator");
 assert(summary.includes("Backsplash:") && summary.includes("backsplashes"), "Order Countertop summary must show backsplash selections");
 
-console.log("Countertop multi-backsplash contract: PASS");
+console.log("Countertop multi-backsplash modal contract: PASS");
