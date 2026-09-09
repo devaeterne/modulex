@@ -193,15 +193,15 @@ function renderParty(title: string, values: string[], x: number, y: number) {
   return commands;
 }
 
-function renderTableHeader(y: number) {
+function renderTableHeader(y: number, showDiscount: boolean) {
   let commands = line(MARGIN, y + 9, PAGE_WIDTH - MARGIN, y + 9, 0.8);
   commands += text("#", MARGIN + 2, y, 7.5, true);
   commands += text("SKU", MARGIN + 22, y, 7.5, true);
   commands += text("DESCRIPTION", MARGIN + 92, y, 7.5, true);
   commands += text("QTY", 375, y, 7.5, true);
   commands += text("UNIT PRICE", 410, y, 7.5, true);
-  commands += text("DISCOUNT", 474, y, 7.5, true);
-  commands += text("TOTAL", 536, y, 7.5, true);
+  if (showDiscount) commands += text("DISCOUNT", 474, y, 7.5, true);
+  commands += text("TOTAL", showDiscount ? 536 : 515, y, 7.5, true);
   commands += line(MARGIN, y - 7, PAGE_WIDTH - MARGIN, y - 7, 0.5);
   return commands;
 }
@@ -224,7 +224,7 @@ function rowHeight(item: CommercialDocumentLine) {
   return Math.max(29, 13 + descriptionCount * 10 + details * 9);
 }
 
-function renderLine(item: CommercialDocumentLine, y: number) {
+function renderLine(item: CommercialDocumentLine, y: number, showDiscount: boolean) {
   const height = rowHeight(item);
   const descriptions = descriptionRows(item);
   const details = detailRows(item);
@@ -242,8 +242,8 @@ function renderLine(item: CommercialDocumentLine, y: number) {
 
   commands += text(item.quantity, 377, y, 7.5);
   commands += text(item.unitPrice, 410, y, 7.5);
-  commands += text(item.discount, 476, y, 7.5);
-  commands += text(item.total, 522, y, 7.5, true);
+  if (showDiscount) commands += text(item.discount, 476, y, 7.5);
+  commands += text(item.total, showDiscount ? 522 : 500, y, 7.5, true);
   commands += line(MARGIN, y - height + 7, PAGE_WIDTH - MARGIN, y - height + 7, 0.35);
   return { commands, height };
 }
@@ -273,6 +273,7 @@ function pageChunks(lines: CommercialDocumentLine[]) {
 }
 
 function buildPageContents(document: CommercialDocument, settings: GeneralSettings, primary: PdfImage | null, secondary: PdfImage | null) {
+  const showDiscount = document.lines.some((item) => Boolean(item.discount.trim()));
   const chunks = pageChunks(document.lines);
   const pages: string[] = [];
 
@@ -300,10 +301,10 @@ function buildPageContents(document: CommercialDocument, settings: GeneralSettin
       tableY = 548;
     }
 
-    commands += renderTableHeader(tableY);
+    commands += renderTableHeader(tableY, showDiscount);
     let rowY = tableY - 27;
     for (const item of items) {
-      const rendered = renderLine(item, rowY);
+      const rendered = renderLine(item, rowY, showDiscount);
       commands += rendered.commands;
       rowY -= rendered.height;
     }
