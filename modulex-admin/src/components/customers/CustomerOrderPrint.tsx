@@ -119,6 +119,7 @@ export default function CustomerOrderPrint() {
   const formatMoney = (value: string | number | null | undefined) => money(value, currency, locale);
   const formatDate = (value: string | null | undefined) => date(value, locale, timezone);
   const grandTotal = Number(order.grand_total ?? order.total_amount ?? 0);
+  const discountAmount = Number(order.discount_amount ?? 0);
   const summariesByItemId = new Map(countertopSummaries.map((summary) => [summary.orderItemId, summary]));
 
   const document: CommercialDocumentModel = {
@@ -136,7 +137,6 @@ export default function CustomerOrderPrint() {
     information: [
       { label: "Billing Address", value: snapshotLines(order.billing_address_snapshot).join(" · ") },
       { label: "Payment", value: order.payment_method_name_snapshot || "—" },
-      { label: "Currency", value: currency },
       ...(order.customer_reference ? [{ label: "Reference", value: order.customer_reference }] : []),
     ],
     lines: items.map((item) => ({
@@ -146,12 +146,12 @@ export default function CustomerOrderPrint() {
       detail: lineDetail(summariesByItemId.get(item.id), item.line_note),
       quantity: String(Number(item.quantity)),
       unitPrice: formatMoney(visiblePricing.get(item.id)?.unitPrice ?? item.unit_price),
-      discount: `${Number(item.discount_percent).toFixed(1)}%`,
+      discount: Number(item.discount_percent) > 0 ? `${Number(item.discount_percent).toFixed(1)}%` : "",
       total: formatMoney(visiblePricing.get(item.id)?.lineTotal ?? item.line_total),
     })),
     totals: [
-      { label: "Subtotal", value: formatMoney(Number(order.customer_visible_sell_amount ?? 0) + Number(order.discount_amount ?? 0)) },
-      { label: "Discount", value: `-${formatMoney(order.discount_amount)}` },
+      { label: "Subtotal", value: formatMoney(Number(order.customer_visible_sell_amount ?? 0) + discountAmount) },
+      ...(discountAmount > 0 ? [{ label: "Discount", value: `-${formatMoney(discountAmount)}` }] : []),
       { label: `Tax (${Number(order.tax_rate).toFixed(1)}%)`, value: formatMoney(order.tax_amount) },
       { label: "Order Total", value: formatMoney(order.total_amount) },
       ...(Number(order.payment_commission_amount ?? 0) > 0 ? [{ label: "Order adjustment", value: formatMoney(order.payment_commission_amount) }] : []),

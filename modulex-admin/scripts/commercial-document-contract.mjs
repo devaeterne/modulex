@@ -53,7 +53,10 @@ if (exists("src/components/documents/CommercialDocument.tsx")) {
   expect(component.includes("centerLogo = secondaryLogo || primaryLogo"), "A4 preview must place Logo 2 in the center slot and preserve a one-logo fallback");
   expect(component.includes("rightLogo = secondaryLogo ? primaryLogo : null"), "A4 preview must move Logo 1 to the right only when Logo 2 exists");
   expect(component.includes("commercial-document-secondary-logo flex h-24"), "A4 preview must keep Logo 2 in a dedicated enlarged visual box");
-  expect(component.includes("max-h-24 max-w-[188px] origin-center scale-[1.18]"), "A4 preview must make the centered Logo 2 slightly larger without stretching it");
+  expect(component.includes("max-h-24 max-w-[188px] origin-center scale-[1.652]"), "A4 preview must keep the merged 40% Logo 2 enlargement");
+  expect(component.includes("const showDiscount = document.lines.some((item) => Boolean(item.discount.trim()));"), "CommercialDocument must derive discount-column visibility from non-empty line discounts");
+  expect(/showDiscount\s*\?\s*<TableCell[^>]*>Discount<\/TableCell>\s*:\s*null/.test(component), "A4 preview/print must hide the Discount header when no line has a discount");
+  expect(/showDiscount\s*\?\s*<TableCell[^>]*>\{item\.discount\}<\/TableCell>\s*:\s*null/.test(component), "A4 preview/print must hide the Discount cells when the discount column is absent");
 }
 
 const adminTheme = read("src/components/ui/theme/adminTheme.ts");
@@ -69,6 +72,9 @@ for (const wrapper of [
   expect(source.includes("CommercialDocument"), `${wrapper} must use the shared CommercialDocument renderer`);
   expect(source.includes("loadCountertopLineSummaries"), `${wrapper} must load saved Countertop configuration snapshots`);
   expect(source.includes("formatCountertopPrintDetail"), `${wrapper} must map Countertop snapshots into printable detail text`);
+  expect(!source.includes('{ label: "Currency", value: currency }'), `${wrapper} must not render Currency as a document-information field`);
+  expect(source.includes("discount: Number(item.discount_percent) > 0 ?"), `${wrapper} must leave zero-value line discounts blank`);
+  expect(source.includes('...(discountAmount > 0 ? [{ label: "Discount"'), `${wrapper} must omit the totals Discount row when the discount amount is zero`);
 }
 
 const invoicePrint = read("src/components/customers/CustomerInvoicePrint.tsx");
@@ -100,6 +106,9 @@ if (exists("src/lib/documents/pdf.ts")) {
   expect(pdf.includes("SECONDARY_CENTER_LOGO_BOX = { x: 215, y: 741, maxWidth: 160, maxHeight: 70 }"), "Downloaded PDF must center and enlarge Logo 2");
   expect(pdf.includes("PRIMARY_RIGHT_LOGO_BOX = { x: 397, y: 751, maxWidth: 140, maxHeight: 50 }"), "Downloaded PDF must move Logo 1 to the right at its normal visual scale");
   expect(pdf.includes("if (secondary)"), "Downloaded PDF must preserve the one-logo fallback while swapping two-logo layouts");
+  expect(pdf.includes("const showDiscount = document.lines.some((item) => Boolean(item.discount.trim()));"), "Downloaded PDF must derive discount-column visibility from non-empty line discounts");
+  expect(pdf.includes("renderTableHeader(tableY, showDiscount)"), "Downloaded PDF must render its Discount header conditionally");
+  expect(pdf.includes("renderLine(item, rowY, showDiscount)"), "Downloaded PDF must render line Discount values conditionally");
 }
 
 const canonicalSqlPath = "sql/commercial-document-branding.sql";

@@ -46,6 +46,7 @@ export default function CommercialDocument({ document, settings }: Props) {
   const centerLogo = secondaryLogo || primaryLogo;
   const rightLogo = secondaryLogo ? primaryLogo : null;
   const addressLines = companyAddress(settings);
+  const showDiscount = document.lines.some((item) => Boolean(item.discount.trim()));
 
   async function downloadPdf() {
     setIsDownloading(true);
@@ -129,7 +130,7 @@ export default function CommercialDocument({ document, settings }: Props) {
                 <TableCell isHeader variant="plain" className="py-2.5 pr-2 text-xs font-semibold">Product / Description</TableCell>
                 <TableCell isHeader variant="plain" className="w-12 py-2.5 pr-2 text-right text-xs font-semibold">Qty</TableCell>
                 <TableCell isHeader variant="plain" className="w-24 py-2.5 pr-2 text-right text-xs font-semibold">Unit Price</TableCell>
-                <TableCell isHeader variant="plain" className="w-20 py-2.5 pr-2 text-right text-xs font-semibold">Discount</TableCell>
+                {showDiscount ? <TableCell isHeader variant="plain" className="w-20 py-2.5 pr-2 text-right text-xs font-semibold">Discount</TableCell> : null}
                 <TableCell isHeader variant="plain" className="w-24 py-2.5 text-right text-xs font-semibold">Total</TableCell>
               </TableRow>
             </TableHeader>
@@ -141,7 +142,7 @@ export default function CommercialDocument({ document, settings }: Props) {
                   <TableCell variant="plain" className={`py-3 pr-2 ${ADMIN_DOCUMENT_STYLES.description}`}><p>{item.description}</p>{item.detail ? <p className={`mt-1 whitespace-pre-line text-xs leading-4 ${ADMIN_DOCUMENT_STYLES.detail}`}>{item.detail}</p> : null}</TableCell>
                   <TableCell variant="plain" className={`py-3 pr-2 text-right ${ADMIN_DOCUMENT_STYLES.numeric}`}>{item.quantity}</TableCell>
                   <TableCell variant="plain" className={`py-3 pr-2 text-right ${ADMIN_DOCUMENT_STYLES.numeric}`}>{item.unitPrice}</TableCell>
-                  <TableCell variant="plain" className={`py-3 pr-2 text-right ${ADMIN_DOCUMENT_STYLES.numeric}`}>{item.discount}</TableCell>
+                  {showDiscount ? <TableCell variant="plain" className={`py-3 pr-2 text-right ${ADMIN_DOCUMENT_STYLES.numeric}`}>{item.discount}</TableCell> : null}
                   <TableCell variant="plain" className={`py-3 text-right font-semibold ${ADMIN_DOCUMENT_STYLES.lineTotal}`}>{item.total}</TableCell>
                 </TableRow>
               ))}
