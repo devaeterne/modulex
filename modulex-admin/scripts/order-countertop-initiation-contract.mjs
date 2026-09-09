@@ -76,7 +76,7 @@ assert(!editOrder.includes('product?.sku ?? "Historical product"'), "Edit Order 
 assert(customerTypes.includes("display_name_override?: string | null"), "CustomerOrderItem typing must expose the optional display-name override");
 assert(orderDetail.includes("item.display_name_override || item.product_name_snapshot"), "Order Detail must render the manual line title before the immutable snapshot");
 assert(orderPrint.includes("item.display_name_override || item.product_name_snapshot"), "Printable Order/PDF must render the manual line title before the immutable snapshot");
-assert(configurator.includes("create_and_attach_countertop_order_item"), "new countertop attachment must use the secure create+attach RPC");
+assert(configurator.includes("create_and_attach_countertop_order_item"), "new countertop attachment must use the secure create+attach RPC family");
 assert(configurator.includes("crypto.randomUUID()") || configurator.includes("randomUUID"), "new countertop initiation must send an idempotency request id");
 assert(configurator.includes("attach_countertop_configuration"), "existing Configure Countertop path must remain intact");
 
@@ -111,7 +111,8 @@ assert(draftShellMigration.includes("p_initial_status='confirmed'") || draftShel
 assert(picker.includes('product.pricing_model !== "price_group"'), "ordinary Cabinet picker must keep non-price-group products disabled if any reach its eligible list");
 assert(picker.includes("excludedProductTypeCodes"), "ordinary Cabinet picker must support explicit Product Type exclusions");
 assert(newOrder.includes('excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]}') && editOrder.includes('excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]}'), "Cabinet entry must exclude Stone, Sink and Service Product Types");
-assert(configurator.includes('contains("metadata", { product_kind: "sink" })'), "Countertop sink dropdown must keep metadata-based sink discovery");
+assert(configurator.includes('product_types!inner(code)') && configurator.includes('.eq("product_types.code","SINK")'), "Countertop Sink discovery must use the canonical SINK Product Type relation rather than metadata as sole truth");
+assert(configurator.includes('.eq("product_types.code","FUCST")'), "Countertop Faucet discovery must use the canonical FUCST Product Type relation rather than metadata as sole truth");
 assert(orderDomain.includes("pricing_model") && picker.includes("priceMap"), "normal Order picker must retain canonical Product Type pricing routing");
 
 assert(pricingV2.includes("if v_type.pricing_model='countertop_material_band'"), "Stone ordinary mutation must remain fail-closed");
