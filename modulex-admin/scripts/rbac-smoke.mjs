@@ -41,6 +41,22 @@ const locationsTableSource = readFileSync(
   resolve(process.cwd(), "src/components/locations/LocationsTable.tsx"),
   "utf8"
 );
+const salesProductionSql = readFileSync(
+  resolve(process.cwd(), "../modulex-store/supabase/migrations/20260909213000_sales_production_report.sql"),
+  "utf8"
+);
+const salesProductionPage = readFileSync(
+  resolve(process.cwd(), "src/app/(admin)/reports/sales-production/page.tsx"),
+  "utf8"
+);
+const salesProductionUi = readFileSync(
+  resolve(process.cwd(), "src/components/reports/SalesProductionReport.tsx"),
+  "utf8"
+);
+const salesProductionAdapter = readFileSync(
+  resolve(process.cwd(), "src/lib/reports/salesProduction.ts"),
+  "utf8"
+);
 
 const checks = [];
 function check(name, fn) {
@@ -145,6 +161,32 @@ check("Sales & Production report remains Finance-only", () => {
     sidebarSource,
     /name:\s*"Sales & Production"\s*,\s*path:\s*"\/reports\/sales-production"\s*,\s*permission:\s*"finance\.view"/,
   );
+});
+
+check("Sales & Production report uses canonical financial and production truth", () => {
+  assert.match(salesProductionSql, /private\.finance_assert_view\(\)/);
+  assert.match(salesProductionSql, /customer_visible_sell_amount/);
+  assert.match(salesProductionSql, /public\.customer_invoices/);
+  assert.match(salesProductionSql, /paid_amount/);
+  assert.match(salesProductionSql, /status in \('issued', 'partially_paid', 'paid', 'overdue'\)/);
+  assert.match(salesProductionSql, /public\.countertop_configurations/);
+  assert.match(salesProductionSql, /\bsqft\b/);
+  assert.match(salesProductionSql, /public\.countertop_stone_types/);
+  assert.match(salesProductionSql, /public\.get_sales_production_report/);
+  assert.match(salesProductionSql, /revoke execute[\s\S]+from public, anon/i);
+  assert.match(salesProductionSql, /grant execute[\s\S]+to authenticated/i);
+  assert.ok(!/total_amount\s*-\s*deposit/i.test(salesProductionSql), "Report must not recreate Balance Due from a deposit field");
+});
+
+check("Sales & Production Admin surface stays behind the report RPC", () => {
+  assert.match(salesProductionPage, /PageBreadCrumb/);
+  assert.match(salesProductionPage, /SalesProductionReport/);
+  for (const primitive of ["ComponentCard", "DateInput", "Label", "Select", "Alert", "Badge", "Button", "TableViewport"]) {
+    assert.ok(salesProductionUi.includes(primitive), `Sales & Production UI should reuse ${primitive}`);
+  }
+  assert.ok(!salesProductionUi.includes("@/lib/supabase/client"), "Feature UI must not query Supabase directly");
+  assert.match(salesProductionAdapter, /supabase\.rpc\("get_sales_production_report"/);
+  assert.ok(!salesProductionAdapter.includes(".from("), "Adapter must consume the protected RPC instead of browser table reads");
 });
 
 check("Personnel and low-stock routes map to their dedicated permissions", () => {
