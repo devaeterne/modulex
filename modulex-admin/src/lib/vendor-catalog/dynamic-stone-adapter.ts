@@ -135,7 +135,29 @@ function parseLocalizedPrice(value: string) {
 }
 
 function extractPrice(html: string) {
-  const values = [...html.matchAll(/\boe_currency_value\b[^>]*>([\s\S]*?)<\//gi)]
+  const activePriceValues = [
+    ...html.matchAll(
+      /<[^>]*\bclass=["'][^"']*\boe_price\b[^"']*["'][^>]*>[\s\S]*?\boe_currency_value\b[^>]*>([\s\S]*?)<\//gi
+    ),
+  ]
+    .map((match) => stripHtml(match[1]))
+    .filter((value): value is string => Boolean(value))
+    .map(parseLocalizedPrice)
+    .filter((value): value is number => value !== null);
+
+  if (activePriceValues.length > 0) return activePriceValues.at(-1) ?? null;
+
+  const withoutCrossedOutPrices = html
+    .replace(/<del\b[^>]*>[\s\S]*?<\/del>/gi, " ")
+    .replace(/<s\b[^>]*>[\s\S]*?<\/s>/gi, " ")
+    .replace(
+      /<([a-z0-9:-]+)\b[^>]*\bclass=["'][^"']*(?:text-decoration-line-through|line-through)[^"']*["'][^>]*>[\s\S]*?<\/\1>/gi,
+      " "
+    );
+
+  const values = [
+    ...withoutCrossedOutPrices.matchAll(/\boe_currency_value\b[^>]*>([\s\S]*?)<\//gi),
+  ]
     .map((match) => stripHtml(match[1]))
     .filter((value): value is string => Boolean(value))
     .map(parseLocalizedPrice)
