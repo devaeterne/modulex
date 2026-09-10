@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-10
-Main baseline: `b90e1a0ac1e2da3d5b0a3e9ef0af743ab42719ff` (`#424` merged)
+Main baseline: `29d36d4e1e9858c2726b3b70bed0105bade85809` (`#426` merged)
 Current phase: **Admin Final Workstreams**
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
@@ -79,12 +79,12 @@ Status: `[x]` LD-A1→LD-A4 implemented in the final Leads workstream.
 
 ## DLR — Dealer Onboarding & Customer Documents
 
-Status: `[~]` core contracts exist; end-to-end lifecycle closeout remains.
+Status: `[x]` DLR-A1→DLR-A4 implemented and production-accepted.
 
-- [ ] **DLR-A1 — Dealer approval to activation.** Verify/finish application approval → Customer/account setup → portal activation as one coherent operator flow.
-- [ ] **DLR-A2 — Rejection/deactivation/reactivation.** Define allowed transitions, reasons, audit behavior and portal access consequences.
-- [ ] **DLR-A3 — Document privacy.** Prove supporting/customer documents remain private by default, Dealer visibility is explicit, and labels/categories/expiry metadata are added only where business-required.
-- [ ] **DLR-A4 — Dealer/document exit gate.** Signed-in production acceptance with negative cross-customer/document access checks and zero manual SQL.
+- [x] **DLR-A1 — Dealer approval to activation.** Verify/finish application approval → Customer/account setup → portal activation as one coherent operator flow.
+- [x] **DLR-A2 — Rejection/deactivation/reactivation.** Define allowed transitions, reasons, audit behavior and portal access consequences.
+- [x] **DLR-A3 — Document privacy.** Prove supporting/customer documents remain private by default, Dealer visibility is explicit, and labels/categories/expiry metadata are added only where business-required.
+- [x] **DLR-A4 — Dealer/document exit gate.** Signed-in production acceptance with negative cross-customer/document access checks and zero manual SQL.
 
 ## USR — Users & Roles
 
