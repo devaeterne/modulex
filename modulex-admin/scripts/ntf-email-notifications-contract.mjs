@@ -56,8 +56,8 @@ assert.match(notificationLifecycle, /addEventListener\(["']storage["']/);
 assert.match(notificationLifecycle, /modulex-notifications-read:/);
 assert.match(notificationLifecycle, /document\.visibilityState\s*!==\s*["']visible["']/);
 assert.match(dropdownItem, /function\s+safeNotificationHref/);
-assert.match(dropdownItem, /value\.startsWith\(["']\/\/["']\)/);
-assert.match(dropdownItem, /value\.includes\(["']\\\\["']\)/);
+assert.ok(dropdownItem.includes('value.startsWith("//")'), "notification deep links must reject protocol-relative URLs");
+assert.ok(dropdownItem.includes('value.includes("\\\\")'), "notification deep links must reject backslash-based paths");
 
 // NTF-A4 — raw queue is no longer readable by normal authenticated roles;
 // operators get a sanitized projection plus bounded retry/stuck recovery.
