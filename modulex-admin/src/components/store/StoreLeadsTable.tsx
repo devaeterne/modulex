@@ -27,6 +27,7 @@ import type {
 import { formatDateTime } from "@/lib/dates/usDate";
 
 const pageSize = 25;
+const EMPTY_SUMMARY: StoreLeadSummary = { total: 0, new: 0, dealer_applications: 0, qualified_or_approved: 0, archived: 0 };
 const summaryCardClass = `${ADMIN_SURFACE_CARD} p-5`;
 const filterCardClass = `${ADMIN_SURFACE_CARD} p-5 sm:p-6`;
 const tableCardClass = ADMIN_SURFACE_CARD;
@@ -71,7 +72,7 @@ function typeLabel(lead: StoreLeadListItem) {
 export default function StoreLeadsTable() {
   const [leads, setLeads] = useState<StoreLeadListItem[]>([]);
   const [assignees, setAssignees] = useState<LeadAssignee[]>([]);
-  const [summary, setSummary] = useState<StoreLeadSummary>({ total: 0, new: 0, dealer_applications: 0, qualified_or_approved: 0, archived: 0 });
+  const [summary, setSummary] = useState<StoreLeadSummary>(EMPTY_SUMMARY);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,13 +148,13 @@ export default function StoreLeadsTable() {
         setLeads([]);
       } else {
         setLeads((pageResult.data ?? []) as StoreLeadListItem[]);
-        setSummary((summaryResult.data ?? summary) as StoreLeadSummary);
+        setSummary((summaryResult.data ?? EMPTY_SUMMARY) as StoreLeadSummary);
       }
       setLoading(false);
     }
     void load();
     return () => { active = false; };
-  }, [profileId, profileRole, debouncedSearch, typeFilter, statusFilter, ownerFilter, includeArchived, page, summary]);
+  }, [profileId, profileRole, debouncedSearch, typeFilter, statusFilter, ownerFilter, includeArchived, page]);
 
   const assigneeMap = useMemo(
     () => new Map(assignees.map((item) => [item.id, item.full_name || item.email || "Unknown user"])),
