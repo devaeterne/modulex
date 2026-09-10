@@ -1,0 +1,1 @@
+MOD closeout is implemented in this branch. See MOD_OPTIONAL_MODULE_CLOSEOUT.md for the production ownership decision and regression contract.
