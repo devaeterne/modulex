@@ -97,13 +97,13 @@ Status: `[x]` USR-A1→USR-A4 implemented, production-migrated and rollback/read
 
 ## SET — General Settings
 
-Status: `[~]` settings surfaces exist; ownership and downstream-consumer review remains.
+Status: `[x]` SET-A1→SET-A5 implemented and production-accepted.
 
-- [ ] **SET-A1 — Company/public profile ownership.** Confirm `general_settings`/Company workspace is the single canonical source and Store consumes only narrow public projections.
-- [ ] **SET-A2 — Locale/timezone/currency.** Verify each setting has one owner and every consuming Admin/Store/Finance surface uses it consistently; preserve Finance transaction-time FX semantics.
-- [ ] **SET-A3 — Tax rules.** Audit actual business requirements, active/inactive behavior, effective usage in Orders/Invoices and mutation authorization.
-- [ ] **SET-A4 — Document settings.** Reconcile numbering, templates, logos/signatures and document defaults without introducing duplicate configuration stores.
-- [ ] **SET-A5 — Settings exit gate.** Regression + RBAC + production acceptance proving settings have clear ownership and downstream consumers.
+- [x] **SET-A1 — Company/public profile ownership.** `general_settings` owns the singleton company/public profile; structured contact/location/hours retain their canonical tables and Store consumes narrow public RPC projections only.
+- [x] **SET-A2 — Locale/timezone/currency.** Locale, timezone and main currency have canonical ownership; customer/order/invoice fallbacks no longer silently force USD and Finance transaction-time FX snapshots are unchanged.
+- [x] **SET-A3 — Tax rules.** Active/inactive fulfillment Tax Rules remain server-enforced at Order confirmation, Order→Invoice tax snapshots remain historical, and mutation/audit boundaries are explicit.
+- [x] **SET-A4 — Document settings.** Order/Invoice numbering format, titles, footers and branding stay in canonical General Settings while existing sequences remain counters; no duplicate document configuration store was introduced.
+- [x] **SET-A5 — Settings exit gate.** Settings RBAC/RLS/RPC boundaries and Store/Finance/Documents downstream contracts are covered by final regression and production-safe acceptance.
 
 ## NTF — Email & Notifications
 

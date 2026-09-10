@@ -7,16 +7,17 @@ import { ADMIN_DOCUMENT_STYLES } from "@/components/ui/theme/adminTheme";
 import { formatCountertopPrintDetail, loadCountertopLineSummaries } from "@/lib/customers/countertop-summary";
 import type { CountertopLineSummary, Customer, CustomerInvoice, CustomerInvoiceItem } from "@/lib/customers/types";
 import type { CommercialDocument as CommercialDocumentModel } from "@/lib/documents/types";
-import { DEFAULT_GENERAL_SETTINGS, type GeneralSettings } from "@/lib/settings/types";
+import type { GeneralSettings } from "@/lib/settings/types";
 import { supabase } from "@/lib/supabase/client";
 import { formatTimestampDate } from "@/lib/dates/usDate";
 
 function money(value: string | number | null | undefined, currency: string, locale: string) {
-  const amount = Number(value ?? 0);
+  const parsed = Number(value ?? 0);
+  const amount = Number.isFinite(parsed) ? parsed : 0;
   try {
-    return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: 2 }).format(Number.isFinite(amount) ? amount : 0);
+    return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: 2 }).format(amount);
   } catch {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(Number.isFinite(amount) ? amount : 0);
+    return `${currency} ${amount.toFixed(2)}`;
   }
 }
 
@@ -57,7 +58,7 @@ export default function CustomerInvoicePrint() {
   const [invoice, setInvoice] = useState<CustomerInvoice | null>(null);
   const [items, setItems] = useState<CustomerInvoiceItem[]>([]);
   const [countertopSummaries, setCountertopSummaries] = useState<CountertopLineSummary[]>([]);
-  const [settings, setSettings] = useState<GeneralSettings>(DEFAULT_GENERAL_SETTINGS);
+  const [settings, setSettings] = useState<GeneralSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -70,7 +71,7 @@ export default function CustomerInvoicePrint() {
         supabase.from("general_settings").select("*").eq("id", 1).maybeSingle(),
       ]);
 
-      const firstError = customerResult.error || invoiceResult.error || itemsResult.error;
+      const firstError = customerResult.error || invoiceResult.error || itemsResult.error || settingsResult.error;
       if (firstError) {
         setErrorMessage(firstError.message);
         setIsLoading(false);
@@ -88,18 +89,18 @@ export default function CustomerInvoicePrint() {
       setCustomer(customerResult.data as Customer);
       setInvoice(invoiceResult.data as CustomerInvoice);
       setItems(itemRows);
-      if (!settingsResult.error && settingsResult.data) setSettings(settingsResult.data as GeneralSettings);
+      if (settingsResult.data) setSettings(settingsResult.data as GeneralSettings);
       setIsLoading(false);
     }
     void load();
   }, [params.id, params.invoiceId]);
 
   if (isLoading) return <div className={`min-h-screen p-10 text-center text-sm ${ADMIN_DOCUMENT_STYLES.loading}`}>Preparing printable invoice...</div>;
-  if (!customer || !invoice) return <div className={`min-h-screen p-10 text-center text-sm ${ADMIN_DOCUMENT_STYLES.loadError}`}>{errorMessage || "Invoice not found."}</div>;
+  if (!customer || !invoice || !settings) return <div className={`min-h-screen p-10 text-center text-sm ${ADMIN_DOCUMENT_STYLES.loadError}`}>{errorMessage || "Invoice or canonical company settings not found."}</div>;
 
-  const locale = settings.locale || "en-US";
-  const timezone = settings.timezone || "UTC";
-  const currency = invoice.currency_code || settings.default_currency || "USD";
+  const locale = settings.locale;
+  const timezone = settings.timezone;
+  const currency = invoice.currency_code;
   const formatMoney = (value: string | number | null | undefined) => money(value, currency, locale);
   const formatDate = (value: string | null | undefined) => date(value, locale, timezone);
   const balance = Math.max(Number(invoice.total_amount ?? 0) - Number(invoice.paid_amount ?? 0), 0);
@@ -114,7 +115,7 @@ export default function CustomerInvoicePrint() {
 
   const document: CommercialDocumentModel = {
     kind: "invoice",
-    title: settings.invoice_document_title || "Invoice",
+    title: settings.invoice_document_title,
     number: invoice.invoice_number,
     fileName: `Invoice-${invoice.invoice_number.replace(/[^a-zA-Z0-9._-]+/g, "-")}.pdf`,
     meta: [
