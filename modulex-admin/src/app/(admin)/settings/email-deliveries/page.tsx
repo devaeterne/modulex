@@ -1,6 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import ComponentCard from "@/components/common/ComponentCard";
+import Button from "@/components/ui/button/Button";
+import Badge from "@/components/ui/badge/Badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  TableStateRow,
+  TableViewport,
+} from "@/components/ui/table";
 import { supabase } from "@/lib/supabase/client";
 import { formatDateTime } from "@/lib/dates/usDate";
 
@@ -36,14 +49,9 @@ export default function EmailDeliveriesPage() {
   const request = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
     const { data } = await supabase.auth.getSession();
     if (!data.session?.access_token) throw new Error("Authentication required.");
-    return fetch(input, {
-      ...init,
-      headers: {
-        ...(init?.headers ?? {}),
-        Authorization: `Bearer ${data.session.access_token}`,
-      },
-      cache: "no-store",
-    });
+    const headers = new Headers(init?.headers);
+    headers.set("Authorization", `Bearer ${data.session.access_token}`);
+    return fetch(input, { ...init, headers, cache: "no-store" });
   }, []);
 
   const load = useCallback(async () => {
@@ -51,9 +59,9 @@ export default function EmailDeliveriesPage() {
     setError(null);
     try {
       const response = await request("/api/admin/email-notifications/monitor?limit=150");
-      const payload = (await response.json()) as { deliveries?: DeliveryRow[]; error?: string };
-      if (!response.ok) throw new Error(payload.error || "Delivery monitor could not be loaded.");
-      setRows(payload.deliveries ?? []);
+      const responseBody = (await response.json()) as { deliveries?: DeliveryRow[]; error?: string };
+      if (!response.ok) throw new Error(responseBody.error || "Delivery monitor could not be loaded.");
+      setRows(responseBody.deliveries ?? []);
     } catch (value) {
       setError(value instanceof Error ? value.message : "Delivery monitor could not be loaded.");
     } finally {
@@ -80,8 +88,8 @@ export default function EmailDeliveriesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notificationId: row.id }),
       });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "Retry could not be scheduled.");
+      const responseBody = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(responseBody.error || "Retry could not be scheduled.");
       await load();
     } catch (value) {
       setError(value instanceof Error ? value.message : "Retry could not be scheduled.");
@@ -99,8 +107,8 @@ export default function EmailDeliveriesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ limit: 50 }),
       });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "Queue processing failed.");
+      const responseBody = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(responseBody.error || "Queue processing failed.");
       await load();
     } catch (value) {
       setError(value instanceof Error ? value.message : "Queue processing failed.");
@@ -111,51 +119,84 @@ export default function EmailDeliveriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Email Deliveries</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Sanitized queue health, failure diagnostics and bounded retry controls. Recipient addresses, provider message IDs and payload contents are intentionally hidden.
-          </p>
+      <PageBreadcrumb pageTitle="Email Deliveries" />
+
+      <ComponentCard
+        title="Delivery operations"
+        desc="Sanitized queue health, failure diagnostics and bounded retry controls. Recipient addresses, provider message IDs and payload contents are intentionally hidden."
+        headerAction={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+              Refresh
+            </Button>
+            <Button size="sm" onClick={() => void processQueue()} disabled={processing}>
+              {processing ? "Processing…" : "Process queue"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="grid gap-3 sm:grid-cols-3">
+          <ComponentCard title="Failed"><strong>{counts.failed}</strong></ComponentCard>
+          <ComponentCard title="Stuck"><strong>{counts.stuck}</strong></ComponentCard>
+          <ComponentCard title="Pending"><strong>{counts.pending}</strong></ComponentCard>
         </div>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => void load()} disabled={loading} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200">
-            Refresh
-          </button>
-          <button type="button" onClick={() => void processQueue()} disabled={processing} className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-            {processing ? "Processing…" : "Process queue"}
-          </button>
-        </div>
-      </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]"><div className="text-xs uppercase tracking-wide text-gray-500">Failed</div><div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{counts.failed}</div></div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]"><div className="text-xs uppercase tracking-wide text-gray-500">Stuck</div><div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{counts.stuck}</div></div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]"><div className="text-xs uppercase tracking-wide text-gray-500">Pending</div><div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{counts.pending}</div></div>
-      </div>
+        {error ? <ComponentCard title="Delivery monitor error" desc={error} /> : null}
 
-      {error && <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-300">{error}</div>}
-
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/[0.02]"><tr><th className="px-4 py-3 text-left font-medium text-gray-500">Event</th><th className="px-4 py-3 text-left font-medium text-gray-500">Status</th><th className="px-4 py-3 text-left font-medium text-gray-500">Attempts</th><th className="px-4 py-3 text-left font-medium text-gray-500">Failure</th><th className="px-4 py-3 text-left font-medium text-gray-500">Updated</th><th className="px-4 py-3 text-right font-medium text-gray-500">Action</th></tr></thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {loading ? <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-500">Loading delivery status…</td></tr> : rows.length === 0 ? <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-500">No email delivery rows found.</td></tr> : rows.map((row) => {
+        <TableViewport>
+          <Table variant="admin" minWidth="wide">
+            <TableHeader variant="admin">
+              <TableRow>
+                <TableCell isHeader variant="admin">Event</TableCell>
+                <TableCell isHeader variant="admin">Status</TableCell>
+                <TableCell isHeader variant="admin">Attempts</TableCell>
+                <TableCell isHeader variant="admin">Failure</TableCell>
+                <TableCell isHeader variant="admin">Updated</TableCell>
+                <TableCell isHeader variant="admin" className="text-right">Action</TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody variant="admin" aria-busy={loading}>
+              {loading ? (
+                <TableStateRow colSpan={6}>Loading delivery status…</TableStateRow>
+              ) : rows.length === 0 ? (
+                <TableStateRow colSpan={6}>No email delivery rows found.</TableStateRow>
+              ) : rows.map((row) => {
                 const retryable = (row.status === "failed" || row.is_stuck) && !row.is_exhausted && row.attempts < row.max_attempts;
-                return <tr key={row.id}>
-                  <td className="px-4 py-3"><div className="font-medium text-gray-900 dark:text-white">{label(row.event_type)}</div><div className="mt-0.5 text-xs text-gray-500">{label(row.audience)} · {label(row.entity_type)}</div></td>
-                  <td className="px-4 py-3"><span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-200">{row.is_stuck ? "Stuck" : label(row.status)}</span>{row.is_exhausted && <div className="mt-1 text-xs text-error-600">Retry budget exhausted</div>}</td>
-                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{row.attempts} / {row.max_attempts}</td>
-                  <td className="max-w-md px-4 py-3"><div className="text-xs font-medium text-gray-700 dark:text-gray-300">{row.failure_code ? label(row.failure_code) : "—"}</div><div className="mt-1 text-xs leading-5 text-gray-500">{row.failure_reason || "No failure recorded."}</div></td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{formatDateTime(row.updated_at)}</td>
-                  <td className="px-4 py-3 text-right"><button type="button" onClick={() => void retry(row)} disabled={!retryable || retrying === row.id} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-200">{retrying === row.id ? "Retrying…" : "Retry"}</button></td>
-                </tr>;
+                return (
+                  <TableRow key={row.id}>
+                    <TableCell variant="admin">
+                      <div>{label(row.event_type)}</div>
+                      <div>{label(row.audience)} · {label(row.entity_type)}</div>
+                    </TableCell>
+                    <TableCell variant="admin">
+                      <div className="flex flex-wrap gap-2">
+                        <Badge size="sm">{row.is_stuck ? "Stuck" : label(row.status)}</Badge>
+                        {row.is_exhausted ? <Badge size="sm">Retry budget exhausted</Badge> : null}
+                      </div>
+                    </TableCell>
+                    <TableCell variant="admin">{row.attempts} / {row.max_attempts}</TableCell>
+                    <TableCell variant="admin">
+                      <div>{row.failure_code ? label(row.failure_code) : "—"}</div>
+                      <div>{row.failure_reason || "No failure recorded."}</div>
+                    </TableCell>
+                    <TableCell variant="admin">{formatDateTime(row.updated_at)}</TableCell>
+                    <TableCell variant="admin" className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void retry(row)}
+                        disabled={!retryable || retrying === row.id}
+                      >
+                        {retrying === row.id ? "Retrying…" : "Retry"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
               })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TableBody>
+          </Table>
+        </TableViewport>
+      </ComponentCard>
     </div>
   );
 }
