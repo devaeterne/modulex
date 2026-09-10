@@ -16,6 +16,7 @@ on:
       - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
       - "modulex-store/supabase/migrations/*dealer*.sql"
       - "modulex-store/supabase/migrations/*dlr*.sql"
+      - "modulex-store/supabase/migrations/*set_general_settings*.sql"
       - ".github/workflows/**"
   push:
     paths:
@@ -32,6 +33,7 @@ on:
       - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
       - "modulex-store/supabase/migrations/*dealer*.sql"
       - "modulex-store/supabase/migrations/*dlr*.sql"
+      - "modulex-store/supabase/migrations/*set_general_settings*.sql"
       - ".github/workflows/**"
 
 concurrency:
@@ -137,6 +139,8 @@ jobs:
         run: node scripts/dashboard-shell-ui-contract.mjs
       - name: General settings UI contract
         run: node scripts/general-settings-ui-contract.mjs
+      - name: SET General Settings closeout contract
+        run: node scripts/set-general-settings-closeout-contract.mjs
       - name: VAL-5 Store Users Settings contract
         run: node scripts/val5-store-users-settings-contract.mjs
       - name: Mobile shell UI contract
