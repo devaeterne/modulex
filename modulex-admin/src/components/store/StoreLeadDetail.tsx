@@ -21,16 +21,6 @@ const statusLabels: Record<StoreLeadStatus, string> = {
   closed: "Closed",
 };
 
-type DealerConversionResult = {
-  ok: boolean;
-  created?: boolean;
-  reason?: string;
-  customer_id?: string;
-  customer_code?: string;
-  customer_name?: string;
-  duplicate_match?: string;
-};
-
 function formatDate(value: string | null) {
   if (!value) return "—";
   return formatDateTime(value);
@@ -55,7 +45,6 @@ export default function StoreLeadDetail({ id }: { id: string }) {
   const [internalNotes, setInternalNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [converting, setConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -98,9 +87,15 @@ export default function StoreLeadDetail({ id }: { id: string }) {
     setSaving(true);
     setError(null);
     setSuccess(null);
+
+    const dealer = lead.lead_type === "dealer_application";
+    const changes = dealer
+      ? { assigned_to: assignedTo || null, internal_notes: internalNotes.trim() || null }
+      : { status, assigned_to: assignedTo || null, internal_notes: internalNotes.trim() || null };
+
     const { data, error: updateError } = await supabase
       .from("store_leads")
-      .update({ status, assigned_to: assignedTo || null, internal_notes: internalNotes.trim() || null })
+      .update(changes)
       .eq("id", lead.id)
       .select("*")
       .single();
@@ -109,32 +104,11 @@ export default function StoreLeadDetail({ id }: { id: string }) {
       setError(updateError.message);
     } else {
       setLead(data as StoreLead);
-      setSuccess("Lead updated.");
+      setSuccess(dealer ? "Dealer application notes and assignment updated." : "Lead updated.");
       const { data: activityData } = await supabase.from("store_lead_activity").select("*").eq("lead_id", lead.id).order("created_at", { ascending: false });
       setActivity((activityData ?? []) as StoreLeadActivity[]);
     }
     setSaving(false);
-  }
-
-  async function convertToCustomer() {
-    if (!lead || lead.lead_type !== "dealer_application" || lead.status !== "approved" || lead.converted_customer_id) return;
-    setConverting(true);
-    setError(null);
-    setSuccess(null);
-    const { data, error: rpcError } = await supabase.rpc("convert_store_dealer_lead_to_customer", { p_lead_id: lead.id });
-    if (rpcError) { setError(rpcError.message); setConverting(false); return; }
-    const result = data as DealerConversionResult | null;
-    if (!result?.ok) {
-      if (result?.reason === "duplicate_customer" && result.customer_id) setError(`A matching customer already exists${result.customer_code ? ` (${result.customer_code})` : ""}. Review customer ${result.customer_id} before converting this lead.`);
-      else if (result?.reason === "lead_not_approved") setError("Only approved dealer applications can be converted.");
-      else if (result?.reason === "not_dealer_application") setError("Only dealer applications can be converted to dealer customers.");
-      else setError("Dealer customer conversion could not be completed.");
-      setConverting(false);
-      return;
-    }
-    setSuccess(result.created ? `Dealer customer ${result.customer_code || result.customer_name || "record"} created.` : "Dealer application is already linked to a customer.");
-    await load();
-    setConverting(false);
   }
 
   if (loading) return <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900">Loading lead...</div>;
@@ -143,14 +117,13 @@ export default function StoreLeadDetail({ id }: { id: string }) {
 
   const dealer = lead.lead_type === "dealer_application";
   const consultation = lead.lead_type === "contact" && lead.request_kind === "project_consultation";
-  const canConvert = dealer && lead.status === "approved" && !lead.converted_customer_id;
   const leadLabel = dealer ? "Dealer Application" : consultation ? "Project Consultation" : "Contact Inquiry";
 
   return <div className="space-y-5">
     <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div><Link href="/store/leads" className="text-sm font-medium text-brand-500">← Back to Leads</Link><h1 className="mt-2 text-xl font-semibold text-gray-800 dark:text-white/90">{lead.reference_code}</h1><p className="mt-1 text-sm text-gray-500">{leadLabel} · Received {formatDate(lead.created_at)}</p></div>
-        <button type="button" className={primaryButton} onClick={save} disabled={saving || converting}>{saving ? "Saving..." : "Save Lead"}</button>
+        <button type="button" className={primaryButton} onClick={save} disabled={saving}>{saving ? "Saving..." : dealer ? "Save Notes & Assignment" : "Save Lead"}</button>
       </div>
       {error ? <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{error}</div> : null}
       {success ? <div className="mt-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">{success}</div> : null}
@@ -176,11 +149,17 @@ export default function StoreLeadDetail({ id }: { id: string }) {
       </div>
 
       <div className="space-y-5">
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6"><h2 className="font-semibold text-gray-800 dark:text-white/90">Workflow</h2><div className="mt-4 space-y-4"><label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</span><select className={inputClass} value={status} onChange={(event) => setStatus(event.target.value as StoreLeadStatus)} disabled={converting}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Assigned To</span><select className={inputClass} value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} disabled={converting}><option value="">Unassigned</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name || item.email || item.id} ({item.role})</option>)}</select></label><label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Internal Notes</span><textarea className={textareaClass} value={internalNotes} maxLength={5000} onChange={(event) => setInternalNotes(event.target.value)} disabled={converting} /></label></div>
-          {dealer ? <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-white/[0.03] dark:text-gray-300">{lead.converted_customer_id ? <div className="flex flex-col gap-3"><p>This dealer application has been converted to a customer. Portal access remains a separate controlled activation step.</p><Link className={primaryButton} href={`/customers/${lead.converted_customer_id}`}>View Customer</Link></div> : canConvert ? <div className="space-y-3"><p>Approval is complete. Create the dealer customer record as a separate controlled action; this does not enable portal access.</p><button type="button" className={primaryButton} onClick={convertToCustomer} disabled={converting}>{converting ? "Creating Customer..." : "Create Dealer Customer"}</button></div> : <p>Approve this dealer application first. Customer creation is intentionally separate from status review.</p>}</div> : null}
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+          <h2 className="font-semibold text-gray-800 dark:text-white/90">Workflow</h2>
+          <div className="mt-4 space-y-4">
+            {dealer ? <div><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</span><div className={`${inputClass} flex items-center bg-gray-50 dark:bg-gray-800`}>{statusLabels[lead.status]}</div><p className="mt-1 text-xs text-gray-500">Dealer approval/rejection is controlled by the Dealer Onboarding panel below.</p></div> : <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</span><select className={inputClass} value={status} onChange={(event) => setStatus(event.target.value as StoreLeadStatus)}>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
+            <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Assigned To</span><select className={inputClass} value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)}><option value="">Unassigned</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name || item.email || item.id} ({item.role})</option>)}</select></label>
+            <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Internal Notes</span><textarea className={textareaClass} value={internalNotes} maxLength={5000} onChange={(event) => setInternalNotes(event.target.value)} /></label>
+          </div>
+          {dealer && lead.converted_customer_id ? <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm text-gray-600 dark:bg-white/[0.03] dark:text-gray-300"><div className="flex flex-col gap-3"><p>This Dealer Application is linked to a canonical Customer account. Lifecycle and Portal actions remain in the controlled Dealer Onboarding workflow.</p><Link className={primaryButton} href={`/customers/${lead.converted_customer_id}`}>View Customer</Link></div></div> : null}
         </section>
 
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6"><h2 className="font-semibold text-gray-800 dark:text-white/90">Activity</h2><div className="mt-4 space-y-3">{activity.map((item) => <div key={item.id} className="rounded-xl border border-gray-100 p-3 text-sm dark:border-gray-800"><div className="font-medium text-gray-800 dark:text-white/90">{item.action === "created" ? "Lead created" : item.action === "converted_to_customer" ? "Converted to customer" : `${item.from_status || "—"} → ${item.to_status || "—"}`}</div><div className="mt-1 text-xs text-gray-500">{formatDate(item.created_at)}{item.actor_user_id ? ` · ${assigneeMap.get(item.actor_user_id) || "Staff"}` : " · Website"}</div></div>)}{activity.length === 0 ? <p className="text-sm text-gray-500">No activity yet.</p> : null}</div></section>
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6"><h2 className="font-semibold text-gray-800 dark:text-white/90">Activity</h2><div className="mt-4 space-y-3">{activity.map((item) => <div key={item.id} className="rounded-xl border border-gray-100 p-3 text-sm dark:border-gray-800"><div className="font-medium text-gray-800 dark:text-white/90">{item.action === "created" ? "Lead created" : item.action === "converted_to_customer" ? "Converted to customer" : item.action.replaceAll("_", " ")}</div><div className="mt-1 text-xs text-gray-500">{formatDate(item.created_at)}{item.actor_user_id ? ` · ${assigneeMap.get(item.actor_user_id) || "Staff"}` : " · Website"}</div>{item.note ? <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">{item.note}</div> : null}</div>)}{activity.length === 0 ? <p className="text-sm text-gray-500">No activity yet.</p> : null}</div></section>
       </div>
     </div>
   </div>;
