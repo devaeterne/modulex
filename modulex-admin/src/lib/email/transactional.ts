@@ -12,6 +12,7 @@ type EmailNotification = {
   payload: Record<string, unknown>;
   status: "pending" | "failed" | "processing" | "sent" | "skipped";
   attempts: number;
+  max_attempts: number;
 };
 
 type GeneralSettings = {
@@ -37,7 +38,27 @@ type GeneralSettings = {
   notify_internal_invoice_issued: boolean;
 };
 
+type ProcessingResult = {
+  id: string;
+  status: "sent" | "failed" | "skipped";
+};
+
+type DeliveryFailure = {
+  code: string;
+  reason: string;
+};
+
 const MAX_ATTEMPTS = 5;
+
+class EmailDeliveryError extends Error {
+  code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "EmailDeliveryError";
+    this.code = code;
+  }
+}
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -61,11 +82,6 @@ function money(value: unknown, currency = "USD") {
 
 function titleCase(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function parseEmails(value: string | null | undefined) {
-  if (!value) return [];
-  return [...new Set(value.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter((item) => item.includes("@")))];
 }
 
 function siteUrl() {
@@ -110,7 +126,7 @@ function detailRows(rows: Array<[string, string]>) {
 
 async function loadSettings() {
   const { data, error } = await supabaseAdmin.from("general_settings").select("*").eq("id", 1).single();
-  if (error || !data) throw new Error(error?.message || "General settings are missing.");
+  if (error || !data) throw new EmailDeliveryError("settings_unavailable", "Email settings are unavailable.");
   return data as GeneralSettings;
 }
 
@@ -145,17 +161,27 @@ async function customerRecipients(customerId: string, type: "order" | "invoice")
   return [...new Set(emails.filter((email) => email.includes("@")))];
 }
 
-function internalRecipients(settings: GeneralSettings, eventType: string) {
-  let configured: string | null = null;
-  if (eventType === "new_store_lead") configured = settings.lead_notification_emails;
-  else if (eventType === "stock_review_required") configured = settings.stock_notification_emails;
-  else if (eventType === "price_review_required") configured = settings.pricing_notification_emails;
-  else if (eventType === "invoice_issued") configured = settings.invoice_notification_emails;
-  else configured = settings.order_notification_emails;
+function payloadUuid(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  if (typeof value !== "string") return null;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    ? value
+    : null;
+}
 
-  const emails = parseEmails(configured);
-  if (!emails.length && settings.email) emails.push(...parseEmails(settings.email));
-  return [...new Set(emails)];
+async function internalRecipients(notification: EmailNotification) {
+  const { data, error } = await supabaseAdmin.rpc("resolve_notification_delivery_recipients", {
+    p_event_type: notification.event_type,
+    p_originator_id: payloadUuid(notification.payload ?? {}, "requested_by"),
+  });
+
+  if (error) throw new EmailDeliveryError("recipient_resolution_failed", "Notification recipients could not be resolved.");
+
+  return [...new Set((data ?? []).map((row: { email?: string; recipient_scope?: string; required_permissions?: string[] }) => {
+    void row.recipient_scope;
+    void row.required_permissions;
+    return String(row.email || "").trim().toLowerCase();
+  }).filter((email: string) => email.includes("@")))];
 }
 
 async function isEnabled(settings: GeneralSettings, notification: EmailNotification) {
@@ -167,10 +193,14 @@ async function isEnabled(settings: GeneralSettings, notification: EmailNotificat
 
   const { data: rule } = await supabaseAdmin
     .from("notification_delivery_rules")
-    .select("internal_email_enabled")
+    .select("internal_email_enabled,recipient_scope,required_permissions")
     .eq("event_type", notification.event_type)
     .maybeSingle();
-  if (rule) return Boolean(rule.internal_email_enabled);
+  if (rule) {
+    void rule.recipient_scope;
+    void rule.required_permissions;
+    return Boolean(rule.internal_email_enabled);
+  }
 
   if (notification.event_type === "new_order") return settings.notify_internal_new_order;
   if (notification.event_type === "order_status_changed") return settings.notify_internal_order_status;
@@ -219,7 +249,7 @@ async function renderStoreLead(notification: EmailNotification, settings: Genera
     .eq("id", notification.entity_id)
     .single();
 
-  if (error || !lead) throw new Error(error?.message || "Store lead was not found.");
+  if (error || !lead) throw new EmailDeliveryError("render_entity_missing", "Store lead data is unavailable for this notification.");
 
   const isDealer = lead.lead_type === "dealer_application";
   const leadLabel = isDealer ? "Dealer application" : "Website inquiry";
@@ -252,10 +282,10 @@ async function renderOrder(notification: EmailNotification, settings: GeneralSet
     supabaseAdmin.from("customer_orders").select("*").eq("id", notification.entity_id).single(),
     supabaseAdmin.from("customer_order_items").select("sku_snapshot, product_name_snapshot, quantity, unit_price, line_total").eq("order_id", notification.entity_id).order("line_no"),
   ]);
-  if (orderError || !order) throw new Error(orderError?.message || "Order was not found.");
+  if (orderError || !order) throw new EmailDeliveryError("render_entity_missing", "Order data is unavailable for this notification.");
 
   const { data: customer } = await supabaseAdmin.from("customers").select("id, name, customer_code, email").eq("id", order.customer_id).single();
-  if (!customer) throw new Error("Order customer was not found.");
+  if (!customer) throw new EmailDeliveryError("render_entity_missing", "Customer data is unavailable for this notification.");
 
   const total = Number(order.grand_total ?? 0) > 0 || Number(order.total_amount ?? 0) === 0 ? Number(order.grand_total ?? 0) : Number(order.total_amount ?? 0);
   const summary = detailRows([
@@ -310,9 +340,9 @@ async function renderOrder(notification: EmailNotification, settings: GeneralSet
 
 async function renderInvoice(notification: EmailNotification, settings: GeneralSettings) {
   const { data: invoice, error } = await supabaseAdmin.from("customer_invoices").select("*").eq("id", notification.entity_id).single();
-  if (error || !invoice) throw new Error(error?.message || "Invoice was not found.");
+  if (error || !invoice) throw new EmailDeliveryError("render_entity_missing", "Invoice data is unavailable for this notification.");
   const { data: customer } = await supabaseAdmin.from("customers").select("id, name, customer_code, email").eq("id", invoice.customer_id).single();
-  if (!customer) throw new Error("Invoice customer was not found.");
+  if (!customer) throw new EmailDeliveryError("render_entity_missing", "Customer data is unavailable for this notification.");
 
   const summary = detailRows([
     ["Invoice", invoice.invoice_number],
@@ -337,9 +367,17 @@ async function renderInvoice(notification: EmailNotification, settings: GeneralS
   };
 }
 
+function providerFailure(status: number) {
+  if (status === 429) return new EmailDeliveryError("provider_rate_limited", "Email provider rate limited the request.");
+  if (status === 401 || status === 403) return new EmailDeliveryError("provider_auth_failed", "Email provider authentication failed.");
+  if (status === 400 || status === 422) return new EmailDeliveryError("provider_rejected", "Email provider rejected the message.");
+  if (status >= 500) return new EmailDeliveryError("provider_unavailable", "Email provider is temporarily unavailable.");
+  return new EmailDeliveryError("provider_error", "Email provider could not deliver the message.");
+}
+
 async function sendWithResend(params: { from: string; to: string; replyTo?: string | null; subject: string; html: string; idempotencyKey: string }) {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("RESEND_API_KEY is not configured.");
+  if (!apiKey) throw new EmailDeliveryError("provider_not_configured", "Email provider is not configured.");
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -357,15 +395,29 @@ async function sendWithResend(params: { from: string; to: string; replyTo?: stri
     }),
   });
 
+  if (!response.ok) throw providerFailure(response.status);
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || `Resend returned HTTP ${response.status}.`);
   return String(payload?.id || "");
 }
 
-async function processOne(notification: EmailNotification, settings: GeneralSettings) {
+function normalizeDeliveryFailure(errorValue: unknown): DeliveryFailure {
+  if (errorValue instanceof EmailDeliveryError) {
+    return { code: errorValue.code, reason: errorValue.message };
+  }
+  return { code: "delivery_failed", reason: "Email delivery failed before completion." };
+}
+
+async function processOne(notification: EmailNotification, settings: GeneralSettings): Promise<ProcessingResult> {
   if (!(await isEnabled(settings, notification))) {
-    await supabaseAdmin.from("email_notifications").update({ status: "skipped", processed_at: new Date().toISOString(), updated_at: new Date().toISOString(), last_error: "Notification email is disabled by the delivery rule." }).eq("id", notification.id);
-    return { id: notification.id, status: "skipped" as const };
+    await supabaseAdmin.from("email_notifications").update({
+      status: "skipped",
+      processing_started_at: null,
+      failure_code: "delivery_disabled",
+      processed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_error: "Notification email is disabled by the delivery rule.",
+    }).eq("id", notification.id);
+    return { id: notification.id, status: "skipped" };
   }
 
   const rendered = notification.event_type.startsWith("approval_")
@@ -376,15 +428,22 @@ async function processOne(notification: EmailNotification, settings: GeneralSett
         ? await renderInvoice(notification, settings)
         : notification.entity_type === "store_lead"
           ? await renderStoreLead(notification, settings)
-          : (() => { throw new Error(`Unsupported notification entity type: ${notification.entity_type}`); })();
+          : (() => { throw new EmailDeliveryError("unsupported_entity", "Notification entity type is unsupported."); })();
 
   const recipients = notification.audience === "customer"
     ? await customerRecipients(rendered.customerId, notification.entity_type === "invoice" ? "invoice" : "order")
-    : internalRecipients(settings, notification.event_type);
+    : await internalRecipients(notification);
 
   if (!recipients.length) {
-    await supabaseAdmin.from("email_notifications").update({ status: "skipped", processed_at: new Date().toISOString(), updated_at: new Date().toISOString(), last_error: "No recipient email is configured." }).eq("id", notification.id);
-    return { id: notification.id, status: "skipped" as const };
+    await supabaseAdmin.from("email_notifications").update({
+      status: "skipped",
+      processing_started_at: null,
+      failure_code: "no_eligible_recipient",
+      processed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      last_error: "No eligible recipient is configured for this notification.",
+    }).eq("id", notification.id);
+    return { id: notification.id, status: "skipped" };
   }
 
   const senderName = settings.email_sender_name?.trim() || settings.company_name;
@@ -407,7 +466,8 @@ async function processOne(notification: EmailNotification, settings: GeneralSett
   const now = new Date().toISOString();
   await supabaseAdmin.from("email_notifications").update({
     status: "sent",
-    attempts: notification.attempts + 1,
+    processing_started_at: null,
+    failure_code: null,
     to_emails: recipients,
     resend_message_ids: messageIds,
     last_error: null,
@@ -416,53 +476,76 @@ async function processOne(notification: EmailNotification, settings: GeneralSett
     updated_at: now,
   }).eq("id", notification.id);
 
-  return { id: notification.id, status: "sent" as const, recipients };
+  return { id: notification.id, status: "sent" };
+}
+
+export function summarizeEmailProcessingResults(results: ProcessingResult[]) {
+  return results.reduce(
+    (summary, result) => {
+      summary.processed += 1;
+      summary[result.status] += 1;
+      return summary;
+    },
+    { processed: 0, sent: 0, failed: 0, skipped: 0 }
+  );
 }
 
 export async function processPendingEmailNotifications(limit = 20) {
   const settings = await loadSettings();
   const now = new Date().toISOString();
 
+  await supabaseAdmin.rpc("recover_stuck_email_notifications");
+
   const { data, error } = await supabaseAdmin
     .from("email_notifications")
-    .select("id,event_type,audience,entity_type,entity_id,event_key,payload,status,attempts")
+    .select("id,event_type,audience,entity_type,entity_id,event_key,payload,status,attempts,max_attempts")
     .in("status", ["pending", "failed"])
     .lt("attempts", MAX_ATTEMPTS)
     .lte("next_attempt_at", now)
     .order("created_at", { ascending: true })
     .limit(Math.min(Math.max(limit, 1), 50));
 
-  if (error) throw new Error(error.message);
+  if (error) throw new EmailDeliveryError("queue_read_failed", "Email queue could not be read.");
 
-  const results: Array<Record<string, unknown>> = [];
+  const results: ProcessingResult[] = [];
 
   for (const candidate of (data ?? []) as EmailNotification[]) {
+    if (candidate.attempts >= candidate.max_attempts) continue;
+
+    const claimedAttempts = candidate.attempts + 1;
+    const claimTime = new Date().toISOString();
     const { data: claimed } = await supabaseAdmin
       .from("email_notifications")
-      .update({ status: "processing", updated_at: new Date().toISOString() })
+      .update({
+        status: "processing",
+        attempts: claimedAttempts,
+        processing_started_at: claimTime,
+        updated_at: claimTime,
+      })
       .eq("id", candidate.id)
       .eq("status", candidate.status)
+      .eq("attempts", candidate.attempts)
       .select("id")
       .maybeSingle();
 
     if (!claimed) continue;
 
     try {
-      results.push(await processOne({ ...candidate, status: "processing" }, settings));
+      results.push(await processOne({ ...candidate, attempts: claimedAttempts, status: "processing" }, settings));
     } catch (errorValue) {
-      const attempts = candidate.attempts + 1;
-      const retryMinutes = Math.min(60, Math.max(2, attempts * 5));
+      const failure = normalizeDeliveryFailure(errorValue);
+      const retryMinutes = Math.min(60, Math.max(2, claimedAttempts * 5));
       const nextAttempt = new Date(Date.now() + retryMinutes * 60_000).toISOString();
-      const message = errorValue instanceof Error ? errorValue.message : "Unknown email delivery error.";
       await supabaseAdmin.from("email_notifications").update({
         status: "failed",
-        attempts,
-        last_error: message,
+        processing_started_at: null,
+        failure_code: failure.code,
+        last_error: failure.reason,
         next_attempt_at: nextAttempt,
         processed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }).eq("id", candidate.id);
-      results.push({ id: candidate.id, status: "failed", error: message });
+      results.push({ id: candidate.id, status: "failed" });
     }
   }
 
