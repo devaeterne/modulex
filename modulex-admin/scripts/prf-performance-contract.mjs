@@ -63,22 +63,22 @@ const migrationSource = (
   await readFile(path.join(migrationsDir, migrationFiles[0]), "utf8")
 ).toLowerCase();
 
-for (const indexName of [
-  "calendar_sync_audit_actor_profile_id_idx",
-  "calendar_sync_outbox_project_id_idx",
-  "vendor_catalog_items_last_seen_run_id_idx",
+assert.ok(
+  migrationSource.includes("vendor_catalog_items_last_seen_run_id_idx"),
+  "PRF-A1 must index the fully populated vendor catalog run FK used on the growing catalog table",
+);
+for (const rejectedIndexPattern of [
+  /calendar_sync_audit_actor_profile_id.*idx/,
+  /calendar_sync_outbox_project_id.*idx/,
+  /calendar_events_(created_by|updated_by).*idx/,
+  /vendor_catalog_items_reviewed_by.*idx/,
 ]) {
-  assert.ok(
-    migrationSource.includes(indexName),
-    `PRF-A1 migration must create ${indexName}`,
+  assert.doesNotMatch(
+    migrationSource,
+    rejectedIndexPattern,
+    "PRF-A1 must not add sparse/write-amplifying actor or project FK indexes without workload evidence",
   );
 }
-
-assert.doesNotMatch(
-  migrationSource,
-  /calendar_events_(created_by|updated_by).*idx/,
-  "PRF-A1 must not add write-amplifying calendar actor indexes without workload evidence",
-);
 assert.ok(
   migrationSource.includes('alter policy "project_participants_bounded_read"'),
   "PRF-A2 must optimize project_participants_bounded_read in place",
