@@ -84,7 +84,7 @@ requireMatch(sql, /grant execute on function public\.create_customer_address[\s\
 requireMatch(sql, /revoke all on function public\.set_customer_address_default[\s\S]{0,300}from public/i, "set_customer_address_default must revoke PUBLIC execute.");
 requireMatch(sql, /grant execute on function public\.set_customer_address_default[\s\S]{0,300}to authenticated/i, "set_customer_address_default must grant execute to authenticated only.");
 
-requireMatch(entityDocumentsMigration, /create table public\.entity_documents/i, "Project/Order documents must have a canonical metadata table.");
+requireMatch(entityDocumentsMigration, /create table(?: if not exists)? public\.entity_documents/i, "Project/Order documents must have a canonical metadata table.");
 requireMatch(entityDocumentsMigration, /entity_type[\s\S]{0,180}project[\s\S]{0,180}order/i, "Entity documents must be restricted to Project and Order ownership.");
 requireMatch(entityDocumentsMigration, /25\s*\*\s*1024\s*\*\s*1024|26214400/i, "Entity document storage must enforce a 25 MiB maximum.");
 requireMatch(entityDocumentsMigration, /application\/pdf[\s\S]*image\/jpeg[\s\S]*image\/png[\s\S]*image\/webp/i, "Entity document storage must explicitly allow PDF and supported image MIME types.");
@@ -108,7 +108,7 @@ requireMatch(entityDocumentsPanel, /25\s*\*\s*1024\s*\*\s*1024|26214400/, "Share
 requireMatch(entityDocumentsPanel, /rpc\(\s*["']list_entity_documents["']/, "Shared entity document panel must use the canonical list RPC.");
 requireMatch(entityDocumentsPanel, /rpc\(\s*["']register_entity_document["']/, "Shared entity document panel must use the canonical registration RPC.");
 requireMatch(entityDocumentsPanel, /rpc\(\s*["']deactivate_entity_document["']/, "Shared entity document panel must use the canonical deactivation RPC.");
-requireMatch(entityDocumentsPanel, /createSignedUrl\([\s\S]{0,200}60/, "Entity document preview/download must use a short-lived signed URL.");
+requireMatch(entityDocumentsPanel, /signedAccessSeconds\s*=\s*60[\s\S]*createSignedUrl/, "Entity document preview/download must use a 60-second signed URL.");
 requireMatch(entityDocumentsPanel, /\.remove\(\[storagePath\]\)/, "Failed metadata registration must clean up its unregistered orphan object.");
 requireNoMatch(entityDocumentsPanel, /from\(["']entity_documents["']\)\.(insert|update|delete)/, "Browser code must not bypass the canonical entity document lifecycle RPCs.");
 requireMatch(projectDocumentsTab, /<EntityDocumentsPanel[\s\S]*entityType="project"[\s\S]*includeLinkedOrders/, "Project Documents must show uploaded Project and linked Order documents.");
