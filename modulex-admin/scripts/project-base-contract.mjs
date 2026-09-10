@@ -191,6 +191,11 @@ assert(
   "Customer Orders must still allow an explicit Cancelled status filter"
 );
 assert(
+  projectDetail.includes('.eq("customer_id", nextProject.customer_id)') &&
+    projectDetail.includes('.is("project_id", null)'),
+  "Project link-existing Order choices must be limited to the same Customer and unassigned Orders"
+);
+assert(
   projectDetail.includes('.neq("status", "cancelled")'),
   "Project link-existing Order choices must exclude cancelled Orders"
 );
@@ -200,8 +205,9 @@ assert(
   "Project link-existing Order picker must fetch and normalize Customer Reference"
 );
 assert(
-  /order\.order_number[\s\S]*customerReference[\s\S]*statusLabel\(order\.status\)/.test(projectDetail),
-  "Project link-existing Order picker must show Customer Reference between Order number and status when present"
+  projectDetail.includes('const referenceLabel = customerReference || "No Reference"') &&
+    /order\.order_number[\s\S]*referenceLabel[\s\S]*statusLabel\(order\.status\)/.test(projectDetail),
+  "Project link-existing Order picker must show Customer Reference or No Reference between Order number and status"
 );
 assert(
   projectDetail.includes('order.status !== "cancelled"'),
