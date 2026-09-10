@@ -2,15 +2,33 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import Select from "@/components/form/Select";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import Button from "@/components/ui/button/Button";
+import {
+  ADMIN_BUTTON_VARIANTS,
+  ADMIN_COMPAT_APPEARANCE,
+  ADMIN_FOCUS_RING,
+  ADMIN_STATUS_TONES,
+  ADMIN_SURFACE_CARD,
+  ADMIN_TEXT_STYLES,
+} from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import type { StoreLeadFormOption } from "@/lib/store/leads";
 
-const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 disabled:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
-const buttonClass = "inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300";
-const primaryButton = "inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50";
-const cardClass = "rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6";
+const cardClass = `${ADMIN_SURFACE_CARD} p-5 sm:p-6`;
+const itemCardClass = `${ADMIN_SURFACE_CARD} p-4`;
+const linkButtonClass = `inline-flex h-10 items-center justify-center px-4 text-sm font-medium ${ADMIN_COMPAT_APPEARANCE["rounded-lg"]} ${ADMIN_BUTTON_VARIANTS.outline} ${ADMIN_FOCUS_RING}`;
+const errorClass = `${ADMIN_STATUS_TONES.light.error} mt-4 px-4 py-3 text-sm`;
+const successClass = `${ADMIN_STATUS_TONES.light.success} mt-4 px-4 py-3 text-sm`;
 const KEY_PATTERN = /^[a-z0-9]+(?:[a-z0-9_-]*[a-z0-9])?$/;
+
+const groupOptions = [
+  { value: "project_type", label: "Project Type" },
+  { value: "consultation_intent", label: "Consultation Intent" },
+];
 
 type Group = StoreLeadFormOption["option_group"];
 type Draft = { option_group: Group; option_key: string; label: string; sort_order: number; is_active: boolean };
@@ -100,30 +118,53 @@ export default function StoreLeadFormOptionsManager() {
 
   return <div className="space-y-5">
     <div className={cardClass}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Lead Form Options</h1><p className="mt-1 text-sm text-gray-500">Manage business-approved project consultation choices. Active options are published to the Store form; captured lead values remain behind Lead RBAC.</p></div><Link href="/store/leads" className={buttonClass}>Back to Leads</Link></div>
-      {error ? <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{error}</div> : null}
-      {success ? <div className="mt-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">{success}</div> : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className={`text-xl font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Lead Form Options</h1>
+          <p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>Manage business-approved project consultation choices. Active options are published to the Store form; captured lead values remain behind Lead RBAC.</p>
+        </div>
+        <Link href="/store/leads" className={linkButtonClass}>Back to Leads</Link>
+      </div>
+      {error ? <div className={errorClass}>{error}</div> : null}
+      {success ? <div className={successClass}>{success}</div> : null}
     </div>
 
     {canEdit ? <div className={cardClass}>
-      <h2 className="font-semibold text-gray-800 dark:text-white/90">Add option</h2>
+      <h2 className={`font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Add option</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-5">
-        <select className={inputClass} value={draft.option_group} onChange={(event) => setDraft((value) => ({ ...value, option_group: event.target.value as Group }))}><option value="project_type">Project Type</option><option value="consultation_intent">Consultation Intent</option></select>
-        <input className={inputClass} value={draft.option_key} maxLength={64} placeholder="option-key" onChange={(event) => setDraft((value) => ({ ...value, option_key: event.target.value.toLowerCase() }))} />
-        <input className={`${inputClass} md:col-span-2`} value={draft.label} maxLength={160} placeholder="Public label" onChange={(event) => setDraft((value) => ({ ...value, label: event.target.value }))} />
-        <div className="flex gap-2"><input className={inputClass} type="number" value={draft.sort_order} onChange={(event) => setDraft((value) => ({ ...value, sort_order: Number(event.target.value) || 0 }))} /><button type="button" className={primaryButton} onClick={createOption} disabled={busy}>Add</button></div>
+        <Select
+          options={groupOptions}
+          value={draft.option_group}
+          onChange={(value) => setDraft((current) => ({ ...current, option_group: value as Group }))}
+        />
+        <Input value={draft.option_key} maxLength={64} placeholder="option-key" onChange={(event) => setDraft((value) => ({ ...value, option_key: event.target.value.toLowerCase() }))} />
+        <Input className="md:col-span-2" value={draft.label} maxLength={160} placeholder="Public label" onChange={(event) => setDraft((value) => ({ ...value, label: event.target.value }))} />
+        <div className="flex gap-2">
+          <Input type="number" value={draft.sort_order} onChange={(event) => setDraft((value) => ({ ...value, sort_order: Number(event.target.value) || 0 }))} />
+          <Button onClick={createOption} disabled={busy}>Add</Button>
+        </div>
       </div>
     </div> : null}
 
     <div className={cardClass}>
-      <h2 className="font-semibold text-gray-800 dark:text-white/90">Configured options</h2>
-      <div className="mt-4 space-y-3">{items.map((item) => <div key={item.id} className="grid gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-800 md:grid-cols-6">
-        <select className={inputClass} value={item.option_group} onChange={(event) => patch(item.id, { option_group: event.target.value as Group })}><option value="project_type">Project Type</option><option value="consultation_intent">Consultation Intent</option></select>
-        <input className={inputClass} value={item.option_key} maxLength={64} onChange={(event) => patch(item.id, { option_key: event.target.value.toLowerCase() })} />
-        <input className={`${inputClass} md:col-span-2`} value={item.label} maxLength={160} onChange={(event) => patch(item.id, { label: event.target.value })} />
-        <div className="flex gap-2"><input className={inputClass} type="number" value={item.sort_order} onChange={(event) => patch(item.id, { sort_order: Number(event.target.value) || 0 })} /><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={item.is_active} onChange={(event) => patch(item.id, { is_active: event.target.checked })} />Active</label></div>
-        <button type="button" className={buttonClass} onClick={() => saveOption(item)} disabled={busy}>Save</button>
-      </div>)}{items.length === 0 ? <p className="text-sm text-gray-500">No business-approved project consultation options are configured yet.</p> : null}</div>
+      <h2 className={`font-semibold ${ADMIN_TEXT_STYLES.strong}`}>Configured options</h2>
+      <div className="mt-4 space-y-3">
+        {items.map((item) => <div key={item.id} className={`${itemCardClass} grid gap-3 md:grid-cols-6`}>
+          <Select
+            options={groupOptions}
+            value={item.option_group}
+            onChange={(value) => patch(item.id, { option_group: value as Group })}
+          />
+          <Input value={item.option_key} maxLength={64} onChange={(event) => patch(item.id, { option_key: event.target.value.toLowerCase() })} />
+          <Input className="md:col-span-2" value={item.label} maxLength={160} onChange={(event) => patch(item.id, { label: event.target.value })} />
+          <div className="flex items-center gap-2">
+            <Input type="number" value={item.sort_order} onChange={(event) => patch(item.id, { sort_order: Number(event.target.value) || 0 })} />
+            <Checkbox label="Active" checked={item.is_active} onChange={(checked) => patch(item.id, { is_active: checked })} />
+          </div>
+          <Button variant="outline" onClick={() => saveOption(item)} disabled={busy}>Save</Button>
+        </div>)}
+        {items.length === 0 ? <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>No business-approved project consultation options are configured yet.</p> : null}
+      </div>
     </div>
   </div>;
 }
