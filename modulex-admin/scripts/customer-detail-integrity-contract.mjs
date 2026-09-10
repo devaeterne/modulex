@@ -16,6 +16,7 @@ const portalCardPath = path.join(root, "src/components/customers/CustomerPortalA
 const readDedupPath = path.join(root, "src/lib/customers/read-dedup.ts");
 const sqlPath = path.join(root, "sql/customer-address-integrity.sql");
 const entityDocumentsMigrationPath = path.join(root, "../modulex-store/supabase/migrations/20260910173000_project_order_entity_documents.sql");
+const entityDocumentsHardeningMigrationPath = path.join(root, "../modulex-store/supabase/migrations/20260910173500_project_order_entity_documents_hardening.sql");
 const packagePath = path.join(root, "package.json");
 
 function read(filePath) {
@@ -43,6 +44,7 @@ const portalCard = read(portalCardPath);
 const readDedup = read(readDedupPath);
 const sql = read(sqlPath);
 const entityDocumentsMigration = read(entityDocumentsMigrationPath);
+const entityDocumentsHardeningMigration = read(entityDocumentsHardeningMigrationPath);
 const pkg = JSON.parse(read(packagePath));
 
 requireNoMatch(page, /legacy-customer-card|<style>/, "Customer detail must not hide legacy actions with route-level CSS.");
@@ -101,6 +103,10 @@ requireMatch(entityDocumentsMigration, /registered entity document files are ret
 requireMatch(entityDocumentsMigration, /grant execute on function public\.list_entity_documents[\s\S]*to authenticated/i, "Entity document listing must be authenticated-only.");
 requireMatch(entityDocumentsMigration, /grant execute on function public\.register_entity_document[\s\S]*to authenticated/i, "Entity document registration must be authenticated-only.");
 requireMatch(entityDocumentsMigration, /grant execute on function public\.deactivate_entity_document[\s\S]*to authenticated/i, "Entity document deactivation must be authenticated-only.");
+requireMatch(entityDocumentsHardeningMigration, /from\s+storage\.objects[\s\S]{0,300}bucket_id\s*=\s*'entity-documents'[\s\S]{0,300}name\s*=\s*v_storage_path/i, "Document registration must verify that the uploaded Storage object exists.");
+requireMatch(entityDocumentsHardeningMigration, /metadata\s*->>\s*'size'[\s\S]{0,400}p_file_size_bytes/i, "Document registration must verify Storage-reported file size.");
+requireMatch(entityDocumentsHardeningMigration, /metadata\s*->>\s*'mimetype'[\s\S]{0,400}v_mime_type/i, "Document registration must verify Storage-reported MIME type.");
+requireMatch(entityDocumentsHardeningMigration, /can_upload_entity_document_object[\s\S]{0,800}not exists[\s\S]{0,300}public\.entity_documents/i, "Uploaders must be able to read only entity-scoped unregistered objects needed for Storage upload/registration.");
 
 requireMatch(entityDocumentsPanel, /multiple/, "Shared entity document upload must support multiple files.");
 requireMatch(entityDocumentsPanel, /\.pdf.*\.jpg.*\.jpeg.*\.png.*\.webp.*\.docx.*\.xlsx.*\.csv/i, "Shared entity document upload must advertise the approved extensions.");
@@ -110,6 +116,9 @@ requireMatch(entityDocumentsPanel, /rpc\(\s*["']register_entity_document["']/, "
 requireMatch(entityDocumentsPanel, /rpc\(\s*["']deactivate_entity_document["']/, "Shared entity document panel must use the canonical deactivation RPC.");
 requireMatch(entityDocumentsPanel, /signedAccessSeconds\s*=\s*60[\s\S]*createSignedUrl/, "Entity document preview/download must use a 60-second signed URL.");
 requireMatch(entityDocumentsPanel, /\.remove\(\[storagePath\]\)/, "Failed metadata registration must clean up its unregistered orphan object.");
+requireMatch(entityDocumentsPanel, /cleanupError[\s\S]{0,500}setOrphanCleanup/, "Failed orphan cleanup must retain operator-visible retry state.");
+requireMatch(entityDocumentsPanel, /await\s+loadDocuments\(\);[\s\S]{0,400}if\s*\(batchError\)\s*setError\(batchError\)/, "Refreshing successful rows must preserve a later batch failure.");
+requireMatch(entityDocumentsPanel, /retryOrphanCleanup[\s\S]{0,1200}\.remove\(\[orphanCleanup\.storagePath\]\)/, "Operators must be able to retry cleanup of an unregistered orphan.");
 requireNoMatch(entityDocumentsPanel, /from\(["']entity_documents["']\)\.(insert|update|delete)/, "Browser code must not bypass the canonical entity document lifecycle RPCs.");
 requireMatch(projectDocumentsTab, /<EntityDocumentsPanel[\s\S]*entityType="project"[\s\S]*includeLinkedOrders/, "Project Documents must show uploaded Project and linked Order documents.");
 requireMatch(projectDocumentsTab, /title="System Documents"/, "Accepted Proposal artifacts must remain a separate System Documents section.");
