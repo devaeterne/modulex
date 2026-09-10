@@ -6,6 +6,7 @@ on:
       - feat/set-general-settings-final-closeout
     paths:
       - scripts/apply-set-general-settings-closeout.mjs
+      - scripts/run-set-general-settings-closeout.mjs
       - .github/workflows/set-general-settings-apply.yml
 
 permissions:
@@ -25,7 +26,7 @@ jobs:
           cache: npm
           cache-dependency-path: modulex-admin/package-lock.json
       - name: Apply deterministic source transform
-        run: node scripts/apply-set-general-settings-closeout.mjs
+        run: node scripts/run-set-general-settings-closeout.mjs
       - name: Install Admin dependencies
         working-directory: modulex-admin
         run: npm ci
@@ -58,7 +59,7 @@ jobs:
         run: npm run build
       - name: Commit verified implementation and remove one-shot tooling
         run: |
-          rm scripts/apply-set-general-settings-closeout.mjs .github/workflows/set-general-settings-apply.yml
+          rm scripts/apply-set-general-settings-closeout.mjs scripts/run-set-general-settings-closeout.mjs .github/workflows/set-general-settings-apply.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
