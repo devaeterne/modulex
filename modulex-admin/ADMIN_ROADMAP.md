@@ -70,12 +70,12 @@ Status: `[~]` core is strong; broader A4 CMS exit gate remains open.
 
 ## LD — Leads
 
-Status: `[~]` list/detail exists; operational lifecycle is not fully closed.
+Status: `[x]` LD-A1→LD-A4 implemented in the final Leads workstream.
 
-- [ ] **LD-A1 — Lead workspace operations.** Complete server-side search/filter/pagination, status handling, owner assignment, notes/activity and clear action hierarchy for contact/dealer leads.
-- [ ] **LD-A2 — Lead conversion.** Define and implement guarded Lead → Customer/Project/Dealer handoff without duplicate identities or manual SQL.
-- [ ] **LD-A3 — Privacy and retention.** Minimize sensitive form exposure, define role visibility, retention/archive behavior and audit expectations.
-- [ ] **LD-A4 — Consultation options integration.** Ensure business-configurable consultation options/fields are Admin-managed and captured values remain privacy-safe.
+- [x] **LD-A1 — Lead workspace operations.** Complete server-side search/filter/pagination, status handling, owner assignment, notes/activity and clear action hierarchy for contact/dealer leads.
+- [x] **LD-A2 — Lead conversion.** Define and implement guarded Lead → Customer/Project/Dealer handoff without duplicate identities or manual SQL.
+- [x] **LD-A3 — Privacy and retention.** Minimize sensitive form exposure, define role visibility, retention/archive behavior and audit expectations.
+- [x] **LD-A4 — Consultation options integration.** Ensure business-configurable consultation options/fields are Admin-managed and captured values remain privacy-safe.
 
 ## DLR — Dealer Onboarding & Customer Documents
 
