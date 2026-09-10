@@ -205,12 +205,9 @@ assert(
   "Project link-existing Order picker must fetch and normalize Customer Reference"
 );
 assert(
-  /order\.order_number[\s\S]*customerReference[\s\S]*statusLabel\(order\.status\)/.test(projectDetail),
-  "Project link-existing Order picker must show Customer Reference between Order number and status when present"
-);
-assert(
-  projectDetail.includes('customerReference || "No Reference"'),
-  "Project link-existing Order picker must show No Reference when Customer Reference is blank"
+  projectDetail.includes('const referenceLabel = customerReference || "No Reference"') &&
+    /order\.order_number[\s\S]*referenceLabel[\s\S]*statusLabel\(order\.status\)/.test(projectDetail),
+  "Project link-existing Order picker must show Customer Reference or No Reference between Order number and status"
 );
 assert(
   projectDetail.includes('order.status !== "cancelled"'),
