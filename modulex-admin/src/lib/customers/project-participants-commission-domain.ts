@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type Profile } from "@/lib/supabase/profile";
 
 const PB6_INTERNAL_ROLES = ["super_admin", "admin", "finance"] as const;
+export const PB6_EXTERNAL_SERVICE_ROLES = ["designer", "installer", "contractor", "referral_partner"] as const;
 
 export type ProjectParticipantSubjectType = "employee" | "customer_contact" | "profile";
 export type ProjectCommissionBasisType = "fixed" | "percentage" | "gross_profit_percentage";
@@ -140,6 +141,18 @@ function hasAnyRole(profile: Profile, roles: readonly Profile["role"][]) {
   return profile.roles.some((role) => roles.includes(role));
 }
 
+function isInternal(profile: Profile) {
+  return hasAnyRole(profile, PB6_INTERNAL_ROLES);
+}
+
+function isLimitedSales(profile: Profile) {
+  return !isInternal(profile) && hasAnyRole(profile, ["sales"]);
+}
+
+function isExternalServiceRole(roleKey: string) {
+  return (PB6_EXTERNAL_SERVICE_ROLES as readonly string[]).includes(roleKey);
+}
+
 async function currentProfileOrThrow() {
   const { profile, error } = await getCurrentProfile();
   if (error) throw error;
@@ -149,15 +162,23 @@ async function currentProfileOrThrow() {
 
 async function requireParticipantView() {
   const profile = await currentProfileOrThrow();
-  if (!hasAnyRole(profile, PB6_INTERNAL_ROLES)) {
+  if (!isInternal(profile) && !hasAnyRole(profile, ["sales"])) {
     throw new Error("You do not have permission to view Project participants.");
+  }
+  return profile;
+}
+
+async function requireParticipantCreate() {
+  const profile = await currentProfileOrThrow();
+  if (!isInternal(profile) && !hasAnyRole(profile, ["sales"])) {
+    throw new Error("You do not have permission to add Project participants.");
   }
   return profile;
 }
 
 async function requireParticipantManage() {
   const profile = await currentProfileOrThrow();
-  if (!hasAnyRole(profile, ["super_admin", "admin"])) {
+  if (!isInternal(profile)) {
     throw new Error("You do not have permission to manage Project participants.");
   }
   return profile;
@@ -165,28 +186,42 @@ async function requireParticipantManage() {
 
 async function requireCommissionView() {
   const profile = await currentProfileOrThrow();
-  if (!hasAnyRole(profile, PB6_INTERNAL_ROLES)) {
+  if (!isInternal(profile) && !hasAnyRole(profile, ["sales"])) {
     throw new Error("You do not have permission to view Project commissions.");
+  }
+  return profile;
+}
+
+async function requireCommissionCreate() {
+  const profile = await currentProfileOrThrow();
+  if (!isInternal(profile) && !hasAnyRole(profile, ["sales"])) {
+    throw new Error("You do not have permission to create Project commissions.");
   }
   return profile;
 }
 
 async function requireCommissionManage() {
   const profile = await currentProfileOrThrow();
-  if (!hasAnyRole(profile, PB6_INTERNAL_ROLES)) {
-    throw new Error("You do not have permission to manage Project commissions.");
+  if (!isInternal(profile)) {
+    throw new Error("You do not have permission to manage Project commission lifecycle.");
   }
   return profile;
 }
 
 export async function getProjectParticipantAccess() {
   const profile = await currentProfileOrThrow();
-  const canViewInternal = hasAnyRole(profile, PB6_INTERNAL_ROLES);
+  const internal = isInternal(profile);
+  const limitedSales = isLimitedSales(profile);
   return {
-    canViewParticipants: canViewInternal,
-    canManageParticipants: hasAnyRole(profile, ["super_admin", "admin"]),
-    canViewCommissions: canViewInternal,
-    canManageCommissions: canViewInternal,
+    isSalesLimited: limitedSales,
+    canViewParticipants: internal || limitedSales,
+    canCreateParticipants: internal || limitedSales,
+    canManageParticipants: internal,
+    canViewCommissions: internal || limitedSales,
+    canCreateCommissions: internal || limitedSales,
+    canManageCommissions: internal,
+    canCorrectCommissions: internal,
+    canViewCommissionEvents: internal,
   };
 }
 
@@ -209,7 +244,7 @@ export async function getCustomerProjectParticipants(projectId: string): Promise
 }
 
 export async function getProjectParticipantRoles(): Promise<ProjectParticipantRole[]> {
-  await requireParticipantView();
+  const profile = await requireParticipantView();
   const { data, error } = await supabase
     .from("project_participant_roles")
     .select("id, role_key, label, is_system")
@@ -217,16 +252,17 @@ export async function getProjectParticipantRoles(): Promise<ProjectParticipantRo
     .order("sort_order")
     .order("label");
   if (error) throw error;
-  return (data ?? []).map((row) => ({
+  const rows = (data ?? []).map((row) => ({
     id: String(row.id),
     roleKey: String(row.role_key),
     label: String(row.label),
     isSystem: Boolean(row.is_system),
   }));
+  return isLimitedSales(profile) ? rows.filter((role) => isExternalServiceRole(role.roleKey)) : rows;
 }
 
 export async function getProjectParticipantCandidates(customerId: string): Promise<ProjectParticipantCandidate[]> {
-  await requireParticipantManage();
+  await requireParticipantCreate();
   const [employeesResult, contactsResult, profilesResult] = await Promise.all([
     supabase
       .from("hr_employees")
@@ -284,13 +320,17 @@ export async function setCustomerProjectParticipant(input: {
   subjectId: string;
   notes?: string | null;
 }) {
-  await requireParticipantManage();
-  if (input.roleKey === "sales_rep") {
+  const profile = await requireParticipantCreate();
+  const roleKey = requiredText(input.roleKey, "Participant role");
+  if (roleKey === "sales_rep") {
     throw new Error("Sales Rep is managed from canonical Project Settings, not from Participants.");
+  }
+  if (isLimitedSales(profile) && !isExternalServiceRole(roleKey)) {
+    throw new Error("Sales can add only Designer, Installer, Contractor, or Referral Partner services.");
   }
   const { data, error } = await supabase.rpc("set_customer_project_participant", {
     p_project_id: input.projectId,
-    p_role_key: requiredText(input.roleKey, "Participant role"),
+    p_role_key: roleKey,
     p_employee_id: input.subjectType === "employee" ? input.subjectId : null,
     p_customer_contact_id: input.subjectType === "customer_contact" ? input.subjectId : null,
     p_profile_id: input.subjectType === "profile" ? input.subjectId : null,
@@ -333,7 +373,9 @@ export async function getProjectCommissionScopeOptions(projectId: string): Promi
   categories: ProjectCommissionScopeOption[];
   products: ProjectCommissionScopeOption[];
 }> {
-  await requireCommissionManage();
+  const profile = await requireCommissionCreate();
+  if (isLimitedSales(profile)) return { categories: [], products: [] };
+
   const { data: orderRows, error: ordersError } = await supabase
     .from("customer_orders")
     .select("id")
@@ -419,11 +461,17 @@ export async function getCustomerProjectCommissionCalculationPreview(input: {
   productCategoryId?: string | null;
   productId?: string | null;
 }): Promise<ProjectCommissionCalculationPreview> {
-  await requireCommissionManage();
+  const profile = await requireCommissionCreate();
+  if (isLimitedSales(profile) && input.basisType === "gross_profit_percentage") {
+    throw new Error("Sales cannot use gross-profit commission calculations.");
+  }
   const currencyCode = normalizeCurrency(input.currencyCode);
-  const { data, error } = await supabase.rpc("get_customer_project_commission_calculation_preview", {
+  const rpcName = isLimitedSales(profile)
+    ? "get_customer_project_external_service_commission_preview"
+    : "get_customer_project_commission_calculation_preview";
+  const { data, error } = await supabase.rpc(rpcName, {
     p_project_id: input.projectId,
-    p_basis_type: input.basisType,
+    ...(isLimitedSales(profile) ? {} : { p_basis_type: input.basisType }),
     p_scope_type: input.scopeType,
     p_currency_code: currencyCode,
     p_product_category_id: input.scopeType === "category" ? input.productCategoryId || null : null,
@@ -459,8 +507,11 @@ export async function createCustomerProjectCommissionObligation(input: {
   productId?: string | null;
   description?: string | null;
 }) {
-  await requireCommissionManage();
+  const profile = await requireCommissionCreate();
   if (!input.participantId) throw new Error("Commission participant is required.");
+  if (isLimitedSales(profile) && input.basisType === "gross_profit_percentage") {
+    throw new Error("Sales cannot use gross-profit commission calculations.");
+  }
   const currencyCode = normalizeCurrency(input.currencyCode);
   if (input.basisType === "fixed") {
     if (!Number.isFinite(input.flatAmount) || Number(input.flatAmount) <= 0) throw new Error("Fixed commission amount must be greater than zero.");
@@ -470,7 +521,10 @@ export async function createCustomerProjectCommissionObligation(input: {
   if (input.scopeType === "category" && !input.productCategoryId) throw new Error("Category scope requires a Project category.");
   if (input.scopeType === "product" && !input.productId) throw new Error("Product scope requires a Project product.");
 
-  const { data, error } = await supabase.rpc("create_customer_project_commission_obligation", {
+  const rpcName = isLimitedSales(profile)
+    ? "create_customer_project_external_service_commission_obligation"
+    : "create_customer_project_commission_obligation";
+  const { data, error } = await supabase.rpc(rpcName, {
     p_project_id: input.projectId,
     p_participant_id: input.participantId,
     p_basis_type: input.basisType,
@@ -483,6 +537,46 @@ export async function createCustomerProjectCommissionObligation(input: {
     p_product_category_id: input.scopeType === "category" ? input.productCategoryId || null : null,
     p_product_id: input.scopeType === "product" ? input.productId || null : null,
     p_description: input.description?.trim() || null,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function replaceCustomerProjectCommissionObligation(input: {
+  obligationId: string;
+  basisType: ProjectCommissionBasisType;
+  currencyCode: string;
+  scopeType: ProjectCommissionScopeType;
+  rate?: number | null;
+  flatAmount?: number | null;
+  orderId?: string | null;
+  productCategoryId?: string | null;
+  productId?: string | null;
+  description?: string | null;
+  reason: string;
+}) {
+  await requireCommissionManage();
+  const reason = requiredText(input.reason, "Correction reason");
+  if (!input.obligationId) throw new Error("Commission obligation is required.");
+  const currencyCode = normalizeCurrency(input.currencyCode);
+  if (input.basisType === "fixed") {
+    if (!Number.isFinite(input.flatAmount) || Number(input.flatAmount) <= 0) throw new Error("Fixed commission amount must be greater than zero.");
+  } else if (!Number.isFinite(input.rate) || Number(input.rate) <= 0 || Number(input.rate) > 100) {
+    throw new Error("Commission percentage must be greater than zero and at most 100.");
+  }
+
+  const { data, error } = await supabase.rpc("replace_customer_project_commission_obligation", {
+    p_obligation_id: input.obligationId,
+    p_basis_type: input.basisType,
+    p_currency_code: currencyCode,
+    p_scope_type: input.scopeType,
+    p_rate: input.basisType !== "fixed" ? Number(input.rate) : null,
+    p_flat_amount: input.basisType === "fixed" ? Number(input.flatAmount) : null,
+    p_order_id: input.orderId || null,
+    p_product_category_id: input.scopeType === "category" ? input.productCategoryId || null : null,
+    p_product_id: input.scopeType === "product" ? input.productId || null : null,
+    p_description: input.description?.trim() || null,
+    p_reason: reason,
   });
   if (error) throw error;
   return data as string;
