@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 
-const root = resolve(process.cwd(), "modulex-admin");
+const cwd = process.cwd();
+const root = basename(cwd) === "modulex-admin" ? cwd : resolve(cwd, "modulex-admin");
 const repoRoot = resolve(root, "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 const checks = [];
