@@ -81,11 +81,12 @@ type FieldErrors = {
   items?: Record<number, ItemFieldErrors>;
 };
 
-function money(value: number, currency = "USD") {
+function money(value: number, currency: string) {
+  const amount = Number.isFinite(value) ? value : 0;
   try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Number.isFinite(value) ? value : 0);
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
   } catch {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(Number.isFinite(value) ? value : 0);
+    return `${currency} ${amount.toFixed(2)}`;
   }
 }
 
@@ -131,6 +132,7 @@ export default function NewCustomerOrder({
   const [products, setProducts] = useState<Product[]>([]);
   const [prices, setPrices] = useState<PriceRow[]>([]);
   const [taxRules, setTaxRules] = useState<TaxRule[]>([]);
+  const [defaultCurrency, setDefaultCurrency] = useState("");
   const [proposalPreview, setProposalPreview] = useState<ProposalOrderConversionPreview | null>(null);
   const [priceGroupId, setPriceGroupId] = useState("");
   const [fulfillmentType, setFulfillmentType] = useState<OrderFulfillmentType>("delivery");
@@ -177,6 +179,7 @@ export default function NewCustomerOrder({
         if (!profileResult.profile) throw new Error("User profile could not be loaded.");
 
         const loadedCustomer = context.customer;
+        const loadedDefaultCurrency = context.defaultCurrency;
         const loadedAddresses = context.addresses;
         const loadedGroups = context.priceGroups;
         const loadedMethods = context.paymentMethods;
@@ -187,7 +190,7 @@ export default function NewCustomerOrder({
           if (acceptedPreview.projectId !== projectId || acceptedPreview.customerId !== customerId) {
             throw new Error("Accepted Proposal source does not belong to this Project/Customer.");
           }
-          if ((acceptedPreview.currencyCode || "USD").toUpperCase() !== (loadedCustomer.currency_code || "USD").toUpperCase()) {
+          if ((acceptedPreview.currencyCode || loadedDefaultCurrency).toUpperCase() !== (loadedCustomer.currency_code || loadedDefaultCurrency).toUpperCase()) {
             throw new Error(mapProposalOrderConversionError(new Error("PROPOSAL_ORDER_CURRENCY_MISMATCH")));
           }
           const selectedSet = new Set(selectedProposalAreaIds);
@@ -207,6 +210,7 @@ export default function NewCustomerOrder({
         }
 
         setCustomer(loadedCustomer);
+        setDefaultCurrency(loadedDefaultCurrency);
         setRole(profileResult.profile.role);
         setAddresses(loadedAddresses);
         setPriceGroups(loadedGroups);
@@ -241,7 +245,7 @@ export default function NewCustomerOrder({
   }, [fulfillmentType, taxRules]);
 
   useEffect(() => {
-    if (!priceGroupId) {
+    if (!priceGroupId || !defaultCurrency) {
       setPrices([]);
       return;
     }
@@ -249,7 +253,7 @@ export default function NewCustomerOrder({
     async function loadGroupPrices() {
       setIsLoadingPrices(true);
       try {
-        const data = await loadOrderPrices(priceGroupId, customer?.currency_code || "USD");
+        const data = await loadOrderPrices(priceGroupId, customer?.currency_code || defaultCurrency);
         if (active) setPrices(data);
       } catch (error) {
         if (active) {
@@ -262,7 +266,7 @@ export default function NewCustomerOrder({
     }
     void loadGroupPrices();
     return () => { active = false; };
-  }, [priceGroupId, customer?.currency_code]);
+  }, [priceGroupId, customer?.currency_code, defaultCurrency]);
 
   const selectedProposalAreaIdSet = useMemo(() => new Set(selectedProposalAreaIds), [selectedProposalAreaIds]);
   const proposalSourceUnits = useMemo(
@@ -285,7 +289,7 @@ export default function NewCustomerOrder({
   );
   const canManageCountertop = role !== null && hasPermission(role, "orders.manage");
   const isMutating = isSaving || isStartingCountertop;
-  const currency = customer?.currency_code || "USD";
+  const currency = customer?.currency_code || defaultCurrency;
 
   const preview = useMemo(() => {
     if (isProposalConversion) {

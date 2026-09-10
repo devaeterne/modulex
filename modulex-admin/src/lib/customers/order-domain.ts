@@ -56,6 +56,7 @@ export type OrderTaxRule = {
 
 export type CreateOrderContext = {
   customer: Customer;
+  defaultCurrency: string;
   addresses: CustomerAddress[];
   priceGroups: PriceGroupLookup[];
   paymentMethods: PaymentMethod[];
@@ -410,20 +411,24 @@ export async function loadCustomerOrderRevisionPolicy(customerId: string, orderI
 export async function loadCreateOrderContext(customerId: string): Promise<CreateOrderContext> {
   await requireEditorProfile("create");
 
-  const [customerResult, addressesResult, groupsResult, methodsResult, products, taxRulesResult] = await Promise.all([
+  const [customerResult, addressesResult, groupsResult, methodsResult, products, taxRulesResult, settingsResult] = await Promise.all([
     supabase.from("customers").select("*").eq("id", customerId).single(),
     supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("address_name"),
     supabase.from("price_groups").select(PRICE_GROUP_COLUMNS).eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
     supabase.from("payment_methods").select(PAYMENT_METHOD_COLUMNS).eq("is_active", true).order("sort_order"),
     loadOrderProducts(),
     supabase.from("order_tax_rules").select("fulfillment_type, tax_rate, is_active"),
+    supabase.from("general_settings").select("default_currency").eq("id", 1).single(),
   ]);
 
-  const firstError = customerResult.error || addressesResult.error || groupsResult.error || methodsResult.error || taxRulesResult.error;
+  const firstError = customerResult.error || addressesResult.error || groupsResult.error || methodsResult.error || taxRulesResult.error || settingsResult.error;
   if (firstError) throw firstError;
+  const defaultCurrency = String(settingsResult.data?.default_currency ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(defaultCurrency)) throw new Error("Company main currency is unavailable or invalid.");
 
   return {
     customer: customerResult.data as Customer,
+    defaultCurrency,
     addresses: (addressesResult.data ?? []) as CustomerAddress[],
     priceGroups: (groupsResult.data ?? []) as PriceGroupLookup[],
     paymentMethods: (methodsResult.data ?? []) as PaymentMethod[],
@@ -434,7 +439,7 @@ export async function loadCreateOrderContext(customerId: string): Promise<Create
 
 export async function loadEditOrderContext(customerId: string, orderId: string): Promise<EditOrderContext> {
   const profile = await requireEditorProfile("edit");
-  const [customerResult, orderResult, itemsResult, addressesResult, groupsResult, methodsResult, products, taxRulesResult] = await Promise.all([
+  const [customerResult, orderResult, itemsResult, addressesResult, groupsResult, methodsResult, products, taxRulesResult, settingsResult] = await Promise.all([
     supabase.from("customers").select("*").eq("id", customerId).single(),
     supabase.from("customer_orders").select("*").eq("id", orderId).eq("customer_id", customerId).single(),
     supabase.from("customer_order_items").select("*").eq("order_id", orderId).order("line_no"),
@@ -443,16 +448,20 @@ export async function loadEditOrderContext(customerId: string, orderId: string):
     supabase.from("payment_methods").select(PAYMENT_METHOD_COLUMNS).eq("is_active", true).order("sort_order"),
     loadOrderProducts(true),
     supabase.from("order_tax_rules").select("fulfillment_type, tax_rate, is_active"),
+    supabase.from("general_settings").select("default_currency").eq("id", 1).single(),
   ]);
 
-  const firstError = customerResult.error || orderResult.error || itemsResult.error || addressesResult.error || groupsResult.error || methodsResult.error || taxRulesResult.error;
+  const firstError = customerResult.error || orderResult.error || itemsResult.error || addressesResult.error || groupsResult.error || methodsResult.error || taxRulesResult.error || settingsResult.error;
   if (firstError) throw firstError;
+  const defaultCurrency = String(settingsResult.data?.default_currency ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(defaultCurrency)) throw new Error("Company main currency is unavailable or invalid.");
 
   const itemRows = (itemsResult.data ?? []) as CustomerOrderItem[];
   const countertopSummaries = await loadCountertopLineSummaries(itemRows.map((item) => item.id));
 
   return {
     customer: customerResult.data as Customer,
+    defaultCurrency,
     order: orderResult.data as CustomerOrder,
     items: itemRows,
     countertopSummaries,

@@ -7,16 +7,17 @@ import { ADMIN_DOCUMENT_STYLES } from "@/components/ui/theme/adminTheme";
 import { formatCountertopPrintDetail, loadCountertopLineSummaries } from "@/lib/customers/countertop-summary";
 import type { CountertopLineSummary, Customer, CustomerOrder, CustomerOrderItem } from "@/lib/customers/types";
 import type { CommercialDocument as CommercialDocumentModel } from "@/lib/documents/types";
-import { DEFAULT_GENERAL_SETTINGS, type GeneralSettings } from "@/lib/settings/types";
+import type { GeneralSettings } from "@/lib/settings/types";
 import { supabase } from "@/lib/supabase/client";
 import { formatTimestampDate } from "@/lib/dates/usDate";
 
 function money(value: string | number | null | undefined, currency: string, locale: string) {
-  const amount = Number(value ?? 0);
+  const parsed = Number(value ?? 0);
+  const amount = Number.isFinite(parsed) ? parsed : 0;
   try {
-    return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: 2 }).format(Number.isFinite(amount) ? amount : 0);
+    return new Intl.NumberFormat(locale, { style: "currency", currency, minimumFractionDigits: 2 }).format(amount);
   } catch {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(Number.isFinite(amount) ? amount : 0);
+    return `${currency} ${amount.toFixed(2)}`;
   }
 }
 
@@ -70,7 +71,7 @@ export default function CustomerOrderPrint() {
   const [items, setItems] = useState<CustomerOrderItem[]>([]);
   const [visiblePricing, setVisiblePricing] = useState(new Map<string, { unitPrice: number; lineTotal: number }>());
   const [countertopSummaries, setCountertopSummaries] = useState<CountertopLineSummary[]>([]);
-  const [settings, setSettings] = useState<GeneralSettings>(DEFAULT_GENERAL_SETTINGS);
+  const [settings, setSettings] = useState<GeneralSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -83,7 +84,7 @@ export default function CustomerOrderPrint() {
         supabase.from("general_settings").select("*").eq("id", 1).maybeSingle(),
       ]);
 
-      const firstError = customerResult.error || orderResult.error || itemsResult.error;
+      const firstError = customerResult.error || orderResult.error || itemsResult.error || settingsResult.error;
       if (firstError) {
         setErrorMessage(firstError.message);
         setIsLoading(false);
@@ -104,18 +105,18 @@ export default function CustomerOrderPrint() {
       if (!visibleResult.error) {
         setVisiblePricing(new Map(((visibleResult.data ?? []) as Array<{ order_item_id: string; customer_visible_unit_price: number | string; customer_visible_line_total: number | string }>).map((row) => [row.order_item_id, { unitPrice: Number(row.customer_visible_unit_price), lineTotal: Number(row.customer_visible_line_total) }])));
       }
-      if (!settingsResult.error && settingsResult.data) setSettings(settingsResult.data as GeneralSettings);
+      if (settingsResult.data) setSettings(settingsResult.data as GeneralSettings);
       setIsLoading(false);
     }
     void load();
   }, [params.id, params.orderId]);
 
   if (isLoading) return <div className={`min-h-screen p-10 text-center text-sm ${ADMIN_DOCUMENT_STYLES.loading}`}>Preparing printable order...</div>;
-  if (!customer || !order) return <div className={`min-h-screen p-10 text-center text-sm ${ADMIN_DOCUMENT_STYLES.loadError}`}>{errorMessage || "Order not found."}</div>;
+  if (!customer || !order || !settings) return <div className={`min-h-screen p-10 text-center text-sm ${ADMIN_DOCUMENT_STYLES.loadError}`}>{errorMessage || "Order or canonical company settings not found."}</div>;
 
-  const locale = settings.locale || "en-US";
-  const timezone = settings.timezone || "UTC";
-  const currency = order.currency_code || settings.default_currency || "USD";
+  const locale = settings.locale;
+  const timezone = settings.timezone;
+  const currency = order.currency_code;
   const formatMoney = (value: string | number | null | undefined) => money(value, currency, locale);
   const formatDate = (value: string | null | undefined) => date(value, locale, timezone);
   const grandTotal = Number(order.grand_total ?? order.total_amount ?? 0);
@@ -124,7 +125,7 @@ export default function CustomerOrderPrint() {
 
   const document: CommercialDocumentModel = {
     kind: "order",
-    title: settings.order_document_title || "Sales Order / Order Confirmation",
+    title: settings.order_document_title,
     number: order.order_number,
     fileName: `Order-${order.order_number.replace(/[^a-zA-Z0-9._-]+/g, "-")}.pdf`,
     meta: [

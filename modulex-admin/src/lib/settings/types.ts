@@ -21,6 +21,10 @@ export type GeneralSettings = {
   default_currency: string;
   locale: string;
   timezone: string;
+  order_number_prefix: string;
+  order_number_padding: number;
+  invoice_number_prefix: string;
+  invoice_number_padding: number;
   administrative_fee_default_percent: number;
   order_document_title: string;
   order_footer_note: string | null;
@@ -52,7 +56,11 @@ export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   country_code: "US",
   default_currency: "USD",
   locale: "en-US",
-  timezone: "America/New_York",
+  timezone: "UTC",
+  order_number_prefix: "ORD-",
+  order_number_padding: 6,
+  invoice_number_prefix: "INV-",
+  invoice_number_padding: 6,
   administrative_fee_default_percent: 3,
   order_document_title: "Sales Order / Order Confirmation",
   order_footer_note: null,
