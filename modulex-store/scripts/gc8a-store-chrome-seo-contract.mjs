@@ -63,12 +63,12 @@ function loadIsolatedTsModule(relative) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
     fileName: filePath,
   }).outputText;
-  const module = { exports: {} };
-  const context = vm.createContext({ module, exports: module.exports, require(specifier) {
+  const loadedModule = { exports: {} };
+  const context = vm.createContext({ module: loadedModule, exports: loadedModule.exports, require(specifier) {
     throw new Error(`Unexpected import in isolated GC-8A module: ${specifier}`);
   }});
   vm.runInContext(compiled, context, { filename: filePath });
-  return module.exports;
+  return loadedModule.exports;
 }
 
 const destinationsSource = read(destinationsPath);
