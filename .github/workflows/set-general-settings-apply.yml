@@ -1,0 +1,66 @@
+name: SET General Settings One Shot Apply
+
+on:
+  push:
+    branches:
+      - feat/set-general-settings-final-closeout
+    paths:
+      - scripts/apply-set-general-settings-closeout.mjs
+      - .github/workflows/set-general-settings-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/set-general-settings-final-closeout
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - name: Apply deterministic source transform
+        run: node scripts/apply-set-general-settings-closeout.mjs
+      - name: Install Admin dependencies
+        working-directory: modulex-admin
+        run: npm ci
+      - name: SET closeout contract
+        working-directory: modulex-admin
+        run: node scripts/set-general-settings-closeout-contract.mjs
+      - name: General Settings regression
+        working-directory: modulex-admin
+        run: node scripts/general-settings-ui-contract.mjs
+      - name: Documents regression
+        working-directory: modulex-admin
+        run: node scripts/commercial-document-contract.mjs
+      - name: Order domain regression
+        working-directory: modulex-admin
+        run: npm run smoke:order-domain
+      - name: Finance currency/FX regression
+        working-directory: modulex-admin
+        run: npm run smoke:a6-finance-core
+      - name: Typecheck
+        working-directory: modulex-admin
+        run: npm run typecheck
+      - name: Lint
+        working-directory: modulex-admin
+        run: npm run lint
+      - name: Build
+        working-directory: modulex-admin
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+        run: npm run build
+      - name: Commit verified implementation and remove one-shot tooling
+        run: |
+          rm scripts/apply-set-general-settings-closeout.mjs .github/workflows/set-general-settings-apply.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(settings): implement SET final closeout"
+          git push origin HEAD:feat/set-general-settings-final-closeout
