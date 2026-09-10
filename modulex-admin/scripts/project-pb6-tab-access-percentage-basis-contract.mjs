@@ -17,6 +17,7 @@ const eventDomainPath = "src/lib/customers/project-commission-events.ts";
 const roleManagerPath = "src/components/customers/project-detail/ProjectParticipantRoleManager.tsx";
 const settingsOverviewPath = "src/components/settings/GeneralSettingsOverview.tsx";
 const settingsRoutePath = "src/app/(admin)/settings/general/project-participant-roles/page.tsx";
+const hardeningMigrationPath = "../modulex-store/supabase/migrations/20260904150500_customer_project_participants_commission_hardening.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260905004500_customer_project_commission_access_basis.sql";
 const mirrorPath = "sql/project-pb6-commission-access-basis.sql";
 const externalServiceMigrationPath = "../modulex-store/supabase/migrations/20260910220000_customer_project_external_service_commission_access.sql";
@@ -31,6 +32,7 @@ for (const [file, message] of [
   [roleManagerPath, "PB-6 role manager must exist"],
   [settingsOverviewPath, "General Settings overview must exist"],
   [settingsRoutePath, "Project Participant Roles General Settings route must exist"],
+  [hardeningMigrationPath, "PB-6 hardening migration must exist"],
   [migrationPath, "PB-6 access/basis migration must exist"],
   [mirrorPath, "PB-6 access/basis Admin SQL mirror must exist"],
   [externalServiceMigrationPath, "PB-6 Sales external-service access migration must exist"],
@@ -45,6 +47,7 @@ const eventDomain = read(eventDomainPath);
 const roleManager = read(roleManagerPath);
 const settingsOverview = read(settingsOverviewPath);
 const settingsRoute = read(settingsRoutePath);
+const hardeningMigration = read(hardeningMigrationPath);
 const migration = read(migrationPath);
 const mirror = read(mirrorPath);
 const externalServiceMigration = read(externalServiceMigrationPath);
@@ -87,6 +90,8 @@ assert.match(migration, /PROJECT_COMMISSION_BASIS_EMPTY/i, "Zero/empty percentag
 assert.match(migration, /get_customer_project_commission_basis_preview/i, "DB must expose a bounded basis preview RPC");
 assert.match(migration, /create_customer_project_commission_obligation[\s\S]*project_commission_scope_basis/i, "Commission creation must calculate percentage basis server-side");
 assert.match(migration, /current_user_has_any_role\(array\['super_admin','admin','finance'\]\)/i, "Historical PB-6 migration must retain its internal boundary; the new migration supersedes it narrowly");
+assert.match(hardeningMigration, /paid_amount[\s\S]*when not public\.current_user_has_any_role\(array\['super_admin','admin','finance'\]\) then null/i, "Existing commission projection must keep Finance payout amounts hidden from non-internal viewers");
+assert.match(hardeningMigration, /payout_currency_state[\s\S]*when not public\.current_user_has_any_role\(array\['super_admin','admin','finance'\]\) then 'restricted'/i, "Existing commission projection must keep payout currency state restricted for non-internal viewers");
 
 assert.match(externalServiceMigration, /designer[\s\S]*installer[\s\S]*contractor[\s\S]*referral_partner/i, "DB must use the approved Sales external-service role whitelist");
 assert.match(externalServiceMigration, /created_by\s*=\s*auth\.uid\(\)/i, "Sales reads must be row-bounded to participant ownership");
@@ -96,7 +101,6 @@ assert.match(externalServiceMigration, /replace_customer_project_commission_obli
 assert.match(externalServiceMigration, /PROJECT_COMMISSION_REPLACE_PENDING_ONLY/i, "Only pending commission obligations may be replaced directly");
 assert.match(externalServiceMigration, /PROJECT_COMMISSION_REPLACEMENT_REASON_REQUIRED/i, "Commission replacement must require an audit reason");
 assert.match(externalServiceMigration, /current_user_has_any_role\(array\['super_admin','admin','finance'\]\)/i, "Finance/Admin/Super Admin must retain full participant and commission management");
-assert.match(externalServiceMigration, /payout_amount[\s\S]*case[\s\S]*super_admin[\s\S]*admin[\s\S]*finance/i, "Sales commission projection must not disclose Finance payout detail");
 assert.doesNotMatch(externalServiceMigration, /append_customer_project_commission_event[\s\S]*current_user_has_any_role\(array\[[^\]]*'sales'[^\]]*\]\)/i, "Sales must not gain commission lifecycle event authority");
 
 console.log("Project PB-6 tab access + percentage basis contract PASS");
