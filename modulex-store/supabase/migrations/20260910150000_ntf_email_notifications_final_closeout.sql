@@ -207,15 +207,16 @@ grant execute on function public.recover_stuck_email_notifications() to service_
 
 -- Read lifecycle RPCs are recipient-scoped and idempotent. SECURITY DEFINER is
 -- required because user_notifications exposes SELECT only; writes stay RPC-only.
+-- Preserve the existing void return contract so this migration can safely replace
+-- the production functions without dropping/recreating their identities.
 create or replace function public.mark_user_notification_read(p_notification_id uuid)
-returns boolean
+returns void
 language plpgsql
 security definer
 set search_path = pg_catalog, public
 as $$
 declare
   v_user_id uuid := (select auth.uid());
-  v_updated integer;
 begin
   if v_user_id is null then
     raise exception 'Authentication required.';
@@ -226,21 +227,17 @@ begin
   set read_at = coalesce(read_at, now())
   where id = p_notification_id
     and user_id = v_user_id;
-
-  get diagnostics v_updated = row_count;
-  return v_updated = 1;
 end;
 $$;
 
 create or replace function public.mark_all_user_notifications_read()
-returns integer
+returns void
 language plpgsql
 security definer
 set search_path = pg_catalog, public
 as $$
 declare
   v_user_id uuid := (select auth.uid());
-  v_updated integer;
 begin
   if v_user_id is null then
     raise exception 'Authentication required.';
@@ -251,9 +248,6 @@ begin
   set read_at = now()
   where user_id = v_user_id
     and read_at is null;
-
-  get diagnostics v_updated = row_count;
-  return v_updated;
 end;
 $$;
 
