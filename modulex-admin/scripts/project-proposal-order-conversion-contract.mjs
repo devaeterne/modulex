@@ -17,6 +17,9 @@ const exists = (file, base = root) => fs.existsSync(path.join(base, file));
 const migrationName = "20260908190000_project_proposal_order_conversion.sql";
 const adminMigration = `supabase/migrations/${migrationName}`;
 const storeMigration = `modulex-store/supabase/migrations/${migrationName}`;
+const serviceUuidHotfixName = "20260910071500_project_proposal_order_service_uuid_fix.sql";
+const adminServiceUuidHotfix = `supabase/migrations/${serviceUuidHotfixName}`;
+const storeServiceUuidHotfix = `modulex-store/supabase/migrations/${serviceUuidHotfixName}`;
 const files = {
   domain: "src/lib/customers/project-proposal-order-conversion-domain.ts",
   selector: "src/components/customers/project-detail/ProjectProposalOrderConversion.tsx",
@@ -31,6 +34,15 @@ assert.equal(exists(storeMigration, repoRoot), true, `P6 canonical Store migrati
 const adminSql = read(adminMigration);
 const storeSql = read(storeMigration, repoRoot);
 assert.equal(adminSql, storeSql, "P6 Admin migration mirror must be byte-identical to canonical Store migration");
+
+assert.equal(exists(adminServiceUuidHotfix), true, `P6 SERVICE UUID hotfix Admin mirror must exist: ${adminServiceUuidHotfix}`);
+assert.equal(exists(storeServiceUuidHotfix, repoRoot), true, `P6 SERVICE UUID hotfix canonical migration must exist: ${storeServiceUuidHotfix}`);
+const adminServiceUuidSql = exists(adminServiceUuidHotfix) ? read(adminServiceUuidHotfix) : "";
+const storeServiceUuidSql = exists(storeServiceUuidHotfix, repoRoot) ? read(storeServiceUuidHotfix, repoRoot) : "";
+assert.equal(adminServiceUuidSql, storeServiceUuidSql, "P6 SERVICE UUID hotfix Admin mirror must be byte-identical to canonical Store migration");
+assert.match(storeServiceUuidSql, /array_agg\(p\.id\s+order\s+by\s+p\.id\)\)\[1\]/i, "P6 SERVICE lookup must use a deterministic UUID-safe aggregate");
+assert.doesNotMatch(storeServiceUuidSql, /min\s*\(\s*p\.id\s*\)/i, "P6 SERVICE lookup must not call unsupported min(uuid)");
+assert.match(storeServiceUuidSql, /create_order_from_accepted_project_proposal/i, "P6 SERVICE UUID hotfix must repair the canonical conversion RPC");
 
 for (const [name, file] of Object.entries(files)) {
   assert.equal(exists(file), true, `P6 ${name} file must exist: ${file}`);

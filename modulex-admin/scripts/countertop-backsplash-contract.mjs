@@ -9,6 +9,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
 const configurator = read("src/components/countertop/CountertopConfigurator.tsx");
 const summary = read("src/lib/customers/countertop-summary.ts");
 const migrationPath = "../modulex-store/supabase/migrations/20260909210000_countertop_backsplash_multi.sql";
+const edgeRecordHotfixPath = "../modulex-store/supabase/migrations/20260910070000_countertop_backsplash_edge_record_fix.sql";
 
 assert(exists(migrationPath), "Countertop backsplash migration must exist");
 const migration = exists(migrationPath) ? read(migrationPath) : "";
@@ -44,6 +45,17 @@ for (const token of [
 
 assert(migration.includes("new.pricing_snapshot->'backsplash_subtotal'"), "Snapshot restore totals must preserve backsplash subtotal");
 assert(migration.includes("public.countertop_edge_profiles"), "Backsplash polished top edge must use managed edge profiles");
+
+assert(exists(edgeRecordHotfixPath), "Backsplash no-edge pricing regression hotfix migration must exist");
+const edgeRecordHotfix = exists(edgeRecordHotfixPath) ? read(edgeRecordHotfixPath) : "";
+for (const token of [
+  "v_edge_name text",
+  "v_edge_pricing_method text",
+  "v_edge_unit_price numeric",
+  "into v_edge_name,v_edge_pricing_method,v_edge_unit_price",
+  "'edge_name',case when v_top_edge then v_edge_name else null end",
+]) assert(edgeRecordHotfix.includes(token), `Backsplash no-edge hotfix contract missing: ${token}`);
+assert(!edgeRecordHotfix.includes("v_edge record"), "Backsplash pricing hotfix must not use an unassigned record for optional edge data");
 
 for (const token of [
   "type BacksplashRow",
