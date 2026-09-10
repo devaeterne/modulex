@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-10
-Main baseline: `29d36d4e1e9858c2726b3b70bed0105bade85809` (`#426` merged)
+Main baseline: `5addfae49ce27e2fea1d43807e19857a5b3b0687` (`#427` merged)
 Current phase: **Admin Final Workstreams**
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
@@ -88,12 +88,12 @@ Status: `[x]` DLR-A1→DLR-A4 implemented and production-accepted.
 
 ## USR — Users & Roles
 
-Status: `[~]` RBAC foundation exists; identity administration closeout remains.
+Status: `[x]` USR-A1→USR-A4 implemented, production-migrated and rollback/read-only accepted.
 
-- [ ] **USR-A1 — User/role management flow audit.** Reconcile `/users` and role-management UI with the canonical permission model and direct-route/data enforcement.
-- [ ] **USR-A2 — Last Super Admin protection.** Prevent accidental removal/deactivation of the final effective Super Admin through every mutation path, with concurrency-safe DB enforcement.
-- [ ] **USR-A3 — Invite/recovery/deactivation lifecycle.** Verify invitation, password recovery, account deactivation/reactivation and stale-session behavior end to end.
-- [ ] **USR-A4 — Role-change audit.** Add/verify immutable actor/time/from/to audit evidence and regression coverage for role assignment/removal.
+- [x] **USR-A1 — User/role management flow audit.** Reconcile `/users` and role-management UI with the canonical permission model and direct-route/data enforcement.
+- [x] **USR-A2 — Last Super Admin protection.** Prevent accidental removal/deactivation of the final effective Super Admin through every mutation path, with concurrency-safe DB enforcement.
+- [x] **USR-A3 — Invite/recovery/deactivation lifecycle.** Verify invitation, password recovery, account deactivation/reactivation and stale-session behavior end to end.
+- [x] **USR-A4 — Role-change audit.** Add/verify immutable actor/time/from/to audit evidence and regression coverage for role assignment/removal.
 
 ## SET — General Settings
 
