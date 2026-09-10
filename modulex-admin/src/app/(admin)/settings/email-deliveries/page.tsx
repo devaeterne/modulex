@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { formatDateTime } from "@/lib/dates/usDate";
 
 type DeliveryRow = {
   id: string;
@@ -20,17 +21,6 @@ type DeliveryRow = {
   is_stuck: boolean;
   is_exhausted: boolean;
 };
-
-function formatDateTime(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "2-digit",
-    day: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
 
 function label(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
