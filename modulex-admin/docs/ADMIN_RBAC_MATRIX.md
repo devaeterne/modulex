@@ -1,9 +1,9 @@
 # Modulex Admin RBAC Matrix
 
-Last reviewed: 2026-08-29
-Baseline: `f248d04864c9e55111d416f99a1cced4ee4f02f3`
+Last reviewed: 2026-09-10
+Baseline: USR-A1→USR-A4 closeout (`feat/usr-users-roles-closeout`)
 
-This document is the Phase A0.2 navigation and direct-route authorization inventory for Modulex Admin. It records the permission expected by production navigation and the current roles that receive each permission.
+This document is the navigation, direct-route, API and database authorization inventory for Modulex Admin. It records the permission expected by production navigation and the current roles that receive each permission.
 
 ## Enforcement model
 
@@ -11,10 +11,10 @@ Admin authorization has four independent layers:
 
 1. **Navigation visibility** — `src/layout/AppSidebar.tsx` filters entries with `hasPermission()`.
 2. **Direct-route visibility** — `src/app/(admin)/layout.tsx` calls `canAccessPath()` and renders Access Denied when the authenticated role does not satisfy the path permission.
-3. **In-page mutation visibility** — list routes that are intentionally readable by operational roles must separately gate mutation affordances and handlers with the corresponding manage permission. Warehouse structure lists use `warehouse.manage`.
-4. **Data authorization** — Supabase RLS/RPC boundaries and protected Admin API handlers remain authoritative for reads/writes. UI visibility must never be treated as a replacement for data authorization.
+3. **In-page/API mutation visibility** — readable routes must separately gate mutation affordances and API handlers with the corresponding manage permission. `/api/admin/users` now requires `users.view` for GET and `users.manage` for POST/PATCH/DELETE.
+4. **Data authorization** — Supabase RLS/RPC/database invariants remain authoritative for reads/writes. UI visibility must never be treated as a replacement for data authorization.
 
-`scripts/rbac-smoke.mjs` asserts that every sidebar path resolves to the same permission through `requiredPermissionForPath()`. It also covers profile access, intentional aliases, negative mutation-route cases, and warehouse-structure list mutation UI guards.
+`scripts/rbac-smoke.mjs` asserts that every sidebar path resolves to the same permission through `requiredPermissionForPath()`. `scripts/admin-users-contract.mjs` additionally locks the Users API permission boundary, negative-role behavior, lifecycle/session contract and USR database invariants.
 
 ## Current production roles
 
@@ -22,13 +22,25 @@ Admin authorization has four independent layers:
 | --- | --- |
 | `super_admin` | Full permission set, including protected Super Admin account management. |
 | `admin` | Full business/system permission set; protected Super Admin account actions remain separately constrained. |
-| `sales` | Customer, lead/dealer application, order, invoice, shipment, installation and selling-price workflows; no Store CMS or internal finance/personnel administration. |
-| `finance` | Pricing/cost visibility, invoices, approvals, finance/payroll operations and reports; no customer master, Store CMS, personnel or warehouse mutation access. |
-| `hr` | Personnel lifecycle management and training; no general dashboard/business operations. |
-| `warehouse` | Inventory mutation, shipments, QR operations and warehouse-structure read access; warehouse structure master-data mutation remains Admin-only. |
-| `shipping` | Shipment execution plus inventory/warehouse/QR visibility; no general stock or warehouse-structure mutation. |
+| `sales` | Customer, lead/dealer application, order, invoice, shipment, installation and selling-price workflows; no Store CMS or internal finance/personnel/user administration. |
+| `finance` | Pricing/cost visibility, invoices, approvals, finance/payroll operations and reports; no customer master, Store CMS, personnel, user administration or warehouse mutation access. |
+| `hr` | Personnel lifecycle management and training; no general dashboard/business/user administration. |
+| `warehouse` | Inventory mutation, shipments, QR operations and warehouse-structure read access; warehouse structure master-data and user administration remain Admin-only. |
+| `shipping` | Shipment execution plus inventory/warehouse/QR visibility; no general stock, warehouse-structure mutation or user administration. |
 
 All active roles receive `profile.view` for their own `/profile` surface.
+
+## Users & Roles canonical model (USR closeout)
+
+- `public.user_roles` is the canonical effective-role source. Multi-role permission union is derived from it.
+- `public.profiles.role` remains a compatibility/primary-role mirror for legacy consumers; managed role RPCs keep it synchronized.
+- `users.view`, `users.manage` and `roles.manage` are currently granted only to `super_admin` and `admin` by `ROLE_PERMISSIONS`.
+- Super Admin targets are separately protected: only an effective Super Admin may assign/remove the `super_admin` role or mutate an existing Super Admin account.
+- `public.set_user_roles(...)` and `public.admin_set_user_access(...)` are service-role-only mutation RPCs and re-authorize the explicit actor against active `user_roles`; browser roles cannot call them directly.
+- `profiles`/`user_roles` RLS direct reads align with the current `users.view` model. Authenticated direct role mutation remains unavailable.
+- A database trigger serializes every effective-Super-Admin reducing path with a transaction advisory lock and rejects `last_effective_super_admin`, including direct/cascade delete, demotion and deactivation paths.
+- `public.user_role_change_audit` is append-only and captures immutable `actor_user_id`, `changed_at`, `from_roles` and `to_roles` evidence for managed role changes.
+- Deactivation is enforced on every Admin API request through `profiles.is_active`; an otherwise-valid stale Auth session receives 403 immediately after deactivation. Reactivation restores access according to the current canonical roles.
 
 ## Navigation → permission → role inventory
 
@@ -78,6 +90,7 @@ Navigation list permissions are not sufficient for mutation URLs. The following 
 - Warehouse structure mutations (`/warehouses/new`, `/warehouses/:id/edit`, `/zones/new`, `/zones/:id/edit`, `/locations/new`, `/locations/:id/edit`) → `warehouse.manage`.
 - Personnel departments/positions and descendants → `personnel.manage`.
 - Store lead detail routes → `leads.manage`.
+- User list API read → `users.view`; invite/create, recovery/password action, role update, activate/deactivate and delete → `users.manage`, with protected-Super-Admin target checks layered on top.
 
 The `warehouse` and `shipping` roles can therefore view warehouse structure but cannot open create/edit warehouse, zone or location routes. On the readable `/warehouses`, `/zones`, and `/locations` list pages, Add/Edit, activate/deactivate, delete, and double-click edit behavior is also gated by `warehouse.manage`; non-mutating drill-down links remain available.
 
@@ -90,13 +103,16 @@ The `warehouse` and `shipping` roles can therefore view warehouse structure but 
 
 ## Regression guard
 
-`npm run smoke:rbac` must fail when:
+`npm run smoke:rbac` and `npm run test:admin-users` must fail when:
 
 - a sidebar path and `requiredPermissionForPath()` disagree,
 - `/profile` is unavailable to an active role,
+- an operational role gains `users.manage` or the Users API falls back to a coarse Admin/staff guard,
 - warehouse/shipping roles gain warehouse-structure mutation routes,
 - warehouse-structure list pages expose or invoke mutation behavior without `warehouse.manage`,
-- the legacy payment-method alias diverges from `finance.manage`, or
+- the legacy payment-method alias diverges from `finance.manage`,
+- last-effective-Super-Admin DB serialization/guard evidence disappears,
+- immutable role-change actor/time/from/to evidence disappears, or
 - current positive/negative role-path expectations regress.
 
-Route checks are a UI authorization boundary only. Supabase RLS/RPC/API authorization must continue to be verified independently by the existing Admin smoke suites.
+Route checks are a UI authorization boundary only. Supabase RLS/RPC/API authorization is independently required and is part of the USR closeout contract.
