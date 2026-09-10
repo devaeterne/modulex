@@ -32,11 +32,11 @@ const newOrderPage = read("src/app/(admin)/customers/[id]/orders/new/page.tsx");
 const newOrder = read("src/components/customers/NewCustomerOrder.tsx");
 const orderDetailPage = read("src/app/(admin)/customers/[id]/orders/[orderId]/page.tsx");
 
-assert(permissions.includes('"projects.view"'), "permissions must define projects.view");
-assert(permissions.includes('"projects.manage"'), "permissions must define projects.manage");
-assert(permissions.includes('path === "/projects"'), "route RBAC must guard /projects");
-assert(sidebar.includes('name: "Projects"'), "sidebar must expose Projects");
-assert(sidebar.includes('path: "/projects"'), "sidebar Projects item must route to /projects");
+assert(permissions.includes('\"projects.view\"'), "permissions must define projects.view");
+assert(permissions.includes('\"projects.manage\"'), "permissions must define projects.manage");
+assert(permissions.includes('path === \"/projects\"'), "route RBAC must guard /projects");
+assert(sidebar.includes('name: \"Projects\"'), "sidebar must expose Projects");
+assert(sidebar.includes('path: \"/projects\"'), "sidebar Projects item must route to /projects");
 
 for (const exportedName of [
   "listCustomerProjects",
@@ -51,13 +51,13 @@ for (const exportedName of [
   );
 }
 
-assert(projectDomain.includes('hasPermission(profile.role, "projects.view")'), "Project reads must use projects.view");
-assert(projectDomain.includes('hasPermission(profile.role, "projects.manage")'), "Project mutations must use projects.manage");
-assert(projectDomain.includes('.rpc("create_customer_project"'), "Project create must use the authoritative RPC");
-assert(projectDomain.includes('.rpc("update_customer_project"'), "Project update must use the authoritative RPC");
-assert(projectDomain.includes('.rpc("get_customer_projects_page"'), "Project list must use server-side paging RPC");
-assert(projectDomain.includes('.rpc("get_customer_project"'), "Project detail must use the authoritative detail RPC");
-assert(projectDomain.includes('.rpc("create_project_customer_order"'), "Project-context Order creation must use the project-aware RPC");
+assert(projectDomain.includes('hasPermission(profile.role, \"projects.view\")'), "Project reads must use projects.view");
+assert(projectDomain.includes('hasPermission(profile.role, \"projects.manage\")'), "Project mutations must use projects.manage");
+assert(projectDomain.includes('.rpc(\"create_customer_project\"'), "Project create must use the authoritative RPC");
+assert(projectDomain.includes('.rpc(\"update_customer_project\"'), "Project update must use the authoritative RPC");
+assert(projectDomain.includes('.rpc(\"get_customer_projects_page\"'), "Project list must use server-side paging RPC");
+assert(projectDomain.includes('.rpc(\"get_customer_project\"'), "Project detail must use the authoritative detail RPC");
+assert(projectDomain.includes('.rpc(\"create_project_customer_order\"'), "Project-context Order creation must use the project-aware RPC");
 assert(projectsPage.includes("PageBreadCrumb"), "Projects list must use the shared page heading convention");
 assert(projectDetailPage.includes("PageBreadCrumb"), "Project detail must use the shared page heading convention");
 assert(projectDetail.includes("projectId="), "Project detail must launch new Orders with Project context");
@@ -66,18 +66,18 @@ assert(newOrderPage.includes("projectId={projectId}"), "New Order page must pass
 assert(
   newOrder.includes("createCustomerOrderWithAdministrativeFee") &&
     administrativeFeeOrderDomain.includes("input.projectId") &&
-    administrativeFeeOrderDomain.includes('.rpc("create_project_customer_order"'),
+    administrativeFeeOrderDomain.includes('.rpc(\"create_project_customer_order\"'),
   "New Order must preserve the Project-aware create boundary when projectId is present"
 );
 assert(newOrder.includes("projectId?: string | null"), "New Order form must accept an optional projectId without breaking standalone creation");
 assert(orderDetailPage.includes("CustomerOrderProjectLink"), "Order detail must expose its Project when linked");
 
 assert(
-  projectsWorkspace.includes('hasPermission(profile.roles, "projects.manage")'),
+  projectsWorkspace.includes('hasPermission(profile.roles, \"projects.manage\")'),
   "Projects create UI must derive projects.manage from the current user's full role set"
 );
 assert(
-  /\{canManageProjects\s*\?\s*\(\s*<ComponentCard\s+title="Create Project"/.test(projectsWorkspace),
+  /\{canManageProjects\s*\?\s*\(\s*<ComponentCard\s+title=\"Create Project\"/.test(projectsWorkspace),
   "Projects create UI must be hidden from projects.view-only users"
 );
 assert(
@@ -104,8 +104,8 @@ assert(
 );
 assert(
   projectsWorkspace.includes("SearchableSelect") &&
-    projectsWorkspace.includes('searchPlaceholder="Search customers') &&
-    projectsWorkspace.includes('searchPlaceholder="Search sales reps'),
+    projectsWorkspace.includes('searchPlaceholder=\"Search customers') &&
+    projectsWorkspace.includes('searchPlaceholder=\"Search sales reps'),
   "Project Customer and Sales Rep selectors must be searchable"
 );
 assert(
@@ -115,19 +115,19 @@ assert(
 );
 
 assert(
-  projectDetail.includes("updateCustomerProject") && projectDetail.includes('.rpc("assign_customer_order_to_project"'),
+  projectDetail.includes("updateCustomerProject") && projectDetail.includes('.rpc(\"assign_customer_order_to_project\"'),
   "Project detail must preserve Order linking while exposing the authoritative Project update boundary"
 );
 assert(
-  projectDetail.includes('hasPermission(profile.roles, "projects.manage")'),
+  projectDetail.includes('hasPermission(profile.roles, \"projects.manage\")'),
   "Project detail manage UI must derive projects.manage from the current user's full role set"
 );
 assert(
-  /\{canManageProjects\s*\?\s*\(\s*<ComponentCard title="Project Settings"/.test(projectDetail),
+  /\{canManageProjects\s*\?\s*\(\s*<ComponentCard title=\"Project Settings\"/.test(projectDetail),
   "Project Settings must be hidden from projects.view-only users"
 );
 assert(
-  projectDetail.includes('.from("customer_project_status_history")') && projectDetail.includes('title="Activity"'),
+  projectDetail.includes('.from(\"customer_project_status_history\")') && projectDetail.includes('title=\"Activity\"'),
   "Project detail must show truthful Project lifecycle activity from status history"
 );
 assert(
@@ -144,8 +144,8 @@ assert(
   projectDetail.includes("describeProjectActivity") &&
     projectDetail.includes("changed_by") &&
     projectDetail.includes("customer_project_status_history_changed_by_fkey") &&
-    projectDetail.includes('variant="admin">Activity</TableCell>') &&
-    projectDetail.includes('variant="admin">By</TableCell>'),
+    projectDetail.includes('variant=\"admin\">Activity</TableCell>') &&
+    projectDetail.includes('variant=\"admin\">By</TableCell>'),
   "Project activity must explain what changed and identify the actor when available"
 );
 
@@ -157,41 +157,46 @@ assert(
   projectProgressUi.includes("ComponentCard") &&
     projectProgressUi.includes("Badge") &&
     projectProgressUi.includes("ADMIN_TEXT_STYLES") &&
-    projectProgressUi.includes('title="Project Progress"'),
+    projectProgressUi.includes('title=\"Project Progress\"'),
   "Project Progress must use shared Admin card, badge and light/dark text primitives"
 );
 for (const sectionLabel of ["Lifecycle", "Orders", "Delivery", "Installation", "Commercial"]) {
   assert(projectProgressUi.includes(sectionLabel), `Project Progress must show ${sectionLabel}`);
 }
 assert(
-  projectProgressDomain.includes('.from("customer_order_status_history")') &&
-    projectProgressDomain.includes('.from("customer_order_revisions")') &&
-    projectProgressDomain.includes('.from("customer_invoices")'),
+  projectProgressDomain.includes('.from(\"customer_order_status_history\")') &&
+    projectProgressDomain.includes('.from(\"customer_order_revisions\")') &&
+    projectProgressDomain.includes('.from(\"customer_invoices\")'),
   "Project Progress must derive activity and commercial state from canonical Order/Invoice records"
 );
 assert(
-  projectProgressDomain.includes('order.status !== "cancelled"') &&
-    projectProgressDomain.includes('order.fulfillment_type !== "pickup"') &&
-    projectProgressDomain.includes('order.fulfillment_type === "delivery_installation"'),
+  projectProgressDomain.includes('order.status !== \"cancelled\"') &&
+    projectProgressDomain.includes('order.fulfillment_type !== \"pickup\"') &&
+    projectProgressDomain.includes('order.fulfillment_type === \"delivery_installation\"'),
   "Project Progress must exclude cancelled Orders and derive delivery/installation eligibility from canonical fulfillment type"
 );
 assert(
-  projectProgressDomain.includes('.neq("status", "void")') &&
+  projectProgressDomain.includes('.neq(\"status\", \"void\")') &&
     projectProgressDomain.includes("PROJECT_PROGRESS_ACTIVITY_LIMIT") &&
     projectProgressDomain.includes("PROJECT_PROGRESS_INVOICE_LIMIT"),
   "Project Progress invoice/activity reads must exclude void invoices and remain explicitly bounded"
 );
 
 assert(
-  customerOrdersList.includes('if (status === "all") query = query.neq("status", "cancelled")'),
+  customerOrdersList.includes('if (status === \"all\") query = query.neq(\"status\", \"cancelled\")'),
   "Customer Orders default list must exclude cancelled Orders"
 );
 assert(
-  customerOrdersList.includes('else query = query.eq("status", status)'),
+  customerOrdersList.includes('else query = query.eq(\"status\", status)'),
   "Customer Orders must still allow an explicit Cancelled status filter"
 );
 assert(
-  projectDetail.includes('.neq("status", "cancelled")'),
+  projectDetail.includes('.eq(\"customer_id\", nextProject.customer_id)') &&
+    projectDetail.includes('.is(\"project_id\", null)'),
+  "Project link-existing Order choices must be limited to the same Customer and unassigned Orders"
+);
+assert(
+  projectDetail.includes('.neq(\"status\", \"cancelled\")'),
   "Project link-existing Order choices must exclude cancelled Orders"
 );
 assert(
@@ -204,7 +209,11 @@ assert(
   "Project link-existing Order picker must show Customer Reference between Order number and status when present"
 );
 assert(
-  projectDetail.includes('order.status !== "cancelled"'),
+  projectDetail.includes('customerReference || \"No Reference\"'),
+  "Project link-existing Order picker must show No Reference when Customer Reference is blank"
+);
+assert(
+  projectDetail.includes('order.status !== \"cancelled\"'),
   "Project detail must exclude cancelled child Orders"
 );
 assert(
@@ -212,7 +221,7 @@ assert(
   "Projects list must use the shared Admin table system"
 );
 assert(
-  projectsWorkspace.includes('from "@/components/ui/alert/Alert"'),
+  projectsWorkspace.includes('from \"@/components/ui/alert/Alert\"'),
   "Projects list must use the shared Alert primitive for feedback"
 );
 assert(
@@ -220,7 +229,7 @@ assert(
   "Project detail Orders must use the shared Admin table system"
 );
 assert(
-  projectDetail.includes('from "@/components/ui/alert/Alert"'),
+  projectDetail.includes('from \"@/components/ui/alert/Alert\"'),
   "Project detail must use the shared Alert primitive for feedback"
 );
 
