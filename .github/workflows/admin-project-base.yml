@@ -13,12 +13,14 @@ on:
       - "modulex-admin/src/layout/AppSidebar.tsx"
       - "modulex-admin/scripts/project-*.mjs"
       - "modulex-admin/scripts/project-import/**"
+      - "modulex-admin/scripts/cost-*.mjs"
       - "modulex-admin/scripts/countertop-sink-fallback-contract.mjs"
       - "modulex-admin/sql/project-*.sql"
       - "modulex-store/supabase/migrations/*project*.sql"
       - "modulex-store/supabase/migrations/*procurement*.sql"
       - "modulex-store/supabase/migrations/*payment*.sql"
       - "modulex-store/supabase/migrations/*commission*.sql"
+      - "modulex-store/supabase/migrations/*cost*.sql"
       - "modulex-store/src/lib/portal/projects.ts"
       - "modulex-store/src/components/portal/PortalProject*.tsx"
       - "modulex-store/src/components/portal/PortalNavigation.tsx"
@@ -59,6 +61,8 @@ jobs:
         run: node scripts/project-progress-layout-contract.mjs
       - name: Project Financial rollup contract
         run: node scripts/project-financial-rollup-contract.mjs
+      - name: Cost & Profitability hardening contract
+        run: node scripts/cost-profitability-hardening-contract.mjs
       - name: Project Payment Ledger contract
         run: node scripts/project-payment-ledger-contract.mjs
       - name: Project Payment edit/delete audit contract
