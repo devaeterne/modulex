@@ -5,7 +5,9 @@ import process from "node:process";
 const root = process.cwd();
 const migrationPaths = [
   "../modulex-store/supabase/migrations/20260911120000_cost_price_snapshot_hardening.sql",
-  "../modulex-store/supabase/migrations/20260911120100_profitability_commission_hardening.sql",
+  "../modulex-store/supabase/migrations/20260911120100_profitability_basis_hardening.sql",
+  "../modulex-store/supabase/migrations/20260911120110_project_financial_summary_hardening.sql",
+  "../modulex-store/supabase/migrations/20260911120120_order_profitability_view_hardening.sql",
   "../modulex-store/supabase/migrations/20260911120200_order_margin_assessment_hardening.sql",
 ];
 
@@ -39,6 +41,9 @@ assert(sql.includes("private.project_commission_gross_profit_basis"), "Gross-pro
 assert(sql.includes("direct_project_cost"), "Project financial summary must expose direct Project cost separately");
 
 assert(/create\s+or\s+replace\s+view\s+public\.v_order_profitability_current_cost/i.test(sql), "Order profitability compatibility view must be hardened in place");
+for (const field of ["order_date", "customer_code", "price_group_name_snapshot", "estimated_margin_percent", "manual_price_lines"]) {
+  assert(sql.includes(field), `Order profitability view must preserve compatibility field ${field}`);
+}
 assert(sql.includes("missing_cost_lines"), "Profitability must retain explicit missing-cost coverage");
 assert(sql.includes("v_missing_cost"), "Order approval assessment must fail closed when any cost is missing");
 assert(sql.includes("cost_evaluation"), "Approval keys must change when draft cost evaluation changes");
