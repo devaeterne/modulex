@@ -238,7 +238,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         hasPermission(profile.roles, "pricing.cost.view")
       );
       const nextCanViewParticipantsCommission = Boolean(
-        profile && profile.roles.some((role) => ["super_admin", "admin", "finance"].includes(role)),
+        profile && profile.roles.some((role) => ["super_admin", "admin", "finance", "sales"].includes(role)),
       );
       const nextCanViewChangeOrders = Boolean(
         profile && profile.roles.some((role) => ["super_admin", "admin", "sales", "finance"].includes(role)),
