@@ -37,6 +37,8 @@ assert.match(migration, /customer_order_number_seq/, "Order numbering must retai
 assert.match(migration, /customer_invoice_number_seq/, "Invoice numbering must retain the canonical invoice sequence");
 assert.match(migration, /order_number_prefix[\s\S]*order_number_padding/, "Order defaults must consume configured numbering format");
 assert.match(migration, /invoice_number_prefix[\s\S]*invoice_number_padding/, "Invoice defaults must consume configured numbering format");
+assert.match(migration, /lpad\(v_sequence_text,\s*greatest\(v_padding,\s*length\(v_sequence_text\)\),\s*'0'\)/i, "Configured padding must be a minimum width and never truncate sequence digits");
+assert.doesNotMatch(migration, /lpad\(nextval\('public\.customer_(?:order|invoice)_number_seq'\)::text,\s*v_padding/i, "Document numbering must not truncate sequence values when padding is short");
 
 // SET-A2: no hard-coded USD fallback may decide customer/order/invoice business currency.
 assert.match(migration, /ALTER COLUMN currency_code DROP DEFAULT/i, "Customer currency must stop using a static USD column default");
@@ -54,16 +56,20 @@ assert.doesNotMatch(orderPrint, /currency:\s*"USD"/, "Order print formatting fai
 assert.doesNotMatch(invoicePrint, /currency:\s*"USD"/, "Invoice print formatting failure must not silently change the transaction currency");
 assert.match(settingsTypes, /timezone:\s*"UTC"/, "Local settings fallback must align with the DB timezone default");
 
-// SET-A3: Tax Rules retain server-side usage and gain actor audit without changing Order→Invoice snapshots.
+// SET-A3: Tax Rules retain server-side usage and gain immutable creator audit.
 for (const column of ["created_by", "updated_by"]) {
   assert.match(migration, new RegExp(`order_tax_rules[\\s\\S]*${column}`), `Tax Rules must record ${column}`);
 }
 assert.match(migration, /auth\.uid\(\)/, "Tax Rule audit must stamp the authenticated actor");
+assert.match(migration, /new\.created_by\s*:=\s*old\.created_by/i, "Tax Rule creator audit must remain immutable on update");
 assert.match(migration, /REVOKE[\s\S]+order_tax_rules[\s\S]+FROM anon/i, "Anonymous Tax Rule DML grants must be removed");
 
-// SET-A1/A5: Store uses public narrow wrappers; private helper execution is not a public contract.
+// SET-A1/A5: Store uses public narrow wrappers; canonical migrations define the
+// private implementations before delegating so clean databases are reproducible.
 assert.match(storeCompany, /callPublicRpc[\s\S]*get_store_public_profile/, "Store company profile must use the public RPC wrapper");
 assert.match(storeCompany, /callPublicRpc[\s\S]*get_store_public_company_locations/, "Store company locations must use the public RPC wrapper");
+assert.match(migration, /create or replace function store_api_private\.get_store_public_profile\(\)[\s\S]*security definer/i, "Canonical migration must define the private company profile implementation");
+assert.match(migration, /create or replace function store_api_private\.get_store_public_company_locations\(\)[\s\S]*security definer/i, "Canonical migration must define the private company locations implementation");
 assert.match(migration, /create or replace function public\.get_store_public_profile\(\)[\s\S]*security definer/i, "Public company profile wrapper must own the privilege boundary");
 assert.match(migration, /create or replace function public\.get_store_public_company_locations\(\)[\s\S]*security definer/i, "Public company locations wrapper must own the privilege boundary");
 assert.match(migration, /REVOKE EXECUTE ON FUNCTION store_api_private\.get_store_public_profile\(\) FROM anon, authenticated/i, "Private company profile helper must not be directly executable by Store roles");
