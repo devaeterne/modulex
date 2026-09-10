@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
-Last reviewed: 2026-09-10
-Main baseline: `5addfae49ce27e2fea1d43807e19857a5b3b0687` (`#427` merged)
+Last reviewed: 2026-09-11
+Main baseline: `fd0ddf1ca581a433fca458400578aef9af692dc5`
 Current phase: **Admin Final Workstreams**
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
@@ -125,11 +125,11 @@ Status: `[x]` PER-A1→PER-A4 closed; all listed Personnel routes are production
 
 ## MOD — Approvals / Training Optional Modules
 
-Status: `[ ]` scope decision remains.
+Status: `[x]` MOD-A1→MOD-A3 closed; Approvals is a shared production workflow and standalone Training is not product scope.
 
-- [ ] **MOD-A1 — Approvals decision.** Decide whether `/approvals` is the shared approval engine or a placeholder. If real, define supported request types, RBAC, lifecycle, audit and owning domains; otherwise remove it cleanly.
-- [ ] **MOD-A2 — Training decision.** Decide whether `/training` belongs to Personnel product scope; formalize its HR model/workflow or remove the production surface.
-- [ ] **MOD-A3 — Optional-module exit gate.** Every visible module must have an explicit product purpose; no TailAdmin-era placeholder may remain in production navigation.
+- [x] **MOD-A1 — Approvals decision.** `/approvals` is the shared approval engine for `order_exception`, `order_revision`, `order_status_change`, `customer_commercial_change`, `customer_price_group_change`, and `invoice_change`. Requesting remains domain-owned; queue visibility is `approvals.view`, review is Admin/Super Admin only, decisions are pending-only approve/reject, reviewer note/time/actor and notification events preserve audit evidence, and order/customer/invoice deep links remain canonical.
+- [x] **MOD-A2 — Training decision.** The standalone `/training` surface was browser-local static help content rather than the production HR training model. It is removed from Admin product scope; existing `hr_training_courses` / `hr_employee_training` schema remains Personnel-owned for PER decisions and is not dropped by MOD.
+- [x] **MOD-A3 — Optional-module exit gate.** Approvals is exposed as a shared operational workflow rather than Finance-owned navigation; standalone Training route/content and its obsolete route permission are removed, with regression coverage locking the decision.
 
 ## RBS — RBAC / Security
 

@@ -122,6 +122,7 @@ const navItems: NavItem[] = [
     ],
   },
   { icon: <TaskIcon />, name: "Request Center", path: "/requests", permission: "requests.view", exact: true },
+  { icon: <TaskIcon />, name: "Approvals", path: "/approvals", permission: "approvals.view", exact: true },
   { icon: <ShootingStarIcon />, name: "What's New", path: "/updates", permission: "updates.view", exact: true },
 ];
 
@@ -145,7 +146,6 @@ const managementItems: NavItem[] = [
       { name: "Invoices", path: "/customers/invoices", permission: "invoices.view" },
       { name: "Payroll", path: "/finance/payroll", permission: "finance.view", new: true },
       { name: "Compensation", path: "/finance/compensation", permission: "finance.view" },
-      { name: "Approvals", path: "/approvals", permission: "approvals.view", new: true },
       { name: "Cost & Margin", path: "/pricing/cost-margin", permission: "pricing.cost.view" },
       { name: "Tax Rules", path: "/settings/general/tax-rules", permission: "finance.manage" },
       { name: "Payment Methods", path: "/settings/payment-methods", permission: "finance.manage" },
