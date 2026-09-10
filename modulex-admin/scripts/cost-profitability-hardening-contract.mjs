@@ -3,8 +3,11 @@ import path from "node:path";
 import process from "node:process";
 
 const root = process.cwd();
-const migrationPath = "../modulex-store/supabase/migrations/20260911120000_cost_profitability_hardening.sql";
-const migration = path.join(root, migrationPath);
+const migrationPaths = [
+  "../modulex-store/supabase/migrations/20260911120000_cost_price_snapshot_hardening.sql",
+  "../modulex-store/supabase/migrations/20260911120100_profitability_commission_hardening.sql",
+  "../modulex-store/supabase/migrations/20260911120200_order_margin_assessment_hardening.sql",
+];
 
 function assert(condition, message) {
   if (!condition) {
@@ -13,8 +16,10 @@ function assert(condition, message) {
   }
 }
 
-assert(fs.existsSync(migration), `Cost & Profitability hardening requires ${migrationPath}`);
-const sql = fs.readFileSync(migration, "utf8");
+for (const migrationPath of migrationPaths) {
+  assert(fs.existsSync(path.join(root, migrationPath)), `Cost & Profitability hardening requires ${migrationPath}`);
+}
+const sql = migrationPaths.map((migrationPath) => fs.readFileSync(path.join(root, migrationPath), "utf8")).join("\n\n");
 
 assert(/system_key\s*=\s*'cost'/i.test(sql), "Cost price group must have the stable system_key=cost");
 assert(sql.includes("private.sync_product_cost_from_cost_price"), "Cost price changes must synchronize the operational product_costs history");
@@ -25,6 +30,7 @@ assert(sql.includes("private.apply_customer_order_item_cost_snapshot"), "Order i
 assert(sql.includes("private.freeze_customer_order_cost_snapshots"), "Order confirmation must freeze any existing line costs");
 assert(sql.includes("confirmed_at"), "Cost snapshots must be anchored to the order confirmation lifecycle");
 
+assert(sql.includes("private.v_profitability_order_lines"), "Profitability consumers must share one canonical line accounting projection");
 assert(sql.includes("customer_visible_sell_amount"), "Profitability revenue must use canonical customer-visible pre-tax revenue");
 assert(sql.includes("private.project_direct_cost_basis"), "Gross profit must include direct Project costs");
 assert(sql.includes("role_key = 'contractor'") || sql.includes("role_key='contractor'"), "Contractor fixed obligations must be classified as direct Project costs");
