@@ -48,6 +48,19 @@ export type OrderPriceRow = {
   amount: string | number;
 };
 
+export type OrderCabinetSearchInput = {
+  query?: string;
+  brandId?: string;
+  categoryId?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type OrderCabinetSearchResult = {
+  products: OrderDomainProduct[];
+  totalCount: number;
+};
+
 export type OrderTaxRule = {
   fulfillment_type: OrderFulfillmentType;
   tax_rate: string | number | null;
@@ -220,6 +233,9 @@ const ORDER_REVISION_IMMUTABLE_FIELDS = [
 const PRICE_GROUP_COLUMNS = "id, name, system_key, sort_order, is_base_price, is_active, available_for_orders, requires_approval, internal_only";
 const PAYMENT_METHOD_COLUMNS = "id, system_key, name, commission_percent, sort_order, is_active";
 const PRODUCT_COLUMNS = "id, sku, name, barcode, status, brand, category, brand_id, category_id, product_types(code, name, pricing_model), units_of_measure(code, name)";
+const ORDER_QUERY_PAGE_SIZE = 500;
+
+let cabinetProductTypeIdPromise: Promise<string> | null = null;
 
 type ProductQueryRow = Omit<OrderDomainProduct, "product_type_code" | "product_type_name" | "pricing_model" | "uom_code" | "uom_name"> & {
   product_types: { code: string; name: string; pricing_model: OrderDomainProduct["pricing_model"] } | null;
@@ -242,27 +258,81 @@ function mapOrderProducts(rows: ProductQueryRow[]): OrderDomainProduct[] {
   }));
 }
 
-async function loadOrderProducts(includeInactive = false): Promise<OrderDomainProduct[]> {
-  const bulkProductsResult = includeInactive
-    ? await supabase.from("products").select(PRODUCT_COLUMNS).in("status", ["active", "inactive"]).order("sku")
-    : await supabase.from("products").select(PRODUCT_COLUMNS).eq("status", "active").order("sku");
-  if (bulkProductsResult.error) throw bulkProductsResult.error;
+async function loadProductTypeIds(codes: string[]): Promise<string[]> {
+  if (codes.length === 0) return [];
+  const { data, error } = await supabase.from("product_types").select("id, code").in("code", codes);
+  if (error) throw error;
+  const idsByCode = new Map((data ?? []).map((row) => [String(row.code).toUpperCase(), String(row.id)]));
+  const missing = codes.filter((code) => !idsByCode.has(code.toUpperCase()));
+  if (missing.length) throw new Error(`Required Product Type missing: ${missing.join(", ")}`);
+  return codes.map((code) => idsByCode.get(code.toUpperCase())!);
+}
 
-  const serviceProductResult = await supabase
-    .from("products")
-    .select(PRODUCT_COLUMNS)
-    .eq("status", "active")
-    .eq("sku", "SERVICE")
-    .maybeSingle();
-  if (serviceProductResult.error) throw serviceProductResult.error;
+async function getCabinetProductTypeId(): Promise<string> {
+  if (!cabinetProductTypeIdPromise) {
+    cabinetProductTypeIdPromise = loadProductTypeIds(["CABINETS"]).then(([id]) => id);
+  }
+  return cabinetProductTypeIdPromise;
+}
 
-  const rows = [...((bulkProductsResult.data ?? []) as unknown as ProductQueryRow[])];
-  const serviceProduct = serviceProductResult.data as unknown as ProductQueryRow | null;
-  if (serviceProduct && !rows.some((product) => product.id === serviceProduct.id)) {
-    rows.push(serviceProduct);
+async function loadOrderProducts(includeInactive = false, productTypeCodes: string[] = []): Promise<OrderDomainProduct[]> {
+  const productTypeIds = productTypeCodes.length ? await loadProductTypeIds(productTypeCodes) : [];
+  const rows: ProductQueryRow[] = [];
+
+  for (let from = 0; ; from += ORDER_QUERY_PAGE_SIZE) {
+    let query = supabase
+      .from("products")
+      .select(PRODUCT_COLUMNS)
+      .order("sku")
+      .range(from, from + ORDER_QUERY_PAGE_SIZE - 1);
+
+    query = includeInactive ? query.in("status", ["active", "inactive"]) : query.eq("status", "active");
+    if (productTypeIds.length) query = query.in("product_type_id", productTypeIds);
+
+    const result = await query;
+    if (result.error) throw result.error;
+    const pageRows = (result.data ?? []) as unknown as ProductQueryRow[];
+    rows.push(...pageRows);
+    if (pageRows.length < ORDER_QUERY_PAGE_SIZE) break;
   }
 
   return mapOrderProducts(rows);
+}
+
+function normalizeOrderCabinetSearch(value: string | undefined) {
+  return (value ?? "")
+    .trim()
+    .replace(/[,%()*]/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+}
+
+export async function searchOrderCabinetProducts(input: OrderCabinetSearchInput = {}): Promise<OrderCabinetSearchResult> {
+  const cabinetProductTypeId = await getCabinetProductTypeId();
+  const pageSize = Math.min(100, Math.max(1, Math.trunc(input.pageSize ?? 50)));
+  const page = Math.max(1, Math.trunc(input.page ?? 1));
+  const from = (page - 1) * pageSize;
+  const normalizedQuery = normalizeOrderCabinetSearch(input.query);
+
+  let request = supabase
+    .from("products")
+    .select(PRODUCT_COLUMNS, { count: "exact" })
+    .eq("status", "active")
+    .eq("product_type_id", cabinetProductTypeId);
+
+  if (input.brandId) request = request.eq("brand_id", input.brandId);
+  if (input.categoryId) request = request.eq("category_id", input.categoryId);
+  if (normalizedQuery) {
+    const pattern = `*${normalizedQuery}*`;
+    request = request.or(`sku.ilike.${pattern},name.ilike.${pattern},barcode.ilike.${pattern},brand.ilike.${pattern},category.ilike.${pattern}`);
+  }
+
+  const result = await request.order("sku").range(from, from + pageSize - 1);
+  if (result.error) throw result.error;
+  return {
+    products: mapOrderProducts((result.data ?? []) as unknown as ProductQueryRow[]),
+    totalCount: result.count ?? 0,
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -415,7 +485,7 @@ export async function loadCreateOrderContext(customerId: string): Promise<Create
     supabase.from("customer_addresses").select("*").eq("customer_id", customerId).eq("is_active", true).order("address_name"),
     supabase.from("price_groups").select(PRICE_GROUP_COLUMNS).eq("is_active", true).eq("available_for_orders", true).eq("internal_only", false).order("sort_order"),
     supabase.from("payment_methods").select(PAYMENT_METHOD_COLUMNS).eq("is_active", true).order("sort_order"),
-    loadOrderProducts(),
+    loadOrderProducts(false, ["CABINETS", "SERVICE"]),
     supabase.from("order_tax_rules").select("fulfillment_type, tax_rate, is_active"),
   ]);
 
@@ -515,16 +585,24 @@ export async function loadOrderDetail(customerId: string, orderId: string): Prom
 }
 
 export async function loadOrderPrices(priceGroupId: string, currencyCode: string): Promise<OrderPriceRow[]> {
-  const { data, error } = await supabase
-    .from("product_prices")
-    .select("product_id, amount")
-    .eq("price_group_id", priceGroupId)
-    .eq("is_active", true)
-    .is("valid_to", null)
-    .eq("currency_code", currencyCode || "USD");
+  const rows: OrderPriceRow[] = [];
+  for (let from = 0; ; from += ORDER_QUERY_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("product_prices")
+      .select("product_id, amount")
+      .eq("price_group_id", priceGroupId)
+      .eq("is_active", true)
+      .is("valid_to", null)
+      .eq("currency_code", currencyCode || "USD")
+      .order("product_id")
+      .range(from, from + ORDER_QUERY_PAGE_SIZE - 1);
 
-  if (error) throw error;
-  return (data ?? []) as OrderPriceRow[];
+    if (error) throw error;
+    const pageRows = (data ?? []) as OrderPriceRow[];
+    rows.push(...pageRows);
+    if (pageRows.length < ORDER_QUERY_PAGE_SIZE) break;
+  }
+  return rows;
 }
 
 function serializeCreateOrderItem(item: CreateOrderItemInput) {
