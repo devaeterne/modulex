@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -161,6 +162,12 @@ assert.match(
   watchChannels,
   /const RENEW_BEFORE_MS = 48 \* 60 \* 60 \* 1000;/,
   "Daily reconciliation must renew Google watch channels at least 48 hours before expiry.",
+);
+
+execFileSync(
+  process.execPath,
+  ["--experimental-strip-types", path.join(root, "scripts/calendar-google-colors.test.mjs")],
+  { stdio: "inherit" },
 );
 
 console.log("PASS: Calendar V3 bidirectional contract");
