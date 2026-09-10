@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
-import PayrollManager from "@/components/hr/PayrollManager";
+import PageBreadCrumb from "@/components/common/PageBreadCrumb";
+import FinancePayrollManager from "@/components/finance/FinancePayrollManager";
 
 export const metadata: Metadata = {
-  title: "Payroll | Modulex Admin",
-  description: "Finance payroll processing",
+  title: "Payroll Settlement | Modulex Admin",
+  description: "Finance settlement of approved HR payroll obligations",
 };
 
 export default function FinancePayrollPage() {
-  return <PayrollManager />;
+  return (
+    <>
+      <PageBreadCrumb pageTitle="Payroll Settlement" />
+      <FinancePayrollManager />
+    </>
+  );
 }
