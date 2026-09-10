@@ -17,6 +17,7 @@ on:
       - "modulex-store/supabase/migrations/*dealer*.sql"
       - "modulex-store/supabase/migrations/*dlr*.sql"
       - "modulex-store/supabase/migrations/*set_general_settings*.sql"
+      - "modulex-store/supabase/migrations/*ntf_email_notifications*.sql"
       - ".github/workflows/**"
   push:
     paths:
@@ -34,6 +35,7 @@ on:
       - "modulex-store/supabase/migrations/*dealer*.sql"
       - "modulex-store/supabase/migrations/*dlr*.sql"
       - "modulex-store/supabase/migrations/*set_general_settings*.sql"
+      - "modulex-store/supabase/migrations/*ntf_email_notifications*.sql"
       - ".github/workflows/**"
 
 concurrency:
@@ -77,6 +79,8 @@ jobs:
         run: node scripts/admin-date-input-contract.mjs
       - name: CI workflow architecture contract
         run: npm run smoke:ci-workflow-architecture
+      - name: NTF Email & Notifications final closeout contract
+        run: node scripts/ntf-email-notifications-contract.mjs
       - name: LD Leads final workstream contract
         run: node scripts/ld-leads-workstream-contract.mjs
       - name: API timing contract
