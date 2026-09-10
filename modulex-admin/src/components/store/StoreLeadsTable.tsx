@@ -2,6 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import Label from "@/components/form/Label";
+import Select from "@/components/form/Select";
+import Checkbox from "@/components/form/input/Checkbox";
+import Input from "@/components/form/input/InputField";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  ADMIN_COMPAT_APPEARANCE,
+  ADMIN_STATUS_TONES,
+  ADMIN_SURFACE_CARD,
+  ADMIN_TEXT_STYLES,
+} from "@/components/ui/theme/adminTheme";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import type {
@@ -13,8 +26,15 @@ import type {
 } from "@/lib/store/leads";
 import { formatDateTime } from "@/lib/dates/usDate";
 
-const inputClass = "h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90";
 const pageSize = 25;
+const summaryCardClass = `${ADMIN_SURFACE_CARD} p-5`;
+const filterCardClass = `${ADMIN_SURFACE_CARD} p-5 sm:p-6`;
+const tableCardClass = ADMIN_SURFACE_CARD;
+const errorClass = `${ADMIN_STATUS_TONES.light.error} p-5 text-sm`;
+const inlineErrorClass = `${ADMIN_STATUS_TONES.light.error} mt-4 px-4 py-3 text-sm`;
+const rowHoverClass = `${ADMIN_COMPAT_APPEARANCE["hover:bg-gray-50"]} ${ADMIN_COMPAT_APPEARANCE["dark:hover:bg-white/[0.02]"]}`;
+const linkClass = `font-medium ${ADMIN_COMPAT_APPEARANCE["text-brand-500"]} ${ADMIN_COMPAT_APPEARANCE["hover:text-brand-600"]}`;
+const footerClass = `flex flex-col gap-3 border-t px-4 py-4 text-sm sm:flex-row sm:items-center sm:justify-between ${ADMIN_COMPAT_APPEARANCE["border-gray-100"]} ${ADMIN_COMPAT_APPEARANCE["dark:border-gray-800"]} ${ADMIN_TEXT_STYLES.muted}`;
 
 const statusLabels: Record<StoreLeadStatus, string> = {
   new: "New",
@@ -26,11 +46,21 @@ const statusLabels: Record<StoreLeadStatus, string> = {
   closed: "Closed",
 };
 
-function statusClass(status: StoreLeadStatus) {
-  if (status === "approved" || status === "qualified") return "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400";
-  if (status === "rejected") return "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400";
-  if (status === "new" || status === "under_review") return "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400";
-  return "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-400";
+const typeOptions = [
+  { value: "all", label: "All Types" },
+  { value: "contact", label: "Contact / Consultation" },
+  { value: "dealer_application", label: "Dealer Application" },
+];
+const statusOptions = [
+  { value: "all", label: "All Statuses" },
+  ...Object.entries(statusLabels).map(([value, label]) => ({ value, label })),
+];
+
+function statusColor(status: StoreLeadStatus): "success" | "error" | "warning" | "light" {
+  if (status === "approved" || status === "qualified") return "success";
+  if (status === "rejected") return "error";
+  if (status === "new" || status === "under_review") return "warning";
+  return "light";
 }
 
 function typeLabel(lead: StoreLeadListItem) {
@@ -123,7 +153,7 @@ export default function StoreLeadsTable() {
     }
     void load();
     return () => { active = false; };
-  }, [profileId, profileRole, debouncedSearch, typeFilter, statusFilter, ownerFilter, includeArchived, page]);
+  }, [profileId, profileRole, debouncedSearch, typeFilter, statusFilter, ownerFilter, includeArchived, page, summary]);
 
   const assigneeMap = useMemo(
     () => new Map(assignees.map((item) => [item.id, item.full_name || item.email || "Unknown user"])),
@@ -132,9 +162,15 @@ export default function StoreLeadsTable() {
   const total = leads[0]?.total_count ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const canManageAllOwners = profileRole === "super_admin" || profileRole === "admin";
+  const ownerOptions = useMemo(() => [
+    { value: "all", label: "Accessible Leads" },
+    { value: "mine", label: "Assigned to Me" },
+    { value: "unassigned", label: "Unassigned" },
+    ...(canManageAllOwners ? assignees.map((item) => ({ value: item.id, label: item.full_name || item.email || item.id })) : []),
+  ], [assignees, canManageAllOwners]);
 
   if (error && !profileId) {
-    return <div className="rounded-2xl border border-error-200 bg-error-50 p-5 text-sm text-error-700 dark:border-error-800 dark:bg-error-500/10 dark:text-error-300">{error}</div>;
+    return <div className={errorClass}>{error}</div>;
   }
 
   return (
@@ -146,85 +182,78 @@ export default function StoreLeadsTable() {
           ["Dealer Applications", summary.dealer_applications],
           ["Qualified / Approved", summary.qualified_or_approved],
         ].map(([label, value]) => (
-          <div key={String(label)} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
-            <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-800 dark:text-white/90">{value}</p>
+          <div key={String(label)} className={summaryCardClass}>
+            <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>{label}</p>
+            <p className={`mt-2 text-2xl font-semibold ${ADMIN_TEXT_STYLES.strong}`}>{value}</p>
           </div>
         ))}
       </div>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900 sm:p-6">
+      <section className={filterCardClass}>
         <div className="grid gap-4 xl:grid-cols-[minmax(280px,1fr)_210px_210px_230px_auto] xl:items-end">
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Search</span>
-            <input className={inputClass} type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Reference, name, company or email" />
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Type</span>
-            <select className={inputClass} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as "all" | StoreLeadType)}>
-              <option value="all">All Types</option>
-              <option value="contact">Contact / Consultation</option>
-              <option value="dealer_application">Dealer Application</option>
-            </select>
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</span>
-            <select className={inputClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | StoreLeadStatus)}>
-              <option value="all">All Statuses</option>
-              {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Owner</span>
-            <select className={inputClass} value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
-              <option value="all">Accessible Leads</option>
-              <option value="mine">Assigned to Me</option>
-              <option value="unassigned">Unassigned</option>
-              {canManageAllOwners ? assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name || item.email || item.id}</option>) : null}
-            </select>
-          </label>
-          <label className="flex h-10 items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input type="checkbox" checked={includeArchived} onChange={(event) => setIncludeArchived(event.target.checked)} />
-            Include archived
-          </label>
+          <div>
+            <Label htmlFor="lead-search">Search</Label>
+            <Input id="lead-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Reference, name, company or email" />
+          </div>
+          <div>
+            <Label htmlFor="lead-type">Type</Label>
+            <Select id="lead-type" options={typeOptions} value={typeFilter} onChange={(value) => setTypeFilter(value as "all" | StoreLeadType)} />
+          </div>
+          <div>
+            <Label htmlFor="lead-status">Status</Label>
+            <Select id="lead-status" options={statusOptions} value={statusFilter} onChange={(value) => setStatusFilter(value as "all" | StoreLeadStatus)} />
+          </div>
+          <div>
+            <Label htmlFor="lead-owner">Owner</Label>
+            <Select id="lead-owner" options={ownerOptions} value={ownerFilter} onChange={setOwnerFilter} />
+          </div>
+          <div className="flex h-10 items-center">
+            <Checkbox label="Include archived" checked={includeArchived} onChange={setIncludeArchived} />
+          </div>
         </div>
-        {error ? <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{error}</div> : null}
+        {error ? <div className={inlineErrorClass}>{error}</div> : null}
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900">
+      <section className={tableCardClass}>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/[0.02]">
-              <tr>
+          <Table variant="admin">
+            <TableHeader variant="admin">
+              <TableRow>
                 {["Reference", "Type", "Contact", "Company", "Status", "Assigned", "Source", "Received", ""].map((heading) => (
-                  <th key={heading} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{heading}</th>
+                  <TableCell key={heading} isHeader variant="admin" className="px-4 text-left">{heading}</TableCell>
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              </TableRow>
+            </TableHeader>
+            <TableBody variant="admin" aria-busy={loading}>
               {!loading ? leads.map((lead) => (
-                <tr key={lead.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                  <td className="whitespace-nowrap px-4 py-4 font-medium text-gray-800 dark:text-white/90">{lead.reference_code}{lead.archived_at ? <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">Archived</span> : null}</td>
-                  <td className="whitespace-nowrap px-4 py-4 text-gray-600 dark:text-gray-300">{typeLabel(lead)}</td>
-                  <td className="px-4 py-4"><div className="font-medium text-gray-800 dark:text-white/90">{lead.first_name} {lead.last_name}</div><div className="text-xs text-gray-500">{lead.email}</div></td>
-                  <td className="px-4 py-4 text-gray-600 dark:text-gray-300">{lead.company_name || "—"}</td>
-                  <td className="whitespace-nowrap px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClass(lead.status)}`}>{statusLabels[lead.status]}</span></td>
-                  <td className="px-4 py-4 text-gray-600 dark:text-gray-300">{lead.assigned_to ? assigneeMap.get(lead.assigned_to) || "Assigned" : "Unassigned"}</td>
-                  <td className="px-4 py-4 text-gray-600 dark:text-gray-300">{lead.utm_source || lead.source || "website"}</td>
-                  <td className="whitespace-nowrap px-4 py-4 text-gray-500">{formatDateTime(lead.created_at)}</td>
-                  <td className="whitespace-nowrap px-4 py-4 text-right"><Link href={`/store/leads/${lead.id}`} className="font-medium text-brand-500 hover:text-brand-600">Open →</Link></td>
-                </tr>
+                <TableRow key={lead.id} className={rowHoverClass}>
+                  <TableCell variant="admin" className="whitespace-nowrap px-4 font-medium">
+                    <span className={ADMIN_TEXT_STYLES.strong}>{lead.reference_code}</span>
+                    {lead.archived_at ? <span className="ml-2"><Badge size="sm" color="light">Archived</Badge></span> : null}
+                  </TableCell>
+                  <TableCell variant="admin" className="whitespace-nowrap px-4">{typeLabel(lead)}</TableCell>
+                  <TableCell variant="admin" className="px-4">
+                    <div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{lead.first_name} {lead.last_name}</div>
+                    <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{lead.email}</div>
+                  </TableCell>
+                  <TableCell variant="admin" className="px-4">{lead.company_name || "—"}</TableCell>
+                  <TableCell variant="admin" className="whitespace-nowrap px-4"><Badge size="sm" color={statusColor(lead.status)}>{statusLabels[lead.status]}</Badge></TableCell>
+                  <TableCell variant="admin" className="px-4">{lead.assigned_to ? assigneeMap.get(lead.assigned_to) || "Assigned" : "Unassigned"}</TableCell>
+                  <TableCell variant="admin" className="px-4">{lead.utm_source || lead.source || "website"}</TableCell>
+                  <TableCell variant="admin" className="whitespace-nowrap px-4">{formatDateTime(lead.created_at)}</TableCell>
+                  <TableCell variant="admin" className="whitespace-nowrap px-4 text-right"><Link href={`/store/leads/${lead.id}`} className={linkClass}>Open →</Link></TableCell>
+                </TableRow>
               )) : null}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
-        {loading ? <div className="p-10 text-center text-sm text-gray-500">Loading Store leads...</div> : null}
-        {!loading && leads.length === 0 ? <div className="p-10 text-center text-sm text-gray-500">No leads match the current filters.</div> : null}
-        <div className="flex flex-col gap-3 border-t border-gray-100 px-4 py-4 text-sm text-gray-500 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+        {loading ? <div className={`p-10 text-center text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading Store leads...</div> : null}
+        {!loading && leads.length === 0 ? <div className={`p-10 text-center text-sm ${ADMIN_TEXT_STYLES.muted}`}>No leads match the current filters.</div> : null}
+        <div className={footerClass}>
           <span>{total} matching lead{total === 1 ? "" : "s"} · Page {page} of {pageCount}</span>
           <div className="flex gap-2">
-            <button type="button" className="rounded-lg border border-gray-300 px-3 py-2 disabled:opacity-40 dark:border-gray-700" disabled={page <= 1 || loading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
-            <button type="button" className="rounded-lg border border-gray-300 px-3 py-2 disabled:opacity-40 dark:border-gray-700" disabled={page >= pageCount || loading} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</button>
+            <Button size="sm" variant="outline" disabled={page <= 1 || loading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</Button>
+            <Button size="sm" variant="outline" disabled={page >= pageCount || loading} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</Button>
           </div>
         </div>
       </section>
