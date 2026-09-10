@@ -169,7 +169,7 @@ export default function OrderProductPicker(props: OrderProductPickerProps) {
       <div className="flex max-h-[90vh] flex-col">
         <div className="space-y-4 p-5 pr-16 sm:p-6 sm:pr-16">
           <div>
-            <h3 className="text-base font-medium text-gray-800 dark:text-white/90">Cabinet Products</h3>
+            <h3 className="text-base font-medium">Cabinet Products</h3>
             <FormHint>Active CABINETS are searched on the server. Results are paginated in batches of {PAGE_SIZE}.</FormHint>
           </div>
 
