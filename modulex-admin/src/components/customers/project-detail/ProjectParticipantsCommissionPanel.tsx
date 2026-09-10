@@ -31,6 +31,7 @@ import {
   getProjectParticipantAccess,
   getProjectParticipantCandidates,
   getProjectParticipantRoles,
+  replaceCustomerProjectCommissionObligation,
   setCustomerProjectParticipant,
   type ProjectCommissionBasisType,
   type ProjectCommissionCalculationPreview,
@@ -47,14 +48,36 @@ import { formatDateTime, formatTimestampDate } from "@/lib/dates/usDate";
 type Props = { projectId: string };
 type BadgeColor = "success" | "warning" | "error" | "info" | "light" | "primary";
 
+type AccessState = {
+  isSalesLimited: boolean;
+  canViewParticipants: boolean;
+  canCreateParticipants: boolean;
+  canManageParticipants: boolean;
+  canViewCommissions: boolean;
+  canCreateCommissions: boolean;
+  canManageCommissions: boolean;
+  canCorrectCommissions: boolean;
+  canViewCommissionEvents: boolean;
+};
+
+const EMPTY_ACCESS: AccessState = {
+  isSalesLimited: false,
+  canViewParticipants: false,
+  canCreateParticipants: false,
+  canManageParticipants: false,
+  canViewCommissions: false,
+  canCreateCommissions: false,
+  canManageCommissions: false,
+  canCorrectCommissions: false,
+  canViewCommissionEvents: false,
+};
+
 function displayDate(value: string | null | undefined) {
-  if (!value) return "—";
-  return formatTimestampDate(value);
+  return value ? formatTimestampDate(value) : "—";
 }
 
 function displayDateTime(value: string | null | undefined) {
-  if (!value) return "—";
-  return formatDateTime(value);
+  return value ? formatDateTime(value) : "—";
 }
 
 function money(value: number, currencyCode: string) {
@@ -110,6 +133,7 @@ function previewIssue(preview: ProjectCommissionCalculationPreview | null, fallb
 }
 
 export default function ProjectParticipantsCommissionPanel({ projectId }: Props) {
+  const [access, setAccess] = useState<AccessState>(EMPTY_ACCESS);
   const [participants, setParticipants] = useState<ProjectParticipant[]>([]);
   const [roles, setRoles] = useState<ProjectParticipantRole[]>([]);
   const [candidates, setCandidates] = useState<ProjectParticipantCandidate[]>([]);
@@ -117,10 +141,6 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
   const [commissionEvents, setCommissionEvents] = useState<ProjectCommissionEventRow[]>([]);
   const [categoryScopes, setCategoryScopes] = useState<ProjectCommissionScopeOption[]>([]);
   const [productScopes, setProductScopes] = useState<ProjectCommissionScopeOption[]>([]);
-  const [canViewParticipants, setCanViewParticipants] = useState(false);
-  const [canManageParticipants, setCanManageParticipants] = useState(false);
-  const [canViewCommissions, setCanViewCommissions] = useState(false);
-  const [canManageCommissions, setCanManageCommissions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -142,6 +162,8 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
   const [commissionRate, setCommissionRate] = useState("");
   const [commissionCurrency, setCommissionCurrency] = useState("USD");
   const [commissionDescription, setCommissionDescription] = useState("");
+  const [correctionObligationId, setCorrectionObligationId] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
 
   const [eventObligationId, setEventObligationId] = useState("");
   const [eventType, setEventType] = useState<ProjectCommissionEventType>("earned");
@@ -153,21 +175,18 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     setLoading(true);
     setError(null);
     try {
-      const [project, access] = await Promise.all([
+      const [project, nextAccess] = await Promise.all([
         getCustomerProject(projectId),
         getProjectParticipantAccess(),
       ]);
-      setCanViewParticipants(access.canViewParticipants);
-      setCanManageParticipants(access.canManageParticipants);
-      setCanViewCommissions(access.canViewCommissions);
-      setCanManageCommissions(access.canManageCommissions);
+      setAccess(nextAccess);
 
       const [nextParticipants, nextRoles, nextCommissions, nextCandidates, scopeOptions] = await Promise.all([
-        access.canViewParticipants ? getCustomerProjectParticipants(projectId) : Promise.resolve([]),
-        access.canViewParticipants ? getProjectParticipantRoles() : Promise.resolve([]),
-        access.canViewCommissions ? getCustomerProjectCommissions(projectId) : Promise.resolve([]),
-        access.canManageParticipants ? getProjectParticipantCandidates(project.customer_id) : Promise.resolve([]),
-        access.canManageCommissions
+        nextAccess.canViewParticipants ? getCustomerProjectParticipants(projectId) : Promise.resolve([]),
+        nextAccess.canViewParticipants ? getProjectParticipantRoles() : Promise.resolve([]),
+        nextAccess.canViewCommissions ? getCustomerProjectCommissions(projectId) : Promise.resolve([]),
+        nextAccess.canCreateParticipants ? getProjectParticipantCandidates(project.customer_id) : Promise.resolve([]),
+        nextAccess.canCreateCommissions && !nextAccess.isSalesLimited
           ? getProjectCommissionScopeOptions(projectId)
           : Promise.resolve({ categories: [], products: [] }),
       ]);
@@ -179,15 +198,20 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
       setCategoryScopes(scopeOptions.categories);
       setProductScopes(scopeOptions.products);
 
-      if (!participantRoleKey) {
-        const firstManualRole = nextRoles.find((role) => role.roleKey !== "sales_rep");
-        if (firstManualRole) setParticipantRoleKey(firstManualRole.roleKey);
+      const firstManualRole = nextRoles.find((role) => role.roleKey !== "sales_rep");
+      if (!participantRoleKey || !nextRoles.some((role) => role.roleKey === participantRoleKey)) {
+        setParticipantRoleKey(firstManualRole?.roleKey ?? "");
       }
-      if (!commissionParticipantId) {
-        const firstParticipant = nextParticipants.find((participant) => participant.isActive);
-        if (firstParticipant) setCommissionParticipantId(firstParticipant.id);
+      const firstParticipant = nextParticipants.find((participant) => participant.isActive);
+      if (!commissionParticipantId || !nextParticipants.some((participant) => participant.id === commissionParticipantId && participant.isActive)) {
+        setCommissionParticipantId(firstParticipant?.id ?? "");
       }
-      if (!eventObligationId && nextCommissions.length > 0) {
+      if (nextAccess.isSalesLimited) {
+        setCommissionScopeType("project");
+        setCommissionScopeId("");
+        if (commissionBasisType === "gross_profit_percentage") setCommissionBasisType("fixed");
+      }
+      if (nextAccess.canViewCommissionEvents && !eventObligationId && nextCommissions.length > 0) {
         setEventObligationId(nextCommissions[0].obligationId);
       }
     } catch (loadError) {
@@ -195,10 +219,10 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     } finally {
       setLoading(false);
     }
-  }, [commissionParticipantId, eventObligationId, participantRoleKey, projectId]);
+  }, [commissionBasisType, commissionParticipantId, eventObligationId, participantRoleKey, projectId]);
 
   const loadEvents = useCallback(async () => {
-    if (!canViewCommissions || !eventObligationId) {
+    if (!access.canViewCommissionEvents || !eventObligationId) {
       setCommissionEvents([]);
       return;
     }
@@ -210,7 +234,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     } finally {
       setLoadingEvents(false);
     }
-  }, [canViewCommissions, eventObligationId]);
+  }, [access.canViewCommissionEvents, eventObligationId]);
 
   useEffect(() => {
     void load();
@@ -223,9 +247,15 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
 
   useEffect(() => {
     let active = true;
-    if (commissionBasisType === "fixed") {
+    if (!access.canCreateCommissions || commissionBasisType === "fixed") {
       setCommissionPreview(null);
       setCommissionPreviewError(null);
+      setLoadingCommissionPreview(false);
+      return () => { active = false; };
+    }
+    if (access.isSalesLimited && commissionBasisType === "gross_profit_percentage") {
+      setCommissionPreview(null);
+      setCommissionPreviewError("Sales cannot use gross-profit commission calculations.");
       setLoadingCommissionPreview(false);
       return () => { active = false; };
     }
@@ -262,7 +292,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     });
 
     return () => { active = false; };
-  }, [commissionBasisType, commissionCurrency, commissionScopeId, commissionScopeType, projectId]);
+  }, [access.canCreateCommissions, access.isSalesLimited, commissionBasisType, commissionCurrency, commissionScopeId, commissionScopeType, projectId]);
 
   const participantRoleOptions = useMemo(
     () => roles.filter((role) => role.roleKey !== "sales_rep").map((role) => ({ value: role.roleKey, label: role.label })),
@@ -304,7 +334,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     ? (commissionPreview.basisAmount * numericRate) / 100
     : null;
   const previewProblem = previewIssue(commissionPreview, commissionPreviewError);
-  const scopeReady = commissionScopeType === "project" || Boolean(commissionScopeId);
+  const scopeReady = commissionScopeType === "project" || Boolean(commissionScopeId) || Boolean(correctionObligationId);
   const commissionReady = commissionBasisType === "fixed"
     ? Number(commissionFlatAmount) > 0
     : Boolean(commissionPreview?.available && commissionPreview.basisAmount !== null && numericRate > 0 && numericRate <= 100);
@@ -340,28 +370,69 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
       });
       setParticipantCandidate("");
       setParticipantNotes("");
-    }, "Project participant added.");
+    }, access.isSalesLimited ? "External service added." : "Project participant added.");
   }
 
-  async function createCommission() {
+  function beginCorrection(commission: ProjectCommissionObligation) {
+    setCorrectionObligationId(commission.obligationId);
+    setCorrectionReason("");
+    setCommissionParticipantId(commission.participantId);
+    setCommissionBasisType(commission.basisType);
+    setCommissionScopeType(commission.scopeType);
+    setCommissionScopeId("");
+    setCommissionFlatAmount(commission.basisType === "fixed" ? String(commission.flatAmount ?? commission.baseAmount) : "");
+    setCommissionRate(commission.basisType === "fixed" ? "" : String(commission.rate ?? ""));
+    setCommissionCurrency(commission.currencyCode);
+    setCommissionDescription("");
+  }
+
+  function cancelCorrection() {
+    setCorrectionObligationId("");
+    setCorrectionReason("");
+    setCommissionScopeType("project");
+    setCommissionScopeId("");
+  }
+
+  async function saveCommission() {
+    if (correctionObligationId && !correctionReason.trim()) {
+      setError("Correction reason is required.");
+      return;
+    }
     await runAction(async () => {
-      await createCustomerProjectCommissionObligation({
-        projectId,
-        participantId: commissionParticipantId,
-        basisType: commissionBasisType,
-        currencyCode: commissionCurrency,
-        scopeType: commissionScopeType,
-        flatAmount: commissionBasisType === "fixed" ? Number(commissionFlatAmount) : null,
-        rate: commissionBasisType !== "fixed" ? Number(commissionRate) : null,
-        productCategoryId: commissionScopeType === "category" ? commissionScopeId || null : null,
-        productId: commissionScopeType === "product" ? commissionScopeId || null : null,
-        description: commissionDescription || null,
-      });
+      if (correctionObligationId) {
+        await replaceCustomerProjectCommissionObligation({
+          obligationId: correctionObligationId,
+          basisType: commissionBasisType,
+          currencyCode: commissionCurrency,
+          scopeType: commissionScopeType,
+          flatAmount: commissionBasisType === "fixed" ? Number(commissionFlatAmount) : null,
+          rate: commissionBasisType !== "fixed" ? Number(commissionRate) : null,
+          productCategoryId: commissionScopeType === "category" ? commissionScopeId || null : null,
+          productId: commissionScopeType === "product" ? commissionScopeId || null : null,
+          description: commissionDescription || null,
+          reason: correctionReason,
+        });
+      } else {
+        await createCustomerProjectCommissionObligation({
+          projectId,
+          participantId: commissionParticipantId,
+          basisType: commissionBasisType,
+          currencyCode: commissionCurrency,
+          scopeType: commissionScopeType,
+          flatAmount: commissionBasisType === "fixed" ? Number(commissionFlatAmount) : null,
+          rate: commissionBasisType !== "fixed" ? Number(commissionRate) : null,
+          productCategoryId: commissionScopeType === "category" ? commissionScopeId || null : null,
+          productId: commissionScopeType === "product" ? commissionScopeId || null : null,
+          description: commissionDescription || null,
+        });
+      }
       setCommissionFlatAmount("");
       setCommissionRate("");
       setCommissionDescription("");
       setCommissionScopeId("");
-    }, "Commission obligation created in Pending status.");
+      setCorrectionReason("");
+      setCorrectionObligationId("");
+    }, correctionObligationId ? "Pending commission corrected. The original obligation was cancelled and preserved in history." : "Commission obligation created in Pending status.");
   }
 
   async function appendCommissionEvent() {
@@ -380,7 +451,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     }, `Commission ${statusLabel(eventType)} event appended.`);
   }
 
-  if (loading && !canViewParticipants && !canViewCommissions) {
+  if (loading && !access.canViewParticipants && !access.canViewCommissions) {
     return (
       <ComponentCard title="Participants & Commission" desc="Loading Project participant and commission boundaries.">
         <p role="status" className="text-sm">Loading Participants & Commission…</p>
@@ -388,17 +459,22 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
     );
   }
 
-  if (!canViewParticipants && !canViewCommissions) return null;
+  if (!access.canViewParticipants && !access.canViewCommissions) return null;
+
+  const participantColumns = access.canManageParticipants ? 6 : 5;
+  const commissionColumns = 6 + (access.isSalesLimited ? 0 : 1) + (access.canCorrectCommissions ? 1 : 0);
 
   return (
     <section className="space-y-6" aria-label="Project Participants and Commission">
       {error ? <div role="alert"><Alert variant="error" title="Participants & Commission action failed" message={error} /></div> : null}
       {message ? <div role="status"><Alert variant="success" title="Participants & Commission updated" message={message} /></div> : null}
 
-      {canViewParticipants ? (
+      {access.canViewParticipants ? (
         <ComponentCard
-          title="Participants"
-          desc="Sales Rep remains canonical in Project Settings. Other Project roles reference existing employee, Customer contact, or Modulex user records."
+          title={access.isSalesLimited ? "My External Services" : "Participants"}
+          desc={access.isSalesLimited
+            ? "Only external-service records you added are visible here. Your Sales Rep assignment and personal sales commission are not exposed in this workspace."
+            : "Sales Rep remains canonical in Project Settings. Finance, Admin, and Super Admin may add or end other Project participants."}
         >
           <TableViewport>
             <Table variant="admin" minWidth="standard">
@@ -409,12 +485,12 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                   <TableCell isHeader variant="admin">Source</TableCell>
                   <TableCell isHeader variant="admin">Started</TableCell>
                   <TableCell isHeader variant="admin">Status</TableCell>
-                  {canManageParticipants ? <TableCell isHeader variant="admin">Action</TableCell> : null}
+                  {access.canManageParticipants ? <TableCell isHeader variant="admin">Action</TableCell> : null}
                 </TableRow>
               </TableHeader>
               <TableBody variant="admin">
-                {loading ? <TableStateRow colSpan={canManageParticipants ? 6 : 5}>Refreshing participants…</TableStateRow> : null}
-                {!loading && participants.length === 0 ? <TableStateRow colSpan={canManageParticipants ? 6 : 5}>No Project participants have been recorded.</TableStateRow> : null}
+                {loading ? <TableStateRow colSpan={participantColumns}>Refreshing participants…</TableStateRow> : null}
+                {!loading && participants.length === 0 ? <TableStateRow colSpan={participantColumns}>{access.isSalesLimited ? "You have not added an external service to this Project yet." : "No Project participants have been recorded."}</TableStateRow> : null}
                 {!loading ? participants.map((participant) => (
                   <TableRow key={participant.id}>
                     <TableCell variant="admin"><span className="font-medium">{participant.displayName}</span></TableCell>
@@ -422,7 +498,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                     <TableCell variant="admin">{participant.source === "project_sales_rep" ? "Project Sales Rep" : statusLabel(participant.subjectType)}</TableCell>
                     <TableCell variant="admin">{displayDate(participant.startedAt)}</TableCell>
                     <TableCell variant="admin"><Badge color={participant.isActive ? "success" : "light"}>{participant.isActive ? "Active" : "Ended"}</Badge></TableCell>
-                    {canManageParticipants ? (
+                    {access.canManageParticipants ? (
                       <TableCell variant="admin">
                         {participant.isActive && participant.source === "manual" ? (
                           <Button variant="outline" size="sm" disabled={saving} onClick={() => void runAction(
@@ -440,7 +516,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
             </Table>
           </TableViewport>
 
-          {canManageParticipants ? (
+          {access.canCreateParticipants ? (
             <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 lg:grid-cols-3`}>
               <div>
                 <Label htmlFor="pb6-participant-role">Role</Label>
@@ -455,17 +531,19 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                 <Input id="pb6-participant-notes" value={participantNotes} onChange={(event) => setParticipantNotes(event.target.value)} />
               </div>
               <div className="flex justify-end lg:col-span-3">
-                <Button disabled={saving || !participantRoleKey || !participantCandidate} onClick={() => void addParticipant()}>{saving ? "Saving…" : "Add Participant"}</Button>
+                <Button disabled={saving || !participantRoleKey || !participantCandidate} onClick={() => void addParticipant()}>{saving ? "Saving…" : access.isSalesLimited ? "Add External Service" : "Add Participant"}</Button>
               </div>
             </div>
           ) : null}
         </ComponentCard>
       ) : null}
 
-      {canViewCommissions ? (
+      {access.canViewCommissions ? (
         <ComponentCard
-          title="Commission Ledger"
-          desc="Project owns commission entitlement only. Actual payouts remain canonical Finance transactions attributed to the commission obligation. Earned and Approved states are explicit; Project status does not auto-earn commission."
+          title={access.isSalesLimited ? "My External Service Compensation" : "Commission Ledger"}
+          desc={access.isSalesLimited
+            ? "You can enter a fixed amount or Sales % for external services you added. Your own sales commission, other participants, Finance payout details, and lifecycle controls are hidden."
+            : "Project owns commission entitlement only. Actual payouts remain canonical Finance transactions attributed to the commission obligation. Earned and Approved states are explicit; Project status does not auto-earn commission."}
         >
           <TableViewport>
             <Table variant="admin" minWidth="wide">
@@ -476,13 +554,14 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                   <TableCell isHeader variant="admin">Basis</TableCell>
                   <TableCell isHeader variant="admin">Current entitlement</TableCell>
                   <TableCell isHeader variant="admin">Status</TableCell>
-                  <TableCell isHeader variant="admin">Finance payout</TableCell>
+                  {!access.isSalesLimited ? <TableCell isHeader variant="admin">Finance payout</TableCell> : null}
                   <TableCell isHeader variant="admin">Created</TableCell>
+                  {access.canCorrectCommissions ? <TableCell isHeader variant="admin">Action</TableCell> : null}
                 </TableRow>
               </TableHeader>
               <TableBody variant="admin">
-                {loading ? <TableStateRow colSpan={7}>Refreshing commission obligations…</TableStateRow> : null}
-                {!loading && commissions.length === 0 ? <TableStateRow colSpan={7}>No commission obligations have been created.</TableStateRow> : null}
+                {loading ? <TableStateRow colSpan={commissionColumns}>Refreshing commission obligations…</TableStateRow> : null}
+                {!loading && commissions.length === 0 ? <TableStateRow colSpan={commissionColumns}>{access.isSalesLimited ? "No compensation has been recorded for your external services." : "No commission obligations have been created."}</TableStateRow> : null}
                 {!loading ? commissions.map((commission) => (
                   <TableRow key={commission.obligationId}>
                     <TableCell variant="admin">
@@ -495,51 +574,73 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                     <TableCell variant="admin">{basisLabel(commission)}</TableCell>
                     <TableCell variant="admin"><span className="font-medium">{money(commission.currentAmount, commission.currencyCode)}</span></TableCell>
                     <TableCell variant="admin"><Badge color={commissionBadge(commission.status)}>{statusLabel(commission.status)}</Badge></TableCell>
-                    <TableCell variant="admin">{payoutLabel(commission)}</TableCell>
+                    {!access.isSalesLimited ? <TableCell variant="admin">{payoutLabel(commission)}</TableCell> : null}
                     <TableCell variant="admin">{displayDate(commission.createdAt)}</TableCell>
+                    {access.canCorrectCommissions ? (
+                      <TableCell variant="admin">
+                        {commission.status === "pending" ? (
+                          <Button variant="outline" size="sm" disabled={saving} onClick={() => beginCorrection(commission)}>Correct commission</Button>
+                        ) : "Use lifecycle adjustment"}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 )) : null}
               </TableBody>
             </Table>
           </TableViewport>
 
-          {canManageCommissions ? (
+          {access.canCreateCommissions ? (
             <div className={`${ADMIN_SURFACE_CARD} space-y-5 p-5`}>
+              {correctionObligationId ? (
+                <Alert variant="warning" title="Correct Pending commission" message="Saving cancels the original Pending obligation and creates a replacement atomically. The original record remains in audit history." />
+              ) : null}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div>
                   <Label htmlFor="pb6-commission-participant">Participant</Label>
-                  <Select id="pb6-commission-participant" options={commissionParticipantOptions} value={commissionParticipantId} onChange={setCommissionParticipantId} placeholder="Select participant" />
+                  <Select id="pb6-commission-participant" options={commissionParticipantOptions} value={commissionParticipantId} onChange={setCommissionParticipantId} placeholder="Select participant" disabled={Boolean(correctionObligationId)} />
                 </div>
                 <div>
                   <Label htmlFor="pb6-commission-basis">Commission method</Label>
                   <Select
                     id="pb6-commission-basis"
-                    options={[
-                      { value: "fixed", label: "Fixed amount" },
-                      { value: "percentage", label: "Sales %" },
-                      { value: "gross_profit_percentage", label: "Gross profit %" },
-                    ]}
+                    options={access.isSalesLimited
+                      ? [
+                          { value: "fixed", label: "Fixed amount" },
+                          { value: "percentage", label: "Sales %" },
+                        ]
+                      : [
+                          { value: "fixed", label: "Fixed amount" },
+                          { value: "percentage", label: "Sales %" },
+                          { value: "gross_profit_percentage", label: "Gross profit %" },
+                        ]}
                     value={commissionBasisType}
                     onChange={(value) => setCommissionBasisType(value as ProjectCommissionBasisType)}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="pb6-commission-scope">Scope</Label>
-                  <Select
-                    id="pb6-commission-scope"
-                    options={[
-                      { value: "project", label: "Whole Project" },
-                      { value: "category", label: "Project product category" },
-                      { value: "product", label: "Project product" },
-                    ]}
-                    value={commissionScopeType}
-                    onChange={(value) => { setCommissionScopeType(value as ProjectCommissionScopeType); setCommissionScopeId(""); }}
-                  />
-                </div>
-                {commissionScopeType !== "project" ? (
+                {!access.isSalesLimited ? (
+                  <div>
+                    <Label htmlFor="pb6-commission-scope">Scope</Label>
+                    <Select
+                      id="pb6-commission-scope"
+                      options={[
+                        { value: "project", label: "Whole Project" },
+                        { value: "category", label: "Project product category" },
+                        { value: "product", label: "Project product" },
+                      ]}
+                      value={commissionScopeType}
+                      onChange={(value) => { setCommissionScopeType(value as ProjectCommissionScopeType); setCommissionScopeId(""); }}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="pb6-sales-commission-scope">Scope</Label>
+                    <Input id="pb6-sales-commission-scope" value="Whole Project" disabled />
+                  </div>
+                )}
+                {!access.isSalesLimited && commissionScopeType !== "project" ? (
                   <div>
                     <Label htmlFor="pb6-commission-scope-id">{commissionScopeType === "category" ? "Category" : "Product"}</Label>
-                    <Select id="pb6-commission-scope-id" options={scopeSelectOptions} value={commissionScopeId} onChange={setCommissionScopeId} placeholder={scopeSelectOptions.length > 0 ? "Select Project scope" : "No matching Project scope"} allowEmpty />
+                    <Select id="pb6-commission-scope-id" options={scopeSelectOptions} value={commissionScopeId} onChange={setCommissionScopeId} placeholder={correctionObligationId ? "Keep existing scope or select new" : scopeSelectOptions.length > 0 ? "Select Project scope" : "No matching Project scope"} allowEmpty />
                   </div>
                 ) : null}
               </div>
@@ -564,24 +665,27 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                   <Label htmlFor="pb6-commission-description">Description</Label>
                   <Input id="pb6-commission-description" value={commissionDescription} onChange={(event) => setCommissionDescription(event.target.value)} />
                 </div>
+                {correctionObligationId ? (
+                  <div className="md:col-span-2 xl:col-span-4">
+                    <Label htmlFor="pb6-correction-reason">Correction reason</Label>
+                    <Input id="pb6-correction-reason" value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} />
+                  </div>
+                ) : null}
               </div>
 
               {commissionBasisType !== "fixed" ? (
                 <div className={`${ADMIN_SURFACE_CARD} space-y-4 p-4`}>
                   <div>
                     <p className="font-medium">Commission Preview</p>
-                    <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Calculated from canonical Project Order and product-cost data. The DB recalculates the snapshot again when the obligation is created.</p>
+                    <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{access.isSalesLimited ? "Calculated from canonical Project sales data. Cost and gross-profit data are not exposed to Sales." : "Calculated from canonical Project Order and product-cost data. The DB recalculates the snapshot again when the obligation is created."}</p>
                   </div>
-
                   {loadingCommissionPreview ? <p role="status" className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Calculating commission preview…</p> : null}
-
                   {!loadingCommissionPreview && previewProblem ? (
                     <div role="status" className="space-y-1">
                       <p className="font-medium">{previewProblem.title}</p>
                       <p className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>{previewProblem.detail}</p>
                     </div>
                   ) : null}
-
                   {!loadingCommissionPreview && commissionPreview?.available && commissionBasisType === "percentage" ? (
                     <div className="grid gap-4 sm:grid-cols-3">
                       <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Sales basis</p><p className="font-medium">{money(commissionPreview.revenueAmount, commissionPreview.currencyCode)}</p></div>
@@ -589,7 +693,6 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                       <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Estimated commission</p><p className="font-medium">{estimatedCommission !== null ? money(estimatedCommission, commissionPreview.currencyCode) : "—"}</p></div>
                     </div>
                   ) : null}
-
                   {!loadingCommissionPreview && commissionPreview?.available && commissionBasisType === "gross_profit_percentage" ? (
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                       <div><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Scoped sales</p><p className="font-medium">{money(commissionPreview.revenueAmount, commissionPreview.currencyCode)}</p></div>
@@ -602,27 +705,21 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                 </div>
               ) : null}
 
-              <div className="flex justify-end">
-                <Button disabled={saving || !commissionParticipantId || !scopeReady || !commissionReady} onClick={() => void createCommission()}>
-                  {saving ? "Saving…" : "Create Pending Commission"}
+              <div className="flex justify-end gap-2">
+                {correctionObligationId ? <Button variant="outline" disabled={saving} onClick={cancelCorrection}>Cancel correction</Button> : null}
+                <Button disabled={saving || !commissionParticipantId || !scopeReady || !commissionReady || (Boolean(correctionObligationId) && !correctionReason.trim())} onClick={() => void saveCommission()}>
+                  {saving ? "Saving…" : correctionObligationId ? "Save Corrected Commission" : "Create Pending Commission"}
                 </Button>
               </div>
             </div>
           ) : null}
 
-          {commissions.length > 0 ? (
+          {access.canViewCommissionEvents && commissions.length > 0 ? (
             <div className="space-y-4">
               <div>
                 <Label htmlFor="pb6-event-obligation">Commission event history</Label>
-                <Select
-                  id="pb6-event-obligation"
-                  options={commissionOptions}
-                  value={eventObligationId}
-                  onChange={setEventObligationId}
-                  placeholder="Select commission"
-                />
+                <Select id="pb6-event-obligation" options={commissionOptions} value={eventObligationId} onChange={setEventObligationId} placeholder="Select commission" />
               </div>
-
               <TableViewport>
                 <Table variant="admin" minWidth="standard">
                   <TableHeader variant="admin">
@@ -639,12 +736,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                     {!loadingEvents && commissionEvents.length === 0 ? <TableStateRow colSpan={5}>No lifecycle events have been appended yet.</TableStateRow> : null}
                     {!loadingEvents ? commissionEvents.map((event) => (
                       <TableRow key={event.eventId}>
-                        <TableCell variant="admin">
-                          <div className="space-y-1">
-                            <p className="font-medium">{statusLabel(event.eventType)}</p>
-                            {event.isReversed ? <Badge color="light">Reversed</Badge> : null}
-                          </div>
-                        </TableCell>
+                        <TableCell variant="admin"><div className="space-y-1"><p className="font-medium">{statusLabel(event.eventType)}</p>{event.isReversed ? <Badge color="light">Reversed</Badge> : null}</div></TableCell>
                         <TableCell variant="admin">{statusLabel(event.statusAfter)}</TableCell>
                         <TableCell variant="admin">{event.amountDelta === 0 ? "—" : `${event.amountDelta > 0 ? "+" : ""}${money(event.amountDelta, selectedCommission?.currencyCode ?? "USD")}`}</TableCell>
                         <TableCell variant="admin">{event.reason || "—"}</TableCell>
@@ -657,7 +749,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
             </div>
           ) : null}
 
-          {canManageCommissions && commissions.length > 0 ? (
+          {access.canManageCommissions && commissions.length > 0 ? (
             <div className={`${ADMIN_SURFACE_CARD} grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-4`}>
               <div>
                 <Label htmlFor="pb6-event-type">Append event</Label>
@@ -676,10 +768,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                 />
               </div>
               {["adjustment", "offset"].includes(eventType) ? (
-                <div>
-                  <Label htmlFor="pb6-event-amount">Amount delta</Label>
-                  <Input id="pb6-event-amount" type="number" step="0.01" value={eventAmount} onChange={(event) => setEventAmount(event.target.value)} />
-                </div>
+                <div><Label htmlFor="pb6-event-amount">Amount delta</Label><Input id="pb6-event-amount" type="number" step="0.01" value={eventAmount} onChange={(event) => setEventAmount(event.target.value)} /></div>
               ) : null}
               {eventType === "reversal" ? (
                 <div>
@@ -688,10 +777,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                 </div>
               ) : null}
               {["cancelled", "adjustment", "offset", "reversal"].includes(eventType) ? (
-                <div>
-                  <Label htmlFor="pb6-event-reason">Reason</Label>
-                  <Input id="pb6-event-reason" value={eventReason} onChange={(event) => setEventReason(event.target.value)} />
-                </div>
+                <div><Label htmlFor="pb6-event-reason">Reason</Label><Input id="pb6-event-reason" value={eventReason} onChange={(event) => setEventReason(event.target.value)} /></div>
               ) : null}
               <div className="flex items-center justify-between gap-3 md:col-span-2 xl:col-span-4">
                 <p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Corrections append new events; approved history is never edited in place.</p>
