@@ -41,7 +41,7 @@ import {
 import { formatDateTime, formatTimestampDate } from "@/lib/dates/usDate";
 import DateInput from "@/components/form/DateInput";
 
-type StandaloneOrder = { id: string; order_number: string; status: string; order_date: string; grand_total: number | string };
+type StandaloneOrder = { id: string; order_number: string; customer_reference: string | null; status: string; order_date: string; grand_total: number | string };
 type ProfileOption = { id: string; full_name: string | null; email: string | null; role: string; is_active: boolean };
 type ProjectActivityActor = { full_name: string | null; email: string | null };
 type ProjectStatusHistory = {
@@ -160,7 +160,15 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   const [editTargetDate, setEditTargetDate] = useState("");
 
   const orderOptions = useMemo(
-    () => standaloneOrders.map((order) => ({ value: order.id, label: `${order.order_number} — ${statusLabel(order.status)}` })),
+    () => standaloneOrders.map((order) => {
+      const customerReference = order.customer_reference?.trim();
+      return {
+        value: order.id,
+        label: customerReference
+          ? `${order.order_number} — ${customerReference} — ${statusLabel(order.status)}`
+          : `${order.order_number} — ${statusLabel(order.status)}`,
+      };
+    }),
     [standaloneOrders]
   );
   const salesRepOptions = useMemo(() => {
@@ -205,7 +213,7 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
         getCurrentProfile(),
         supabase
           .from("customer_orders")
-          .select("id, order_number, status, order_date, grand_total")
+          .select("id, order_number, customer_reference, status, order_date, grand_total")
           .eq("customer_id", nextProject.customer_id)
           .is("project_id", null)
           .neq("status", "cancelled")
