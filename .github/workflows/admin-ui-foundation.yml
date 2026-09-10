@@ -71,6 +71,8 @@ jobs:
         run: node scripts/admin-date-input-contract.mjs
       - name: CI workflow architecture contract
         run: npm run smoke:ci-workflow-architecture
+      - name: LD Leads final workstream contract
+        run: node scripts/ld-leads-workstream-contract.mjs
       - name: API timing contract
         run: npm run smoke:api-timing
       - name: Google Calendar integration contract
