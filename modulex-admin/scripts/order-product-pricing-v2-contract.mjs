@@ -43,6 +43,15 @@ assert(/createOrder\(validItems,\s*header,\s*"draft"\)/.test(createOrder) && cre
 assert(!createOrder.includes('href="/pricing/countertop"'), "New Order must not route Countertop initiation through the Pricing workspace");
 assert(editOrder.includes("pricing_model") && detail.includes("pricingModelLabel"), "edit/detail UI must expose pricing route metadata");
 
+// Cabinet picker scale boundary: query and price resolution must stay server-filtered and paginated.
+assert(domain.includes("searchOrderCabinetProducts"), "Order domain must expose a dedicated server-filtered Cabinet search");
+assert(domain.includes('eq("product_types.code", "CABINETS")') || domain.includes('eq("product_type_id"'), "Cabinet search must constrain Product Type at the database query boundary");
+assert(domain.includes("count: \"exact\"") && domain.includes(".range("), "Cabinet search must use server-side count + pagination");
+assert(domain.includes("product_ids") || domain.includes("productIds") || domain.includes('.in("product_id"'), "Cabinet search must resolve prices only for the returned product page");
+assert(picker.includes("debouncedQuery") || picker.includes("setTimeout"), "Cabinet picker search must be debounced before hitting the server");
+assert(picker.includes("totalCount") && picker.includes("page"), "Cabinet picker must expose paginated server result state");
+assert(!picker.includes("eligibleProducts.filter"), "Cabinet picker must not depend on client-side full-catalog filtering");
+
 // UI boundary: Price Group money is server-authoritative; configured Stone preserves its stored canonical price.
 assert(editOrder.includes("Server Price"), "Edit Order must label canonical Price Group money as Server Price");
 assert(!/<input[^>]+value=\{item\.unit_price\}[^>]+onChange=/s.test(editOrder), "Edit Order must not expose an editable unit_price input");
