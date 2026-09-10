@@ -1,4 +1,7 @@
-import { processPendingEmailNotifications } from "@/lib/email/transactional";
+import {
+  processPendingEmailNotifications,
+  summarizeEmailProcessingResults,
+} from "@/lib/email/transactional";
 import { withApiTiming } from "@/lib/observability/apiTiming";
 import { isSupabaseAdminConfigured, supabaseAdmin } from "@/lib/supabase/server-admin";
 
@@ -26,10 +29,8 @@ async function requireActiveStaff(request: Request) {
   }
 
   const accessToken = authorization.slice("Bearer ".length).trim();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabaseAdmin.auth.getUser(accessToken);
+  const { data, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
+  const user = data.user;
 
   if (userError || !user) {
     return { response: jsonError("Invalid or expired session.", 401) };
@@ -67,12 +68,9 @@ async function handlePost(request: Request) {
 
   try {
     const results = await processPendingEmailNotifications(limit);
-    return Response.json({ success: true, processed: results.length, results });
-  } catch (error) {
-    return jsonError(
-      error instanceof Error ? error.message : "Email notifications could not be processed.",
-      500
-    );
+    return Response.json({ success: true, ...summarizeEmailProcessingResults(results) });
+  } catch {
+    return jsonError("Email notifications could not be processed.", 500);
   }
 }
 

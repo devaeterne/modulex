@@ -12,6 +12,14 @@ interface DropdownItemProps {
   children: React.ReactNode;
 }
 
+export function safeNotificationHref(href: string) {
+  const value = href.trim();
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return "/";
+  }
+  return value;
+}
+
 export const DropdownItem: React.FC<DropdownItemProps> = ({
   tag = "button",
   href,
@@ -32,7 +40,7 @@ export const DropdownItem: React.FC<DropdownItemProps> = ({
 
   if (tag === "a" && href) {
     return (
-      <Link href={href} className={combinedClasses} onClick={handleClick}>
+      <Link href={safeNotificationHref(href)} className={combinedClasses} onClick={handleClick}>
         {children}
       </Link>
     );
