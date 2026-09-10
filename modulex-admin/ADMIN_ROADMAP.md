@@ -26,6 +26,7 @@ This file is the current execution source of truth for `modulex-admin`. The prev
 # Closed domains
 
 - [x] **Customers** — CUST-7→CUST-11 / VAL-3 lifecycle, validation, server-side list/search/filter/pagination, Sales Rep relationships, UI/accessibility, AR/Finance boundary and owner acceptance are closed.
+- [x] VAL-3 — Customers / Orders / Invoices.
 - [x] **Orders Core** — create/edit/detail, lifecycle/status validation, revisions, pricing, procurement/reservation integration and portal-safe projection are closed.
   - The stale legacy roadmap item for Product Type + UOM + `pricing_model` routing is closed; production migration `order_product_pricing_v2` is live and current Admin uses the routed order behavior.
   - The stale legacy roadmap item for configured Countertop Replace/Remove is closed; the migration is live and the dedicated Draft-only flow is in current main.
