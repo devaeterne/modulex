@@ -14,6 +14,8 @@ on:
       - "modulex-store/supabase/migrations/*manual_service*.sql"
       - "modulex-store/supabase/migrations/*calendar*.sql"
       - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
+      - "modulex-store/supabase/migrations/*dealer*.sql"
+      - "modulex-store/supabase/migrations/*dlr*.sql"
       - ".github/workflows/**"
   push:
     paths:
@@ -28,6 +30,8 @@ on:
       - "modulex-store/supabase/migrations/*manual_service*.sql"
       - "modulex-store/supabase/migrations/*calendar*.sql"
       - "modulex-store/supabase/migrations/*customer_contact_address_lifecycle*.sql"
+      - "modulex-store/supabase/migrations/*dealer*.sql"
+      - "modulex-store/supabase/migrations/*dlr*.sql"
       - ".github/workflows/**"
 
 concurrency:
@@ -123,6 +127,12 @@ jobs:
         run: node scripts/customer-production-acceptance-contract.mjs
       - name: CUST-7 VAL-3 Customer lifecycle migration contract
         run: npm run smoke:val-3-customers-orders-invoices
+      - name: Dealer onboarding lifecycle contract
+        run: npm run smoke:dealer-onboarding
+      - name: Dealer Portal Admin contract
+        run: npm run smoke:dealer-portal-admin
+      - name: Store Portal Admin contract
+        run: npm run smoke:store-portal-admin
       - name: Dashboard shell contract
         run: node scripts/dashboard-shell-ui-contract.mjs
       - name: General settings UI contract
