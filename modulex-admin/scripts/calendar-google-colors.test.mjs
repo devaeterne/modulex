@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   normalizeGoogleMirrorEvent,
   normalizeLocalCalendarEvent,
@@ -92,5 +93,13 @@ const mirrorEvent = normalizeGoogleMirrorEvent({
 
 assert.equal(mirrorEvent?.background_color, "#fbd75b");
 assert.equal(mirrorEvent?.foreground_color, "#000000");
+
+const adminCalendarSource = await readFile(new URL("../src/lib/calendar/admin-calendar.ts", import.meta.url), "utf8");
+assert.match(adminCalendarSource, /getGoogleCalendarEventColors/);
+assert.match(adminCalendarSource, /getConnectedGoogleAccessToken/);
+assert.match(adminCalendarSource, /normalizeLocalCalendarEvent\(row, company, "local", providerColors\)/);
+assert.match(adminCalendarSource, /normalizeGoogleMirrorEvent\(mirror, calendar, providerColors\)/);
+assert.match(adminCalendarSource, /calendar_business_event_extensions/);
+assert.match(adminCalendarSource, /provider_color_id/);
 
 console.log("PASS: Google Calendar event color resolution");
