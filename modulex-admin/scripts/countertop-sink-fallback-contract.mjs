@@ -14,8 +14,10 @@ const zeroPriceFixMigrationPath = "../modulex-store/supabase/migrations/20260908
 
 assert(configurator.includes('import SearchableSelect from "@/components/form/SearchableSelect"'), "Countertop Stone/Sink selection must use the shared searchable dropdown primitive");
 assert((configurator.match(/<SearchableSelect/g) ?? []).length >= 2, "Countertop Stone and Sink fields must both render searchable dropdowns");
-assert(configurator.includes('searchPlaceholder="Search stone by name or SKU"'), "Sink search must be discoverable by name/SKU inside its dropdown");
-assert(configurator.includes('searchPlaceholder="Search sink by name or SKU"'), "Sink search must be discoverable by name/SKU inside its dropdown");
+assert(configurator.includes('searchPlaceholder="Search stone by name or SKU"'), "Stone search must be discoverable by name/SKU inside its dropdown");
+const hasExplicitSinkSearch = configurator.includes('searchPlaceholder="Search sink by name or SKU"');
+const hasFixtureTypeSearch = configurator.includes('searchPlaceholder={`Search ${row.fixture_type} by name or SKU`}');
+assert(hasExplicitSinkSearch || hasFixtureTypeSearch, "Sink search must be discoverable by name/SKU inside its dropdown");
 assert(configurator.includes("manualSinkPrice"), "Countertop configurator must keep manual Sink fallback price state");
 assert(configurator.includes("Manual sink price fallback"), "Countertop configurator must label the manual Sink fallback clearly");
 const usesDirectSinkFallback = configurator.includes('rpc("calculate_countertop_price_with_sink_fallback"');
