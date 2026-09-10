@@ -54,24 +54,16 @@ check("Personnel navigation exposes the production route set", () => {
 
 check("Finance payroll is a settlement/read surface, not an HR calculation editor", () => {
   const page = read("src/app/(admin)/finance/payroll/page.tsx");
-  const manager = read("src/components/hr/PayrollManager.tsx");
-  assert.match(page, /<PayrollManager\s+mode="finance"\s*\/>/);
+  const financeManager = read("src/components/finance/FinancePayrollManager.tsx");
+  assert.match(page, /FinancePayrollManager/);
+  assert.match(page, /Payroll Settlement/);
   assert.doesNotMatch(page, /Finance payroll processing/i);
-  assert.match(manager, /mode\??:\s*"hr"\s*\|\s*"finance"/);
-  assert.match(manager, /const canManagePayroll\s*=\s*mode\s*===\s*"hr"/);
-  assert.match(manager, /canManagePayroll/);
-  assert.match(manager, /Payment source of truth/);
-  assert.match(manager, /\/finance\/transactions\?/);
-  assert.doesNotMatch(manager, /update\(\{\s*status:\s*["']paid["']/);
-});
-
-check("Finance role copy describes settlement rather than payroll processing", () => {
-  const permissions = read("src/lib/auth/permissions.ts");
-  const financeDescription = permissions.match(/finance:\s*"([^"]+)"/)?.[1] ?? "";
-  assert.ok(financeDescription, "Finance role description not found");
-  assert.doesNotMatch(financeDescription, /payroll processing/i);
-  assert.match(financeDescription, /payroll/i);
-  assert.match(financeDescription, /settlement|payment/i);
+  assert.match(financeManager, /getFinancePayrollObligations/);
+  assert.match(financeManager, /\/finance\/transactions\?/);
+  assert.match(financeManager, /HR payroll source records/);
+  assert.doesNotMatch(financeManager, /prepare_hr_payroll_run/);
+  assert.doesNotMatch(financeManager, /set_hr_payroll_run_status/);
+  assert.doesNotMatch(financeManager, /from\("hr_payroll_(?:periods|runs|items)"\)/);
 });
 
 check("Canonical migration hardens HR-owned payroll writes and HR audit FKs", () => {
@@ -85,6 +77,7 @@ check("Canonical migration hardens HR-owned payroll writes and HR audit FKs", ()
   assert.match(sql, /array\['super_admin','admin','hr'\]/);
   assert.match(sql, /prepare_hr_payroll_run/);
   assert.match(sql, /set_hr_payroll_run_status/);
+  assert.match(sql, /from anon/i);
   assert.match(sql, /revoke all on table public\.hr_payroll_finance_settlement_state/i);
   assert.match(sql, /revoke all on table public\.hr_payroll_finance_settlement_effects/i);
   assert.match(sql, /create index if not exists hr_payroll_runs_created_by_idx/i);
@@ -108,14 +101,17 @@ check("Leave regression stays behind canonical workflow RPCs", () => {
   assert.doesNotMatch(leave, /from\("hr_leave_balances"\)\.update/);
 });
 
-check("Personnel payroll mutation paths stay in HR while cash settlement stays in Finance", () => {
+check("Personnel owns payroll calculation while Finance owns cash settlement", () => {
   const compensation = read("src/components/hr/CompensationManager.tsx");
   const payroll = read("src/components/hr/PayrollManager.tsx");
-  assert.match(compensation, /profile\?\.role === "hr"/);
+  const finance = read("src/components/finance/FinancePayrollManager.tsx");
+  assert.match(compensation, /only HR and administrators can change compensation setup/i);
   assert.match(payroll, /prepare_hr_payroll_run/);
   assert.match(payroll, /set_hr_payroll_run_status/);
   assert.match(payroll, /get_hr_payroll_finance_settlement/);
-  assert.match(payroll, /getFinancePayrollObligations/);
+  assert.match(payroll, /Payment source of truth/);
+  assert.match(finance, /Record Payment/);
+  assert.match(finance, /posted Finance employee-payment transactions/);
 });
 
 const failed = checks.filter((item) => !item.ok);
