@@ -119,6 +119,21 @@ export type AdminCalendarEvent = {
   transparency?: string | null;
 };
 
+export type GoogleCalendarEventColor = { background?: string; foreground?: string };
+export type GoogleCalendarEventColorPalette = Record<string, GoogleCalendarEventColor>;
+
+export function resolveGoogleCalendarEventColors(input: {
+  providerColorId: string | null;
+  calendar: AdminCalendarDescriptor;
+  palette: GoogleCalendarEventColorPalette;
+}) {
+  const providerColor = input.providerColorId ? input.palette[input.providerColorId] : undefined;
+  return {
+    backgroundColor: providerColor?.background || input.calendar.default_background_color,
+    foregroundColor: providerColor?.foreground || input.calendar.default_foreground_color,
+  };
+}
+
 type BusinessCalendarEventType = "project_start" | "project_target" | "project_delivery" | "installation";
 
 const MODULEX_EVENT_COLORS: Record<BusinessCalendarEventType, string> = {
@@ -247,10 +262,12 @@ export function normalizeLocalCalendarEvent(
   row: LocalCalendarEventRow,
   calendar: AdminCalendarDescriptor,
   syncStatus: AdminCalendarEvent["sync_status"] = "local",
+  providerColors: GoogleCalendarEventColorPalette = {},
 ): AdminCalendarEvent | null {
   const start = row.all_day ? row.all_day_start : row.start_at;
   if (!start) return null;
   const isDefault = row.provider_event_type === "default";
+  const colors = resolveGoogleCalendarEventColors({ providerColorId: row.provider_color_id, calendar, palette: providerColors });
   return {
     id: `${calendar.id}:${isDefault ? "calendar_event" : "google_special"}:${row.id}`,
     calendar_id: calendar.id,
@@ -265,8 +282,8 @@ export function normalizeLocalCalendarEvent(
     end: row.all_day ? row.all_day_end : row.end_at,
     all_day: row.all_day,
     timezone: row.timezone || calendar.timezone,
-    background_color: calendar.default_background_color,
-    foreground_color: calendar.default_foreground_color,
+    background_color: colors.backgroundColor,
+    foreground_color: colors.foregroundColor,
     navigation_target: row.project_id ? projectNavigation(row.project_id) : null,
     provider_event_url: row.provider_html_link,
     provider_color_id: row.provider_color_id,
@@ -290,9 +307,11 @@ export function normalizeLocalCalendarEvent(
 export function normalizeGoogleMirrorEvent(
   mirror: GoogleCalendarMirrorRow,
   calendar: AdminCalendarDescriptor,
+  providerColors: GoogleCalendarEventColorPalette = {},
 ): AdminCalendarEvent | null {
   const start = mirror.all_day ? mirror.all_day_start : mirror.start_at;
   if (!start) return null;
+  const colors = resolveGoogleCalendarEventColors({ providerColorId: mirror.provider_color_id, calendar, palette: providerColors });
 
   return {
     id: `${calendar.id}:google_external:${mirror.provider_event_id}`,
@@ -308,8 +327,8 @@ export function normalizeGoogleMirrorEvent(
     end: mirror.all_day ? mirror.all_day_end : mirror.end_at,
     all_day: mirror.all_day,
     timezone: calendar.timezone,
-    background_color: calendar.default_background_color,
-    foreground_color: calendar.default_foreground_color,
+    background_color: colors.backgroundColor,
+    foreground_color: colors.foregroundColor,
     navigation_target: null,
     provider_event_url: mirror.provider_event_url,
     provider_color_id: mirror.provider_color_id,

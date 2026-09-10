@@ -6,6 +6,7 @@ import {
   type AdminCalendarEventQuery,
 } from "@/lib/calendar/admin-calendar";
 import type { AdminCalendarEventType } from "@/lib/calendar/event-normalization";
+import { decorateGoogleCalendarEventColors } from "@/lib/calendar/provider-event-colors";
 import { withApiTiming } from "@/lib/observability/apiTiming";
 
 const EVENT_TYPES = new Set<AdminCalendarEventType>([
@@ -62,6 +63,7 @@ async function handleGet(request: Request) {
     const snapshot = await getAdminCalendarSnapshot(query);
     return Response.json({
       ...snapshot,
+      events: await decorateGoogleCalendarEventColors(snapshot.events),
       can_manage: hasPermission(auth.actor.profile.roles, "calendar.manage"),
     });
   } catch (error) {
