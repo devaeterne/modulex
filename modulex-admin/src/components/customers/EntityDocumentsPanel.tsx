@@ -41,6 +41,11 @@ type EntityDocument = {
   created_at: string;
 };
 
+type OrphanCleanup = {
+  storagePath: string;
+  fileName: string;
+};
+
 type Props = {
   entityType: EntityDocumentType;
   entityId: string;
@@ -139,6 +144,7 @@ export default function EntityDocumentsPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [orphanCleanup, setOrphanCleanup] = useState<OrphanCleanup | null>(null);
 
   const loadDocuments = useCallback(async () => {
     setLoading(true);
@@ -195,17 +201,18 @@ export default function EntityDocumentsPanel({
 
   async function uploadDocuments(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canUpload || files.length === 0 || busyId) return;
+    if (!canUpload || files.length === 0 || busyId || orphanCleanup) return;
 
     setBusyId("upload");
     setError(null);
     setMessage(null);
     let uploadedCount = 0;
+    let batchError: string | null = null;
 
     for (const file of files) {
       const validationError = validateFile(file);
       if (validationError) {
-        setError(validationError);
+        batchError = validationError;
         break;
       }
 
@@ -216,7 +223,7 @@ export default function EntityDocumentsPanel({
         upsert: false,
       });
       if (uploadError) {
-        setError(`${file.name}: ${uploadError.message}`);
+        batchError = `${file.name}: ${uploadError.message}`;
         break;
       }
 
@@ -231,8 +238,13 @@ export default function EntityDocumentsPanel({
         p_description: description.trim() || null,
       });
       if (metadataError) {
-        await supabase.storage.from(bucket).remove([storagePath]);
-        setError(`${file.name}: ${metadataError.message}`);
+        const { error: cleanupError } = await supabase.storage.from(bucket).remove([storagePath]);
+        if (cleanupError) {
+          setOrphanCleanup({ storagePath, fileName: file.name });
+          batchError = `${file.name}: metadata registration failed (${metadataError.message}) and orphan cleanup also failed (${cleanupError.message}). Retry orphan cleanup before uploading more files.`;
+        } else {
+          batchError = `${file.name}: ${metadataError.message}`;
+        }
         break;
       }
       uploadedCount += 1;
@@ -242,9 +254,31 @@ export default function EntityDocumentsPanel({
     setFileInputKey((value) => value + 1);
     if (uploadedCount > 0) {
       await loadDocuments();
-      setMessage(`${uploadedCount} file${uploadedCount === 1 ? "" : "s"} uploaded.`);
+      setMessage(
+        batchError
+          ? `${uploadedCount} file${uploadedCount === 1 ? "" : "s"} uploaded before the batch stopped.`
+          : `${uploadedCount} file${uploadedCount === 1 ? "" : "s"} uploaded.`,
+      );
       setDescription("");
     }
+    if (batchError) setError(batchError);
+    setBusyId(null);
+  }
+
+  async function retryOrphanCleanup() {
+    if (!orphanCleanup || busyId) return;
+    setBusyId("orphan-cleanup");
+    setError(null);
+    setMessage(null);
+    const fileName = orphanCleanup.fileName;
+    const { error: cleanupError } = await supabase.storage.from(bucket).remove([orphanCleanup.storagePath]);
+    if (cleanupError) {
+      setError(`${fileName}: orphan cleanup retry failed (${cleanupError.message}).`);
+      setBusyId(null);
+      return;
+    }
+    setOrphanCleanup(null);
+    setMessage(`${fileName}: orphaned private upload was removed.`);
     setBusyId(null);
   }
 
@@ -295,6 +329,23 @@ export default function EntityDocumentsPanel({
         {error ? <Alert variant="error" title="Document action failed" message={error} /> : null}
         {message ? <Alert variant="success" title="Documents updated" message={message} /> : null}
 
+        {orphanCleanup ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+            <FormHint>
+              {orphanCleanup.fileName} was uploaded but could not be registered or removed. Resolve this private orphan before uploading more files.
+            </FormHint>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busyId !== null}
+              onClick={() => void retryOrphanCleanup()}
+            >
+              {busyId === "orphan-cleanup" ? "Cleaning up…" : "Retry orphan cleanup"}
+            </Button>
+          </div>
+        ) : null}
+
         {canUpload ? (
           <form onSubmit={uploadDocuments} className="grid gap-4 md:grid-cols-2">
             <div>
@@ -305,7 +356,7 @@ export default function EntityDocumentsPanel({
                 type="file"
                 accept={acceptedExtensions}
                 multiple
-                disabled={busyId !== null}
+                disabled={busyId !== null || orphanCleanup !== null}
                 onChange={selectFiles}
                 hint={selectedSummary}
               />
@@ -317,7 +368,7 @@ export default function EntityDocumentsPanel({
                 options={documentTypeOptions}
                 value={documentType}
                 onChange={setDocumentType}
-                disabled={busyId !== null}
+                disabled={busyId !== null || orphanCleanup !== null}
               />
             </div>
             <div className="md:col-span-2">
@@ -326,13 +377,13 @@ export default function EntityDocumentsPanel({
                 id={`${entityType}-document-description`}
                 value={description}
                 maxLength={1000}
-                disabled={busyId !== null}
+                disabled={busyId !== null || orphanCleanup !== null}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="Optional note applied to the selected files"
               />
             </div>
             <div className="md:col-span-2 flex justify-end">
-              <Button type="submit" disabled={busyId !== null || files.length === 0}>
+              <Button type="submit" disabled={busyId !== null || files.length === 0 || orphanCleanup !== null}>
                 {busyId === "upload" ? "Uploading…" : `Upload ${files.length || ""} file${files.length === 1 ? "" : "s"}`.trim()}
               </Button>
             </div>
@@ -341,7 +392,7 @@ export default function EntityDocumentsPanel({
           <FormHint>You have read-only access to these documents.</FormHint>
         )}
 
-        {error && !loading ? (
+        {error && !loading && !orphanCleanup ? (
           <Button type="button" variant="outline" size="sm" onClick={() => void loadDocuments()} disabled={busyId !== null}>
             Retry
           </Button>
