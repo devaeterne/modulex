@@ -19,7 +19,6 @@ const emptyDraft: Draft = { option_group: "project_type", option_key: "", label:
 export default function StoreLeadFormOptionsManager() {
   const [items, setItems] = useState<StoreLeadFormOption[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
-  const [profileId, setProfileId] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -37,13 +36,13 @@ export default function StoreLeadFormOptionsManager() {
     }
     const editable = ["super_admin", "admin"].includes(profile.role);
     setCanEdit(editable);
-    setProfileId(profile.id);
     if (!editable) {
-      setError("Store form configuration requires Store management access.");
+      setError("Store form configuration requires Admin access.");
       setLoading(false);
       return;
     }
-    const { data, error: queryError } = await supabase.from("store_lead_form_options").select("*").order("option_group").order("sort_order").order("label");
+
+    const { data, error: queryError } = await supabase.rpc("get_admin_store_lead_form_options");
     if (queryError) setError(queryError.message);
     else setItems((data ?? []) as StoreLeadFormOption[]);
     setLoading(false);
@@ -51,30 +50,46 @@ export default function StoreLeadFormOptionsManager() {
 
   useEffect(() => { void load(); }, [load]);
 
-  function validate(value: Pick<Draft, "option_key" | "label">) {
+  function validate(value: Pick<Draft, "option_key" | "label" | "sort_order">) {
     if (!KEY_PATTERN.test(value.option_key) || value.option_key.length > 64) return "Option key must be a lowercase slug using letters, numbers, underscore or hyphen.";
     if (!value.label.trim() || value.label.trim().length > 160) return "Label is required and must be 160 characters or fewer.";
+    if (!Number.isInteger(value.sort_order) || value.sort_order < -10000 || value.sort_order > 10000) return "Sort order must be an integer between -10000 and 10000.";
     return null;
   }
 
-  async function createOption() {
-    const validation = validate(draft);
-    if (validation || !profileId) { setError(validation || "Unable to identify current user."); return; }
+  async function persistOption(id: string | null, value: Draft) {
+    const validation = validate(value);
+    if (validation) { setError(validation); return false; }
     setBusy(true); setError(null); setSuccess(null);
-    const { error: insertError } = await supabase.from("store_lead_form_options").insert({ ...draft, option_key: draft.option_key.trim(), label: draft.label.trim(), updated_by: profileId });
-    if (insertError) setError(insertError.message);
-    else { setDraft(emptyDraft); setSuccess("Form option created."); await load(); }
+    const { data, error: rpcError } = await supabase.rpc("upsert_store_lead_form_option", {
+      p_id: id,
+      p_option_group: value.option_group,
+      p_option_key: value.option_key.trim(),
+      p_label: value.label.trim(),
+      p_sort_order: value.sort_order,
+      p_is_active: value.is_active,
+    });
     setBusy(false);
+    if (rpcError) { setError(rpcError.message); return false; }
+    const result = data as { ok?: boolean; reason?: string } | null;
+    if (!result?.ok) { setError(result?.reason === "option_not_found" ? "This option no longer exists. Reload and try again." : "Unable to save consultation option."); return false; }
+    return true;
+  }
+
+  async function createOption() {
+    if (await persistOption(null, draft)) {
+      setDraft(emptyDraft);
+      setSuccess("Form option created.");
+      await load();
+    }
   }
 
   async function saveOption(item: StoreLeadFormOption) {
-    const validation = validate(item);
-    if (validation || !profileId) { setError(validation || "Unable to identify current user."); return; }
-    setBusy(true); setError(null); setSuccess(null);
-    const { error: updateError } = await supabase.from("store_lead_form_options").update({ option_group: item.option_group, option_key: item.option_key.trim(), label: item.label.trim(), sort_order: item.sort_order, is_active: item.is_active, updated_by: profileId }).eq("id", item.id);
-    if (updateError) setError(updateError.message);
-    else { setSuccess("Form option saved."); await load(); }
-    setBusy(false);
+    const value: Draft = { option_group: item.option_group, option_key: item.option_key, label: item.label, sort_order: item.sort_order, is_active: item.is_active };
+    if (await persistOption(item.id, value)) {
+      setSuccess("Form option saved.");
+      await load();
+    }
   }
 
   function patch(id: string, changes: Partial<StoreLeadFormOption>) {
@@ -85,7 +100,7 @@ export default function StoreLeadFormOptionsManager() {
 
   return <div className="space-y-5">
     <div className={cardClass}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Lead Form Options</h1><p className="mt-1 text-sm text-gray-500">Manage business-approved project consultation choices. No option is published until it is active.</p></div><Link href="/store/leads" className={buttonClass}>Back to Leads</Link></div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><h1 className="text-xl font-semibold text-gray-800 dark:text-white/90">Lead Form Options</h1><p className="mt-1 text-sm text-gray-500">Manage business-approved project consultation choices. Active options are published to the Store form; captured lead values remain behind Lead RBAC.</p></div><Link href="/store/leads" className={buttonClass}>Back to Leads</Link></div>
       {error ? <div className="mt-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700">{error}</div> : null}
       {success ? <div className="mt-4 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700">{success}</div> : null}
     </div>
