@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-10
-Main baseline: `29d36d4e1e9858c2726b3b70bed0105bade85809` (`#426` merged)
+Main baseline: `5addfae49ce27e2fea1d43807e19857a5b3b0687` (`#427` merged)
 Current phase: **Admin Final Workstreams**
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
