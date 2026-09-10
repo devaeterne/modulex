@@ -220,7 +220,7 @@ export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   super_admin: "Full system access, including protected Super Admin account management.",
   admin: "Full business and system administration, except protected Super Admin account actions.",
   sales: "Customer, project, calendar, procurement status, website lead, dealer application, order, invoice, shipment and installation workflows. Customer collection and procurement status are visible, while payment entry, vendor cost and internal finance remain restricted.",
-  finance: "Projects, calendar visibility, invoices, customer payment ledger, vendor-invoice allocation, collections and payroll processing. Product Cost/FOB, cost-margin pricing, procurement ordering/delivery and employee HR master data stay restricted.",
+  finance: "Projects, calendar visibility, invoices, customer payment ledger, vendor-invoice allocation, collections and approved payroll settlement. Payroll calculation/source records and employee HR master data remain HR-owned; Product Cost/FOB, cost-margin pricing and procurement ordering/delivery stay restricted.",
   hr: "Full personnel lifecycle management including attendance, leave, compensation, payroll, benefits, documents, compliance, onboarding/offboarding and performance.",
   warehouse: "Stock, shipment and QR operations with read access to warehouse structure. Warehouse master data remains Admin-managed.",
   shipping: "Shipment execution with inventory, warehouse-location and QR-label visibility. General stock operations, customer commercial data and order-financial screens stay restricted.",
