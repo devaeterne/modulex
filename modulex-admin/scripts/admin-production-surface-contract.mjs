@@ -101,4 +101,6 @@ const profilePage = await readFile(
 );
 assert.match(profilePage, /CorporateProfile/, "The intentional Modulex profile surface must remain available");
 
+await import("./prf-performance-contract.mjs");
+
 console.log("admin production surface contract: ok");
