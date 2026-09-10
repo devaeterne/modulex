@@ -94,12 +94,14 @@ const mirrorEvent = normalizeGoogleMirrorEvent({
 assert.equal(mirrorEvent?.background_color, "#fbd75b");
 assert.equal(mirrorEvent?.foreground_color, "#000000");
 
-const adminCalendarSource = await readFile(new URL("../src/lib/calendar/admin-calendar.ts", import.meta.url), "utf8");
-assert.match(adminCalendarSource, /getGoogleCalendarEventColors/);
-assert.match(adminCalendarSource, /getConnectedGoogleAccessToken/);
-assert.match(adminCalendarSource, /normalizeLocalCalendarEvent\(row, company, "local", providerColors\)/);
-assert.match(adminCalendarSource, /normalizeGoogleMirrorEvent\(mirror, calendar, providerColors\)/);
-assert.match(adminCalendarSource, /calendar_business_event_extensions/);
-assert.match(adminCalendarSource, /provider_color_id/);
+const routeSource = await readFile(new URL("../src/app/api/admin/calendar/route.ts", import.meta.url), "utf8");
+const decoratorSource = await readFile(new URL("../src/lib/calendar/provider-event-colors.ts", import.meta.url), "utf8").catch(() => "");
+assert.match(routeSource, /decorateGoogleCalendarEventColors/);
+assert.match(routeSource, /events:\s*await decorateGoogleCalendarEventColors\(snapshot\.events\)/);
+assert.match(decoratorSource, /getGoogleCalendarEventColors/);
+assert.match(decoratorSource, /getConnectedGoogleAccessToken/);
+assert.match(decoratorSource, /calendar_business_event_extensions/);
+assert.match(decoratorSource, /provider_color_id/);
+assert.match(decoratorSource, /GOOGLE_COLOR_CACHE_TTL_MS/);
 
 console.log("PASS: Google Calendar event color resolution");
