@@ -76,6 +76,15 @@ function parsePositiveInteger(value: string | null, fallback: number) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function toSummary(data: CustomerDashboardSummary): Summary {
+  return {
+    total: data.stats.total_customers,
+    active: data.stats.active_customers,
+    prospects: data.stats.prospects,
+    portal: data.stats.portal_enabled,
+  };
+}
+
 export default function CustomersTable() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerTypes, setCustomerTypes] = useState<CustomerType[]>([]);
@@ -160,13 +169,7 @@ export default function CustomersTable() {
       p_recent_customers: 0,
     });
     if (error) throw error;
-    const { stats } = data as CustomerDashboardSummary;
-    setSummary({
-      total: stats.total_customers,
-      active: stats.active_customers,
-      prospects: stats.prospects,
-      portal: stats.portal_enabled,
-    });
+    setSummary(toSummary(data as CustomerDashboardSummary));
   }, []);
 
   useEffect(() => {
@@ -218,7 +221,7 @@ export default function CustomersTable() {
     async function initialize() {
       setIsLoading(true);
       setErrorMessage(null);
-      const [{ profile, error: profileError }, typesResult, groupsResult, profilesResult] = await Promise.all([
+      const [{ profile, error: profileError }, typesResult, groupsResult, profilesResult, summaryResult] = await Promise.all([
         getCurrentProfile(),
         supabase.from("customer_types").select("id, system_key, name, sort_order, is_active").eq("is_active", true).order("sort_order"),
         supabase
@@ -234,9 +237,13 @@ export default function CustomersTable() {
           .eq("is_active", true)
           .in("role", ["super_admin", "admin", "sales"])
           .order("full_name"),
+        supabase.rpc("get_customer_dashboard", {
+          p_recent_orders: 0,
+          p_recent_customers: 0,
+        }),
       ]);
 
-      const firstError = profileError || typesResult.error || groupsResult.error || profilesResult.error;
+      const firstError = profileError || typesResult.error || groupsResult.error || profilesResult.error || summaryResult.error;
       if (firstError) {
         setErrorMessage(firstError.message);
         setIsLoading(false);
@@ -247,15 +254,11 @@ export default function CustomersTable() {
       setCustomerTypes((typesResult.data ?? []) as CustomerType[]);
       setPriceGroups((groupsResult.data ?? []) as PriceGroupLookup[]);
       setProfiles((profilesResult.data ?? []) as ProfileLookup[]);
-      try {
-        await loadSummary();
-      } catch (summaryError) {
-        setErrorMessage(summaryError instanceof Error ? summaryError.message : "Customer summary could not be loaded.");
-      }
+      setSummary(toSummary(summaryResult.data as CustomerDashboardSummary));
       setReferenceReady(true);
     }
     void initialize();
-  }, [loadSummary]);
+  }, []);
 
   useEffect(() => {
     if (!referenceReady || !urlReady) return;
@@ -333,7 +336,7 @@ export default function CustomersTable() {
       name: "",
       legal_name: "",
       customer_type_id: "",
-      status: "prospect",
+      status: "prospect" as CustomerStatus,
       email: "",
       phone: "",
       country_code: "",
