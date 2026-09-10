@@ -28,7 +28,7 @@ const permissions = await readFile(
 const usrMigration = await readFile(
   path.join(
     root,
-    "../modulex-store/supabase/migrations/20260910144000_usr_users_roles_closeout.sql"
+    "../modulex-store/supabase/migrations/20260910124416_usr_users_roles_closeout.sql"
   ),
   "utf8"
 );
