@@ -237,7 +237,6 @@ check("Warehouse structure list mutations require warehouse.manage in the UI", (
       handlerGuards.length >= expectedHandlerGuards,
       `${name} should guard every mutation handler with warehouse.manage`
     );
-
     const conditionalMutationGroups = source.match(/\{canManage\s*(?:&&|\?)\s*\(/g) ?? [];
     assert.ok(
       conditionalMutationGroups.length >= 2,
@@ -252,6 +251,77 @@ check("Role/path access follows the permission matrix", () => {
   assert.equal(canAccessPath("finance", "/customers/payment-methods"), true);
   assert.equal(canAccessPath("shipping", "/stock-operations"), false);
   assert.equal(canAccessPath("hr", "/personnel/employees"), true);
+});
+
+check("RBS negative route matrix stays fail-closed for every operational role", () => {
+  const roles = ["super_admin", "admin", "sales", "finance", "hr", "warehouse", "shipping"];
+  const allowedByPath = new Map([
+    ["/users", ["super_admin", "admin"]],
+    ["/roles", ["super_admin", "admin"]],
+    ["/store/content", ["super_admin", "admin"]],
+    ["/store/products", ["super_admin", "admin"]],
+    ["/pricing/cost-margin", ["super_admin", "admin"]],
+    ["/finance", ["super_admin", "admin", "finance"]],
+    ["/personnel/employees", ["super_admin", "admin", "hr"]],
+    ["/stock-operations", ["super_admin", "admin", "warehouse"]],
+    ["/warehouses/new", ["super_admin", "admin"]],
+    ["/store/leads", ["super_admin", "admin", "sales"]],
+    ["/store/leads/example", ["super_admin", "admin", "sales"]],
+    ["/pricing/products", ["super_admin", "admin", "sales", "finance"]],
+  ]);
+
+  for (const [path, allowedRoles] of allowedByPath) {
+    for (const role of roles) {
+      assert.equal(
+        canAccessPath(role, path),
+        allowedRoles.includes(role),
+        `${role} access to ${path} should match the RBS negative matrix`
+      );
+    }
+  }
+});
+
+check("RBS sensitive permissions do not bleed across Finance, Sales, Warehouse or Shipping", () => {
+  const denied = {
+    sales: ["finance.view", "finance.manage", "pricing.cost.view", "store.manage", "personnel.view", "warehouse.manage"],
+    finance: ["pricing.cost.view", "store.manage", "personnel.view", "warehouse.manage", "inventory.manage", "users.view"],
+    hr: ["finance.view", "pricing.view", "pricing.cost.view", "store.manage", "inventory.manage", "warehouse.manage", "users.view"],
+    warehouse: ["finance.view", "pricing.manage", "pricing.cost.view", "store.manage", "warehouse.manage", "users.view"],
+    shipping: ["finance.view", "pricing.manage", "pricing.cost.view", "store.manage", "inventory.manage", "warehouse.manage", "users.view"],
+  };
+
+  for (const [role, permissionsToDeny] of Object.entries(denied)) {
+    for (const permission of permissionsToDeny) {
+      assert.equal(hasPermission(role, permission), false, `${role} must not receive ${permission}`);
+    }
+  }
+
+  for (const permission of ["finance.manage", "pricing.cost.view", "store.manage", "warehouse.manage", "users.manage", "roles.manage"]) {
+    assert.equal(hasPermission("super_admin", permission), true, `super_admin should receive ${permission}`);
+    assert.equal(hasPermission("admin", permission), true, `admin should receive ${permission}`);
+  }
+});
+
+check("RBS operational positives remain narrowly scoped", () => {
+  assert.equal(hasPermission("sales", "pricing.view"), true);
+  assert.equal(hasPermission("sales", "leads.manage"), true);
+  assert.equal(hasPermission("finance", "finance.manage"), true);
+  assert.equal(hasPermission("finance", "pricing.view"), true);
+  assert.equal(hasPermission("hr", "personnel.manage"), true);
+  assert.equal(hasPermission("warehouse", "inventory.manage"), true);
+  assert.equal(hasPermission("warehouse", "shipments.manage"), true);
+  assert.equal(hasPermission("shipping", "shipments.manage"), true);
+  assert.equal(hasPermission("shipping", "inventory.view"), true);
+});
+
+check("RBS Store CMS boundary is Admin-only in sidebar and direct routes", () => {
+  for (const path of ["/store/content", "/store/pages", "/store/projects", "/store/marketing", "/store/colors", "/store/products"]) {
+    for (const role of ["sales", "finance", "hr", "warehouse", "shipping"]) {
+      assert.equal(canAccessPath(role, path), false, `${role} must not access ${path}`);
+    }
+  }
+  assert.match(sidebarSource, /permission:\s*"store\.manage"/);
+  assert.match(sidebarSource, /permission:\s*"store\.view"/);
 });
 
 const failed = checks.filter((item) => !item.ok);
