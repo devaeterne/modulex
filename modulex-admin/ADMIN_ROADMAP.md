@@ -116,12 +116,12 @@ Status: `[~]` polling/queue coordination and routing foundations exist; operatio
 
 ## PER — Personnel / HR
 
-Status: `[~]` many routes are functional, but A6.1 product-scope closeout is not complete.
+Status: `[x]` PER-A1→PER-A4 closed; all listed Personnel routes are production scope and HR/Finance payroll ownership is production-verified.
 
-- [ ] **PER-A1 — Route/product-scope classification.** Classify Employees, Departments, Positions, Attendance, Leave, Lifecycle, Documents, Performance, Compliance, Compensation, Benefits, Payroll and Reports as production/planned/remove.
-- [ ] **PER-A2 — Production-domain contracts.** For every production route, verify data model, RBAC, lifecycle, validation, audit and acceptance coverage; close gaps instead of keeping template behavior.
-- [ ] **PER-A3 — HR/Finance boundary.** Make payroll calculation/source records explicitly HR-owned and actual payment/money movement/reporting Finance-owned across UI, DB and docs.
-- [ ] **PER-A4 — Placeholder cleanup + production acceptance.** Remove/de-nav non-product routes, close signed-in production smoke and update Personnel acceptance evidence.
+- [x] **PER-A1 — Route/product-scope classification.** Employees, Departments, Positions, Attendance, Leave, Lifecycle, Documents, Performance, Compliance, Compensation, Benefits, Payroll and Reports are production routes; no listed route is planned/remove.
+- [x] **PER-A2 — Production-domain contracts.** Production routes are reconciled against the live HR data model, RBAC, lifecycle, validation, audit, bounded data-access/performance and regression contracts; the final Personnel contract is permanent CI coverage.
+- [x] **PER-A3 — HR/Finance boundary.** Payroll calculation/source records are HR-owned; Finance receives approved-obligation/read settlement projections and owns actual employee payment/money movement/reporting through the Finance transaction ledger, without a duplicate payroll cash ledger.
+- [x] **PER-A4 — Placeholder cleanup + production acceptance.** No Personnel route was removed because none is a true placeholder. Production migration/RLS/RPC authorization, Advisor checks and Admin production-surface/Personnel/Leave regressions are closed with zero acceptance residue.
 
 ## MOD — Approvals / Training Optional Modules
 
