@@ -80,7 +80,7 @@ assert(storeMigration.includes("Invalid or inactive consultation intent"), "Stor
 
 const roadmap = read("modulex-admin/ADMIN_ROADMAP.md");
 for (const item of ["LD-A1", "LD-A2", "LD-A3", "LD-A4"]) {
-  assert(new RegExp(`- \\[x\\] ${item}\\b`).test(roadmap), `${item} must be closed in ADMIN_ROADMAP.md`);
+  assert(new RegExp(`- \\[x\\] \\*\\*${item}\\b`).test(roadmap), `${item} must be closed in ADMIN_ROADMAP.md`);
 }
 
 console.log("LD Leads final workstream contract: OK");
