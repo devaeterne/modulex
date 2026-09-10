@@ -195,6 +195,15 @@ assert(
   "Project link-existing Order choices must exclude cancelled Orders"
 );
 assert(
+  projectDetail.includes('customer_reference') &&
+    /order\.customer_reference\?\.trim\(\)/.test(projectDetail),
+  "Project link-existing Order picker must fetch and normalize Customer Reference"
+);
+assert(
+  /order\.order_number[\s\S]*customerReference[\s\S]*statusLabel\(order\.status\)/.test(projectDetail),
+  "Project link-existing Order picker must show Customer Reference between Order number and status when present"
+);
+assert(
   projectDetail.includes('order.status !== "cancelled"'),
   "Project detail must exclude cancelled child Orders"
 );
