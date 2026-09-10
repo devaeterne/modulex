@@ -120,6 +120,15 @@ if (exists("src/lib/documents/pdf.ts")) {
   expect(pdf.includes("splitLongToken(item.sku"), "Downloaded PDF SKU wrapping must split long unbroken Stone/Countertop SKU tokens");
   expect(pdf.includes("const skuCount = Math.max(1, skuRows(item).length);"), "Downloaded PDF row height must account for wrapped SKU rows");
   expect(pdf.includes("skus.forEach((row, index) =>"), "Downloaded PDF must render wrapped SKU rows separately instead of overflowing into Description");
+  expect(pdf.includes('function renderInformation(entries: CommercialDocument["information"], x: number, y: number)'), "Downloaded PDF must render Document Information as its own labeled block");
+  expect(pdf.includes('text("DOCUMENT INFORMATION", x, y, 7.5, true)'), "Downloaded PDF must show the Document Information heading");
+  expect(pdf.includes("const PARTY_TOP_Y = 630;"), "Downloaded PDF party blocks must start below the order/invoice meta block");
+  expect(pdf.includes("commands += renderInformation(document.information, 410, PARTY_TOP_Y);"), "Downloaded PDF must keep document information in the third party column");
+  expect(!pdf.includes("let infoY = 660;"), "Downloaded PDF must not overlap document information with order/invoice meta");
+  expect(pdf.includes("let totalsY = rowY - 18;"), "Downloaded PDF totals must flow directly below the final line item");
+  expect(!pdf.includes("Math.min(rowY - 8, 215)"), "Downloaded PDF totals must not be pinned to a low fixed page position");
+  expect(pdf.includes("const signatureY = Math.max(104, totalsY - 24);"), "Downloaded PDF signatures must follow the totals block instead of being fixed near the page bottom");
+  expect(!pdf.includes("line(MARGIN, 112, 235, 112, 0.5)"), "Downloaded PDF signatures must not use the old fixed baseline");
 }
 
 const canonicalSqlPath = "sql/commercial-document-branding.sql";

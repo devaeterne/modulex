@@ -6,7 +6,9 @@ const PAGE_HEIGHT = 841.89;
 const MARGIN = 42;
 const SECONDARY_CENTER_LOGO_BOX = { x: 215, y: 741, maxWidth: 160, maxHeight: 70 } as const;
 const PRIMARY_RIGHT_LOGO_BOX = { x: 397, y: 751, maxWidth: 140, maxHeight: 50 } as const;
-const FIRST_PAGE_LINE_HEIGHT = 270;
+const PARTY_TOP_Y = 630;
+const FIRST_PAGE_TABLE_Y = 510;
+const FIRST_PAGE_LINE_HEIGHT = 230;
 const CONTINUATION_PAGE_LINE_HEIGHT = 370;
 const encoder = new TextEncoder();
 
@@ -209,6 +211,19 @@ function renderParty(title: string, values: string[], x: number, y: number) {
   return commands;
 }
 
+function renderInformation(entries: CommercialDocument["information"], x: number, y: number) {
+  let commands = text("DOCUMENT INFORMATION", x, y, 7.5, true);
+  let cursor = y - 16;
+  for (const entry of (entries ?? []).slice(0, 5)) {
+    const rows = wrap(`${entry.label}: ${entry.value}`, 30).slice(0, 2);
+    for (const row of rows) {
+      commands += text(row, x, cursor, 8);
+      cursor -= 11;
+    }
+  }
+  return commands;
+}
+
 function renderTableHeader(y: number, showDiscount: boolean) {
   let commands = line(MARGIN, y + 9, PAGE_WIDTH - MARGIN, y + 9, 0.8);
   commands += text("#", MARGIN + 2, y, 7.5, true);
@@ -316,14 +331,10 @@ function buildPageContents(document: CommercialDocument, settings: GeneralSettin
 
     let tableY = 650;
     if (firstPage) {
-      commands += renderParty(document.billTo.title, document.billTo.lines, MARGIN, 660);
-      if (document.shipTo) commands += renderParty(document.shipTo.title, document.shipTo.lines, 225, 660);
-      let infoY = 660;
-      for (const entry of (document.information ?? []).slice(0, 5)) {
-        commands += text(`${entry.label}: ${entry.value}`, 410, infoY, 8);
-        infoY -= 13;
-      }
-      tableY = 548;
+      commands += renderParty(document.billTo.title, document.billTo.lines, MARGIN, PARTY_TOP_Y);
+      if (document.shipTo) commands += renderParty(document.shipTo.title, document.shipTo.lines, 225, PARTY_TOP_Y);
+      commands += renderInformation(document.information, 410, PARTY_TOP_Y);
+      tableY = FIRST_PAGE_TABLE_Y;
     }
 
     commands += renderTableHeader(tableY, showDiscount);
@@ -336,8 +347,7 @@ function buildPageContents(document: CommercialDocument, settings: GeneralSettin
 
     const lastPage = pageIndex === chunks.length - 1;
     if (lastPage) {
-      let totalsY = Math.min(rowY - 8, 215);
-      if (totalsY < 112) totalsY = 215;
+      let totalsY = rowY - 18;
       commands += line(355, totalsY + 18, PAGE_WIDTH - MARGIN, totalsY + 18, 0.8);
       for (const total of document.totals) {
         commands += text(total.label, 365, totalsY, total.strong ? 9.5 : 8, total.strong);
@@ -360,10 +370,12 @@ function buildPageContents(document: CommercialDocument, settings: GeneralSettin
       }
 
       if (document.signatureLabels) {
-        commands += line(MARGIN, 112, 235, 112, 0.5);
-        commands += line(360, 112, PAGE_WIDTH - MARGIN, 112, 0.5);
-        commands += text(document.signatureLabels[0], 92, 97, 7.5);
-        commands += text(document.signatureLabels[1], 398, 97, 7.5);
+        const signatureY = Math.max(104, totalsY - 24);
+        const signatureBaselineY = document.notes ? 104 : signatureY;
+        commands += line(MARGIN, signatureBaselineY, 235, signatureBaselineY, 0.5);
+        commands += line(360, signatureBaselineY, PAGE_WIDTH - MARGIN, signatureBaselineY, 0.5);
+        commands += text(document.signatureLabels[0], 92, signatureBaselineY - 15, 7.5);
+        commands += text(document.signatureLabels[1], 398, signatureBaselineY - 15, 7.5);
       }
     }
 
