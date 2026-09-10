@@ -18,7 +18,7 @@
 1. Require the Admin route group to expose shared `loading.tsx` and `error.tsx` boundaries.
 2. Require profile and role reads to be issued together after session resolution.
 3. Require Customers initial reference-data and summary reads to share one parallel batch.
-4. Require exactly one canonical PRF migration with the approved three FK indexes and RLS policy rewrites.
+4. Require exactly one canonical PRF migration with the evidence-approved FK index and RLS policy rewrites.
 5. Let the existing Admin UI workflow demonstrate RED before the implementation files exist.
 
 ### Task 2: Apply production database performance closeout
@@ -26,7 +26,7 @@
 **Files:**
 - Create: `modulex-store/supabase/migrations/<production-version>_prf_admin_supabase_performance_closeout.sql`
 
-1. Add covering FK indexes only for `calendar_sync_audit.actor_profile_id`, `calendar_sync_outbox.project_id`, and `vendor_catalog_items.last_seen_run_id`.
+1. Add the covering FK index for `vendor_catalog_items.last_seen_run_id` only. Production triage rejected `calendar_sync_audit.actor_profile_id` (0/94,961 non-null), `calendar_sync_outbox.project_id` (11/3,271 non-null plus heavy update churn), sparse Calendar actor FKs, and the remaining tiny/empty FK candidates because current read/parent-lifecycle benefit did not exceed write/storage cost.
 2. Rewrite `project_participants_bounded_read` to cache row-invariant `auth.uid()` calls via `(select auth.uid())` without changing the predicate.
 3. Replace `store_pages_admin_all` with INSERT/UPDATE/DELETE-only Admin policies and retain `store_pages_internal_read` as the only authenticated SELECT policy.
 4. Apply through Supabase migration tooling, then mirror the exact generated migration version and SQL into the repository.
