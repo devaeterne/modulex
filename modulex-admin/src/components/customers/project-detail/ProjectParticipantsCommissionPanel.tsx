@@ -540,7 +540,7 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
 
       {access.canViewCommissions ? (
         <ComponentCard
-          title={access.isSalesLimited ? "My External Service Compensation" : "Commission Ledger"}
+          title={access.isSalesLimited ? "My External Service Compensation" : "Project Cost & Commission"}
           desc={access.isSalesLimited
             ? "You can enter a fixed amount or Sales % for external services you added. Your own sales commission, other participants, Finance payout details, and lifecycle controls are hidden."
             : "Project owns commission entitlement only. Actual payouts remain canonical Finance transactions attributed to the commission obligation. Earned and Approved states are explicit; Project status does not auto-earn commission."}
@@ -605,14 +605,14 @@ export default function ProjectParticipantsCommissionPanel({ projectId }: Props)
                     id="pb6-commission-basis"
                     options={access.isSalesLimited
                       ? [
-                          { value: "fixed", label: "Fixed amount" },
-                          { value: "percentage", label: "Sales %" },
-                        ]
+                        { value: "fixed", label: "Fixed amount" },
+                        { value: "percentage", label: "Sales %" },
+                      ]
                       : [
-                          { value: "fixed", label: "Fixed amount" },
-                          { value: "percentage", label: "Sales %" },
-                          { value: "gross_profit_percentage", label: "Gross profit %" },
-                        ]}
+                        { value: "fixed", label: "Fixed amount" },
+                        { value: "percentage", label: "Sales %" },
+                        { value: "gross_profit_percentage", label: "Gross profit %" },
+                      ]}
                     value={commissionBasisType}
                     onChange={(value) => setCommissionBasisType(value as ProjectCommissionBasisType)}
                   />
