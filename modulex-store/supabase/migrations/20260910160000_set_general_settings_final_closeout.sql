@@ -115,7 +115,7 @@ end
 $patch$;
 
 -- SET-A4/SET-A2: Order numbering and missing transaction currency consume the
--- canonical singleton. Current values reproduce the legacy ORD-000001 behavior.
+-- canonical singleton. Padding is a minimum width and never truncates a sequence.
 create or replace function public.set_customer_order_defaults()
 returns trigger
 language plpgsql
@@ -127,6 +127,8 @@ declare
   v_prefix text;
   v_padding integer;
   v_administrative_fee numeric(7,3);
+  v_sequence_value bigint;
+  v_sequence_text text;
 begin
   select upper(btrim(gs.default_currency)), gs.order_number_prefix, gs.order_number_padding, gs.administrative_fee_default_percent
   into v_default_currency, v_prefix, v_padding, v_administrative_fee
@@ -141,7 +143,9 @@ begin
   end if;
 
   if new.order_number is null or trim(new.order_number) = '' then
-    new.order_number := v_prefix || lpad(nextval('public.customer_order_number_seq')::text, v_padding, '0');
+    v_sequence_value := nextval('public.customer_order_number_seq');
+    v_sequence_text := v_sequence_value::text;
+    new.order_number := v_prefix || lpad(v_sequence_text, greatest(v_padding, length(v_sequence_text)), '0');
   end if;
   new.order_number := upper(trim(new.order_number));
 
@@ -172,6 +176,8 @@ declare
   v_default_currency varchar(3);
   v_prefix text;
   v_padding integer;
+  v_sequence_value bigint;
+  v_sequence_text text;
 begin
   select upper(btrim(gs.default_currency)), gs.invoice_number_prefix, gs.invoice_number_padding
   into v_default_currency, v_prefix, v_padding
@@ -186,7 +192,9 @@ begin
   end if;
 
   if new.invoice_number is null or trim(new.invoice_number) = '' then
-    new.invoice_number := v_prefix || lpad(nextval('public.customer_invoice_number_seq')::text, v_padding, '0');
+    v_sequence_value := nextval('public.customer_invoice_number_seq');
+    v_sequence_text := v_sequence_value::text;
+    new.invoice_number := v_prefix || lpad(v_sequence_text, greatest(v_padding, length(v_sequence_text)), '0');
   end if;
   new.invoice_number := upper(trim(new.invoice_number));
 
@@ -217,6 +225,8 @@ as $function$
 begin
   if tg_op = 'INSERT' then
     new.created_by := auth.uid();
+  else
+    new.created_by := old.created_by;
   end if;
   new.updated_by := auth.uid();
   new.updated_at := now();
@@ -231,8 +241,109 @@ for each row execute function private.touch_order_tax_rule();
 
 revoke all privileges on table public.order_tax_rules from anon;
 
--- SET-A1/A5: Store callers use narrow public wrappers. Make those wrappers the
--- executable boundary so the SECURITY DEFINER helpers are not directly exposed.
+-- SET-A1/A5: Store callers use narrow public wrappers. Canonical migrations must
+-- also define the private implementations so clean databases do not depend on
+-- production-only drift.
+create schema if not exists store_api_private;
+revoke all on schema store_api_private from public;
+
+create or replace function store_api_private.get_store_public_profile()
+returns jsonb
+language sql
+stable
+security definer
+set search_path to 'pg_catalog', 'public'
+as $function$
+  select jsonb_build_object(
+    'companyName', g.company_name,
+    'legalName', g.legal_name,
+    'logoUrl', g.logo_url,
+    'email', g.email,
+    'phone', g.phone,
+    'website', g.website,
+    'addressLine1', g.address_line_1,
+    'addressLine2', g.address_line_2,
+    'city', g.city,
+    'stateRegion', g.state_region,
+    'postalCode', g.postal_code,
+    'countryCode', g.country_code,
+    'locale', g.locale
+  )
+  from public.general_settings g
+  where g.id = 1;
+$function$;
+
+create or replace function store_api_private.get_store_public_company_locations()
+returns jsonb
+language sql
+stable
+security definer
+set search_path to 'pg_catalog', 'public'
+as $function$
+  select jsonb_build_object(
+    'contactChannels', coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', c.id,
+            'channelType', c.channel_type,
+            'label', c.label,
+            'value', c.value,
+            'href', c.href
+          ) order by c.sort_order asc, c.label asc, c.id asc
+        )
+        from public.company_contact_channels c
+        where c.is_active = true
+      ),
+      '[]'::jsonb
+    ),
+    'locations', coalesce(
+      (
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', l.id,
+            'locationType', l.location_type,
+            'name', l.name,
+            'email', l.email,
+            'phone', l.phone,
+            'addressLine1', l.address_line_1,
+            'addressLine2', l.address_line_2,
+            'city', l.city,
+            'stateRegion', l.state_region,
+            'postalCode', l.postal_code,
+            'countryCode', l.country_code,
+            'mapUrl', l.map_url,
+            'hours', coalesce(
+              (
+                select jsonb_agg(
+                  jsonb_build_object(
+                    'dayOfWeek', h.day_of_week,
+                    'opensAt', h.opens_at,
+                    'closesAt', h.closes_at,
+                    'isClosed', h.is_closed,
+                    'note', h.note
+                  ) order by h.day_of_week asc, h.id asc
+                )
+                from public.company_location_hours h
+                where h.location_id = l.id
+              ),
+              '[]'::jsonb
+            )
+          ) order by l.sort_order asc, l.name asc, l.id asc
+        )
+        from public.company_locations l
+        where l.is_active = true
+      ),
+      '[]'::jsonb
+    )
+  );
+$function$;
+
+revoke all on function store_api_private.get_store_public_profile() from public;
+revoke all on function store_api_private.get_store_public_company_locations() from public;
+revoke execute on function store_api_private.get_store_public_profile() from anon, authenticated;
+revoke execute on function store_api_private.get_store_public_company_locations() from anon, authenticated;
+
 create or replace function public.get_store_public_profile()
 returns jsonb
 language sql
@@ -258,12 +369,9 @@ revoke all on function public.get_store_public_company_locations() from public;
 grant execute on function public.get_store_public_profile() to anon, authenticated, service_role;
 grant execute on function public.get_store_public_company_locations() to anon, authenticated, service_role;
 
-revoke execute on function store_api_private.get_store_public_profile() from anon, authenticated;
-revoke execute on function store_api_private.get_store_public_company_locations() from anon, authenticated;
-
 comment on column public.general_settings.order_number_prefix is 'Canonical prefix for generated customer Order numbers.';
-comment on column public.general_settings.order_number_padding is 'Canonical zero-padding width for generated customer Order numbers.';
+comment on column public.general_settings.order_number_padding is 'Canonical zero-padding minimum width for generated customer Order numbers.';
 comment on column public.general_settings.invoice_number_prefix is 'Canonical prefix for generated customer Invoice numbers.';
-comment on column public.general_settings.invoice_number_padding is 'Canonical zero-padding width for generated customer Invoice numbers.';
+comment on column public.general_settings.invoice_number_padding is 'Canonical zero-padding minimum width for generated customer Invoice numbers.';
 
 commit;
