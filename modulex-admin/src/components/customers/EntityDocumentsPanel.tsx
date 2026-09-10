@@ -330,7 +330,7 @@ export default function EntityDocumentsPanel({
         {message ? <Alert variant="success" title="Documents updated" message={message} /> : null}
 
         {orphanCleanup ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
             <FormHint>
               {orphanCleanup.fileName} was uploaded but could not be registered or removed. Resolve this private orphan before uploading more files.
             </FormHint>
