@@ -116,20 +116,31 @@ export type StoreLeadConversion = {
   created_at: string;
 };
 
-export type StoreLeadDetailPayload = {
-  ok: boolean;
-  reason?: string;
-  role?: string;
-  can_archive?: boolean;
-  lead?: StoreLead;
-  activity?: StoreLeadActivity[];
-  assignees?: LeadAssignee[];
-  conversions?: StoreLeadConversion[];
-};
-
 export type LeadAssignee = {
   id: string;
   full_name: string | null;
   email: string | null;
   role: string;
 };
+
+export type StoreLeadDetailPayload =
+  | {
+      ok: true;
+      role: string;
+      can_archive: boolean;
+      lead: StoreLead;
+      activity: StoreLeadActivity[];
+      assignees: LeadAssignee[];
+      conversions: StoreLeadConversion[];
+      reason?: never;
+    }
+  | {
+      ok: false;
+      reason: string;
+      role?: string;
+      can_archive?: boolean;
+      lead?: never;
+      activity?: never;
+      assignees?: LeadAssignee[];
+      conversions?: never;
+    };
