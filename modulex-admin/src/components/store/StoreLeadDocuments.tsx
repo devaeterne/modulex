@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { getCurrentProfile } from "@/lib/supabase/profile";
+import type { StoreLeadDetailPayload } from "@/lib/store/leads";
 
 type LeadDocument = {
   id: string;
@@ -37,15 +37,29 @@ export default function StoreLeadDocuments({ id }: { id: string }) {
   useEffect(() => {
     let active = true;
     async function load() {
-      const { profile, error: profileError } = await getCurrentProfile();
-      if (profileError || !profile || !["super_admin", "admin", "sales"].includes(profile.role)) {
-        if (active) { setError("You do not have access to supporting documents."); setLoading(false); }
+      const { data: detailData, error: leadError } = await supabase.rpc("get_store_lead_detail", { p_lead_id: id });
+      if (!active) return;
+      if (leadError) {
+        setError(leadError.message);
+        setLoading(false);
         return;
       }
-      const { data: lead, error: leadError } = await supabase.from("store_leads").select("lead_type").eq("id", id).single();
-      if (leadError || !lead) { if (active) { setError(leadError?.message || "Unable to load lead."); setLoading(false); } return; }
-      if (lead.lead_type !== "dealer_application") { if (active) setLoading(false); return; }
-      const { data, error: documentError } = await supabase.from("store_lead_documents").select("id, document_type, storage_path, original_filename, mime_type, size_bytes, created_at").eq("lead_id", id).order("created_at", { ascending: false });
+      const detail = detailData as StoreLeadDetailPayload | null;
+      if (!detail?.ok || !detail.lead) {
+        setError("Lead not found or not available to your role.");
+        setLoading(false);
+        return;
+      }
+      if (detail.lead.lead_type !== "dealer_application") {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: documentError } = await supabase
+        .from("store_lead_documents")
+        .select("id, document_type, storage_path, original_filename, mime_type, size_bytes, created_at")
+        .eq("lead_id", id)
+        .order("created_at", { ascending: false });
       if (!active) return;
       setDealer(true);
       if (documentError) setError(documentError.message);
