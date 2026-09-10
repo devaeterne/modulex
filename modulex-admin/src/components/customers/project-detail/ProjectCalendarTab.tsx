@@ -16,6 +16,11 @@ import { getCustomerProject, updateCustomerProjectSchedule, type CustomerProject
 import { formatDateOnly, formatDateTime } from "@/lib/dates/usDate";
 import { supabase } from "@/lib/supabase/client";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PROJECT_CALENDAR_LOOKBACK_DAYS = 30;
+const PROJECT_CALENDAR_LOOKAHEAD_DAYS = 335;
+const PROJECT_CALENDAR_RANGE_IS_VALID = PROJECT_CALENDAR_LOOKBACK_DAYS + PROJECT_CALENDAR_LOOKAHEAD_DAYS <= 370;
+
 type InstallationOption = {
   id: string;
   installation_number: string;
@@ -97,9 +102,10 @@ export default function ProjectCalendarTab({ projectId, canManage }: { projectId
         nextInstallations = (result.data ?? []) as InstallationOption[];
       }
 
-      const now = new Date();
-      const start = new Date(now); start.setUTCMonth(start.getUTCMonth() - 6);
-      const end = new Date(now); end.setUTCFullYear(end.getUTCFullYear() + 2);
+      if (!PROJECT_CALENDAR_RANGE_IS_VALID) throw new Error("Project Calendar range configuration is invalid.");
+      const now = Date.now();
+      const start = new Date(now - PROJECT_CALENDAR_LOOKBACK_DAYS * DAY_MS);
+      const end = new Date(now + PROJECT_CALENDAR_LOOKAHEAD_DAYS * DAY_MS);
       const params = new URLSearchParams({ start: start.toISOString(), end: end.toISOString(), project_id: projectId });
       const [nextSnapshot, nextCompany] = await Promise.all([
         authenticatedFetch<CalendarSnapshot>(`/api/admin/calendar?${params.toString()}`),
