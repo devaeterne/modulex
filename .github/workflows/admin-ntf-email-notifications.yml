@@ -1,0 +1,44 @@
+name: Admin NTF Email & Notifications
+
+on:
+  pull_request:
+    paths:
+      - "modulex-admin/src/components/ui/NotificationDropdown.tsx"
+      - "modulex-admin/src/components/email/EmailNotificationPump.tsx"
+      - "modulex-admin/src/lib/email/**"
+      - "modulex-admin/src/lib/notifications.ts"
+      - "modulex-admin/src/app/api/admin/email-notifications/**"
+      - "modulex-admin/src/app/(admin)/settings/email-deliveries/**"
+      - "modulex-admin/scripts/ntf-email-notifications-contract.mjs"
+      - "modulex-store/supabase/migrations/*ntf_email_notifications*"
+      - "modulex-admin/ADMIN_ROADMAP.md"
+      - ".github/workflows/admin-ntf-email-notifications.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ntf-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modulex-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+          cache-dependency-path: modulex-admin/package-lock.json
+      - run: npm ci
+      - name: NTF contract
+        run: node scripts/ntf-email-notifications-contract.mjs
+      - name: Polling contract
+        run: npm run smoke:polling
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Production build
+        run: npm run build
