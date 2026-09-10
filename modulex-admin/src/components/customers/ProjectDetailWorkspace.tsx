@@ -162,11 +162,10 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
   const orderOptions = useMemo(
     () => standaloneOrders.map((order) => {
       const customerReference = order.customer_reference?.trim();
+      const referenceLabel = customerReference || "No Reference";
       return {
         value: order.id,
-        label: customerReference
-          ? `${order.order_number} — ${customerReference} — ${statusLabel(order.status)}`
-          : `${order.order_number} — ${statusLabel(order.status)}`,
+        label: `${order.order_number} — ${referenceLabel} — ${statusLabel(order.status)}`,
       };
     }),
     [standaloneOrders]
