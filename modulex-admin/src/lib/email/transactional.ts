@@ -130,7 +130,7 @@ async function loadSettings() {
   return data as GeneralSettings;
 }
 
-async function customerRecipients(customerId: string, type: "order" | "invoice") {
+async function customerRecipients(customerId: string, type: "order" | "invoice"): Promise<string[]> {
   const flag = type === "order" ? "is_order_contact" : "is_billing_contact";
   const { data: preferred } = await supabaseAdmin
     .from("customer_contacts")
@@ -158,7 +158,7 @@ async function customerRecipients(customerId: string, type: "order" | "invoice")
     if (customer?.email) emails = [String(customer.email).trim().toLowerCase()];
   }
 
-  return [...new Set(emails.filter((email) => email.includes("@")))];
+  return Array.from(new Set<string>(emails.filter((email) => email.includes("@"))));
 }
 
 function payloadUuid(payload: Record<string, unknown>, key: string) {
@@ -169,7 +169,7 @@ function payloadUuid(payload: Record<string, unknown>, key: string) {
     : null;
 }
 
-async function internalRecipients(notification: EmailNotification) {
+async function internalRecipients(notification: EmailNotification): Promise<string[]> {
   const { data, error } = await supabaseAdmin.rpc("resolve_notification_delivery_recipients", {
     p_event_type: notification.event_type,
     p_originator_id: payloadUuid(notification.payload ?? {}, "requested_by"),
@@ -177,11 +177,13 @@ async function internalRecipients(notification: EmailNotification) {
 
   if (error) throw new EmailDeliveryError("recipient_resolution_failed", "Notification recipients could not be resolved.");
 
-  return [...new Set((data ?? []).map((row: { email?: string; recipient_scope?: string; required_permissions?: string[] }) => {
+  const emails = (data ?? []).map((row: { email?: string; recipient_scope?: string; required_permissions?: string[] }) => {
     void row.recipient_scope;
     void row.required_permissions;
     return String(row.email || "").trim().toLowerCase();
-  }).filter((email: string) => email.includes("@")))];
+  }).filter((email: string) => email.includes("@"));
+
+  return Array.from(new Set<string>(emails));
 }
 
 async function isEnabled(settings: GeneralSettings, notification: EmailNotification) {
@@ -430,7 +432,7 @@ async function processOne(notification: EmailNotification, settings: GeneralSett
           ? await renderStoreLead(notification, settings)
           : (() => { throw new EmailDeliveryError("unsupported_entity", "Notification entity type is unsupported."); })();
 
-  const recipients = notification.audience === "customer"
+  const recipients: string[] = notification.audience === "customer"
     ? await customerRecipients(rendered.customerId, notification.entity_type === "invoice" ? "invoice" : "order")
     : await internalRecipients(notification);
 
