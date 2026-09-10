@@ -6,11 +6,16 @@ const root = process.cwd();
 const pagePath = path.join(root, "src/app/(admin)/customers/[id]/page.tsx");
 const cardPath = path.join(root, "src/components/customers/CustomerCard.tsx");
 const documentsPanelPath = path.join(root, "src/components/customers/CustomerDocumentsPanel.tsx");
+const entityDocumentsPanelPath = path.join(root, "src/components/customers/EntityDocumentsPanel.tsx");
+const orderDocumentsPanelPath = path.join(root, "src/components/customers/OrderDocumentsPanel.tsx");
+const orderDetailPagePath = path.join(root, "src/app/(admin)/customers/[id]/orders/[orderId]/page.tsx");
+const projectDocumentsTabPath = path.join(root, "src/components/customers/project-detail/ProjectDocumentsTab.tsx");
 const orderActionsPath = path.join(root, "src/components/customers/CustomerOrderActions.tsx");
 const customerInstallationsPath = path.join(root, "src/app/(admin)/customers/[id]/installations/page.tsx");
 const portalCardPath = path.join(root, "src/components/customers/CustomerPortalAccessCard.tsx");
 const readDedupPath = path.join(root, "src/lib/customers/read-dedup.ts");
 const sqlPath = path.join(root, "sql/customer-address-integrity.sql");
+const entityDocumentsMigrationPath = path.join(root, "../modulex-store/supabase/migrations/20260910173000_project_order_entity_documents.sql");
 const packagePath = path.join(root, "package.json");
 
 function read(filePath) {
@@ -28,11 +33,16 @@ function requireNoMatch(source, pattern, message) {
 const page = read(pagePath);
 const card = read(cardPath);
 const documentsPanel = read(documentsPanelPath);
+const entityDocumentsPanel = read(entityDocumentsPanelPath);
+const orderDocumentsPanel = read(orderDocumentsPanelPath);
+const orderDetailPage = read(orderDetailPagePath);
+const projectDocumentsTab = read(projectDocumentsTabPath);
 const orderActions = read(orderActionsPath);
 const customerInstallations = read(customerInstallationsPath);
 const portalCard = read(portalCardPath);
 const readDedup = read(readDedupPath);
 const sql = read(sqlPath);
+const entityDocumentsMigration = read(entityDocumentsMigrationPath);
 const pkg = JSON.parse(read(packagePath));
 
 requireNoMatch(page, /legacy-customer-card|<style>/, "Customer detail must not hide legacy actions with route-level CSS.");
@@ -73,6 +83,38 @@ requireMatch(sql, /revoke all on function public\.create_customer_address[\s\S]{
 requireMatch(sql, /grant execute on function public\.create_customer_address[\s\S]{0,400}to authenticated/i, "create_customer_address must grant execute to authenticated only.");
 requireMatch(sql, /revoke all on function public\.set_customer_address_default[\s\S]{0,300}from public/i, "set_customer_address_default must revoke PUBLIC execute.");
 requireMatch(sql, /grant execute on function public\.set_customer_address_default[\s\S]{0,300}to authenticated/i, "set_customer_address_default must grant execute to authenticated only.");
+
+requireMatch(entityDocumentsMigration, /create table public\.entity_documents/i, "Project/Order documents must have a canonical metadata table.");
+requireMatch(entityDocumentsMigration, /entity_type[\s\S]{0,180}project[\s\S]{0,180}order/i, "Entity documents must be restricted to Project and Order ownership.");
+requireMatch(entityDocumentsMigration, /25\s*\*\s*1024\s*\*\s*1024|26214400/i, "Entity document storage must enforce a 25 MiB maximum.");
+requireMatch(entityDocumentsMigration, /application\/pdf[\s\S]*image\/jpeg[\s\S]*image\/png[\s\S]*image\/webp/i, "Entity document storage must explicitly allow PDF and supported image MIME types.");
+requireMatch(entityDocumentsMigration, /application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document/i, "Entity document storage must allow DOCX.");
+requireMatch(entityDocumentsMigration, /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/i, "Entity document storage must allow XLSX.");
+requireMatch(entityDocumentsMigration, /text\/csv/i, "Entity document storage must allow CSV.");
+requireMatch(entityDocumentsMigration, /create or replace function public\.list_entity_documents\s*\(/i, "Entity documents must expose a canonical list RPC.");
+requireMatch(entityDocumentsMigration, /p_include_linked_orders[\s\S]*customer_orders[\s\S]*project_id/i, "Project document reads must be able to include linked Order documents without copying files.");
+requireMatch(entityDocumentsMigration, /create or replace function public\.register_entity_document\s*\(/i, "Entity documents must expose a canonical registration RPC.");
+requireMatch(entityDocumentsMigration, /create or replace function public\.deactivate_entity_document\s*\(/i, "Entity documents must expose a canonical deactivation RPC.");
+requireMatch(entityDocumentsMigration, /set search_path = ''/i, "Entity document RPCs/helpers must pin search_path.");
+requireMatch(entityDocumentsMigration, /insert into public\.customer_activity/i, "Entity document lifecycle must write Customer activity.");
+requireMatch(entityDocumentsMigration, /registered entity document files are retained|unregistered/i, "Storage deletion must be limited to failed-registration orphan cleanup.");
+requireMatch(entityDocumentsMigration, /grant execute on function public\.list_entity_documents[\s\S]*to authenticated/i, "Entity document listing must be authenticated-only.");
+requireMatch(entityDocumentsMigration, /grant execute on function public\.register_entity_document[\s\S]*to authenticated/i, "Entity document registration must be authenticated-only.");
+requireMatch(entityDocumentsMigration, /grant execute on function public\.deactivate_entity_document[\s\S]*to authenticated/i, "Entity document deactivation must be authenticated-only.");
+
+requireMatch(entityDocumentsPanel, /multiple/, "Shared entity document upload must support multiple files.");
+requireMatch(entityDocumentsPanel, /\.pdf.*\.jpg.*\.jpeg.*\.png.*\.webp.*\.docx.*\.xlsx.*\.csv/i, "Shared entity document upload must advertise the approved extensions.");
+requireMatch(entityDocumentsPanel, /25\s*\*\s*1024\s*\*\s*1024|26214400/, "Shared entity document upload must apply the 25 MiB early UX guard.");
+requireMatch(entityDocumentsPanel, /rpc\(\s*["']list_entity_documents["']/, "Shared entity document panel must use the canonical list RPC.");
+requireMatch(entityDocumentsPanel, /rpc\(\s*["']register_entity_document["']/, "Shared entity document panel must use the canonical registration RPC.");
+requireMatch(entityDocumentsPanel, /rpc\(\s*["']deactivate_entity_document["']/, "Shared entity document panel must use the canonical deactivation RPC.");
+requireMatch(entityDocumentsPanel, /createSignedUrl\([\s\S]{0,200}60/, "Entity document preview/download must use a short-lived signed URL.");
+requireMatch(entityDocumentsPanel, /\.remove\(\[storagePath\]\)/, "Failed metadata registration must clean up its unregistered orphan object.");
+requireNoMatch(entityDocumentsPanel, /from\(["']entity_documents["']\)\.(insert|update|delete)/, "Browser code must not bypass the canonical entity document lifecycle RPCs.");
+requireMatch(projectDocumentsTab, /<EntityDocumentsPanel[\s\S]*entityType="project"[\s\S]*includeLinkedOrders/, "Project Documents must show uploaded Project and linked Order documents.");
+requireMatch(projectDocumentsTab, /title="System Documents"/, "Accepted Proposal artifacts must remain a separate System Documents section.");
+requireMatch(orderDocumentsPanel, /<EntityDocumentsPanel[\s\S]*entityType="order"/, "Order document wrapper must mount the shared panel for the current Order.");
+requireMatch(orderDetailPage, /<OrderDocumentsPanel\s*\/>/, "Order Detail must expose Documents & Photos.");
 
 if (pkg.scripts?.["smoke:customer-detail"] !== "node scripts/customer-detail-integrity-contract.mjs") {
   throw new Error("package.json must expose smoke:customer-detail.");
