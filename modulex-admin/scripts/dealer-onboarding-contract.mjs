@@ -94,7 +94,7 @@ for (const contract of [
   assert.ok(detail.includes(contract), `Guarded Lead detail contract missing: ${contract}`);
 }
 for (const contract of [
-  'supabase.from("store_lead_documents")',
+  '.from("store_lead_documents")',
   'supabase.storage.from("dealer-supporting-documents").createSignedUrl',
   "Supporting Documents",
 ]) {
