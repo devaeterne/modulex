@@ -24,6 +24,7 @@ interface InputProps {
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
   autoComplete?: string;
   accept?: string;
+  multiple?: boolean;
   required?: boolean;
   readOnly?: boolean;
   disabled?: boolean;
@@ -53,6 +54,7 @@ const Input: FC<InputProps> = ({
   inputMode,
   autoComplete,
   accept,
+  multiple = false,
   required = false,
   readOnly = false,
   disabled = false,
@@ -94,6 +96,7 @@ const Input: FC<InputProps> = ({
         inputMode={inputMode}
         autoComplete={autoComplete}
         accept={accept}
+        multiple={multiple}
         required={required}
         readOnly={readOnly}
         disabled={disabled}
