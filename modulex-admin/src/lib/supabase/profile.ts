@@ -39,12 +39,19 @@ async function loadCurrentProfile() {
     return { profile: null, error: null };
   }
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  const [profileResult, rolesResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id),
+  ]);
 
+  const { data, error } = profileResult;
   if (error || !data) {
     return {
       profile: null,
@@ -52,11 +59,7 @@ async function loadCurrentProfile() {
     };
   }
 
-  const { data: roleRows, error: rolesError } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", user.id);
-
+  const { data: roleRows, error: rolesError } = rolesResult;
   if (rolesError) {
     return {
       profile: null,
