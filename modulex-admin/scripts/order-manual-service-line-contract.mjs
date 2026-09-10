@@ -106,7 +106,10 @@ assert(serviceDetails.includes("lineNote"), "ServiceLineDetails must render the 
 
 assert(orderDomain.includes("manual_service"), "client order domain must represent manual_service explicitly");
 assert(orderDomain.includes("line_note"), "client order serialization/hydration must preserve line_note");
-assert(/from\("products"\)[\s\S]{0,500}\.eq\("sku",\s*"SERVICE"\)/.test(orderDomain), "Order context must fetch canonical SERVICE by stable SKU independently of the bulk product-list row cap");
+const hasDirectCanonicalServiceLookup = /from\("products"\)[\s\S]{0,500}\.eq\("sku",\s*"SERVICE"\)/.test(orderDomain);
+const hasScopedPaginatedServiceLookup = orderDomain.includes('loadOrderProducts(false, ["CABINETS", "SERVICE"])') && /async function loadOrderProducts[\s\S]{0,1800}\.range\(/.test(orderDomain);
+assert(hasDirectCanonicalServiceLookup || hasScopedPaginatedServiceLookup, "Order context must load SERVICE independently of the global product-list row cap");
+assert(/product\.sku\s*===\s*"SERVICE"[\s\S]{0,180}product\.product_type_code\s*===\s*"SERVICE"/.test(newOrder), "New Order must resolve the canonical Service line by stable SKU and Product Type");
 assert(types.includes("line_note"), "order/invoice item types must expose historical line_note");
 
 for (const [name, source] of [
