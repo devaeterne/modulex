@@ -143,6 +143,13 @@ assert.match(projectCalendarTab, /projectId/);
 assert.match(projectCalendarTab, /Planned Delivery Date/);
 assert.match(projectCalendarTab, /Primary Installation/);
 assert.match(projectCalendarTab, /ADMIN_TEXT_STYLES/);
+// The Calendar GET route rejects windows over 370 days. Project Calendar must never
+// recreate the former -6 months / +2 years request that made every project tab fail.
+assert.match(projectCalendarTab, /PROJECT_CALENDAR_LOOKBACK_DAYS\s*=\s*30/);
+assert.match(projectCalendarTab, /PROJECT_CALENDAR_LOOKAHEAD_DAYS\s*=\s*335/);
+assert.match(projectCalendarTab, /PROJECT_CALENDAR_LOOKBACK_DAYS\s*\+\s*PROJECT_CALENDAR_LOOKAHEAD_DAYS\s*<=\s*370/);
+assert.doesNotMatch(projectCalendarTab, /setUTCMonth\(start\.getUTCMonth\(\)\s*-\s*6\)/);
+assert.doesNotMatch(projectCalendarTab, /setUTCFullYear\(end\.getUTCFullYear\(\)\s*\+\s*2\)/);
 
 assert.match(googleCalendarProvider, /calendarList/);
 assert.match(googleCalendarProvider, /backgroundColor/);
