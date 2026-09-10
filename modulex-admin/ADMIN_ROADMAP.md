@@ -162,6 +162,7 @@ Status: `[~]` UI foundation is closed; operational accessibility audit remains.
 
 Status: `[~]` VAL-1→VAL-4 are closed.
 
+- [~] VAL-5 — Store CMS / Users / Settings / remaining Admin forms.
 - [ ] **VAL-A1 — VAL-5 Store CMS / Users / Settings / remaining forms.** Inventory DB-vs-client validation mismatches and remediate only verified gaps across the open Admin domains.
 - [ ] **VAL-A2 — VAL-6 full regression / production acceptance.** Run consolidated validation contracts, negative boundary tests and production-safe acceptance; publish final evidence and close the cross-cutting VAL track.
 
