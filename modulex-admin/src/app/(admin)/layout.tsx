@@ -8,6 +8,7 @@ import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
 import EmailNotificationPump from "@/components/email/EmailNotificationPump";
+import NotificationLifecycleBridge from "@/components/email/NotificationLifecycleBridge";
 import { supabase } from "@/lib/supabase/client";
 import { getCurrentProfile, type UserRole } from "@/lib/supabase/profile";
 import { canAccessPath, hasPermission, ROLE_LABELS } from "@/lib/auth/permissions";
@@ -132,6 +133,7 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen xl:flex print:block print:min-h-0">
+      <NotificationLifecycleBridge />
       {!isHrOnly && <EmailNotificationPump />}
       <div className="print:hidden">
         <AppSidebar roles={roles} />
