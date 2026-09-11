@@ -4,9 +4,11 @@ import process from "node:process";
 
 const root = process.cwd();
 const panelPath = path.join(root, "src/components/customers/EntityDocumentsPanel.tsx");
-const orderDetailPath = path.join(root, "src/components/customers/CustomerOrderDetail.tsx");
+const orderPanelPath = path.join(root, "src/components/customers/OrderDocumentsPanel.tsx");
 const orderPagePath = path.join(root, "src/app/(admin)/customers/[id]/orders/[orderId]/page.tsx");
+const projectDocumentsPath = path.join(root, "src/components/customers/project-detail/ProjectDocumentsTab.tsx");
 const customerPanelPath = path.join(root, "src/components/customers/CustomerDocumentsPanel.tsx");
+const previewPath = path.join(root, "src/components/customers/PrivateDocumentPreview.tsx");
 const grantRepairPath = path.join(
   root,
   "../modulex-store/supabase/migrations/20260911134819_entity_document_storage_helper_execute_grants.sql",
@@ -18,6 +20,10 @@ const customerPolicyGrantRepairPath = path.join(
 const tfxMigrationPath = path.join(
   root,
   "../modulex-store/supabase/migrations/20260911135828_entity_document_tfx_mime_support.sql",
+);
+const registrationMigrationPath = path.join(
+  root,
+  "../modulex-store/supabase/migrations/20260911144500_entity_document_registration_file_types.sql",
 );
 
 function read(filePath) {
@@ -33,12 +39,15 @@ function requireNoMatch(source, pattern, message) {
 }
 
 const panel = read(panelPath);
-const orderDetail = read(orderDetailPath);
+const orderPanel = read(orderPanelPath);
 const orderPage = read(orderPagePath);
+const projectDocuments = read(projectDocumentsPath);
 const customerPanel = read(customerPanelPath);
+const preview = read(previewPath);
 const grantRepair = read(grantRepairPath);
 const customerPolicyGrantRepair = read(customerPolicyGrantRepairPath);
 const tfxMigration = read(tfxMigrationPath);
+const registrationMigration = read(registrationMigrationPath);
 
 requireMatch(
   panel,
@@ -50,23 +59,22 @@ requireMatch(panel, /tfx:\s*["']image\/tiff-fx["']/, "Entity document upload mus
 requireMatch(panel, /["']image\/tiff-fx["']/, "Entity document upload must allow the TFX MIME type.");
 requireMatch(panel, /XLS\/XLSX[^\n]*TFX|XLSX[^\n]*TFX/i, "Upload guidance must mention spreadsheet and TFX support.");
 
-requireMatch(
-  orderDetail,
-  /<EntityDocumentsPanel[\s\S]*entityType=["']order["'][\s\S]*entityId=\{order\.id\}/,
-  "Order detail must bind document ownership to the loaded canonical order.id, never only to a route parameter.",
-);
-requireNoMatch(
-  orderPage,
-  /<OrderDocumentsPanel\b/,
-  "Order page must not mount a second route-param-driven document panel.",
-);
+requireMatch(orderPage, /<OrderDocumentsPanel\b/, "Order detail route must mount exactly one dedicated Order document panel.");
+requireMatch(orderPanel, /from\(["']customer_orders["']\)/, "Order documents must verify ownership against customer_orders.");
+requireMatch(orderPanel, /\.eq\(["']id["'],\s*params\.orderId\)/, "Order documents must resolve the route Order id through customer_orders.");
+requireMatch(orderPanel, /\.eq\(["']customer_id["'],\s*params\.id\)/, "Order documents must verify the Order belongs to the route Customer.");
+requireMatch(orderPanel, /entityType=["']order["'][\s\S]*entityId=\{canonicalOrderId\}/, "Order documents must bind metadata/storage ownership to the verified canonical Order id.");
+requireNoMatch(projectDocuments, /includeLinkedOrders/, "Project Documents must not aggregate linked Order documents into Project ownership.");
 
 for (const previewPanel of [panel, customerPanel]) {
   requireMatch(previewPanel, /createSignedUrl\(/, "Private document preview must use a short-lived signed URL.");
   requireMatch(previewPanel, /previewUrl|previewDocument|previewItem/i, "Document preview must keep explicit in-app preview state.");
-  requireMatch(previewPanel, /role=["']dialog["']|aria-modal=["']true["']/, "Document preview must render in an accessible in-app dialog.");
+  requireMatch(previewPanel, /<PrivateDocumentPreview\b/, "Document panels must render the shared in-app private preview dialog.");
   requireNoMatch(previewPanel, /getPublicUrl\(/, "Private document preview must never use public bucket URLs.");
 }
+requireMatch(preview, /role=["']dialog["']/, "Private document preview must expose dialog semantics.");
+requireMatch(preview, /aria-modal=["']true["']/, "Private document preview must identify itself as modal.");
+requireMatch(preview, /<iframe\b/, "Browser-previewable files must render inside the application.");
 
 for (const helper of [
   "can_upload_entity_document_object",
@@ -85,7 +93,7 @@ for (const helper of ["can_store_dealer_read_document_object", "can_staff_mutate
   requireMatch(
     customerPolicyGrantRepair,
     new RegExp(`grant\\s+execute\\s+on\\s+function\\s+private\\.${helper}\\(text,\\s*text\\)\\s+to\\s+authenticated`, "i"),
-    `${helper} must be executable by authenticated because customer-document Storage RLS policies are planned with entity-document access.`,
+    `${helper} must be executable by authenticated because customer-document Storage RLS calls it as the caller.`,
   );
 }
 requireNoMatch(
@@ -98,5 +106,11 @@ requireMatch(tfxMigration, /update\s+storage\.buckets/i, "TFX support must updat
 requireMatch(tfxMigration, /image\/tiff-fx/i, "TFX support must add the registered image/tiff-fx MIME type.");
 requireMatch(tfxMigration, /where\s+id\s*=\s*['"]entity-documents['"]/i, "TFX MIME support must stay scoped to entity-documents.");
 requireNoMatch(tfxMigration, /public\s*=\s*true/i, "TFX support must not make the entity-documents bucket public.");
+
+requireMatch(registrationMigration, /\.xls/i, "Entity document registration must accept XLS metadata.");
+requireMatch(registrationMigration, /application\/vnd\.ms-excel/i, "Entity document registration must accept the XLS MIME type.");
+requireMatch(registrationMigration, /\.tfx/i, "Entity document registration must accept TFX metadata.");
+requireMatch(registrationMigration, /image\/tiff-fx/i, "Entity document registration must accept the TFX MIME type.");
+requireMatch(registrationMigration, /revoke\s+all\s+on\s+function\s+public\.register_entity_document/i, "Registration RPC must retain explicit execute hardening.");
 
 console.log("Project/Order entity document upload contract passed.");
