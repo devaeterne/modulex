@@ -18,7 +18,7 @@ assert.match(searchable, /aria-activedescendant=/, "SearchableSelect must expose
 assert.match(searchable, /event\.key === "ArrowDown"/, "SearchableSelect must support ArrowDown traversal");
 assert.match(searchable, /event\.key === "ArrowUp"/, "SearchableSelect must support ArrowUp traversal");
 assert.match(searchable, /triggerRef\.current\?\.focus\(\)/, "SearchableSelect must restore focus to its trigger when dismissed");
-assert.match(searchable, /role="option"[\s\S]{0,240}id=/, "SearchableSelect options must expose stable ids for active-descendant navigation");
+assert.match(searchable, /id=\{optionId\(index\)\}/, "SearchableSelect options must expose stable ids for active-descendant navigation");
 
 assert.match(dropdown, /event\.key === "ArrowDown"/, "Dropdown must support ArrowDown traversal");
 assert.match(dropdown, /event\.key === "ArrowUp"/, "Dropdown must support ArrowUp traversal");
