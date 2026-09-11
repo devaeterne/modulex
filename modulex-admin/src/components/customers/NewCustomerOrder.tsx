@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import ComponentCard from "@/components/common/ComponentCard";
 import SummaryRow from "@/components/common/SummaryRow";
 import CountertopConfigurator from "@/components/countertop/CountertopConfigurator";
+import CustomVendorCabinetLineModal from "@/components/customers/CustomVendorCabinetLineModal";
 import ManualServiceLineModal from "@/components/customers/ManualServiceLineModal";
 import OrderProductPicker, { type OrderPickerProduct } from "@/components/customers/OrderProductPicker";
 import ServiceLineDetails from "@/components/customers/ServiceLineDetails";
@@ -19,8 +20,15 @@ import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, Tabl
 import { PlusIcon } from "@/icons";
 import { hasPermission } from "@/lib/auth/permissions";
 import {
+  cleanupCustomVendorCabinetDocument,
+  createCustomVendorCabinetOrderLine,
+  uploadCustomVendorCabinetDocument,
+  type CustomVendorCabinetDraft,
+} from "@/lib/customers/custom-vendor-cabinet";
+import {
   loadCreateOrderContext,
   loadOrderPrices,
+  setCustomerOrderStatus,
   type OrderPriceRow,
   type OrderTaxRule,
 } from "@/lib/customers/order-domain";
@@ -149,9 +157,12 @@ export default function NewCustomerOrder({
   const [orderDiscount, setOrderDiscount] = useState("0");
   const [initialStatus, setInitialStatus] = useState<"draft" | "confirmed">("draft");
   const [items, setItems] = useState<DraftItem[]>([]);
+  const [customVendorCabinet, setCustomVendorCabinet] = useState<CustomVendorCabinetDraft | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [countertopDraftOrderId, setCountertopDraftOrderId] = useState<string | null>(null);
+  const [preparedCustomVendorOrderId, setPreparedCustomVendorOrderId] = useState<string | null>(null);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+  const [isVendorCabinetModalOpen, setIsVendorCabinetModalOpen] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
@@ -307,7 +318,7 @@ export default function NewCustomerOrder({
         grandTotal: customerVisibleSell + tax,
       };
     }
-    let subtotal = 0;
+    let subtotal = customVendorCabinet?.sellPrice ?? 0;
     for (const item of items) {
       const quantity = Number(item.quantity || 0);
       const discount = Number(item.discount_percent || 0);
@@ -320,7 +331,7 @@ export default function NewCustomerOrder({
     const customerVisibleSell = baseSell + administrativeFee;
     const tax = customerVisibleSell * Math.max(0, Number(taxRate || 0)) / 100;
     return { subtotal, baseSell, administrativeFee, customerVisibleSell, tax, grandTotal: customerVisibleSell + tax };
-  }, [administrativeFeePercent, isProposalConversion, items, orderDiscount, priceMap, proposalAcceptedTotal, taxRate]);
+  }, [administrativeFeePercent, customVendorCabinet, isProposalConversion, items, orderDiscount, priceMap, proposalAcceptedTotal, taxRate]);
 
   function clearHeaderError(field: Exclude<keyof FieldErrors, "items">) {
     setFieldErrors((current) => ({ ...current, [field]: undefined }));
@@ -440,7 +451,7 @@ export default function NewCustomerOrder({
 
   function validateItems(allowEmpty: boolean): ValidatedOrderItem[] | null {
     if (!allowEmpty && items.length === 0) {
-      setErrorMessage("Choose at least one valid product or service line.");
+      setErrorMessage("Choose at least one valid product, service, or Vendor Cabinet line.");
       return null;
     }
 
@@ -492,7 +503,7 @@ export default function NewCustomerOrder({
     return validated;
   }
 
-  async function createOrder(validItems: ValidatedOrderItem[], header: ValidatedHeader, status: "draft" | "confirmed") {
+  async function createOrder(validItems: ValidatedOrderItem[], header: ValidatedHeader, status: "draft" | "confirmed", discountOverride?: string | number) {
     if (!customer) throw new Error("Customer is required.");
 
     const sharedInput = {
@@ -505,7 +516,7 @@ export default function NewCustomerOrder({
       customerNotes,
       internalNotes,
       taxRate: header.taxRate,
-      orderDiscountAmount: header.orderDiscountAmount,
+      orderDiscountAmount: discountOverride ?? header.orderDiscountAmount,
       paymentMethodId,
       administrativeFeePercent: header.administrativeFeePercent,
       initialStatus: status,
@@ -551,14 +562,49 @@ export default function NewCustomerOrder({
       return;
     }
 
-    const validItems = validateItems(false);
+    const validItems = validateItems(Boolean(customVendorCabinet));
     if (!validItems) return;
     setIsSaving(true);
     try {
-      const orderId = await createOrder(validItems, header, initialStatus);
+      if (!customVendorCabinet) {
+        const orderId = await createOrder(validItems, header, initialStatus);
+        router.push(`/customers/${customer?.id}/orders/${orderId}`);
+        return;
+      }
+
+      const orderId = preparedCustomVendorOrderId ?? await createOrder(validItems, header, "draft", 0);
+      if (!preparedCustomVendorOrderId) setPreparedCustomVendorOrderId(orderId);
+      const uploadedDocument = await uploadCustomVendorCabinetDocument({
+        orderId,
+        vendorName: customVendorCabinet.vendorName,
+        lineName: customVendorCabinet.lineName,
+        file: customVendorCabinet.file,
+      });
+      try {
+        await createCustomVendorCabinetOrderLine({
+          orderId,
+          vendorId: customVendorCabinet.vendorId,
+          lineName: customVendorCabinet.lineName,
+          totalCost: customVendorCabinet.totalCost,
+          markupPercent: customVendorCabinet.markupPercent,
+          documentId: uploadedDocument.documentId,
+          orderDiscountAmount: header.orderDiscountAmount,
+        });
+      } catch (lineError) {
+        await cleanupCustomVendorCabinetDocument(uploadedDocument);
+        throw lineError;
+      }
+
+      if (initialStatus === "confirmed") {
+        await setCustomerOrderStatus({
+          orderId,
+          status: "confirmed",
+          note: "Confirmed after Vendor Cabinet quote, cost and private PDF were attached.",
+        });
+      }
       router.push(`/customers/${customer?.id}/orders/${orderId}`);
     } catch (error) {
-      setErrorMessage(errorMessage(error, "Unable to create order."));
+      setErrorMessage(errorMessage(error, preparedCustomVendorOrderId ? "The prepared Draft could not complete the Vendor Cabinet workflow." : "Unable to create order."));
       setIsSaving(false);
     }
   }
@@ -566,6 +612,10 @@ export default function NewCustomerOrder({
   async function startCountertop() {
     if (isProposalConversion) {
       setErrorMessage("Create the Proposal-based Draft first, then add Countertop configuration from the canonical Order.");
+      return;
+    }
+    if (customVendorCabinet) {
+      setErrorMessage("Save the Vendor Cabinet Order first, then add Countertop configuration from the saved Draft.");
       return;
     }
     if (!canManageCountertop) return setErrorMessage("You do not have permission to manage customer orders.");
@@ -605,6 +655,7 @@ export default function NewCustomerOrder({
   return (
     <div className="space-y-5">
       {errorMessageState ? <Alert variant="error" title="Order action failed" message={errorMessageState} /> : null}
+      {preparedCustomVendorOrderId ? <Alert variant="info" title="Draft prepared" message="A Draft Order already exists for this Vendor Cabinet workflow. Retry will reuse that Draft instead of creating a duplicate." /> : null}
       {isProposalConversion && proposalPreview ? (
         <Alert
           variant="success"
@@ -632,8 +683,8 @@ export default function NewCustomerOrder({
 
       <ComponentCard
         title={isProposalConversion ? "Accepted Proposal Scope" : "Products"}
-        desc={isProposalConversion ? "Accepted commercial units are locked for initial conversion. Product-specific detail can be added after the canonical Draft Order exists." : "Cabinet products use server Price Group pricing. Countertop and Service use their dedicated order-entry routes."}
-        headerAction={!isProposalConversion ? <div className="flex flex-wrap justify-end gap-2">{canManageCountertop ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || isLoadingPrices} onClick={startCountertop}>{isStartingCountertop ? "Preparing Draft…" : "Countertop"}</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={() => setIsProductPickerOpen(true)}>Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating} onClick={openService}>Service</Button></div> : undefined}
+        desc={isProposalConversion ? "Accepted commercial units are locked for initial conversion. Product-specific detail can be added after the canonical Draft Order exists." : "Stock Cabinets use Product/Price Group pricing. Vendor Cabinets stay productless and use the vendor PDF cost plus markup. Countertop and Service keep their dedicated routes."}
+        headerAction={!isProposalConversion ? <div className="flex flex-wrap justify-end gap-2">{canManageCountertop ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || isLoadingPrices} onClick={startCountertop}>{isStartingCountertop ? "Preparing Draft…" : "Countertop"}</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || Boolean(preparedCustomVendorOrderId)} onClick={() => setIsProductPickerOpen(true)}>Stock Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || Boolean(preparedCustomVendorOrderId)} onClick={() => setIsVendorCabinetModalOpen(true)}>Vendor Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || Boolean(preparedCustomVendorOrderId)} onClick={openService}>Service</Button></div> : undefined}
       >
         <TableViewport>
           <Table variant="admin" minWidth="standard">
@@ -650,7 +701,19 @@ export default function NewCustomerOrder({
                     <TableCell variant="admin" className="text-right"><FormHint>Locked</FormHint></TableCell>
                   </TableRow>
                 ))
-              ) : items.length === 0 ? <TableStateRow colSpan={6}>No lines yet. Choose Countertop, Cabinet, or Service.</TableStateRow> : items.map((item, index) => {
+              ) : null}
+              {!isProposalConversion && items.length === 0 && !customVendorCabinet ? <TableStateRow colSpan={6}>No lines yet. Choose Countertop, Stock Cabinet, Vendor Cabinet, or Service.</TableStateRow> : null}
+              {!isProposalConversion && customVendorCabinet ? (
+                <TableRow>
+                  <TableCell variant="admin" className="min-w-[320px]"><div className="font-semibold">VENDOR-CABINET</div><FormHint>{customVendorCabinet.lineName} · {customVendorCabinet.vendorName} · private PDF attached on save</FormHint></TableCell>
+                  <TableCell variant="admin"><FormHint>1 · fixed</FormHint></TableCell>
+                  <TableCell variant="admin">{money(customVendorCabinet.sellPrice, currency)}</TableCell>
+                  <TableCell variant="admin"><FormHint>Order discount only</FormHint></TableCell>
+                  <TableCell variant="admin" className="font-semibold">{money(customVendorCabinet.sellPrice, currency)}</TableCell>
+                  <TableCell variant="admin" className="text-right"><Button size="sm" variant="danger" disabled={Boolean(preparedCustomVendorOrderId)} onClick={() => setCustomVendorCabinet(null)}>Remove</Button></TableCell>
+                </TableRow>
+              ) : null}
+              {!isProposalConversion ? items.map((item, index) => {
                 const product = productMap.get(item.product_id);
                 const isService = item.pricing_model === "manual_service";
                 const price = isService ? Number(item.unit_price ?? 0) : priceMap.get(item.product_id) ?? 0;
@@ -663,10 +726,10 @@ export default function NewCustomerOrder({
                     <TableCell variant="admin">{isService || priceMap.has(item.product_id) ? money(price, currency) : "No price"}</TableCell>
                     <TableCell variant="admin" className="w-32"><Input id={`new-order-item-${index}-discount`} ariaLabel={`${product?.sku ?? "Product"} discount percent`} inputMode="decimal" value={item.discount_percent} error={Boolean(itemError?.discount_percent)} hint={itemError?.discount_percent} onChange={(event) => { clearItemError(index, "discount_percent"); updateItem(index, { discount_percent: event.target.value }); }} /></TableCell>
                     <TableCell variant="admin" className="font-semibold">{money(total, currency)}</TableCell>
-                    <TableCell variant="admin" className="text-right"><Button size="sm" variant="danger" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button></TableCell>
+                    <TableCell variant="admin" className="text-right"><Button size="sm" variant="danger" disabled={Boolean(preparedCustomVendorOrderId)} onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>Remove</Button></TableCell>
                   </TableRow>
                 );
-              })}
+              }) : null}
             </TableBody>
           </Table>
         </TableViewport>
@@ -674,10 +737,11 @@ export default function NewCustomerOrder({
 
       <div className="grid gap-5 xl:grid-cols-12">
         <div className="xl:col-span-8"><ComponentCard title="Notes" desc="Customer-facing and internal context for this order."><div className="grid gap-4 md:grid-cols-2"><Field label="Customer Notes" htmlFor="new-order-customer-notes"><TextArea id="new-order-customer-notes" rows={5} value={customerNotes} onChange={setCustomerNotes} /></Field><Field label="Internal Notes" htmlFor="new-order-internal-notes"><TextArea id="new-order-internal-notes" rows={5} value={internalNotes} onChange={setInternalNotes} /></Field></div></ComponentCard></div>
-        <div className="xl:col-span-4"><ComponentCard title="Order Total" desc={isProposalConversion ? "Accepted customer-visible pre-tax sell is authoritative. Internal base/Administrative Fee cents are derived and verified server-side on save." : "Internal preview; customer-facing documents absorb Administrative Fee into line prices."}><div className="space-y-3">{isProposalConversion ? <><SummaryRow label="Accepted Proposal scope" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Order Discount" value={money(0, currency)} /><SummaryRow label="Base Sell" value="Derived server-side" /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value="Included in accepted sell" /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax estimate" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total estimate" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || !paymentMethodId || proposalSourceUnits.length === 0} onClick={saveOrder}>{isSaving ? "Creating…" : "Create Draft from Proposal"}</Button></> : <><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Base Sell" value={money(preview.baseSell, currency)} /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value={money(preview.administrativeFee, currency)} /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button></>}</div></ComponentCard></div>
+        <div className="xl:col-span-4"><ComponentCard title="Order Total" desc={isProposalConversion ? "Accepted customer-visible pre-tax sell is authoritative. Internal base/Administrative Fee cents are derived and verified server-side on save." : "Internal preview; customer-facing documents absorb Administrative Fee into line prices. Vendor cost and markup never appear on customer documents."}><div className="space-y-3">{isProposalConversion ? <><SummaryRow label="Accepted Proposal scope" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Order Discount" value={money(0, currency)} /><SummaryRow label="Base Sell" value="Derived server-side" /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value="Included in accepted sell" /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax estimate" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total estimate" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || !paymentMethodId || proposalSourceUnits.length === 0} onClick={saveOrder}>{isSaving ? "Creating…" : "Create Draft from Proposal"}</Button></> : <><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Base Sell" value={money(preview.baseSell, currency)} /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value={money(preview.administrativeFee, currency)} /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button></>}</div></ComponentCard></div>
       </div>
 
       {!isProposalConversion ? <OrderProductPicker isOpen={isProductPickerOpen} onClose={() => setIsProductPickerOpen(false)} products={products} selectedQuantities={selectedQuantities} priceMap={priceMap} onAdd={addProduct} currencyCode={currency} disableWithoutPrice excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]} /> : null}
+      {!isProposalConversion ? <CustomVendorCabinetLineModal isOpen={isVendorCabinetModalOpen} currencyCode={currency} onClose={() => setIsVendorCabinetModalOpen(false)} onSubmit={setCustomVendorCabinet} /> : null}
       {!isProposalConversion ? <ManualServiceLineModal isOpen={isServiceModalOpen} currencyCode={currency} onClose={() => setIsServiceModalOpen(false)} onSubmit={addServiceLine} /> : null}
     </div>
   );
