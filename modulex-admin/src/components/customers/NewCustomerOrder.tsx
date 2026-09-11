@@ -17,6 +17,7 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { PlusIcon } from "@/icons";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -746,7 +747,7 @@ export default function NewCustomerOrder({
         <Modal isOpen={isCabinetSourceModalOpen} onClose={() => setIsCabinetSourceModalOpen(false)} className="mx-4 w-full max-w-lg p-6" ariaLabel="Choose Cabinet Source">
           <div className="space-y-5">
             <div>
-              <h3 className="text-base font-medium text-gray-800 dark:text-white/90">Choose Cabinet Source</h3>
+              <h3 className={`text-base font-medium ${ADMIN_TEXT_STYLES.strong}`}>Choose Cabinet Source</h3>
               <FormHint>Choose whether this Cabinet line comes from stock inventory or from a vendor quote.</FormHint>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
