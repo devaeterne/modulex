@@ -58,7 +58,7 @@ begin
     reason,
     order_snapshot,
     items_snapshot,
-    created_by
+    revised_by
   ) values (
     p_order_id,
     v_revision,
