@@ -22,6 +22,13 @@ type PortalPosition = {
   right: number;
 };
 
+const MENU_ITEM_SELECTOR = [
+  "[role='menuitem']:not([aria-disabled='true'])",
+  "a[href]",
+  "button:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(",");
+
 export const Dropdown: React.FC<DropdownProps> = ({
   isOpen,
   onClose,
@@ -34,7 +41,12 @@ export const Dropdown: React.FC<DropdownProps> = ({
   offset = 8,
 }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
   const [portalPosition, setPortalPosition] = useState<PortalPosition | null>(null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const updatePortalPosition = useCallback(() => {
     if (!portal || !anchorRef?.current) return;
@@ -82,21 +94,51 @@ export const Dropdown: React.FC<DropdownProps> = ({
         !anchorRef?.current?.contains(target) &&
         !(event.target as HTMLElement).closest(".dropdown-toggle")
       ) {
-        onClose();
+        onCloseRef.current();
       }
     };
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+    const getItems = () => Array.from(
+      dropdownRef.current?.querySelectorAll<HTMLElement>(MENU_ITEM_SELECTOR) ?? [],
+    );
+
+    const focusAt = (items: HTMLElement[], index: number) => {
+      if (items.length === 0) return;
+      items[(index + items.length) % items.length]?.focus();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCloseRef.current();
+        window.requestAnimationFrame(() => anchorRef?.current?.focus());
+        return;
+      }
+
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      const items = getItems();
+      if (items.length === 0) return;
+      event.preventDefault();
+      const currentIndex = items.findIndex((item) => item === document.activeElement);
+
+      if (event.key === "ArrowDown") {
+        focusAt(items, currentIndex < 0 ? 0 : currentIndex + 1);
+      } else if (event.key === "ArrowUp") {
+        focusAt(items, currentIndex < 0 ? items.length - 1 : currentIndex - 1);
+      } else if (event.key === "Home") {
+        focusAt(items, 0);
+      } else if (event.key === "End") {
+        focusAt(items, items.length - 1);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [anchorRef, isOpen, onClose]);
+  }, [anchorRef, isOpen]);
 
   if (!isOpen) return null;
 
