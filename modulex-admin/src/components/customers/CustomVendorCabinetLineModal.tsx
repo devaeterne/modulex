@@ -51,6 +51,10 @@ type Props = CreateProps | EditProps;
 export default function CustomVendorCabinetLineModal(props: Props) {
   const { isOpen, currencyCode, onClose } = props;
   const isEdit = props.mode === "edit";
+  const initialVendorId = props.mode === "edit" ? props.initialValue.vendorId : "";
+  const initialLineName = props.mode === "edit" ? props.initialValue.lineName : "";
+  const initialTotalCost = props.mode === "edit" ? String(props.initialValue.totalCost) : "";
+  const initialMarkupPercent = props.mode === "edit" ? String(props.initialValue.markupPercent) : "";
   const [vendors, setVendors] = useState<ActiveOrderVendor[]>([]);
   const [vendorId, setVendorId] = useState("");
   const [lineName, setLineName] = useState("");
@@ -64,11 +68,10 @@ export default function CustomVendorCabinetLineModal(props: Props) {
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
-    const initial = props.mode === "edit" ? props.initialValue : null;
-    setVendorId(initial?.vendorId ?? "");
-    setLineName(initial?.lineName ?? "");
-    setTotalCost(initial ? String(initial.totalCost) : "");
-    setMarkupPercent(initial ? String(initial.markupPercent) : "");
+    setVendorId(initialVendorId);
+    setLineName(initialLineName);
+    setTotalCost(initialTotalCost);
+    setMarkupPercent(initialMarkupPercent);
     setFile(null);
     setError(null);
     setFileInputKey((value) => value + 1);
@@ -84,7 +87,7 @@ export default function CustomVendorCabinetLineModal(props: Props) {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [isOpen, props]);
+  }, [initialLineName, initialMarkupPercent, initialTotalCost, initialVendorId, isOpen]);
 
   const selectedVendor = useMemo(() => vendors.find((vendor) => vendor.id === vendorId) ?? null, [vendorId, vendors]);
   const sellPrice = useMemo(() => {
