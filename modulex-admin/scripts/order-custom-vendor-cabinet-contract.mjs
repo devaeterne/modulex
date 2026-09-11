@@ -32,7 +32,7 @@ assert(domain.includes("calculateCustomVendorCabinetSellPrice"), "custom Cabinet
 assert(domain.includes("createCustomVendorCabinetOrderLine"), "custom Cabinet domain must call the guarded order-line RPC");
 assert(domain.includes("uploadCustomVendorCabinetDocument"), "custom Cabinet domain must register the private Order PDF");
 assert(newOrder.includes("CustomVendorCabinetLineModal"), "New Order must expose the vendor Cabinet entry flow");
-// The Cabinet action is a gate: users must choose Stock or Vendor before either child flow opens.
+// Regression guard: Cabinet must gate both child flows behind an explicit Stock/Vendor choice.
 assert(newOrder.includes("isCabinetSourceModalOpen"), "Cabinet entry must keep an explicit source-choice state");
 assert(newOrder.includes("Choose Cabinet Source"), "Cabinet entry must show a source chooser before opening either flow");
 assert(newOrder.includes('onClick={() => setIsCabinetSourceModalOpen(true)}>Cabinet</Button>'), "Products action must expose one Cabinet entry point");
