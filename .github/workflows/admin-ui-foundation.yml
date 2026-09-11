@@ -81,6 +81,8 @@ jobs:
         run: node scripts/admin-date-input-contract.mjs
       - name: CI workflow architecture contract
         run: npm run smoke:ci-workflow-architecture
+      - name: OPS observability and release closeout contract
+        run: node scripts/ops-observability-release-contract.mjs
       - name: NTF Email & Notifications final closeout contract
         run: node scripts/ntf-email-notifications-contract.mjs
       - name: LD Leads final workstream contract
