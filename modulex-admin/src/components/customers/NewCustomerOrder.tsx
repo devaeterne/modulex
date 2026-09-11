@@ -16,6 +16,8 @@ import TextArea from "@/components/form/input/TextArea";
 import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
+import { Modal } from "@/components/ui/modal";
+import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { PlusIcon } from "@/icons";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -161,6 +163,7 @@ export default function NewCustomerOrder({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [countertopDraftOrderId, setCountertopDraftOrderId] = useState<string | null>(null);
   const [preparedCustomVendorOrderId, setPreparedCustomVendorOrderId] = useState<string | null>(null);
+  const [isCabinetSourceModalOpen, setIsCabinetSourceModalOpen] = useState(false);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isVendorCabinetModalOpen, setIsVendorCabinetModalOpen] = useState(false);
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
@@ -684,7 +687,7 @@ export default function NewCustomerOrder({
       <ComponentCard
         title={isProposalConversion ? "Accepted Proposal Scope" : "Products"}
         desc={isProposalConversion ? "Accepted commercial units are locked for initial conversion. Product-specific detail can be added after the canonical Draft Order exists." : "Stock Cabinets use Product/Price Group pricing. Vendor Cabinets stay productless and use the vendor PDF cost plus markup. Countertop and Service keep their dedicated routes."}
-        headerAction={!isProposalConversion ? <div className="flex flex-wrap justify-end gap-2">{canManageCountertop ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || isLoadingPrices} onClick={startCountertop}>{isStartingCountertop ? "Preparing Draft…" : "Countertop"}</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || Boolean(preparedCustomVendorOrderId)} onClick={() => setIsProductPickerOpen(true)}>Stock Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || Boolean(preparedCustomVendorOrderId)} onClick={() => setIsVendorCabinetModalOpen(true)}>Vendor Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || Boolean(preparedCustomVendorOrderId)} onClick={openService}>Service</Button></div> : undefined}
+        headerAction={!isProposalConversion ? <div className="flex flex-wrap justify-end gap-2">{canManageCountertop ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || isLoadingPrices} onClick={startCountertop}>{isStartingCountertop ? "Preparing Draft…" : "Countertop"}</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || Boolean(preparedCustomVendorOrderId)} onClick={() => setIsCabinetSourceModalOpen(true)}>Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} disabled={isMutating || Boolean(preparedCustomVendorOrderId)} onClick={openService}>Service</Button></div> : undefined}
       >
         <TableViewport>
           <Table variant="admin" minWidth="standard">
@@ -702,7 +705,7 @@ export default function NewCustomerOrder({
                   </TableRow>
                 ))
               ) : null}
-              {!isProposalConversion && items.length === 0 && !customVendorCabinet ? <TableStateRow colSpan={6}>No lines yet. Choose Countertop, Stock Cabinet, Vendor Cabinet, or Service.</TableStateRow> : null}
+              {!isProposalConversion && items.length === 0 && !customVendorCabinet ? <TableStateRow colSpan={6}>No lines yet. Choose Countertop, Cabinet, or Service.</TableStateRow> : null}
               {!isProposalConversion && customVendorCabinet ? (
                 <TableRow>
                   <TableCell variant="admin" className="min-w-[320px]"><div className="font-semibold">VENDOR-CABINET</div><FormHint>{customVendorCabinet.lineName} · {customVendorCabinet.vendorName} · private PDF attached on save</FormHint></TableCell>
@@ -740,6 +743,23 @@ export default function NewCustomerOrder({
         <div className="xl:col-span-4"><ComponentCard title="Order Total" desc={isProposalConversion ? "Accepted customer-visible pre-tax sell is authoritative. Internal base/Administrative Fee cents are derived and verified server-side on save." : "Internal preview; customer-facing documents absorb Administrative Fee into line prices. Vendor cost and markup never appear on customer documents."}><div className="space-y-3">{isProposalConversion ? <><SummaryRow label="Accepted Proposal scope" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Order Discount" value={money(0, currency)} /><SummaryRow label="Base Sell" value="Derived server-side" /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value="Included in accepted sell" /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax estimate" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total estimate" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || !paymentMethodId || proposalSourceUnits.length === 0} onClick={saveOrder}>{isSaving ? "Creating…" : "Create Draft from Proposal"}</Button></> : <><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Base Sell" value={money(preview.baseSell, currency)} /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value={money(preview.administrativeFee, currency)} /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isMutating || isLoadingPrices || !paymentMethodId} onClick={saveOrder}>{isSaving ? "Creating…" : initialStatus === "confirmed" ? "Create & Confirm" : "Create Draft"}</Button></>}</div></ComponentCard></div>
       </div>
 
+      {!isProposalConversion ? (
+        <Modal isOpen={isCabinetSourceModalOpen} onClose={() => setIsCabinetSourceModalOpen(false)} className="mx-4 w-full max-w-lg p-6" ariaLabel="Choose Cabinet Source">
+          <div className="space-y-5">
+            <div>
+              <h3 className={`text-base font-medium ${ADMIN_TEXT_STYLES.strong}`}>Choose Cabinet Source</h3>
+              <FormHint>Choose whether this Cabinet line comes from stock inventory or from a vendor quote.</FormHint>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button variant="outline" onClick={() => { setIsCabinetSourceModalOpen(false); setIsProductPickerOpen(true); }}>Stock Cabinet</Button>
+              <Button variant="outline" onClick={() => { setIsCabinetSourceModalOpen(false); setIsVendorCabinetModalOpen(true); }}>Vendor Cabinet</Button>
+            </div>
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={() => setIsCabinetSourceModalOpen(false)}>Cancel</Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
       {!isProposalConversion ? <OrderProductPicker isOpen={isProductPickerOpen} onClose={() => setIsProductPickerOpen(false)} products={products} selectedQuantities={selectedQuantities} priceMap={priceMap} onAdd={addProduct} currencyCode={currency} disableWithoutPrice excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]} /> : null}
       {!isProposalConversion ? <CustomVendorCabinetLineModal isOpen={isVendorCabinetModalOpen} currencyCode={currency} onClose={() => setIsVendorCabinetModalOpen(false)} onSubmit={setCustomVendorCabinet} /> : null}
       {!isProposalConversion ? <ManualServiceLineModal isOpen={isServiceModalOpen} currencyCode={currency} onClose={() => setIsServiceModalOpen(false)} onSubmit={addServiceLine} /> : null}
