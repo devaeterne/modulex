@@ -25,8 +25,14 @@ import { hasPermission } from "@/lib/auth/permissions";
 import {
   cleanupCustomVendorCabinetDocument,
   createCustomVendorCabinetOrderLine,
+  getCustomVendorCabinetDocument,
+  getCustomVendorCabinetDocumentUrl,
+  removeCustomVendorCabinetDocument,
+  updateCustomVendorCabinetOrderLine,
   uploadCustomVendorCabinetDocument,
+  type CustomVendorCabinetDocument,
   type CustomVendorCabinetDraft,
+  type CustomVendorCabinetEditDraft,
 } from "@/lib/customers/custom-vendor-cabinet";
 import {
   getCustomerOrderRevisionPolicy,
@@ -73,9 +79,11 @@ type DraftItem = {
   discount_percent: string;
   pricing_model: OrderLinePricingModel | null;
   line_note: string;
+  vendor_id: string;
   vendor_name_snapshot: string;
   manual_cost_amount: string;
   manual_markup_percent: string;
+  source_document_id: string;
 };
 type TaxRule = OrderTaxRule;
 type ValidatedRevisionItem = {
@@ -99,9 +107,11 @@ type FieldErrors = {
 };
 
 type VendorCabinetItemSnapshot = CustomerOrderItem & {
+  vendor_id?: string | null;
   vendor_name_snapshot?: string | null;
   manual_cost_amount?: string | number | null;
   manual_markup_percent?: string | number | null;
+  source_document_id?: string | null;
 };
 
 function money(value: number, currency = "USD") {
@@ -148,9 +158,11 @@ function mapDraftItem(item: CustomerOrderItem): DraftItem {
     discount_percent: String(item.discount_percent),
     pricing_model: (item.pricing_model_snapshot as OrderLinePricingModel | null | undefined) ?? null,
     line_note: item.line_note ?? "",
+    vendor_id: vendorSnapshot.vendor_id ?? "",
     vendor_name_snapshot: vendorSnapshot.vendor_name_snapshot ?? "",
     manual_cost_amount: vendorSnapshot.manual_cost_amount == null ? "" : String(vendorSnapshot.manual_cost_amount),
     manual_markup_percent: vendorSnapshot.manual_markup_percent == null ? "" : String(vendorSnapshot.manual_markup_percent),
+    source_document_id: vendorSnapshot.source_document_id ?? "",
   };
 }
 
@@ -193,6 +205,9 @@ export default function EditCustomerOrder() {
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isVendorCabinetModalOpen, setIsVendorCabinetModalOpen] = useState(false);
   const [isAddingVendorCabinet, setIsAddingVendorCabinet] = useState(false);
+  const [isUpdatingVendorCabinet, setIsUpdatingVendorCabinet] = useState(false);
+  const [editingVendorCabinetItemId, setEditingVendorCabinetItemId] = useState<string | null>(null);
+  const [editingVendorCabinetDocument, setEditingVendorCabinetDocument] = useState<CustomVendorCabinetDocument | null>(null);
   const [isCountertopOpen, setIsCountertopOpen] = useState(false);
   const [countertopEditItemId, setCountertopEditItemId] = useState<string | null>(null);
   const [countertopRemoveItemId, setCountertopRemoveItemId] = useState<string | null>(null);
@@ -290,6 +305,7 @@ export default function EditCustomerOrder() {
   const countertopEditItem = countertopEditItemId ? items.find((item) => item.id === countertopEditItemId) ?? null : null;
   const countertopRemoveItem = countertopRemoveItemId ? items.find((item) => item.id === countertopRemoveItemId) ?? null : null;
   const countertopRemoveSummary = countertopRemoveItemId ? summariesByItemId.get(countertopRemoveItemId) ?? null : null;
+  const editingVendorCabinetItem = editingVendorCabinetItemId ? items.find((item) => item.id === editingVendorCabinetItemId) ?? null : null;
 
   const preview = useMemo(() => {
     let subtotal = 0;
@@ -359,9 +375,11 @@ export default function EditCustomerOrder() {
         discount_percent: "0",
         pricing_model: product.pricing_model,
         line_note: "",
+        vendor_id: "",
         vendor_name_snapshot: "",
         manual_cost_amount: "",
         manual_markup_percent: "",
+        source_document_id: "",
       }];
     });
   }
@@ -402,9 +420,11 @@ export default function EditCustomerOrder() {
         discount_percent: "0",
         pricing_model: "manual_service",
         line_note: value.lineNote,
+        vendor_id: "",
         vendor_name_snapshot: "",
         manual_cost_amount: "",
         manual_markup_percent: "",
+        source_document_id: "",
       }]);
     }
     setIsServiceModalOpen(false);
@@ -419,6 +439,13 @@ export default function EditCustomerOrder() {
     setItems(context.items.map(mapDraftItem));
     setOrderDiscount(String(context.order.discount_amount ?? 0));
     return context;
+  }
+
+  function closeVendorCabinetModal() {
+    if (isAddingVendorCabinet || isUpdatingVendorCabinet) return;
+    setIsVendorCabinetModalOpen(false);
+    setEditingVendorCabinetItemId(null);
+    setEditingVendorCabinetDocument(null);
   }
 
   async function addVendorCabinet(value: CustomVendorCabinetDraft) {
@@ -456,6 +483,100 @@ export default function EditCustomerOrder() {
       setErrorMessage(operationErrorMessage(error, lineCreated ? "Vendor Cabinet was added, but the Order could not be refreshed." : "Unable to add Vendor Cabinet to this Order."));
     } finally {
       setIsAddingVendorCabinet(false);
+    }
+  }
+
+  async function openVendorCabinetEditor(item: DraftItem) {
+    if (!order || order.status !== "draft") {
+      setErrorMessage("Vendor Cabinet packages can only be edited while the Order is Draft.");
+      return;
+    }
+    if (!item.id || !item.vendor_id || !item.source_document_id) {
+      setErrorMessage("This Vendor Cabinet package is missing its Vendor or source PDF reference.");
+      return;
+    }
+    setIsUpdatingVendorCabinet(true);
+    setErrorMessage(null);
+    try {
+      const document = await getCustomVendorCabinetDocument(item.source_document_id);
+      setEditingVendorCabinetItemId(item.id);
+      setEditingVendorCabinetDocument(document);
+      setIsVendorCabinetModalOpen(true);
+    } catch (error) {
+      setErrorMessage(operationErrorMessage(error, "Unable to open Vendor Cabinet editor."));
+    } finally {
+      setIsUpdatingVendorCabinet(false);
+    }
+  }
+
+  async function viewVendorCabinetPdf(item: DraftItem) {
+    if (!item.source_document_id) {
+      setErrorMessage("This Vendor Cabinet package has no source PDF reference.");
+      return;
+    }
+    setErrorMessage(null);
+    try {
+      const document = editingVendorCabinetDocument?.documentId === item.source_document_id
+        ? editingVendorCabinetDocument
+        : await getCustomVendorCabinetDocument(item.source_document_id);
+      const signedUrl = await getCustomVendorCabinetDocumentUrl(document);
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setErrorMessage(operationErrorMessage(error, "Unable to open Vendor Cabinet PDF."));
+    }
+  }
+
+  async function updateVendorCabinet(value: CustomVendorCabinetEditDraft) {
+    const itemId = editingVendorCabinetItemId;
+    const currentDocument = editingVendorCabinetDocument;
+    const currentItem = itemId ? items.find((item) => item.id === itemId) ?? null : null;
+    if (!order || order.status !== "draft" || !itemId || !currentDocument || !currentItem) {
+      setErrorMessage("Vendor Cabinet package context is no longer available. Reload the Order and try again.");
+      return;
+    }
+    if (isUpdatingVendorCabinet) return;
+
+    setIsUpdatingVendorCabinet(true);
+    setErrorMessage(null);
+    let replacement: Awaited<ReturnType<typeof uploadCustomVendorCabinetDocument>> | null = null;
+    let lineUpdated = false;
+    try {
+      if (value.replacementFile) {
+        replacement = await uploadCustomVendorCabinetDocument({
+          orderId: order.id,
+          vendorName: value.vendorName,
+          lineName: value.lineName,
+          file: value.replacementFile,
+        });
+      }
+
+      await updateCustomVendorCabinetOrderLine({
+        orderItemId: itemId,
+        vendorId: value.vendorId,
+        lineName: value.lineName,
+        totalCost: value.totalCost,
+        markupPercent: value.markupPercent,
+        documentId: replacement?.documentId ?? currentDocument.documentId,
+        orderDiscountAmount: orderDiscount,
+      });
+      lineUpdated = true;
+      await reloadAuthoritativeOrder();
+      setIsVendorCabinetModalOpen(false);
+      setEditingVendorCabinetItemId(null);
+      setEditingVendorCabinetDocument(null);
+
+      if (replacement) {
+        try {
+          await removeCustomVendorCabinetDocument(currentDocument);
+        } catch (cleanupError) {
+          setErrorMessage(operationErrorMessage(cleanupError, "Vendor Cabinet was updated, but the previous PDF could not be removed. Retry document cleanup before closing this Order."));
+        }
+      }
+    } catch (error) {
+      if (replacement && !lineUpdated) await cleanupCustomVendorCabinetDocument(replacement);
+      setErrorMessage(operationErrorMessage(error, lineUpdated ? "Vendor Cabinet was updated, but the Order could not be refreshed." : "Unable to update Vendor Cabinet package."));
+    } finally {
+      setIsUpdatingVendorCabinet(false);
     }
   }
 
@@ -698,6 +819,7 @@ export default function EditCustomerOrder() {
     <div className="space-y-5">
       {errorMessage ? <Alert variant="error" title="Order revision failed" message={errorMessage} /> : null}
       {isAddingVendorCabinet ? <Alert variant="info" title="Adding Vendor Cabinet" message="Uploading the private PDF and adding the quoted Cabinet package to this Draft…" /> : null}
+      {isUpdatingVendorCabinet ? <Alert variant="info" title="Updating Vendor Cabinet" message="Saving the quoted Cabinet package and private PDF state…" /> : null}
       {selectedPriceGroup?.requires_approval ? <Alert variant="warning" title="Approval required" message={`${selectedPriceGroup.name} is a restricted price group. Sales use requires approval.`} /> : null}
 
       <ComponentCard title={`Edit ${order.order_number}`} desc={`${customer.name} · ${revisionPolicy.reason}`} headerAction={<Button variant="outline" onClick={() => router.push(`/customers/${customerId}/orders/${orderId}`)}>Back to Order</Button>}>
@@ -765,7 +887,12 @@ export default function EditCustomerOrder() {
                     <TableCell variant="admin" className="font-semibold">{money(total, currency)}</TableCell>
                     <TableCell variant="admin" className="text-right">
                       <div className="flex flex-wrap justify-end gap-2">
-                        {isVendorCabinet ? <FormHint>Saved package · dedicated Vendor Cabinet workflow</FormHint> : isConfiguredCountertop ? (
+                        {isVendorCabinet ? (
+                          item.id ? <>
+                            {order.status === "draft" ? <Button size="sm" variant="outline" disabled={isUpdatingVendorCabinet} onClick={() => void openVendorCabinetEditor(item)}>Edit Vendor Cabinet</Button> : null}
+                            <Button size="sm" variant="outline" onClick={() => void viewVendorCabinetPdf(item)}>View PDF</Button>
+                          </> : <FormHint>Vendor Cabinet package is not saved yet.</FormHint>
+                        ) : isConfiguredCountertop ? (
                           canMutateConfiguredCountertop && item.id ? <>
                             <Button size="sm" variant="outline" onClick={() => openCountertopReplacement(item.id!)}>Replace Countertop</Button>
                             <Button size="sm" variant="danger" onClick={() => openCountertopRemoval(item.id!)}>Remove Countertop</Button>
@@ -800,7 +927,7 @@ export default function EditCustomerOrder() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Button variant="outline" onClick={() => { setIsCabinetSourceModalOpen(false); setIsProductPickerOpen(true); }}>Stock Cabinet</Button>
-            <Button disabled={order.status !== "draft" || isAddingVendorCabinet} onClick={() => { setIsCabinetSourceModalOpen(false); setIsVendorCabinetModalOpen(true); }}>Vendor Cabinet</Button>
+            <Button disabled={order.status !== "draft" || isAddingVendorCabinet} onClick={() => { setEditingVendorCabinetItemId(null); setEditingVendorCabinetDocument(null); setIsCabinetSourceModalOpen(false); setIsVendorCabinetModalOpen(true); }}>Vendor Cabinet</Button>
           </div>
           {order.status !== "draft" ? <Alert variant="warning" title="Draft required" message="Vendor Cabinet packages are added through a dedicated workflow and can only be attached while the Order is Draft." /> : <FormHint>Vendor Cabinet is saved immediately to this Draft and reloads authoritative Order lines. Save unrelated edits first.</FormHint>}
         </div>
@@ -808,12 +935,30 @@ export default function EditCustomerOrder() {
 
       <OrderProductPicker isOpen={isProductPickerOpen} onClose={() => setIsProductPickerOpen(false)} products={activeProducts} selectedQuantities={selectedQuantities} priceMap={priceMap} onAdd={addProduct} currencyCode={currency} disableWithoutPrice excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]} />
 
-      <CustomVendorCabinetLineModal
-        isOpen={isVendorCabinetModalOpen}
-        currencyCode={currency}
-        onClose={() => setIsVendorCabinetModalOpen(false)}
-        onSubmit={(value) => { void addVendorCabinet(value); }}
-      />
+      {editingVendorCabinetItem && editingVendorCabinetDocument ? (
+        <CustomVendorCabinetLineModal
+          isOpen={isVendorCabinetModalOpen}
+          mode="edit"
+          currencyCode={currency}
+          initialValue={{
+            vendorId: editingVendorCabinetItem.vendor_id,
+            lineName: editingVendorCabinetItem.display_name_override || editingVendorCabinetItem.product_name_snapshot,
+            totalCost: Number(editingVendorCabinetItem.manual_cost_amount || 0),
+            markupPercent: Number(editingVendorCabinetItem.manual_markup_percent || 0),
+            currentFileName: editingVendorCabinetDocument.fileName,
+          }}
+          onClose={closeVendorCabinetModal}
+          onViewCurrentPdf={() => { void viewVendorCabinetPdf(editingVendorCabinetItem); }}
+          onSubmit={(value) => { void updateVendorCabinet(value); }}
+        />
+      ) : (
+        <CustomVendorCabinetLineModal
+          isOpen={isVendorCabinetModalOpen}
+          currencyCode={currency}
+          onClose={closeVendorCabinetModal}
+          onSubmit={(value) => { void addVendorCabinet(value); }}
+        />
+      )}
 
       <ManualServiceLineModal
         isOpen={isServiceModalOpen}

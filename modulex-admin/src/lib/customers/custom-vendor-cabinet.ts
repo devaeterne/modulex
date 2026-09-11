@@ -20,10 +20,17 @@ export type CustomVendorCabinetDraft = {
   file: File;
 };
 
+export type CustomVendorCabinetEditDraft = Omit<CustomVendorCabinetDraft, "file"> & {
+  replacementFile: File | null;
+};
+
 export type UploadedCustomVendorCabinetDocument = {
   documentId: string;
   storagePath: string;
+  fileName: string;
 };
+
+export type CustomVendorCabinetDocument = UploadedCustomVendorCabinetDocument;
 
 function safeFileName(name: string) {
   const cleaned = name.trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/-+/g, "-");
@@ -87,13 +94,48 @@ export async function uploadCustomVendorCabinetDocument(input: {
     throw new Error("Vendor PDF registration did not return a document id.");
   }
 
-  return { documentId: row.id, storagePath };
+  return { documentId: row.id, storagePath, fileName: input.file.name };
+}
+
+export async function getCustomVendorCabinetDocument(documentId: string): Promise<CustomVendorCabinetDocument> {
+  if (!documentId) throw new Error("Vendor Cabinet source document is missing.");
+  const { data, error } = await supabase
+    .from("entity_documents")
+    .select("id, storage_bucket, storage_path, file_name")
+    .eq("id", documentId)
+    .eq("is_active", true)
+    .single();
+  if (error) throw error;
+  if (!data || data.storage_bucket !== ENTITY_DOCUMENT_BUCKET || !data.storage_path) {
+    throw new Error("Vendor Cabinet source PDF could not be resolved.");
+  }
+  return {
+    documentId: String(data.id),
+    storagePath: String(data.storage_path),
+    fileName: String(data.file_name || "vendor-cabinet.pdf"),
+  };
+}
+
+export async function getCustomVendorCabinetDocumentUrl(document: CustomVendorCabinetDocument) {
+  const { data, error } = await supabase.storage.from(ENTITY_DOCUMENT_BUCKET).createSignedUrl(document.storagePath, 300);
+  if (error) throw error;
+  if (!data?.signedUrl) throw new Error("Vendor Cabinet PDF URL could not be created.");
+  return data.signedUrl;
+}
+
+export async function removeCustomVendorCabinetDocument(document: UploadedCustomVendorCabinetDocument) {
+  const deactivation = await supabase.rpc("deactivate_entity_document", { p_document_id: document.documentId });
+  if (deactivation.error) throw deactivation.error;
+  const removal = await supabase.storage.from(ENTITY_DOCUMENT_BUCKET).remove([document.storagePath]);
+  if (removal.error) throw removal.error;
 }
 
 export async function cleanupCustomVendorCabinetDocument(document: UploadedCustomVendorCabinetDocument) {
-  const deactivation = await supabase.rpc("deactivate_entity_document", { p_document_id: document.documentId });
-  if (deactivation.error) return;
-  await supabase.storage.from(ENTITY_DOCUMENT_BUCKET).remove([document.storagePath]);
+  try {
+    await removeCustomVendorCabinetDocument(document);
+  } catch {
+    // Best-effort rollback for failed add/edit flows; keep the original operation error authoritative.
+  }
 }
 
 export async function createCustomVendorCabinetOrderLine(input: {
@@ -117,5 +159,29 @@ export async function createCustomVendorCabinetOrderLine(input: {
   });
   if (error) throw error;
   if (!data) throw new Error("Vendor Cabinet order line could not be created.");
+  return { orderItemId: String(data), sellPrice };
+}
+
+export async function updateCustomVendorCabinetOrderLine(input: {
+  orderItemId: string;
+  vendorId: string;
+  lineName: string;
+  totalCost: number;
+  markupPercent: number;
+  documentId: string;
+  orderDiscountAmount: string | number;
+}) {
+  const sellPrice = calculateCustomVendorCabinetSellPrice(input.totalCost, input.markupPercent);
+  const { data, error } = await supabase.rpc("update_custom_vendor_cabinet_order_line", {
+    p_order_item_id: input.orderItemId,
+    p_vendor_id: input.vendorId,
+    p_line_name: input.lineName.trim(),
+    p_total_cost: input.totalCost,
+    p_markup_percent: input.markupPercent,
+    p_document_id: input.documentId,
+    p_order_discount_amount: Number(input.orderDiscountAmount),
+  });
+  if (error) throw error;
+  if (!data) throw new Error("Vendor Cabinet order line could not be updated.");
   return { orderItemId: String(data), sellPrice };
 }

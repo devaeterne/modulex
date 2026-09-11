@@ -8,12 +8,15 @@ const expect = (ok, message) => { if (!ok) throw new Error(message); };
 
 const adminSqlPath = "sql/a6-finance-vendor-master.sql";
 const migrationPath = "../modulex-store/supabase/migrations/20260905223000_a6_finance_vendor_master.sql";
+const uxMigrationPath = "../modulex-store/supabase/migrations/20260911223100_vendor_management_type_filter.sql";
 
 expect(exists(adminSqlPath), "A6-F3A Vendor Master SQL must exist");
 expect(exists(migrationPath), "A6-F3A shared Supabase migration mirror must exist");
+expect(exists(uxMigrationPath), "Vendor Management UX must ship a server-side vendor type filter migration");
 
 const sql = read(adminSqlPath);
 const migration = read(migrationPath);
+const uxMigration = read(uxMigrationPath);
 expect(sql === migration, "A6-F3A Admin SQL and shared migration must stay byte-identical");
 
 for (const table of [
@@ -84,13 +87,25 @@ for (const file of [route, manager, adapter]) expect(exists(file), `Missing A6-F
 expect(read(route).includes("PageBreadCrumb"), "Finance Vendors route must use shared PageBreadCrumb");
 
 const ui = read(manager);
-for (const primitive of ["ComponentCard", "Alert", "Button", "Label", "Input", "Select", "TableViewport"]) {
+const adapterSource = read(adapter);
+for (const primitive of ["ComponentCard", "Alert", "Button", "Label", "Input", "Select", "TableViewport", "Modal"]) {
   expect(ui.includes(primitive), `Finance Vendors must reuse shared ${primitive}`);
 }
 for (const label of ["Contacts", "Compliance", "W-9", "COI", "Source"] ) {
   expect(ui.toLowerCase().includes(label.toLowerCase()), `Vendor UI must expose ${label}`);
 }
 expect(/missing|expired/i.test(ui), "Vendor UI must render missing/expired compliance warning states");
+expect(ui.includes("Add Vendor"), "Vendor Management must expose a compact Add Vendor action");
+expect(ui.includes("isVendorModalOpen"), "Vendor create/edit must use a modal instead of permanently occupying the page top");
+expect(!ui.includes('title={editingVendor ? "Edit Canonical Vendor" : "New Canonical Vendor"}'), "Vendor Management must not render the large permanent create/edit card");
+for (const tab of ["Overview", "Contacts", "Sources", "Compliance"]) {
+  expect(ui.includes(`"${tab}"`), `Vendor detail must expose a ${tab} tab`);
+}
+expect(ui.includes("vendorTypeFilter"), "Vendor Overview must expose a Vendor Type filter");
+expect(adapterSource.includes("vendorType?: VendorType | null"), "Vendor adapter must accept a server-side Vendor Type filter");
+expect(adapterSource.includes("p_vendor_type"), "Vendor adapter must pass Vendor Type to get_vendors_page");
+expect(uxMigration.includes("p_vendor_type"), "Vendor type filtering must be implemented server-side for paginated Vendor Management");
+expect(uxMigration.includes("get_vendors_page"), "Vendor type filter migration must extend the canonical Vendor page RPC");
 
 const sidebar = read("src/layout/AppSidebar.tsx");
 expect(sidebar.includes('path: "/finance/vendors"') && sidebar.includes('permission: "finance.view"'), "Finance sidebar must expose Vendors using existing finance.view permission");

@@ -10,23 +10,51 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
-import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
+import { ADMIN_SURFACE_CARD, ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   calculateCustomVendorCabinetSellPrice,
   loadActiveCustomVendorCabinetVendors,
   validateCustomVendorCabinetPdf,
   type ActiveOrderVendor,
   type CustomVendorCabinetDraft,
+  type CustomVendorCabinetEditDraft,
 } from "@/lib/customers/custom-vendor-cabinet";
 
-type Props = {
+type InitialEditValue = {
+  vendorId: string;
+  lineName: string;
+  totalCost: number;
+  markupPercent: number;
+  currentFileName: string;
+};
+
+type CreateProps = {
   isOpen: boolean;
   currencyCode: string;
+  mode?: "create";
   onClose: () => void;
   onSubmit: (value: CustomVendorCabinetDraft) => void;
 };
 
-export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onClose, onSubmit }: Props) {
+type EditProps = {
+  isOpen: boolean;
+  currencyCode: string;
+  mode: "edit";
+  initialValue: InitialEditValue;
+  onClose: () => void;
+  onViewCurrentPdf: () => void;
+  onSubmit: (value: CustomVendorCabinetEditDraft) => void;
+};
+
+type Props = CreateProps | EditProps;
+
+export default function CustomVendorCabinetLineModal(props: Props) {
+  const { isOpen, currencyCode, onClose } = props;
+  const isEdit = props.mode === "edit";
+  const initialVendorId = props.mode === "edit" ? props.initialValue.vendorId : "";
+  const initialLineName = props.mode === "edit" ? props.initialValue.lineName : "";
+  const initialTotalCost = props.mode === "edit" ? String(props.initialValue.totalCost) : "";
+  const initialMarkupPercent = props.mode === "edit" ? String(props.initialValue.markupPercent) : "";
   const [vendors, setVendors] = useState<ActiveOrderVendor[]>([]);
   const [vendorId, setVendorId] = useState("");
   const [lineName, setLineName] = useState("");
@@ -40,10 +68,10 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
-    setVendorId("");
-    setLineName("");
-    setTotalCost("");
-    setMarkupPercent("");
+    setVendorId(initialVendorId);
+    setLineName(initialLineName);
+    setTotalCost(initialTotalCost);
+    setMarkupPercent(initialMarkupPercent);
     setFile(null);
     setError(null);
     setFileInputKey((value) => value + 1);
@@ -59,7 +87,7 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [isOpen]);
+  }, [initialLineName, initialMarkupPercent, initialTotalCost, initialVendorId, isOpen]);
 
   const selectedVendor = useMemo(() => vendors.find((vendor) => vendor.id === vendorId) ?? null, [vendorId, vendors]);
   const sellPrice = useMemo(() => {
@@ -80,17 +108,23 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
       if (normalizedLineName.length > 160) throw new Error("Line Name must be 160 characters or fewer.");
       if (!totalCost.trim() || !Number.isFinite(cost) || cost < 0) throw new Error("Total Cost must be zero or greater.");
       if (!markupPercent.trim() || !Number.isFinite(markup) || markup < 0 || markup > 1000) throw new Error("Markup % must be between 0 and 1000.");
-      if (!file) throw new Error("Vendor PDF is required.");
-      validateCustomVendorCabinetPdf(file);
-      onSubmit({
+      if (file) validateCustomVendorCabinetPdf(file);
+
+      const common = {
         vendorId: selectedVendor.id,
         vendorName: selectedVendor.display_name || selectedVendor.legal_name,
         lineName: normalizedLineName,
         totalCost: cost,
         markupPercent: markup,
         sellPrice: calculateCustomVendorCabinetSellPrice(cost, markup),
-        file,
-      });
+      };
+
+      if (props.mode === "edit") {
+        props.onSubmit({ ...common, replacementFile: file });
+      } else {
+        if (!file) throw new Error("Vendor PDF is required.");
+        props.onSubmit({ ...common, file });
+      }
       onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Vendor Cabinet line is invalid.");
@@ -98,11 +132,11 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} className="mx-4 w-full max-w-2xl p-6" ariaLabel="Vendor Cabinet line">
+    <Modal isOpen={isOpen} onClose={onClose} className="mx-4 w-full max-w-2xl p-6" ariaLabel={isEdit ? "Edit Vendor Cabinet line" : "Vendor Cabinet line"}>
       <div className="space-y-5">
         <div>
-          <h3 className={`text-base font-medium ${ADMIN_TEXT_STYLES.strong}`}>Vendor Cabinet</h3>
-          <FormHint>Create one productless Order line from a vendor quote. Cost and markup stay internal; the customer sees only the calculated sell price.</FormHint>
+          <h3 className={`text-base font-medium ${ADMIN_TEXT_STYLES.strong}`}>{isEdit ? "Edit Vendor Cabinet" : "Vendor Cabinet"}</h3>
+          <FormHint>{isEdit ? "Update the saved vendor package. The current private PDF stays attached unless you replace it." : "Create one productless Order line from a vendor quote. Cost and markup stay internal; the customer sees only the calculated sell price."}</FormHint>
         </div>
 
         {error ? <Alert variant="error" title="Vendor Cabinet line" message={error} /> : null}
@@ -139,8 +173,20 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
           </div>
         </div>
 
+        {props.mode === "edit" ? (
+          <div className={`${ADMIN_SURFACE_CARD} p-4`}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>Current PDF</span>
+                <FormHint>{props.initialValue.currentFileName}</FormHint>
+              </div>
+              <Button size="sm" variant="outline" onClick={props.onViewCurrentPdf}>View PDF</Button>
+            </div>
+          </div>
+        ) : null}
+
         <div>
-          <Label htmlFor="vendor-cabinet-pdf">Vendor PDF</Label>
+          <Label htmlFor="vendor-cabinet-pdf">{isEdit ? "Replace PDF" : "Vendor PDF"}</Label>
           <FileInput
             key={fileInputKey}
             id="vendor-cabinet-pdf"
@@ -151,7 +197,7 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
               setError(null);
             }}
           />
-          <FormHint>Private Order evidence · PDF only · max 25 MiB.</FormHint>
+          <FormHint>{isEdit ? "Optional. Leave empty to keep the current private PDF." : "Private Order evidence · PDF only · max 25 MiB."}</FormHint>
         </div>
 
         <div className="flex items-center justify-between gap-3">
@@ -161,7 +207,7 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={submit} disabled={loading}>Add Vendor Cabinet</Button>
+            <Button onClick={submit} disabled={loading}>{isEdit ? "Save Changes" : "Add Vendor Cabinet"}</Button>
           </div>
         </div>
       </div>
