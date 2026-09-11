@@ -48,11 +48,13 @@ export default function SearchableSelect({
   className = "",
 }: SearchableSelectProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const searchChangeRef = useRef(onSearchChange);
   const listboxId = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(-1);
   const hasRemoteSearch = Boolean(onSearchChange);
 
   useEffect(() => {
@@ -67,10 +69,14 @@ export default function SearchableSelect({
     return options.filter((option) => option.label.toLowerCase().includes(normalized));
   }, [hasRemoteSearch, options, query]);
 
+  const optionId = (index: number) => `${listboxId}-option-${index}`;
+
   useEffect(() => {
     if (!isOpen) return;
+    const selectedIndex = filteredOptions.findIndex((option) => option.value === value);
+    setActiveIndex(selectedIndex >= 0 ? selectedIndex : filteredOptions.length > 0 ? 0 : -1);
     searchRef.current?.focus();
-  }, [isOpen]);
+  }, [filteredOptions, isOpen, value]);
 
   useEffect(() => {
     if (!isOpen || !hasRemoteSearch) return;
@@ -84,6 +90,7 @@ export default function SearchableSelect({
       if (!rootRef.current?.contains(event.target as Node)) {
         setIsOpen(false);
         setQuery("");
+        setActiveIndex(-1);
       }
     };
     document.addEventListener("pointerdown", handlePointerDown);
@@ -96,39 +103,73 @@ export default function SearchableSelect({
       ? ADMIN_FIELD_STATES.error
       : ADMIN_FIELD_STATES.default;
 
-  function close() {
+  function close(restoreFocus = false) {
     setIsOpen(false);
     setQuery("");
+    setActiveIndex(-1);
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => triggerRef.current?.focus());
+    }
   }
 
   function selectValue(nextValue: string) {
     onChange(nextValue);
-    close();
+    close(true);
+  }
+
+  function moveActive(delta: number) {
+    if (filteredOptions.length === 0) return;
+    setActiveIndex((current) => {
+      const start = current < 0 ? (delta > 0 ? -1 : 0) : current;
+      return (start + delta + filteredOptions.length) % filteredOptions.length;
+    });
   }
 
   function handleTriggerKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
     if (disabled) return;
-    if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
+    if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       setIsOpen(true);
     }
-    if (event.key === "Escape") close();
+    if (event.key === "Escape") close(true);
   }
 
   function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
-      close();
+      close(true);
+      return;
     }
-    if (event.key === "Enter" && filteredOptions.length === 1) {
+    if (event.key === "ArrowDown") {
       event.preventDefault();
-      selectValue(filteredOptions[0].value);
+      moveActive(1);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      moveActive(-1);
+      return;
+    }
+    if (event.key === "Home" && filteredOptions.length > 0) {
+      event.preventDefault();
+      setActiveIndex(0);
+      return;
+    }
+    if (event.key === "End" && filteredOptions.length > 0) {
+      event.preventDefault();
+      setActiveIndex(filteredOptions.length - 1);
+      return;
+    }
+    if (event.key === "Enter" && activeIndex >= 0 && filteredOptions[activeIndex]) {
+      event.preventDefault();
+      selectValue(filteredOptions[activeIndex].value);
     }
   }
 
   return (
     <div ref={rootRef} className={`relative w-full ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         className={`${ADMIN_FIELD_BASE} ${stateClass} ${ADMIN_FOCUS_RING} ${ADMIN_CONTROL_DISABLED} flex items-center justify-between gap-3 text-left`}
         onClick={() => {
@@ -161,11 +202,16 @@ export default function SearchableSelect({
           <input
             ref={searchRef}
             type="search"
+            role="combobox"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleSearchKeyDown}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls={listboxId}
+            aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
             className={`${ADMIN_FIELD_BASE} ${ADMIN_FIELD_STATES.default} ${ADMIN_FOCUS_RING}`}
           />
           <div id={listboxId} role="listbox" className="mt-2 max-h-64 overflow-y-auto py-1">
@@ -180,16 +226,19 @@ export default function SearchableSelect({
                 {placeholder}
               </button>
             ) : null}
-            {loading ? <p className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">Loading options…</p> : null}
-            {!loading ? filteredOptions.map((option) => {
+            {loading ? <p className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400" role="status">Loading options…</p> : null}
+            {!loading ? filteredOptions.map((option, index) => {
               const isSelected = option.value === value;
               return (
                 <button
                   key={option.value}
+                  id={optionId(index)}
                   type="button"
                   role="option"
                   aria-selected={isSelected}
+                  tabIndex={-1}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${isSelected ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/[0.06]"}`}
+                  onMouseEnter={() => setActiveIndex(index)}
                   onClick={() => selectValue(option.value)}
                 >
                   {option.label}
@@ -197,7 +246,7 @@ export default function SearchableSelect({
               );
             }) : null}
             {!loading && filteredOptions.length === 0 ? (
-              <p className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">{noResultsText}</p>
+              <p className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400" role="status">{noResultsText}</p>
             ) : null}
           </div>
         </div>
