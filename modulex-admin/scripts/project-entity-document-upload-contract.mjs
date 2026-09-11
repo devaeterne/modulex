@@ -23,7 +23,7 @@ const tfxMigrationPath = path.join(
 );
 const registrationMigrationPath = path.join(
   root,
-  "../modulex-store/supabase/migrations/20260911144500_entity_document_registration_file_types.sql",
+  "../modulex-store/supabase/migrations/20260911145327_entity_document_registration_file_types.sql",
 );
 
 function read(filePath) {
