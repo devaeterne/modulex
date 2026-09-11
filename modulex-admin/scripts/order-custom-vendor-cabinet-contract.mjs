@@ -32,8 +32,14 @@ assert(domain.includes("calculateCustomVendorCabinetSellPrice"), "custom Cabinet
 assert(domain.includes("createCustomVendorCabinetOrderLine"), "custom Cabinet domain must call the guarded order-line RPC");
 assert(domain.includes("uploadCustomVendorCabinetDocument"), "custom Cabinet domain must register the private Order PDF");
 assert(newOrder.includes("CustomVendorCabinetLineModal"), "New Order must expose the vendor Cabinet entry flow");
+assert(newOrder.includes("isCabinetSourceModalOpen"), "Cabinet entry must keep an explicit source-choice state");
+assert(newOrder.includes("Choose Cabinet Source"), "Cabinet entry must show a source chooser before opening either flow");
+assert(newOrder.includes('onClick={() => setIsCabinetSourceModalOpen(true)}>Cabinet</Button>'), "Products action must expose one Cabinet entry point");
 assert(newOrder.includes("Stock Cabinet"), "Cabinet source selection must preserve the Stock Cabinet route");
 assert(newOrder.includes("Vendor Cabinet"), "Cabinet source selection must expose the Vendor Cabinet route");
+assert(newOrder.includes("setIsCabinetSourceModalOpen(false); setIsProductPickerOpen(true);"), "Stock choice must close the source chooser before opening the product picker");
+assert(newOrder.includes("setIsCabinetSourceModalOpen(false); setIsVendorCabinetModalOpen(true);"), "Vendor choice must close the source chooser before opening the vendor flow");
+assert(!newOrder.includes('onClick={() => setIsProductPickerOpen(true)}>Stock Cabinet</Button>'), "Stock Cabinet must not bypass the source chooser from the Products action row");
 assert(migration.includes("create_custom_vendor_cabinet_order_line"), "migration must define the guarded custom Cabinet line RPC");
 assert(migration.includes("product_id is null"), "custom Cabinet lines must remain productless");
 assert(migration.includes("manual_vendor_cabinet"), "custom Cabinet lines must carry a distinct pricing/cost source marker");
