@@ -1,6 +1,6 @@
 # Vendor Payables / Order Settlement Design
 
-Status: Awaiting written-spec review  
+Status: Self-reviewed; awaiting written-spec approval  
 Date: 2026-09-12  
 Scope: Modulex Admin Finance + Vendor Cabinet order commitments
 
@@ -211,7 +211,7 @@ Draft → Open → paid/partially paid derived from allocations, or Void.
 
 `+ Add Vendor Bill` creates the real Vendor Bill draft using the existing bill RPCs.
 
-After the header is saved, Finance allocates Bill lines to Vendor commitments for that vendor. The allocation UI shows open/planned commitments with Project, Order, description, committed amount, already-invoiced amount and available amount.
+After the header is saved, Finance allocates Bill lines to **committed, non-cancelled** Vendor commitments for that vendor. Planned Draft-Order commitments remain visible in the Commitments workspace but are not eligible for Bill allocation until the Order is confirmed. The allocation UI shows Project, Order, description, committed amount, already-invoiced amount and available amount.
 
 Finance can allocate one bill across multiple Orders. The sum of commitment allocations is checked against each bill line amount.
 
@@ -239,7 +239,7 @@ Finance may settle:
 
 The remaining $7,000 on ORD-085 and $8,000 on ORD-091 remain visible even though the invoice itself has received a partial payment.
 
-Reversing a Vendor Payment allocation requires corresponding order-settlement reversal capacity; order-level paid amounts must always reconcile to the surviving valid invoice payment allocations.
+Vendor Payment reversal must preserve reconciliation atomically. The Finance-aware reversal boundary will create matching negative `vendor_payment_order_allocations` rows for all surviving child settlements and reverse the invoice payment allocation in the same transaction. A direct reversal path that would leave positive order settlements above the surviving invoice payment amount must fail closed.
 
 ## 9. Finance UI redesign
 
@@ -387,6 +387,7 @@ Verify:
 
 - productless Vendor Cabinet line is projected as a commitment;
 - Draft vs confirmed vs cancelled state derivation;
+- planned commitments cannot be allocated to Vendor Bills;
 - Vendor mismatch rejection;
 - invoice-line allocation sum enforcement;
 - one bill → many Orders;
@@ -394,6 +395,7 @@ Verify:
 - invoice variance behavior;
 - payment settlement cannot exceed valid invoice payment allocation;
 - payment settlement cannot exceed commitment's invoiced amount;
+- Finance-aware payment reversal atomically reverses child order settlements;
 - reversal restores derived paid/remaining values;
 - direct unauthorised table mutation fails;
 - Sales cannot perform Finance settlement mutations;
