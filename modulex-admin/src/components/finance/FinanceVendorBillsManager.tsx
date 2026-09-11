@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
+import { ADMIN_COMPAT_APPEARANCE } from "@/components/ui/theme/adminTheme";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import VendorCommitmentsPanel from "@/components/finance/vendor-payables/VendorCommitmentsPanel";
@@ -65,7 +66,7 @@ export default function FinanceVendorBillsManager() {
       {accessError ? <Alert variant="error" title="Vendor Payables" message={accessError} /> : null}
       {!loadingAccess && !canManage ? <Alert variant="info" title="Read-only Finance access" message="You can review Vendor commitments, Vendor Bills, real payment settlement and Payment Schedule, but Finance mutations require finance.manage." /> : null}
       <ComponentCard title="Vendor Payables" desc="Commitments come from Vendor Cabinet Orders. Vendor Bills remain AP documents, Payment Schedule remains Bill-based, and posted Vendor Payments remain the only settlement source.">
-        <div className="mb-5 flex flex-wrap gap-2 border-b border-gray-200 pb-4 dark:border-gray-800">
+        <div className={`mb-5 flex flex-wrap gap-2 border-b pb-4 ${ADMIN_COMPAT_APPEARANCE["border-gray-200"]} ${ADMIN_COMPAT_APPEARANCE["dark:border-gray-800"]}`}>
           {tabs.map((item) => <Button key={item.id} size="sm" variant={tab === item.id ? "primary" : "ghost"} onClick={() => navigate(item.id)}>{item.label}</Button>)}
         </div>
         {tab === "commitments" ? <VendorCommitmentsPanel initialVendorId={vendorId} initialOrderId={orderId} onOpenBills={(vendor, order) => navigate("bills", vendor, order)} /> : null}
