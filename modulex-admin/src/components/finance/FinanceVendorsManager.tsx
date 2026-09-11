@@ -519,7 +519,7 @@ export default function FinanceVendorsManager() {
             <div><Label htmlFor="vendor-type">Vendor type</Label><Select id="vendor-type" options={vendorTypeOptions} value={vendorForm.vendorType} onChange={(value) => setVendorForm((current) => ({ ...current, vendorType: value as VendorType }))} /></div>
             <div><Label htmlFor="vendor-currency">Default currency</Label><Input id="vendor-currency" maxLength={3} value={vendorForm.defaultCurrencyCode} onChange={(event) => setVendorForm((current) => ({ ...current, defaultCurrencyCode: event.target.value.toUpperCase() }))} /></div>
           </div>
-          <details className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <details className="p-4">
             <summary className={`cursor-pointer text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>Additional Details</summary>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div><Label htmlFor="vendor-remit-name">Remit to</Label><Input id="vendor-remit-name" value={vendorForm.remitToName} onChange={(event) => setVendorForm((current) => ({ ...current, remitToName: event.target.value }))} /></div>
