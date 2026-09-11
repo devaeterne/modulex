@@ -70,7 +70,10 @@ const route = "src/app/(admin)/finance/bills/page.tsx";
 const manager = "src/components/finance/FinanceVendorBillsManager.tsx";
 const adapter = "src/lib/finance/vendorBills.ts";
 for (const file of [route, manager, adapter]) expect(exists(file), `Missing A6-F3B Vendor Bills surface: ${file}`);
-expect(read(route).includes("PageBreadCrumb"), "Finance Vendor Bills route must use shared PageBreadCrumb");
+const routeSource = read(route);
+expect(routeSource.includes("PageBreadCrumb"), "Finance Vendor Bills route must use shared PageBreadCrumb");
+expect(routeSource.includes("FinanceVendorBillsManager"), "The canonical /finance/bills route must remain the Vendor Bills/Payables workspace boundary");
+expect(/Vendor Bills|Vendor Payables/.test(routeSource), "The /finance/bills route title may be Vendor Bills or Vendor Payables, but the route must remain stable");
 const ui = read(manager);
 for (const primitive of ["ComponentCard", "Alert", "Button", "Label", "Input", "Select", "TableViewport"]) {
   expect(ui.includes(primitive), `Finance Vendor Bills must reuse shared ${primitive}`);
