@@ -30,6 +30,10 @@ const deactivateMigrationPath = path.join(
   root,
   "../modulex-store/supabase/migrations/20260911152326_entity_document_deactivate_rls_lock_fix.sql",
 );
+const storageDeleteMigrationPath = path.join(
+  root,
+  "../modulex-store/supabase/migrations/20260911160000_entity_document_storage_delete_on_deactivate.sql",
+);
 
 function read(filePath) {
   return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
@@ -55,6 +59,7 @@ const customerPolicyGrantRepair = read(customerPolicyGrantRepairPath);
 const tfxMigration = read(tfxMigrationPath);
 const registrationMigration = read(registrationMigrationPath);
 const deactivateMigration = read(deactivateMigrationPath);
+const storageDeleteMigration = read(storageDeleteMigrationPath);
 
 requireMatch(
   panel,
@@ -145,6 +150,32 @@ requireMatch(
   deactivateMigration,
   /grant\s+execute\s+on\s+function\s+public\.deactivate_entity_document\s*\(uuid\)\s+to\s+authenticated/i,
   "Deactivate RPC must remain executable by authenticated callers and rely on internal role authorization.",
+);
+
+const deactivateFunction = panel.match(/async function deactivateDocument\(item: EntityDocument\)[\s\S]*?\n  }\n\n  const scopeDescription/)?.[0] ?? "";
+const deactivateRpcIndex = deactivateFunction.indexOf('supabase.rpc("deactivate_entity_document"');
+const storageRemoveIndex = deactivateFunction.indexOf(".remove([item.storage_path])");
+if (deactivateRpcIndex < 0 || storageRemoveIndex < 0 || deactivateRpcIndex > storageRemoveIndex) {
+  throw new Error("Entity document removal must deactivate metadata first, then delete the private Storage object.");
+}
+requireMatch(deactivateFunction, /pendingStorageCleanup|retryDeactivatedStorageCleanup/i, "Failed post-deactivation Storage cleanup must expose an explicit retry path.");
+requireNoMatch(deactivateFunction, /private file (?:will be|was) retained/i, "Deactivate UI must not claim the private file is retained after successful removal.");
+requireMatch(
+  storageDeleteMigration,
+  /create\s+or\s+replace\s+function\s+private\.can_delete_unregistered_entity_document_object\s*\(p_bucket_id\s+text,\s*p_object_name\s+text\)/i,
+  "Storage deletion behavior must be changed through a canonical helper migration.",
+);
+requireMatch(storageDeleteMigration, /d\.is_active\s*=\s*true/i, "Storage DELETE must remain blocked while matching document metadata is active.");
+requireMatch(storageDeleteMigration, /not\s+exists\s*\([\s\S]*d\.is_active\s*=\s*true/i, "Storage DELETE must allow only objects without active entity-document metadata.");
+requireMatch(
+  storageDeleteMigration,
+  /revoke\s+(?:all|execute)\s+on\s+function\s+private\.can_delete_unregistered_entity_document_object\s*\(text,\s*text\)\s+from\s+(?:public|anon)/i,
+  "Storage delete helper must remain unavailable to PUBLIC/anon.",
+);
+requireMatch(
+  storageDeleteMigration,
+  /grant\s+execute\s+on\s+function\s+private\.can_delete_unregistered_entity_document_object\s*\(text,\s*text\)\s+to\s+authenticated/i,
+  "Authenticated Storage RLS callers must retain access to the delete helper.",
 );
 
 console.log("Project/Order entity document upload contract passed.");
