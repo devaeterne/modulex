@@ -1,92 +1,89 @@
 # Modulex Admin
 
-> **Warehouse, Inventory & Operations Management Platform**
+> **Modulex internal operations and Store control plane**
 
-Modulex Admin is the operational control plane for Modulex. It manages products, pricing, inventory, warehouses, customers, orders, Store CMS, dealer operations, vendor catalog review, company settings, users, permissions and reporting against the shared Supabase production data model.
+Modulex Admin is the authenticated operational application for Modulex. It manages customers, projects, orders, products, pricing, inventory/warehouses, Finance, Personnel, vendors, approvals, calendar, settings, users/RBAC, reporting, and the business-editable Store control plane against the shared Supabase data model.
 
-For active delivery status and acceptance requirements, read `ADMIN_ROADMAP.md` first.
+Read `ADMIN_ROADMAP.md` first for current delivery status. Do not infer current status from historical acceptance files, archived plans, old PR notes, or chat history.
 
-## Core boundaries
+## Documentation source-of-truth map
 
-- Product master data, commercial pricing and inventory are separate domains.
-- Modulex warehouse stock is authoritative only through Modulex inventory and movement contracts.
-- External vendor catalog status is reference data and does not become Modulex inventory.
-- Vendor catalog products may be approved without confirmed vendor stock; staff confirms vendor stock with the supplier when required. Only products marked `MISSING` from authoritative vendor discovery are blocked from new/unfinished approval.
-- Vendor status changes do not activate/deactivate canonical Modulex products.
-- A vendor reference price is copied to the canonical product's active base `List Price` only when the vendor item is approved; later vendor sync price changes do not automatically reprice the product.
-- Store publication remains explicit and requires the Store publishing/price contracts.
-- Privileged Supabase credentials stay server-only; browser code uses only browser-safe public configuration.
+| Document | Canonical responsibility | Status semantics |
+| --- | --- | --- |
+| `../AGENTS.md` | Repo-wide execution, safety, CI and change discipline | Current contract |
+| `ADMIN_ROADMAP.md` | Current Admin workstreams, blockers, completion/defer state | Current status source |
+| `docs/ADMIN_PRODUCTION_SURFACE.md` | Route/domain map, Admin vs Store ownership, Supabase and public/internal boundaries | Current architecture map |
+| `docs/ADMIN_RBAC_MATRIX.md` | Navigation/direct-route/API/data authorization expectations | Current authorization map |
+| `docs/ADMIN_RUNTIME_CONFIG.md` | Vercel/runtime/env and browser-vs-server secret boundary | Current runtime contract |
+| `docs/ADMIN_UI_GUIDE.md` | Shared Admin UI/component/responsive conventions | Current UI contract |
+| `docs/ADMIN_VALIDATION_GUIDE.md` | Validation, mutation, lifecycle and data-contract rules | Current validation contract |
+| `docs/OPS_OBSERVABILITY_RELEASE_STANDARD.md` | Verification, CI, migration, Advisor, production smoke and Vercel release flow | Current release/runbook contract |
+| `docs/FINANCE_DOMAIN_PLAN.md` | Finance ownership/architecture | Current Finance architecture |
+| `docs/FINANCE_F0_BASELINE.md` | Pre-Finance production snapshot | Historical baseline only |
+| `financefinal.md` | Earlier Finance execution tracker | Historical execution evidence; not current Finance status |
+| `docs/acceptance/**`, `../docs/acceptance/**` | Point-in-time acceptance/evidence for closed packages | Historical evidence; never overrides current code/roadmaps |
+| `docs/archive/**`, `../docs/plans/**` | Superseded plans/roadmaps | Historical/obsolete planning evidence |
 
-## Main operational domains
+When two documents appear to conflict, use this precedence: execution-time code/schema/production state → current roadmap → current domain/runtime contracts → acceptance evidence → archived plans/chat history.
 
-- Product Master — products, brands, categories, Product Types, UOM and QR identity
-- Pricing — price groups, product prices, costs, margins and countertop material bands
-- Warehouses — warehouses, zones, locations and scan-assisted operations
-- Inventory — on-hand/reserved/available snapshots backed by append-safe movement history
-- Customers — master records, addresses, portal lifecycle and documents
-- Orders — product/service/countertop lines, revisions, pricing, fulfillment and documents
-- Store Control Plane — product content, media, pages, projects, marketing, reviews and company content
-- Vendor Catalog — controlled discovery, review, category mapping, family/variant import and bounded bulk approval
-- Users & RBAC — authenticated role/permission enforcement across UI, API/RPC and database boundaries
-
-## Vendor Catalog
-
-Vendor Catalog adapters currently include Karran and Ruvati. Discovery stages vendor-owned catalog data under `vendor_catalog_*` and never auto-publishes Store content.
-
-Karran public Shopify `variant.available` is retained in raw source payloads but is not treated as dealer/distributor stock. Presence in authoritative Karran discovery is catalog-available; exact vendor quantity is not tracked.
-
-Ruvati `is_purchasable` / `is_in_stock` values may be shown as vendor-status reference signals, but they do not block approval and do not mutate canonical product status. `vendor_stock_quantity` is not populated by the current workflow.
-
-Approval requires valid vendor-category mapping to active Modulex Category + Product Type + UOM. `AVAILABLE`, `OUT_OF_STOCK`, `UNAVAILABLE` and `UNKNOWN` rows may be imported while present in the vendor catalog. `MISSING` requires two successful authoritative full-vendor misses and blocks approval without deleting/deactivating an existing canonical product.
-
-If an approved vendor row has `vendor_price_reference`, the database approval trigger writes that amount, in `vendor_currency`, to the canonical product's active base `List Price` price group. It preserves normal `product_prices` effective-history semantics and does not calculate or write any non-base price group.
-
-See `docs/VENDOR_CATALOG_SYNC.md` for the full contract.
-
-## Architecture
+## System boundary
 
 ```text
-Modulex Admin (Next.js / React)
-            │
-            ▼
-Supabase Cloud
-├── PostgreSQL
-├── Authentication
-├── Storage
-├── RLS / RPC / database guards
-└── shared operational data
-            │
-            ▼
-Modulex Store / Customer & Dealer Portal
+Internal operators
+      │
+      ▼
+Modulex Admin ── authenticated/RBAC/RLS/RPC ──┐
+                                              │
+                                              ▼
+                                      Shared Supabase
+                                      Postgres/Auth/Storage
+                                              │
+                         narrow published/portal projections
+                                              │
+                                              ▼
+                              Modulex Store / Customer / Dealer
 ```
 
-## Technology stack
+Admin owns internal operations and the CMS/control plane. Store owns public website and Customer/Dealer portal delivery. Mutable public business content is managed through Admin and persisted in Supabase; Store consumes only approved/narrow published projections. Internal cost, margin, private documents, operational audit data, elevated credentials, and unrestricted table access must not leak into public/portal surfaces.
 
-- Next.js 16
-- React 19
-- TypeScript
-- Tailwind CSS v4
-- TailAdmin shared UI primitives
-- Supabase PostgreSQL/Auth/Storage
-- Vercel deployment
+The authoritative route/domain ownership matrix and public/internal boundary are in `docs/ADMIN_PRODUCTION_SURFACE.md`.
+
+## Supabase ownership
+
+The canonical migration history is:
+
+```text
+modulex-store/supabase/migrations
+```
+
+`modulex-admin/supabase/migrations` is a secondary compatibility mirror only where one already exists. Never use the Admin mirror, a filename, or chat history to decide production migration state; compare canonical merged migrations with the production Supabase migration list.
+
+## Core domain rules
+
+- Product master, pricing, inventory, Finance, HR/Personnel, Projects/Orders, Store CMS and identity/RBAC remain distinct owning domains.
+- Modulex inventory truth changes only through approved inventory/movement contracts; vendor availability is reference data, not Modulex stock.
+- Store publication is explicit. Vendor import/approval does not automatically make public content live.
+- Finance owns actual money movement; HR owns payroll calculation/source records; Projects/Orders remain commercial/operational context rather than a duplicate cash ledger.
+- Admin may manage Store content, but Store public/portal reads remain narrow and permission-safe.
+- Privileged Supabase/provider credentials are server-only.
 
 ## Local setup
 
-Requirements: Node.js 20+ and npm.
+Requirements: project-supported Node.js/npm versions from the lockfile/CI configuration.
 
 ```bash
 git clone <repository-url>
-cd modulex-admin
-npm install
+cd modulex/modulex-admin
+npm ci
 cp .env.example .env.local
 npm run dev
 ```
 
-Browser-safe Supabase variables belong in `.env.local`. Never commit service-role/secret credentials or expose them through `NEXT_PUBLIC_*` variables.
+Browser-safe Supabase variables belong in `.env.local`. Never commit service-role/secret credentials or expose them through `NEXT_PUBLIC_*` variables. Environment ownership and allowed variables are defined in `docs/ADMIN_RUNTIME_CONFIG.md`.
 
-## Verification
+## Verification and release
 
-Use targeted contracts while developing, then the relevant final gates before claiming completion.
+`docs/OPS_OBSERVABILITY_RELEASE_STANDARD.md` is the single reference flow for development verification and release. In summary:
 
 ```bash
 npm run typecheck
@@ -94,51 +91,16 @@ npm run lint
 npm run build
 ```
 
-General deterministic smoke chain:
+Run the relevant domain contracts for the changed scope. `npm run smoke` is the broad aggregate smoke chain and includes DB/live-capable contracts that require their documented environment; it is not a substitute for signed-in production acceptance.
 
-```bash
-npm run smoke
-```
+Admin UI changes additionally follow `docs/ADMIN_UI_GUIDE.md` and the strict/shared UI contracts. Authorization changes follow `docs/ADMIN_RBAC_MATRIX.md`. DB/RLS/RPC/grant/index changes require canonical migration discipline, fresh relevant Supabase Advisor evidence, and production-safe acceptance as defined by the release standard.
 
-Changed Admin UI surfaces must also pass:
-
-```bash
-npm run smoke:admin-ui-strict
-npm run smoke:admin-ui
-```
-
-Vendor Catalog changes must pass the dedicated workflow contracts:
-
-```bash
-node scripts/vendor-catalog-sync-contract.mjs
-node scripts/vendor-approval-idempotency-contract.mjs
-node scripts/vendor-availability-contract.mjs
-```
-
-Database/RLS/RPC changes require the appropriate database acceptance plus Supabase Security/Performance Advisor review. Do not run production business-data mutations merely for smoke testing when rollback/read-only acceptance is sufficient.
-
-## Deployment
-
-Admin is deployed on Vercel and uses Supabase Cloud as the shared system of record. Environment variables and domain aliases are deployment configuration, not source-code constants.
-
-Before production acceptance:
-
-1. verify current `main` and open parallel work;
-2. review/apply required canonical migrations in order;
-3. run relevant Supabase advisors for schema/RLS/RPC changes;
-4. verify Admin CI including typecheck/lint/build and strict UI when applicable;
-5. deploy the merged `main` revision;
-6. run the package-specific signed-in acceptance documented in `ADMIN_ROADMAP.md` and related acceptance docs.
-
-## Security principles
-
-- Enable and maintain appropriate RLS on exposed data.
-- Never expose service-role/secret keys to the browser.
-- Protected actions must be authorized through the complete boundary: UI, server route/RPC, grants/RLS and DB lifecycle guards.
-- Sensitive inventory/order/pricing writes use existing validated/idempotent mutation contracts rather than direct browser table writes.
-- Preserve audit/history semantics; physical deletion is not the default for referenced business records.
-- Public Store/Dealer projections must remain narrow and must not leak internal costs, inventory internals or operational metadata.
+Do not create a second release checklist in a feature/acceptance document; link to the OPS standard and record only package-specific evidence.
 
 ## Working agreement
 
-`AGENTS.md` is the repository-wide execution contract. `ADMIN_ROADMAP.md` is the Admin operational source of truth. Material Admin work must keep roadmap status, verification evidence, rollout state and next action current in the same workstream.
+- Start every package from execution-time current `main` and current open-PR state.
+- Preserve existing architecture/contracts unless the package explicitly changes them.
+- Reuse/extend canonical primitives rather than creating parallel tables, RPCs, routes, permissions, ledgers, or documentation sources of truth.
+- Update the owning roadmap and package acceptance evidence in the same PR when status or architecture changes.
+- Mark work complete only with the evidence required by `ADMIN_ROADMAP.md` and the relevant domain/release contracts.

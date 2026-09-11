@@ -1,71 +1,128 @@
-# Modulex Admin Production Surface Inventory
+# Modulex Admin Production Surface & Domain Map
 
-Last reviewed: 2026-08-29
-Baseline main: `6cbd27198d930cb129b912fa4faece3bf967e292`
+Last reviewed: 2026-09-11
+Baseline main: `02f2bce3433df43c7b4fb10d611ed99e7406a822`
 
-This inventory classifies the Admin route/navigation surface for Phase A0. It is intentionally conservative: a route is removed only when it is clearly TailAdmin/demo residue. Business modules whose long-term scope is still under review remain explicit rather than being silently deleted.
+This is the canonical handoff map for the Modulex Admin production surface. It answers four questions without relying on chat history: **which domain owns a capability, where its Admin route lives, where Supabase changes are canonical, and what may cross from internal Admin data into Store/public/portal delivery.**
 
-## Classification
+`ADMIN_ROADMAP.md` owns delivery status. `ADMIN_RBAC_MATRIX.md` owns role/permission expectations. This document owns route/domain and cross-surface architecture.
 
-### Production operational surfaces
+## Ownership model
 
-These route families are Modulex business/control-plane surfaces and remain reachable subject to the existing permission model:
+| Layer / domain | Primary owner | Runtime surface | Boundary |
+| --- | --- | --- | --- |
+| Internal operations | `modulex-admin` | authenticated Admin routes | RBAC + server/RPC + grants/RLS + DB lifecycle guards |
+| Store CMS/control plane | `modulex-admin` | `/store/*`, relevant Settings | edits canonical Supabase business content; does not directly render the public site |
+| Public Oakwell website | `modulex-store` | public Store routes | published/public projection only |
+| Customer Portal | `modulex-store` | authenticated customer routes | customer-scoped projection only |
+| Dealer Portal | `modulex-store` | authenticated dealer routes | dealer/customer-scoped projection only |
+| Shared system of record | Supabase | Postgres/Auth/Storage/RPC | one data model; access differs by caller/surface |
+| Canonical migration history | `modulex-store/supabase/migrations` | source-controlled SQL | production migration source of truth |
+| Admin migration mirror | `modulex-admin/supabase/migrations` | compatibility mirror where established | secondary only; never decides production history |
 
-- `/` — operational dashboard
-- `/products`, `/brands`, `/categories`, `/low-stock` — product master and stock visibility
-- `/pricing/*` — pricing dashboard, product pricing, groups, cost/margin
-- `/customers/*` — customers, orders, shipments, installations, invoices
-- `/inventory`, `/stock-movements`, `/stock-operations` — inventory operations
-- `/warehouses`, `/zones`, `/locations` — warehouse/location model
-- `/qr-labels`, `/scan`, `/shelf-inventory` — QR/barcode and physical stock workflows
-- `/reports/*` — inventory/movement reporting
-- `/users`, `/roles` — identity and access administration
-- `/store/*` — Store CMS, products, colors, marketing, leads, Pages and Projects
-- `/settings/general/*`, `/settings/payment-methods` — operational settings
-- `/profile` — intentional Modulex user-profile surface used by the authenticated header dropdown
+A domain may be displayed by another surface without transferring ownership. Example: Finance can show approved payroll settlement while Personnel/HR remains the payroll calculation/source owner; Store can display an Order/Project projection while Admin remains the operational owner.
 
-### Intentional business surfaces pending later scope decisions
+## Current Admin production route families
 
-These are not TailAdmin component demos. They remain in place for later roadmap decisions and must not be removed as part of A0 demo cleanup:
+The table describes current route families and canonical ownership. Nested detail/new/edit/print routes inherit the same domain unless a stricter permission is documented in `ADMIN_RBAC_MATRIX.md`.
 
-- `/personnel/*` — Phase A6 classification still required
-- `/finance/*` — Phase A6 classification still required
-- `/approvals` — Phase A6 decision still required
-- `/training` — Phase A6 decision still required
+| Route family | Domain owner / purpose |
+| --- | --- |
+| `/` | Admin operational dashboard |
+| `/customers`, `/customers/dashboard` | Customer master and customer operations |
+| `/customers/orders` and nested order routes | Orders commercial/lifecycle domain |
+| `/customers/shipments` | Shipment/fulfillment execution |
+| `/customers/installations` | Installation execution |
+| `/customers/invoices` | Customer invoice document surface; Finance owns resulting money movement |
+| `/projects`, `/projects/import` | Project operations/import; Finance remains money-movement owner |
+| `/calendar` | Company Calendar and Google Calendar integration surface |
+| `/products`, `/products/types`, `/products/uom`, `/brands`, `/categories` | Product Master/taxonomy |
+| `/products/vendor-imports` | Vendor Catalog review/import into canonical Product Master |
+| `/pricing/dashboard`, `/pricing/products`, `/pricing/groups`, `/pricing/material-bands` | Pricing and price-group/material-band controls |
+| `/pricing/countertop/*` | Countertop configuration/catalog/services/settings |
+| `/pricing/cost-margin` | restricted internal cost/margin projection |
+| `/inventory`, `/stock-movements`, `/stock-operations`, `/low-stock` | Inventory snapshots, append-safe movements and stock operations |
+| `/warehouses`, `/zones`, `/locations` | Warehouse/location master and read surfaces |
+| `/qr-labels`, `/scan`, `/shelf-inventory` | QR/barcode and physical stock workflows |
+| `/requests` | Request Center |
+| `/approvals` | shared approval queue/workflow; requesting remains domain-owned |
+| `/updates` | product/release updates visible to authorized staff |
+| `/finance/*` | Finance Core, expenses, AR/AP, accounts, vendors/bills/payments/schedules/aging/reports and settlement projections |
+| `/personnel/*` | Personnel/HR: employees, departments, positions, attendance, leave, lifecycle, documents, performance, compliance, compensation, benefits, payroll and reports |
+| `/reports/sales-production`, `/reports/inventory`, `/reports/movements` | production reporting surfaces; each report reads its owning domain truth |
+| `/store/*` | Admin Store control plane: content/company/pages/cabinet content/products/colors/projects/media/reviews/leads/form options/marketing |
+| `/users`, `/roles` | Users, effective roles and access administration |
+| `/settings/general/*` | company/localization/documents/email/notifications/product updates/project participant roles and other general settings |
+| `/settings/payment-methods` | shared payment-method configuration with Finance mutation authority |
+| `/settings/integrations/google-calendar` | Google Calendar integration settings |
+| `/profile` | authenticated user profile |
 
-Their presence is deliberate for now; future A6 work must classify each as production, planned, or remove.
+### Intentional aliases / compatibility routes
 
-### Removed TailAdmin/demo surfaces
+- `/customers/payment-methods` is a legacy redirect/alias for `/settings/payment-methods`; it is not a second configuration source.
+- Compatibility projections/tables/RPCs may exist for older consumers, but they do not create a second business owner. Their deprecation/removal requires explicit migration evidence.
 
-The following sample routes are prohibited from the production Admin surface and are protected by `scripts/admin-production-surface-contract.mjs`:
+## Product-scope decisions already closed
 
-- `/alerts`
-- `/avatars`
-- `/badge`
-- `/buttons`
-- `/images`
-- `/modals`
-- `/videos`
-- `/bar-chart`
-- `/line-chart`
-- `/form-elements`
-- `/basic-tables`
-- `/blank`
-- `/calendar`
-- `/api-test`
-- `/error-404` — explicit TailAdmin template route; global `not-found.tsx` is the single intentional 404 surface
+The old Phase A0/A6 classification is no longer current.
 
-`/api-test` was also removed from the authenticated sidebar navigation.
+- **Finance** is production scope and closed through the Finance F0→F7 architecture/acceptance track.
+- **Personnel/HR** is production scope; all listed Personnel routes are retained.
+- **Approvals** is a shared production workflow.
+- **Standalone `/training` is not product scope.** Its former static route and obsolete route permission were removed. Existing HR training schema, where retained, remains Personnel-owned rather than resurrecting a standalone Training product surface.
+- **`/calendar` is a production Company Calendar route.** Only the old TailAdmin sample calendar route under the template route group is prohibited.
 
-## Guardrails
+## Public vs internal data boundary
 
-`npm run smoke:production-surface` fails when a known TailAdmin/demo route file is reintroduced or when `/api-test` is added back to navigation. The contract also asserts that the intentional `/profile` surface remains present, the operational dashboard continues to source KPIs/recent movements from the production RPC boundary, dashboard Quick Actions resolve the active profile and filter through `canAccessPath()`, the global 404 does not expose TailAdmin branding, and production Sign In does not preload the known developer account.
+Modulex uses one Supabase project, but shared storage does **not** mean shared visibility.
 
-Phase A0.2 navigation/direct-route permission truth is documented in `docs/ADMIN_RBAC_MATRIX.md`. `npm run smoke:rbac` compares every sidebar path with `requiredPermissionForPath()`, verifies all active roles can reach `/profile`, protects manage-only Store and warehouse mutation routes, and keeps intentional route aliases aligned with their canonical permissions.
+### Internal by default
 
-These UI/route guards do not replace Supabase RLS/RPC/API authorization; data authorization remains independently enforced and tested.
+The following remain internal unless a deliberately narrow projection says otherwise:
 
-## Remaining A0 work
+- cost, margin, landed-cost and internal pricing inputs;
+- inventory internals, stock movement/audit detail and warehouse mutation metadata;
+- Finance ledger/audit internals and payment-sensitive operational data;
+- HR/Personnel records and payroll source detail;
+- internal notes, approval/audit history, actor metadata and idempotency/debug state;
+- private customer/dealer/supporting documents unless visibility is explicitly granted;
+- service-role/secret/provider credentials and server-only configuration.
 
-- Complete runtime/package/environment cleanup tasks listed in `ADMIN_ROADMAP.md` (A0.3).
-- Keep A6 Personnel/Finance/Training/Approvals scope decisions explicit rather than treating them as template residue.
+### Allowed cross-surface pattern
+
+```text
+Admin mutation / canonical domain truth
+        ↓
+Supabase table/RPC/storage + RLS/lifecycle guards
+        ↓
+reviewed narrow public/customer/dealer projection
+        ↓
+modulex-store public or portal consumer
+```
+
+Public/portal consumers must not bypass a reviewed projection merely because the underlying table is in the same Supabase project. `SECURITY DEFINER` functions are acceptable only as intentional narrow boundaries with reviewed authorization/grants and safe `search_path` behavior.
+
+## Store CMS ownership
+
+`modulex-admin` is the business-editable control plane for mutable Store content. `modulex-store` owns rendering/delivery. The intended flow is:
+
+`Admin → Supabase DB/Storage → published/public projection → Store`.
+
+Do not create a second hard-coded production copy of company profile, contact/location/hours, real project/media/review/FAQ content, configurable navigation/footer labels, or other operator-owned content inside Store runtime source.
+
+## Removed / prohibited production residue
+
+The production-surface regression prohibits the old TailAdmin/demo routes, including UI-element demos, chart demos, form/table samples, blank page, `/api-test`, and the template-specific error page. The global Modulex `not-found.tsx` is the intentional 404 surface.
+
+The old TailAdmin sample calendar path under `(others-pages)/calendar` remains prohibited; the current `/calendar` production domain is a separate Modulex route and must not be treated as demo residue.
+
+## Executable guardrails
+
+- `npm run smoke:production-surface` protects demo-route removal, dashboard production RPC use, permission-filtered quick actions, Modulex 404 identity and sign-in/profile expectations.
+- `npm run smoke:rbac` protects navigation/direct-route permission alignment; it does not replace RLS/RPC authorization.
+- Domain contracts protect deeper behavior, lifecycle and cross-surface projections.
+- `docs/OPS_OBSERVABILITY_RELEASE_STANDARD.md` defines the verification/release flow for changes to this map or the underlying runtime.
+
+## Documentation lifecycle
+
+Historical acceptance files may describe the route set that existed when they were written. They remain evidence, not the current route inventory. When current code/product ownership changes, update this document, the relevant RBAC/domain contract, `ADMIN_ROADMAP.md`, and acceptance evidence in the same PR.

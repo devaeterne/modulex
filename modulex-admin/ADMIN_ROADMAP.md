@@ -1,27 +1,73 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-11
-Main baseline: `015b9c4d2811d4e7ba3d141590f271876909d7ef`
+Main baseline: `02f2bce3433df43c7b4fb10d611ed99e7406a822`
 Current phase: **Admin Final Workstreams**
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
-This file is the current execution source of truth for `modulex-admin`. The previous detailed roadmap is preserved at `docs/archive/ADMIN_ROADMAP_2026-09-08.md`; acceptance documents remain authoritative for historical proof.
+This file is the current execution/status source of truth for `modulex-admin`. The previous detailed roadmap is preserved at `docs/archive/ADMIN_ROADMAP_2026-09-08.md`; acceptance documents are point-in-time historical proof and do not override current code, production state, or this roadmap.
 
 ## Status legend
 
-- `[x]` closed: merged and accepted at the level required by that domain.
-- `[~]` active/partial: substantial implementation exists but the listed exit gate is not closed.
-- `[ ]` not closed: work remains.
+- `[x]` closed: the workstream's required implementation/documentation and applicable verification/acceptance evidence are complete. A PR that changes the status to `[x]` must carry that evidence; merge makes the closed state authoritative on `main`.
+- `[~]` active/partial: work has started or substantial implementation exists, but one or more exit gates remain open.
+- `[ ]` not closed: work remains or has not started.
+- `[!]` deferred / not product scope: intentionally not being implemented now. The item must state the reason, owner decision or dependency, and the concrete condition that would reopen it. `[!]` is not a substitute for an unexplained blocker.
+
+## Workstream lifecycle contract
+
+### Open a workstream when
+
+- a roadmap-coded requirement is newly approved, a concrete regression reopens a closed capability, or current evidence proves a material gap in an existing domain;
+- the owning prefix/domain is explicit and duplicate work in another active PR/workstream has been ruled out;
+- execution-time `main`, open PRs, current production migration state when relevant, and applicable deployment state have been re-read;
+- acceptance/exit criteria are specific enough to prove completion without relying on chat history.
+
+Do not open a new prefix merely to rename an existing requirement. Extend the existing owning workstream when the architecture/domain is unchanged.
+
+### While active
+
+- Mark the package/workstream `[~]` once implementation or reconciliation work begins.
+- Preserve one canonical owner for each domain, route, RPC/data source, release rule and documentation contract; prefer REUSE/EXTEND/BRIDGE over parallel replacements.
+- Use TDD for behavior changes. Documentation-only reconciliation must still be backed by executable documentation/domain contracts where such contracts exist.
+- Record blockers/dependencies in the roadmap or owning acceptance record rather than leaving stale implied status.
+
+### Evidence required for `[x]`
+
+An item may become `[x]` only after all applicable evidence for that item is present:
+
+1. **Source/contract evidence** — requested code/docs/schema are present and current architecture/ownership is explicit.
+2. **Automated verification** — relevant domain contract/CI plus Admin global typecheck/lint/build and UI/RBAC gates when the scope affects them.
+3. **Database evidence when applicable** — canonical merged migration, production migration-state verification, RLS/RPC/grant/lifecycle checks, and fresh relevant Security/Performance Advisor disposition.
+4. **Production acceptance when applicable** — signed-in production-safe smoke, negative authorization path where relevant, and zero test residue; prefer read-only/rollback-only probes.
+5. **Deployment evidence when runtime changed** — expected merged SHA is the Vercel production artifact and is healthy.
+6. **Handoff evidence** — the owning acceptance record and this roadmap are updated in the same PR so the result can be understood without chat history.
+
+A docs-only package does not invent migrations, Advisors, deployment or production mutations merely to satisfy ceremony; record those gates as not applicable and prove the changed documentation through the existing documentation/domain/CI contracts.
+
+### Use `[!]` only when
+
+- the owner intentionally defers the work, explicitly declares it not product scope, or a named external dependency makes execution inappropriate now;
+- the reason is written next to the item; and
+- the reopen condition is explicit when future work is possible.
+
+Do not mark an implementation defect `[!]` simply because it is inconvenient. Security/integrity blockers stay open until fixed or explicitly owner-deferred with risk recorded.
+
+### Same-PR maintenance rule
+
+Any PR that opens, closes, defers, materially re-scopes, or changes the architecture/acceptance contract of a coded workstream **must update `ADMIN_ROADMAP.md` in that same PR**. It must also update the owning acceptance/domain document when the evidence or contract changes. Cross-surface changes review/update `modulex-store/STORE_ROADMAP.md` where affected.
+
+Historical acceptance/plan documents remain evidence; do not rewrite old proof to make current status look cleaner. Mark their role as historical/obsolete from a current canonical document and add new acceptance evidence when current behavior changes.
 
 ## Execution rules
 
-- Each prefix below is an independent conversation/workstream. Keep one prefix in one chat unless a hard dependency is discovered.
-- At the start of every workstream, re-check execution-time `main`, open PRs, production migrations, and relevant production deployment state.
+- Each prefix below is an independent conversation/workstream unless a hard dependency is discovered.
+- At the start of every workstream, re-check execution-time `main`, open PRs, production migrations when relevant, and relevant production deployment state.
 - Do not reopen completed domains without a concrete regression or explicitly approved new scope.
 - Canonical Supabase migrations live under `modulex-store/supabase/migrations`; Admin mirrors are secondary only where an established mirror exists.
-- Use TDD for behavior changes. Before closeout, run the relevant domain workflow, Admin UI/RBAC gates when affected, production-safe acceptance, and fresh Supabase Advisors for DB/RLS/RPC/index changes.
+- Before closeout, run the relevant domain workflow, Admin UI/RBAC gates when affected, production-safe acceptance, and fresh Supabase Advisors for DB/RLS/RPC/grant/index changes.
 - Production mutation acceptance should be read-only or rollback-only whenever possible and must leave zero test residue.
-- When a coded item closes, update this file in the same PR.
+- `docs/OPS_OBSERVABILITY_RELEASE_STANDARD.md` is the single verification/migration/Advisor/Vercel release flow; do not create per-feature duplicate release checklists.
 
 # Closed domains
 
@@ -157,6 +203,7 @@ Status: `[x]` UXA-A1→UXA-A3 closed; operational accessibility and responsive h
 - [x] **UXA-A1 — Keyboard/focus audit.** Tables, dropdowns, modals, drawers, forms, scanner and navigation must be keyboard-operable with predictable focus restoration.
 - [x] **UXA-A2 — Mobile/tablet operations.** Re-test warehouse/scanner, Customer/Order, Finance and high-use forms at supported breakpoints with no hidden critical action/data.
 - [x] **UXA-A3 — Destructive/loading states.** Standardize confirmation, disabled, pending, retry and error recovery for destructive/high-risk mutations.
+
 ## VAL — Validation Finalization
 
 Status: `[~]` VAL-1→VAL-4 are closed.
@@ -176,12 +223,12 @@ Status: `[x]` OPS-A1→OPS-A4 closed; the operational baseline, audit reuse cont
 
 ## DOC — Repository Documentation / Handoff
 
-Status: `[~]` README and several core docs exist; A8 exit gate is not fully reconciled.
+Status: `[x]` DOC-A1→DOC-A4 reconciled; existing docs are retained with explicit canonical/historical roles and executable drift checks.
 
-- [ ] **DOC-A1 — Documentation inventory/reconciliation.** Map existing README, Production Surface, RBAC, Runtime Config, UI, Validation, Finance and acceptance docs to current architecture; remove stale contradictions.
-- [ ] **DOC-A2 — Route/domain/Supabase map.** Ensure a new developer can identify domain ownership, Admin/Store boundaries and canonical migration location without chat history.
-- [ ] **DOC-A3 — Verification/deploy handbook.** Consolidate lint/typecheck/build/smoke/live-smoke, Vercel expectations and migration/release references.
-- [ ] **DOC-A4 — Roadmap maintenance contract.** Define how coded items are opened/closed and require roadmap/acceptance updates in the same PR.
+- [x] **DOC-A1 — Documentation inventory/reconciliation.** README/Production Surface/RBAC/Runtime/UI/Validation/Finance/acceptance sources have explicit ownership/precedence; stale Training/Calendar/Finance-baseline contradictions and duplicate current-status claims are removed or classified as historical evidence.
+- [x] **DOC-A2 — Route/domain/Supabase map.** `docs/ADMIN_PRODUCTION_SURFACE.md` is the canonical route/domain + Admin/Store + canonical migration + public/internal boundary map; root/Admin READMEs lead new developers/agents to it.
+- [x] **DOC-A3 — Verification/deploy handbook.** `docs/OPS_OBSERVABILITY_RELEASE_STANDARD.md` remains the single verification/release flow for typecheck/lint/build, relevant smoke/domain CI, production-safe smoke, canonical migrations, Advisors and Vercel; duplicate feature-level release handbooks are not created.
+- [x] **DOC-A4 — Roadmap maintenance contract.** This roadmap now permanently defines open/active/closed/deferred semantics, evidence required for `[x]`, valid `[!]` use, and same-PR roadmap/acceptance maintenance.
 
 # Final Admin exit gate
 
@@ -192,4 +239,4 @@ The Admin program is considered fully closed only when all open coded workstream
 - [ ] Store/Lead/Dealer/User/Settings/Personnel operational flows require no manual SQL.
 - [ ] Critical workflows have repeatable CI + production-safe acceptance.
 - [ ] Security/Performance Advisor results are triaged and intentional warnings are documented.
-- [ ] Release/handoff documentation is sufficient to operate without prior chat context.
+- [x] Release/handoff documentation is sufficient to operate without prior chat context.
