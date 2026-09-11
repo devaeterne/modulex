@@ -1,8 +1,14 @@
-import { getVendorsPage, type VendorListItem } from "@/lib/finance/vendors";
 import { supabase } from "@/lib/supabase/client";
 
 const ENTITY_DOCUMENT_BUCKET = "entity-documents";
 const MAX_VENDOR_PDF_BYTES = 25 * 1024 * 1024;
+
+export type ActiveOrderVendor = {
+  id: string;
+  code: string;
+  legal_name: string;
+  display_name: string;
+};
 
 export type CustomVendorCabinetDraft = {
   vendorId: string;
@@ -32,8 +38,10 @@ export function calculateCustomVendorCabinetSellPrice(totalCost: number, markupP
   return Math.round(totalCost * (1 + markupPercent / 100) * 10000) / 10000;
 }
 
-export async function loadActiveCustomVendorCabinetVendors(): Promise<VendorListItem[]> {
-  return getVendorsPage({ limit: 200, offset: 0, status: "active" });
+export async function loadActiveCustomVendorCabinetVendors(): Promise<ActiveOrderVendor[]> {
+  const { data, error } = await supabase.rpc("get_active_order_vendors");
+  if (error) throw error;
+  return (data ?? []) as ActiveOrderVendor[];
 }
 
 export function validateCustomVendorCabinetPdf(file: File) {

@@ -3,14 +3,14 @@ import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import FinanceVendorsManager from "@/components/finance/FinanceVendorsManager";
 
 export const metadata: Metadata = {
-  title: "Finance Vendors | Modulex Admin",
+  title: "Vendor Management | Modulex Admin",
   description: "Manage canonical vendors, source identities, contacts and compliance",
 };
 
 export default function FinanceVendorsPage() {
   return (
     <>
-      <PageBreadCrumb pageTitle="Finance Vendors" />
+      <PageBreadCrumb pageTitle="Vendor Management" />
       <FinanceVendorsManager />
     </>
   );

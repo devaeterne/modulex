@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import FormHint from "@/components/form/FormHint";
 import Label from "@/components/form/Label";
@@ -14,9 +15,9 @@ import {
   calculateCustomVendorCabinetSellPrice,
   loadActiveCustomVendorCabinetVendors,
   validateCustomVendorCabinetPdf,
+  type ActiveOrderVendor,
   type CustomVendorCabinetDraft,
 } from "@/lib/customers/custom-vendor-cabinet";
-import type { VendorListItem } from "@/lib/finance/vendors";
 
 type Props = {
   isOpen: boolean;
@@ -26,7 +27,7 @@ type Props = {
 };
 
 export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onClose, onSubmit }: Props) {
-  const [vendors, setVendors] = useState<VendorListItem[]>([]);
+  const [vendors, setVendors] = useState<ActiveOrderVendor[]>([]);
   const [vendorId, setVendorId] = useState("");
   const [lineName, setLineName] = useState("");
   const [totalCost, setTotalCost] = useState("");
@@ -107,7 +108,10 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
         {error ? <Alert variant="error" title="Vendor Cabinet line" message={error} /> : null}
 
         <div>
-          <Label htmlFor="vendor-cabinet-vendor">Vendor</Label>
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <Label htmlFor="vendor-cabinet-vendor">Vendor</Label>
+            <Link className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`} href="/finance/vendors">Manage Vendors</Link>
+          </div>
           <Select
             id="vendor-cabinet-vendor"
             value={vendorId}
@@ -116,11 +120,12 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
             placeholder={loading ? "Loading active vendors…" : "Select vendor"}
             disabled={loading}
           />
+          {!loading && vendors.length === 0 ? <FormHint>No active vendors are available. Create or activate one in Vendor Management.</FormHint> : null}
         </div>
 
         <div>
           <Label htmlFor="vendor-cabinet-line-name">Line Name</Label>
-          <Input id="vendor-cabinet-line-name" value={lineName} onChange={(event) => setLineName(event.target.value)} maxLength={160} placeholder="Kitchen Cabinets" />
+          <Input id="vendor-cabinet-line-name" value={lineName} onChange={(event) => setLineName(event.target.value)} maxLength={160} placeholder="Crystal Cabinet" />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -130,7 +135,7 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
           </div>
           <div>
             <Label htmlFor="vendor-cabinet-markup">Markup %</Label>
-            <Input id="vendor-cabinet-markup" inputMode="decimal" value={markupPercent} onChange={(event) => setMarkupPercent(event.target.value)} placeholder="30" />
+            <Input id="vendor-cabinet-markup" inputMode="decimal" value={markupPercent} onChange={(event) => setMarkupPercent(event.target.value)} placeholder="70" />
           </div>
         </div>
 

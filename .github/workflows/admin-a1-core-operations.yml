@@ -74,6 +74,7 @@ jobs:
       - run: npm run smoke:order-domain
       - run: npm run smoke:order-lifecycle
       - run: node scripts/order-status-action-guidance-contract.mjs
+      - run: node scripts/order-custom-vendor-cabinet-contract.mjs
       - run: npm run smoke:dealer-portal-admin
       - run: npm run smoke:store-portal-admin
 

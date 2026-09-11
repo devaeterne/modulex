@@ -6,6 +6,7 @@ import ComponentCard from "@/components/common/ComponentCard";
 import SummaryRow from "@/components/common/SummaryRow";
 import CountertopConfigurator from "@/components/countertop/CountertopConfigurator";
 import CountertopLineDetails from "@/components/customers/CountertopLineDetails";
+import CustomVendorCabinetLineModal from "@/components/customers/CustomVendorCabinetLineModal";
 import ManualServiceLineModal from "@/components/customers/ManualServiceLineModal";
 import OrderProductPicker, { type OrderPickerProduct } from "@/components/customers/OrderProductPicker";
 import ServiceLineDetails from "@/components/customers/ServiceLineDetails";
@@ -21,6 +22,12 @@ import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { PlusIcon } from "@/icons";
 import { hasPermission } from "@/lib/auth/permissions";
+import {
+  cleanupCustomVendorCabinetDocument,
+  createCustomVendorCabinetOrderLine,
+  uploadCustomVendorCabinetDocument,
+  type CustomVendorCabinetDraft,
+} from "@/lib/customers/custom-vendor-cabinet";
 import {
   getCustomerOrderRevisionPolicy,
   loadEditOrderContext,
@@ -54,6 +61,7 @@ import DateInput from "@/components/form/DateInput";
 
 type Product = OrderPickerProduct;
 type PriceRow = OrderPriceRow;
+type OrderLinePricingModel = OrderPricingModel | "manual_vendor_cabinet";
 type DraftItem = {
   id?: string;
   product_id: string;
@@ -63,8 +71,11 @@ type DraftItem = {
   quantity: string;
   unit_price: string;
   discount_percent: string;
-  pricing_model: OrderPricingModel | null;
+  pricing_model: OrderLinePricingModel | null;
   line_note: string;
+  vendor_name_snapshot: string;
+  manual_cost_amount: string;
+  manual_markup_percent: string;
 };
 type TaxRule = OrderTaxRule;
 type ValidatedRevisionItem = {
@@ -87,6 +98,12 @@ type FieldErrors = {
   items?: Record<number, ItemFieldErrors>;
 };
 
+type VendorCabinetItemSnapshot = CustomerOrderItem & {
+  vendor_name_snapshot?: string | null;
+  manual_cost_amount?: string | number | null;
+  manual_markup_percent?: string | number | null;
+};
+
 function money(value: number, currency = "USD") {
   try {
     return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number.isFinite(value) ? value : 0);
@@ -104,13 +121,14 @@ function operationErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-function pricingModelFor(item: DraftItem, product: Product | undefined): OrderPricingModel | null {
+function pricingModelFor(item: DraftItem, product: Product | undefined): OrderLinePricingModel | null {
   return item.pricing_model ?? product?.pricing_model ?? null;
 }
 
 function resolveOrderLineUnitPriceValue(item: DraftItem, product: Product | undefined, priceValueMap: Map<string, string>) {
   const model = pricingModelFor(item, product);
   if (model === "price_group") return priceValueMap.get(item.product_id);
+  if (model === "manual_vendor_cabinet") return item.unit_price;
   if ((model === "countertop_material_band" || model === "manual_service") && (item.id || model === "manual_service")) {
     return item.unit_price;
   }
@@ -118,6 +136,7 @@ function resolveOrderLineUnitPriceValue(item: DraftItem, product: Product | unde
 }
 
 function mapDraftItem(item: CustomerOrderItem): DraftItem {
+  const vendorSnapshot = item as VendorCabinetItemSnapshot;
   return {
     id: item.id,
     product_id: item.product_id ?? "",
@@ -127,8 +146,11 @@ function mapDraftItem(item: CustomerOrderItem): DraftItem {
     quantity: String(item.quantity),
     unit_price: String(item.unit_price),
     discount_percent: String(item.discount_percent),
-    pricing_model: item.pricing_model_snapshot ?? null,
+    pricing_model: (item.pricing_model_snapshot as OrderLinePricingModel | null | undefined) ?? null,
     line_note: item.line_note ?? "",
+    vendor_name_snapshot: vendorSnapshot.vendor_name_snapshot ?? "",
+    manual_cost_amount: vendorSnapshot.manual_cost_amount == null ? "" : String(vendorSnapshot.manual_cost_amount),
+    manual_markup_percent: vendorSnapshot.manual_markup_percent == null ? "" : String(vendorSnapshot.manual_markup_percent),
   };
 }
 
@@ -167,7 +189,10 @@ export default function EditCustomerOrder() {
   const [orderDiscount, setOrderDiscount] = useState("0");
   const [revisionReason, setRevisionReason] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [isCabinetSourceModalOpen, setIsCabinetSourceModalOpen] = useState(false);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+  const [isVendorCabinetModalOpen, setIsVendorCabinetModalOpen] = useState(false);
+  const [isAddingVendorCabinet, setIsAddingVendorCabinet] = useState(false);
   const [isCountertopOpen, setIsCountertopOpen] = useState(false);
   const [countertopEditItemId, setCountertopEditItemId] = useState<string | null>(null);
   const [countertopRemoveItemId, setCountertopRemoveItemId] = useState<string | null>(null);
@@ -246,7 +271,10 @@ export default function EditCustomerOrder() {
   const summariesByItemId = useMemo(() => new Map(countertopSummaries.map((summary) => [summary.orderItemId, summary])), [countertopSummaries]);
   const selectedQuantities = useMemo(() => {
     const values = new Map<string, number>();
-    for (const item of items) values.set(item.product_id, (values.get(item.product_id) ?? 0) + Number(item.quantity || 0));
+    for (const item of items) {
+      if (!item.product_id) continue;
+      values.set(item.product_id, (values.get(item.product_id) ?? 0) + Number(item.quantity || 0));
+    }
     return values;
   }, [items]);
   const selectedPriceGroup = useMemo(() => priceGroups.find((group) => group.id === priceGroupId) ?? null, [priceGroups, priceGroupId]);
@@ -331,6 +359,9 @@ export default function EditCustomerOrder() {
         discount_percent: "0",
         pricing_model: product.pricing_model,
         line_note: "",
+        vendor_name_snapshot: "",
+        manual_cost_amount: "",
+        manual_markup_percent: "",
       }];
     });
   }
@@ -371,10 +402,61 @@ export default function EditCustomerOrder() {
         discount_percent: "0",
         pricing_model: "manual_service",
         line_note: value.lineNote,
+        vendor_name_snapshot: "",
+        manual_cost_amount: "",
+        manual_markup_percent: "",
       }]);
     }
     setIsServiceModalOpen(false);
     setServiceEditIndex(null);
+  }
+
+  async function reloadAuthoritativeOrder() {
+    const context = await loadEditOrderContext(customerId, orderId);
+    setOrder(context.order);
+    setProducts(context.products as Product[]);
+    setCountertopSummaries(context.countertopSummaries);
+    setItems(context.items.map(mapDraftItem));
+    setOrderDiscount(String(context.order.discount_amount ?? 0));
+    return context;
+  }
+
+  async function addVendorCabinet(value: CustomVendorCabinetDraft) {
+    if (!order || order.status !== "draft") {
+      setErrorMessage("Vendor Cabinet lines can only be added while the Order is Draft.");
+      return;
+    }
+    if (isAddingVendorCabinet) return;
+    setIsAddingVendorCabinet(true);
+    setErrorMessage(null);
+    let uploaded: Awaited<ReturnType<typeof uploadCustomVendorCabinetDocument>> | null = null;
+    let lineCreated = false;
+    try {
+      uploaded = await uploadCustomVendorCabinetDocument({
+        orderId: order.id,
+        vendorName: value.vendorName,
+        lineName: value.lineName,
+        file: value.file,
+      });
+      await createCustomVendorCabinetOrderLine({
+        orderId: order.id,
+        vendorId: value.vendorId,
+        lineName: value.lineName,
+        totalCost: value.totalCost,
+        markupPercent: value.markupPercent,
+        documentId: uploaded.documentId,
+        orderDiscountAmount: orderDiscount,
+      });
+      lineCreated = true;
+      await reloadAuthoritativeOrder();
+      setIsVendorCabinetModalOpen(false);
+      setIsCabinetSourceModalOpen(false);
+    } catch (error) {
+      if (uploaded && !lineCreated) await cleanupCustomVendorCabinetDocument(uploaded);
+      setErrorMessage(operationErrorMessage(error, lineCreated ? "Vendor Cabinet was added, but the Order could not be refreshed." : "Unable to add Vendor Cabinet to this Order."));
+    } finally {
+      setIsAddingVendorCabinet(false);
+    }
   }
 
   async function handleCountertopAttached(createdItemId: string) {
@@ -505,14 +587,24 @@ export default function EditCustomerOrder() {
       const product = productMap.get(item.product_id);
       const model = pricingModelFor(item, product);
       const itemError: ItemFieldErrors = {};
-      if (model === "countertop_material_band" && !item.id) blockingMessage ??= "Countertop Material Band products must be configured through the Countertop action.";
-      if (model === "none") blockingMessage ??= "No Commercial Pricing products cannot be added to customer orders.";
-      if (!item.product_id) blockingMessage ??= "Select a product for every line.";
-
       const quantity = parseOrderQuantity(item.quantity);
       const lineDiscount = parseOrderPercent(item.discount_percent);
       if (quantity.error || quantity.value === null) itemError.quantity = quantity.error ?? "Enter a valid quantity.";
       if (lineDiscount.error || lineDiscount.value === null) itemError.discount_percent = lineDiscount.error ?? "Enter a valid line discount.";
+
+      if (model === "manual_vendor_cabinet") {
+        const unitPrice = parseOrderMoney(item.unit_price);
+        if (!item.id || item.product_id) blockingMessage ??= "Vendor Cabinet lines must be managed through the dedicated Vendor Cabinet workflow.";
+        if (quantity.value !== null && compareDbDecimal(quantity.value, "1", ORDER_QUANTITY_DECIMAL) !== 0) itemError.quantity = "Vendor Cabinet quantity is fixed at 1.";
+        if (lineDiscount.value !== null && Number(lineDiscount.value) !== 0) itemError.discount_percent = "Vendor Cabinet line discount is fixed at 0; use the Order discount.";
+        if (unitPrice.error || unitPrice.value === null) itemError.unit_price = unitPrice.error ?? "Vendor Cabinet sell price is invalid.";
+        if (Object.keys(itemError).length) itemErrors[index] = itemError;
+        return;
+      }
+
+      if (model === "countertop_material_band" && !item.id) blockingMessage ??= "Countertop Material Band products must be configured through the Countertop action.";
+      if (model === "none") blockingMessage ??= "No Commercial Pricing products cannot be added to customer orders.";
+      if (!item.product_id) blockingMessage ??= "Select a product for every line.";
 
       const unitPriceValue = resolveOrderLineUnitPriceValue(item, product, priceValueMap);
       const unitPrice = parseOrderMoney(unitPriceValue);
@@ -534,7 +626,7 @@ export default function EditCustomerOrder() {
           quantity: quantity.value,
           unitPrice: unitPrice.value,
           discountPercent: lineDiscount.value,
-          pricingModel: model,
+          pricingModel: model as OrderPricingModel | null,
           lineNote: item.line_note,
         });
       }
@@ -545,6 +637,11 @@ export default function EditCustomerOrder() {
       setFieldErrors(errors);
       setErrorMessage(blockingMessage ?? "Correct the highlighted order fields.");
       focusFirstInvalid(errors);
+      return null;
+    }
+
+    if (validatedItems.length === 0 && items.some((item) => pricingModelFor(item, productMap.get(item.product_id)) === "manual_vendor_cabinet")) {
+      setErrorMessage("This Draft contains only Vendor Cabinet lines. Vendor Cabinet package data is already saved; add a Stock/Service line before using the generic revision action.");
       return null;
     }
 
@@ -600,6 +697,7 @@ export default function EditCustomerOrder() {
   return (
     <div className="space-y-5">
       {errorMessage ? <Alert variant="error" title="Order revision failed" message={errorMessage} /> : null}
+      {isAddingVendorCabinet ? <Alert variant="info" title="Adding Vendor Cabinet" message="Uploading the private PDF and adding the quoted Cabinet package to this Draft…" /> : null}
       {selectedPriceGroup?.requires_approval ? <Alert variant="warning" title="Approval required" message={`${selectedPriceGroup.name} is a restricted price group. Sales use requires approval.`} /> : null}
 
       <ComponentCard title={`Edit ${order.order_number}`} desc={`${customer.name} · ${revisionPolicy.reason}`} headerAction={<Button variant="outline" onClick={() => router.push(`/customers/${customerId}/orders/${orderId}`)}>Back to Order</Button>}>
@@ -619,8 +717,8 @@ export default function EditCustomerOrder() {
 
       <ComponentCard
         title="Products"
-        desc="Cabinet prices use the canonical Price Group route. Configured Countertops use dedicated Replace/Remove actions; Service lines keep their saved authoritative commercial values."
-        headerAction={<div className="flex flex-wrap justify-end gap-2">{canManageCountertop && order.status === "draft" ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} onClick={() => { setCountertopEditItemId(null); setIsCountertopOpen(true); }}>Countertop</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} onClick={() => setIsProductPickerOpen(true)}>Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} onClick={openNewService}>Service</Button></div>}
+        desc="Cabinet starts with a Stock/Vendor source choice. Stock uses canonical Price Group products; Vendor Cabinet uses one productless quoted package with private PDF, cost and markup."
+        headerAction={<div className="flex flex-wrap justify-end gap-2">{canManageCountertop && order.status === "draft" ? <Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} onClick={() => { setCountertopEditItemId(null); setIsCountertopOpen(true); }}>Countertop</Button> : null}<Button size="sm" startIcon={<PlusIcon className="size-4" />} onClick={() => setIsCabinetSourceModalOpen(true)}>Cabinet</Button><Button size="sm" variant="outline" startIcon={<PlusIcon className="size-4" />} onClick={openNewService}>Service</Button></div>}
       >
         <TableViewport>
           <Table variant="admin" minWidth="standard">
@@ -630,6 +728,7 @@ export default function EditCustomerOrder() {
                 const product = productMap.get(item.product_id);
                 const model = pricingModelFor(item, product);
                 const isService = model === "manual_service";
+                const isVendorCabinet = model === "manual_vendor_cabinet";
                 const resolvedPriceValue = resolveOrderLineUnitPriceValue(item, product, priceValueMap);
                 const resolvedPrice = Number(resolvedPriceValue ?? 0);
                 const total = Number(item.quantity || 0) * resolvedPrice * (1 - Number(item.discount_percent || 0) / 100);
@@ -637,13 +736,14 @@ export default function EditCustomerOrder() {
                 const isConfiguredCountertop = Boolean(item.id && countertopSummary);
                 const canMutateConfiguredCountertop = isConfiguredCountertop && canManageCountertop && order.status === "draft";
                 const itemError = fieldErrors.items?.[index];
-                const displaySku = item.sku_snapshot || product?.sku || "Historical product";
-                const displayName = item.display_name_override.trim() || item.product_name_snapshot || product?.name || item.product_id;
+                const displaySku = item.sku_snapshot || product?.sku || (isVendorCabinet ? "VENDOR-CABINET" : "Historical product");
+                const displayName = item.display_name_override.trim() || item.product_name_snapshot || product?.name || (isVendorCabinet ? "Vendor Cabinet" : item.product_id);
                 return (
                   <TableRow key={item.id ?? `${item.product_id}-${index}`}>
                     <TableCell variant="admin" className="min-w-[360px]">
-                      <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{displaySku}</span>{product?.status === "inactive" ? <Badge size="sm" color="warning">Inactive</Badge> : null}</div>
+                      <div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{displaySku}</span>{isVendorCabinet ? <Badge size="sm" color="info">Vendor Cabinet</Badge> : null}{product?.status === "inactive" ? <Badge size="sm" color="warning">Inactive</Badge> : null}</div>
                       <FormHint>{displayName}</FormHint>
+                      {isVendorCabinet ? <FormHint>{item.vendor_name_snapshot || "Vendor"}{item.manual_cost_amount ? ` · Cost ${money(Number(item.manual_cost_amount), currency)}` : ""}{item.manual_markup_percent ? ` · Markup ${Number(item.manual_markup_percent).toFixed(3)}%` : ""} · private PDF attached</FormHint> : null}
                       {canMutateConfiguredCountertop && item.id ? (
                         <div className="mt-3 max-w-xl">
                           <Field label="Line Title" htmlFor={`edit-order-countertop-title-${index}`} hint="Order-only display name. Leave blank and save to use the historical Stone name. Maximum 160 characters.">
@@ -655,17 +755,17 @@ export default function EditCustomerOrder() {
                         </div>
                       ) : null}
                       <CountertopLineDetails summary={countertopSummary} />
-                      <ServiceLineDetails lineNote={item.line_note} />
+                      {!isVendorCabinet ? <ServiceLineDetails lineNote={item.line_note} /> : null}
                       {itemError?.unit_price ? <FormHint>{itemError.unit_price}</FormHint> : null}
                       {itemError?.line_note ? <FormHint>{itemError.line_note}</FormHint> : null}
                     </TableCell>
-                    <TableCell variant="admin" className="w-28">{isConfiguredCountertop ? <FormHint>{item.quantity} · configured{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : isService ? <FormHint>1 · fixed{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-quantity`} ariaLabel={`${displaySku} quantity`} inputMode="decimal" value={item.quantity} error={Boolean(itemError?.quantity)} hint={itemError?.quantity} onChange={(event) => { clearItemError(index, "quantity"); updateItem(index, { quantity: event.target.value }); }} />}</TableCell>
-                    <TableCell variant="admin" className="min-w-[180px]"><span className="font-semibold">{resolvedPriceValue === undefined ? "Unavailable" : money(resolvedPrice, currency)}</span><FormHint>{model === "countertop_material_band" ? "Countertop · configured price" : model === "manual_service" ? "Service · explicit price" : "Price Group · server authoritative"}</FormHint></TableCell>
-                    <TableCell variant="admin" className="w-32">{isConfiguredCountertop ? <FormHint>{Number(item.discount_percent || 0).toFixed(2)}% · configured{itemError?.discount_percent ? ` · ${itemError.discount_percent}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-discount`} ariaLabel={`${displaySku} discount percent`} inputMode="decimal" value={item.discount_percent} error={Boolean(itemError?.discount_percent)} hint={itemError?.discount_percent} onChange={(event) => { clearItemError(index, "discount_percent"); updateItem(index, { discount_percent: event.target.value }); }} />}</TableCell>
+                    <TableCell variant="admin" className="w-28">{isVendorCabinet ? <FormHint>1 · package</FormHint> : isConfiguredCountertop ? <FormHint>{item.quantity} · configured{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : isService ? <FormHint>1 · fixed{itemError?.quantity ? ` · ${itemError.quantity}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-quantity`} ariaLabel={`${displaySku} quantity`} inputMode="decimal" value={item.quantity} error={Boolean(itemError?.quantity)} hint={itemError?.quantity} onChange={(event) => { clearItemError(index, "quantity"); updateItem(index, { quantity: event.target.value }); }} />}</TableCell>
+                    <TableCell variant="admin" className="min-w-[180px]"><span className="font-semibold">{resolvedPriceValue === undefined ? "Unavailable" : money(resolvedPrice, currency)}</span><FormHint>{isVendorCabinet ? "Vendor Cabinet · cost + markup" : model === "countertop_material_band" ? "Countertop · configured price" : model === "manual_service" ? "Service · explicit price" : "Price Group · server authoritative"}</FormHint></TableCell>
+                    <TableCell variant="admin" className="w-32">{isVendorCabinet ? <FormHint>0.00% · package</FormHint> : isConfiguredCountertop ? <FormHint>{Number(item.discount_percent || 0).toFixed(2)}% · configured{itemError?.discount_percent ? ` · ${itemError.discount_percent}` : ""}</FormHint> : <Input id={`edit-order-item-${index}-discount`} ariaLabel={`${displaySku} discount percent`} inputMode="decimal" value={item.discount_percent} error={Boolean(itemError?.discount_percent)} hint={itemError?.discount_percent} onChange={(event) => { clearItemError(index, "discount_percent"); updateItem(index, { discount_percent: event.target.value }); }} />}</TableCell>
                     <TableCell variant="admin" className="font-semibold">{money(total, currency)}</TableCell>
                     <TableCell variant="admin" className="text-right">
                       <div className="flex flex-wrap justify-end gap-2">
-                        {isConfiguredCountertop ? (
+                        {isVendorCabinet ? <FormHint>Saved package · dedicated Vendor Cabinet workflow</FormHint> : isConfiguredCountertop ? (
                           canMutateConfiguredCountertop && item.id ? <>
                             <Button size="sm" variant="outline" onClick={() => openCountertopReplacement(item.id!)}>Replace Countertop</Button>
                             <Button size="sm" variant="danger" onClick={() => openCountertopRemoval(item.id!)}>Remove Countertop</Button>
@@ -692,7 +792,28 @@ export default function EditCustomerOrder() {
         <div className="xl:col-span-4"><ComponentCard title="Revised Total" desc="Internal preview; the server remains authoritative when the revision is saved."><div className="space-y-3"><SummaryRow label="Lines after discount" value={money(preview.subtotal, currency)} /><SummaryRow label="Order discount" value={`-${money(Number(orderDiscount || 0), currency)}`} /><SummaryRow label="Base Sell" value={money(preview.baseSell, currency)} /><SummaryRow label={`Administrative Fee (${Number(administrativeFeePercent || 0).toFixed(3)}%)`} value={money(preview.administrativeFee, currency)} /><SummaryRow label="Customer-visible Sell" value={money(preview.customerVisibleSell, currency)} /><SummaryRow label="Tax" value={money(preview.tax, currency)} /><SummaryRow label="Customer Total" value={money(preview.grandTotal, currency)} strong divider /><Button className="w-full" disabled={isSaving || isLoadingPrices || !revisionPolicy.canEdit} onClick={saveRevision}>{isSaving ? "Saving…" : revisionPolicy.mode === "approval" ? "Submit for Approval" : "Save Revision"}</Button></div></ComponentCard></div>
       </div>
 
+      <Modal isOpen={isCabinetSourceModalOpen} onClose={() => setIsCabinetSourceModalOpen(false)} className="mx-4 w-full max-w-xl p-6" ariaLabel="Choose Cabinet Source">
+        <div className="space-y-5">
+          <div>
+            <h3 className="text-lg font-semibold">Choose Cabinet Source</h3>
+            <FormHint>Choose Stock for catalog/inventory Cabinets, or Vendor for one quoted custom Cabinet package with private PDF, cost and markup.</FormHint>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button variant="outline" onClick={() => { setIsCabinetSourceModalOpen(false); setIsProductPickerOpen(true); }}>Stock Cabinet</Button>
+            <Button disabled={order.status !== "draft" || isAddingVendorCabinet} onClick={() => { setIsCabinetSourceModalOpen(false); setIsVendorCabinetModalOpen(true); }}>Vendor Cabinet</Button>
+          </div>
+          {order.status !== "draft" ? <Alert variant="warning" title="Draft required" message="Vendor Cabinet packages are added through a dedicated workflow and can only be attached while the Order is Draft." /> : <FormHint>Vendor Cabinet is saved immediately to this Draft and reloads authoritative Order lines. Save unrelated edits first.</FormHint>}
+        </div>
+      </Modal>
+
       <OrderProductPicker isOpen={isProductPickerOpen} onClose={() => setIsProductPickerOpen(false)} products={activeProducts} selectedQuantities={selectedQuantities} priceMap={priceMap} onAdd={addProduct} currencyCode={currency} disableWithoutPrice excludedProductTypeCodes={["STONE", "SINK", "SERVICE"]} />
+
+      <CustomVendorCabinetLineModal
+        isOpen={isVendorCabinetModalOpen}
+        currencyCode={currency}
+        onClose={() => setIsVendorCabinetModalOpen(false)}
+        onSubmit={(value) => { void addVendorCabinet(value); }}
+      />
 
       <ManualServiceLineModal
         isOpen={isServiceModalOpen}
