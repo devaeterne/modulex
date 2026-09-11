@@ -24,6 +24,7 @@ on:
       - "modulex-admin/scripts/a6-finance-vendor-master-contract.mjs"
       - "modulex-admin/scripts/a6-finance-vendor-bills-contract.mjs"
       - "modulex-admin/scripts/a6-finance-vendor-payments-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-vendor-payables-contract.mjs"
       - "modulex-admin/scripts/a6-finance-payment-schedule-contract.mjs"
       - "modulex-admin/scripts/a6-finance-purchasing-ap-integration-contract.mjs"
       - "modulex-admin/scripts/a6-finance-ap-aging-contract.mjs"
@@ -43,6 +44,7 @@ on:
       - "modulex-admin/sql/a6-finance-vendor-bills.sql"
       - "modulex-admin/sql/a6-finance-vendor-bills-hardening.sql"
       - "modulex-admin/sql/a6-finance-vendor-payments.sql"
+      - "modulex-admin/sql/a6-finance-vendor-payables.sql"
       - "modulex-admin/sql/a6-finance-payment-schedule.sql"
       - "modulex-admin/sql/a6-finance-payment-schedule-hardening.sql"
       - "modulex-admin/sql/a6-finance-purchasing-ap-integration.sql"
@@ -67,6 +69,7 @@ on:
       - "modulex-store/supabase/migrations/20260905234500_a6_finance_vendor_bills.sql"
       - "modulex-store/supabase/migrations/20260905234600_a6_finance_vendor_bills_hardening.sql"
       - "modulex-store/supabase/migrations/20260905235900_a6_finance_vendor_payments.sql"
+      - "modulex-store/supabase/migrations/20260912010000_a6_finance_vendor_payables.sql"
       - "modulex-store/supabase/migrations/20260906113000_a6_finance_payment_schedule.sql"
       - "modulex-store/supabase/migrations/20260906113100_a6_finance_payment_schedule_hardening.sql"
       - "modulex-store/supabase/migrations/20260906114500_a6_finance_purchasing_ap_integration.sql"
@@ -99,6 +102,7 @@ on:
       - "modulex-admin/scripts/a6-finance-vendor-master-contract.mjs"
       - "modulex-admin/scripts/a6-finance-vendor-bills-contract.mjs"
       - "modulex-admin/scripts/a6-finance-vendor-payments-contract.mjs"
+      - "modulex-admin/scripts/a6-finance-vendor-payables-contract.mjs"
       - "modulex-admin/scripts/a6-finance-payment-schedule-contract.mjs"
       - "modulex-admin/scripts/a6-finance-purchasing-ap-integration-contract.mjs"
       - "modulex-admin/scripts/a6-finance-ap-aging-contract.mjs"
@@ -118,6 +122,7 @@ on:
       - "modulex-admin/sql/a6-finance-vendor-bills.sql"
       - "modulex-admin/sql/a6-finance-vendor-bills-hardening.sql"
       - "modulex-admin/sql/a6-finance-vendor-payments.sql"
+      - "modulex-admin/sql/a6-finance-vendor-payables.sql"
       - "modulex-admin/sql/a6-finance-payment-schedule.sql"
       - "modulex-admin/sql/a6-finance-payment-schedule-hardening.sql"
       - "modulex-admin/sql/a6-finance-purchasing-ap-integration.sql"
@@ -142,6 +147,7 @@ on:
       - "modulex-store/supabase/migrations/20260905234500_a6_finance_vendor_bills.sql"
       - "modulex-store/supabase/migrations/20260905234600_a6_finance_vendor_bills_hardening.sql"
       - "modulex-store/supabase/migrations/20260905235900_a6_finance_vendor_payments.sql"
+      - "modulex-store/supabase/migrations/20260912010000_a6_finance_vendor_payables.sql"
       - "modulex-store/supabase/migrations/20260906113000_a6_finance_payment_schedule.sql"
       - "modulex-store/supabase/migrations/20260906113100_a6_finance_payment_schedule_hardening.sql"
       - "modulex-store/supabase/migrations/20260906114500_a6_finance_purchasing_ap_integration.sql"
@@ -178,6 +184,7 @@ jobs:
       - run: node scripts/a6-finance-vendor-master-contract.mjs
       - run: node scripts/a6-finance-vendor-bills-contract.mjs
       - run: node scripts/a6-finance-vendor-payments-contract.mjs
+      - run: node scripts/a6-finance-vendor-payables-contract.mjs
       - run: node scripts/a6-finance-payment-schedule-contract.mjs
       - run: node scripts/a6-finance-purchasing-ap-integration-contract.mjs
       - run: node scripts/a6-finance-ap-aging-contract.mjs
