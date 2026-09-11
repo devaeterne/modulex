@@ -11,6 +11,11 @@ const read = (relative) => fs.readFileSync(path.join(adminRoot, relative), "utf8
 const standard = read("docs/OPS_OBSERVABILITY_RELEASE_STANDARD.md");
 const acceptance = read("docs/OPS_CLOSEOUT_ACCEPTANCE.md");
 const roadmap = read("ADMIN_ROADMAP.md");
+const adminReadme = read("README.md");
+const productionSurface = read("docs/ADMIN_PRODUCTION_SURFACE.md");
+const rbacMatrix = read("docs/ADMIN_RBAC_MATRIX.md");
+const runtimeConfig = read("docs/ADMIN_RUNTIME_CONFIG.md");
+const rootReadme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
 const workflow = fs.readFileSync(path.join(repoRoot, ".github", "workflows", "admin-ui-foundation.yml"), "utf8");
 
 function requireAll(text, values, label) {
@@ -155,9 +160,106 @@ for (const id of ["OPS-A1", "OPS-A2", "OPS-A3", "OPS-A4"]) {
   assert.match(roadmap, new RegExp(`- \\[x\\] \\*\\*${id}`), `Roadmap must keep ${id} checked`);
 }
 
+// DOC-A1 → DOC-A4 — canonical handoff sources and lifecycle semantics must stay explicit.
+requireAll(
+  rootReadme,
+  [
+    "modulex-admin/ADMIN_ROADMAP.md",
+    "modulex-admin/docs/ADMIN_PRODUCTION_SURFACE.md",
+    "modulex-admin/docs/OPS_OBSERVABILITY_RELEASE_STANDARD.md",
+    "modulex-store/supabase/migrations",
+    "Acceptance files and archived plans are point-in-time evidence",
+  ],
+  "Root handoff index",
+);
+
+requireAll(
+  adminReadme,
+  [
+    "Documentation source-of-truth map",
+    "docs/ADMIN_PRODUCTION_SURFACE.md",
+    "docs/ADMIN_RBAC_MATRIX.md",
+    "docs/ADMIN_RUNTIME_CONFIG.md",
+    "docs/ADMIN_UI_GUIDE.md",
+    "docs/ADMIN_VALIDATION_GUIDE.md",
+    "docs/OPS_OBSERVABILITY_RELEASE_STANDARD.md",
+    "docs/FINANCE_DOMAIN_PLAN.md",
+    "docs/FINANCE_F0_BASELINE.md",
+    "Historical baseline only",
+    "Historical execution evidence",
+    "modulex-store/supabase/migrations",
+  ],
+  "Admin documentation map",
+);
+
+requireAll(
+  productionSurface,
+  [
+    "Ownership model",
+    "modulex-store/supabase/migrations",
+    "Current Admin production route families",
+    "`/calendar`",
+    "Standalone `/training` is not product scope",
+    "Public vs internal data boundary",
+    "Admin → Supabase DB/Storage → published/public projection → Store",
+  ],
+  "Admin production/domain map",
+);
+assert.doesNotMatch(
+  productionSurface,
+  /pending later scope decisions|Phase A6 classification still required/,
+  "Production surface must not retain obsolete A6 scope-decision language",
+);
+
+requireAll(
+  rbacMatrix,
+  [
+    "Standalone `/training` was removed from product scope",
+    "npm run smoke:rbac",
+    "npm run smoke:admin-users",
+    "RBS-A4",
+  ],
+  "Admin RBAC handoff",
+);
+assert.doesNotMatch(rbacMatrix, /`training\.view` remains/, "RBAC docs must not resurrect removed training.view");
+assert.doesNotMatch(rbacMatrix, /npm run test:admin-users/, "RBAC docs must use the real admin-users script name");
+
+requireAll(
+  runtimeConfig,
+  [
+    "OPS_OBSERVABILITY_RELEASE_STANDARD.md",
+    "A Vercel `READY` result is release evidence for a specific SHA only",
+    "npm run smoke:runtime-config",
+  ],
+  "Runtime handoff",
+);
+
+assert.match(roadmap, /Status: `\[x\]` DOC-A1→DOC-A4 reconciled/, "Roadmap must mark DOC closeout reconciled");
+for (const id of ["DOC-A1", "DOC-A2", "DOC-A3", "DOC-A4"]) {
+  assert.match(roadmap, new RegExp(`- \\[x\\] \\*\\*${id}`), `Roadmap must keep ${id} checked`);
+}
+requireAll(
+  roadmap,
+  [
+    "`[!]` deferred / not product scope",
+    "Workstream lifecycle contract",
+    "Evidence required for `[x]`",
+    "Use `[!]` only when",
+    "Same-PR maintenance rule",
+    "must update `ADMIN_ROADMAP.md` in that same PR",
+  ],
+  "Roadmap maintenance contract",
+);
+
 assert.ok(
   workflow.includes("node scripts/ops-observability-release-contract.mjs"),
-  "Approved Admin global CI workflow must execute the OPS closeout contract",
+  "Approved Admin global CI workflow must execute the OPS/DOC closeout contract",
+);
+const rootReadmePathMatches = workflow.match(/^\s*-\s+"README\.md"\s*$/gm) ?? [];
+assert.equal(
+  rootReadmePathMatches.length,
+  2,
+  "Admin UI Foundation must trigger on root README.md for both pull_request and push so DOC handoff drift cannot bypass CI",
 );
 
 // Narrow fail-closed guard: never pipe known secret environment values directly into source console logging.
@@ -197,4 +299,4 @@ for (const file of walk(path.join(adminRoot, "src"))) {
   );
 }
 
-console.log("OPS observability/release closeout contract: PASS");
+console.log("OPS observability/release + DOC handoff contract: PASS");

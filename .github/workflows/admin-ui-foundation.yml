@@ -3,6 +3,7 @@ name: Admin UI Foundation
 on:
   pull_request:
     paths:
+      - "README.md"
       - "AGENTS.md"
       - "docs/CI_WORKFLOW_ARCHITECTURE.md"
       - "docs/acceptance/us-date-format-audit.json"
@@ -22,6 +23,7 @@ on:
       - ".github/workflows/**"
   push:
     paths:
+      - "README.md"
       - "AGENTS.md"
       - "docs/CI_WORKFLOW_ARCHITECTURE.md"
       - "docs/acceptance/us-date-format-audit.json"
