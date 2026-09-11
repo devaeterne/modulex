@@ -142,12 +142,14 @@ export async function getVendorsPage(options?: {
   offset?: number;
   status?: VendorStatus | null;
   search?: string | null;
+  vendorType?: VendorType | null;
 }) {
   const { data, error } = await supabase.rpc("get_vendors_page", {
     p_limit: options?.limit ?? 50,
     p_offset: options?.offset ?? 0,
     p_status: options?.status ?? null,
     p_search: clean(options?.search),
+    p_vendor_type: options?.vendorType ?? null,
   });
   if (error) throw rpcError(error, "Vendors could not be loaded.");
   return (data ?? []) as VendorListItem[];
