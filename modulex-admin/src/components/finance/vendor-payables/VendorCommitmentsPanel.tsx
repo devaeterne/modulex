@@ -11,7 +11,7 @@ import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
-import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
+import { ADMIN_COMPAT_APPEARANCE, ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import { getCustomVendorCabinetDocument, getCustomVendorCabinetDocumentUrl } from "@/lib/customers/custom-vendor-cabinet";
 import { getVendorsPage, type VendorListItem } from "@/lib/finance/vendors";
 import {
@@ -232,12 +232,12 @@ export default function VendorCommitmentsPanel({
             </div>
             <div>
               <h4 className="mb-2 font-semibold">Linked Vendor Bills</h4>
-              {detail.bill_allocations.length === 0 ? <p className={ADMIN_TEXT_STYLES.muted}>No Open Vendor Bill allocations.</p> : <div className="space-y-2">{detail.bill_allocations.map((allocation) => <div key={allocation.id} className="flex flex-wrap justify-between gap-2 rounded-lg border border-gray-200 p-3 dark:border-gray-800"><span>{allocation.invoice_number} · {allocation.line_description}</span><span className="font-medium">{money(Number(allocation.amount), allocation.currency_code)}</span></div>)}</div>}
+              {detail.bill_allocations.length === 0 ? <p className={ADMIN_TEXT_STYLES.muted}>No Open Vendor Bill allocations.</p> : <div className="space-y-2">{detail.bill_allocations.map((allocation) => <div key={allocation.id} className={`flex flex-wrap justify-between gap-2 border p-3 ${ADMIN_COMPAT_APPEARANCE["rounded-lg"]} ${ADMIN_COMPAT_APPEARANCE["border-gray-200"]} ${ADMIN_COMPAT_APPEARANCE["dark:border-gray-800"]}`}><span>{allocation.invoice_number} · {allocation.line_description}</span><span className="font-medium">{money(Number(allocation.amount), allocation.currency_code)}</span></div>)}</div>}
               {detail.draft_allocations.length ? <p className={`mt-2 text-xs ${ADMIN_TEXT_STYLES.muted}`}>{detail.draft_allocations.length} Draft Bill allocation preview{detail.draft_allocations.length === 1 ? "" : "s"} not included in Invoiced totals.</p> : null}
             </div>
             <div>
               <h4 className="mb-2 font-semibold">Order Settlement History</h4>
-              {detail.settlements.length === 0 ? <p className={ADMIN_TEXT_STYLES.muted}>No Vendor Payment settlement has been attributed to this Order commitment.</p> : <div className="space-y-2">{detail.settlements.map((settlement) => <div key={settlement.id} className="flex flex-wrap justify-between gap-2 rounded-lg border border-gray-200 p-3 dark:border-gray-800"><span>{settlement.invoice_number ?? "Vendor Bill"}{settlement.transaction_reference ? ` · ${settlement.transaction_reference}` : ""}</span><span className={settlement.amount_delta < 0 ? "font-medium text-error-600" : "font-medium"}>{money(Number(settlement.amount_delta), settlement.currency_code)}</span></div>)}</div>}
+              {detail.settlements.length === 0 ? <p className={ADMIN_TEXT_STYLES.muted}>No Vendor Payment settlement has been attributed to this Order commitment.</p> : <div className="space-y-2">{detail.settlements.map((settlement) => <div key={settlement.id} className={`flex flex-wrap justify-between gap-2 border p-3 ${ADMIN_COMPAT_APPEARANCE["rounded-lg"]} ${ADMIN_COMPAT_APPEARANCE["border-gray-200"]} ${ADMIN_COMPAT_APPEARANCE["dark:border-gray-800"]}`}><span>{settlement.invoice_number ?? "Vendor Bill"}{settlement.transaction_reference ? ` · ${settlement.transaction_reference}` : ""}</span><span className={settlement.amount_delta < 0 ? "font-medium text-error-600" : "font-medium"}>{money(Number(settlement.amount_delta), settlement.currency_code)}</span></div>)}</div>}
             </div>
           </div>
         )}
