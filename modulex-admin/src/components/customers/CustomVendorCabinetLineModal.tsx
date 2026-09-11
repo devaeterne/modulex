@@ -110,7 +110,7 @@ export default function CustomVendorCabinetLineModal({ isOpen, currencyCode, onC
         <div>
           <div className="mb-1 flex items-center justify-between gap-3">
             <Label htmlFor="vendor-cabinet-vendor">Vendor</Label>
-            <Link className="text-sm font-medium text-brand-500 hover:text-brand-600" href="/finance/vendors">Manage Vendors</Link>
+            <Link className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`} href="/finance/vendors">Manage Vendors</Link>
           </div>
           <Select
             id="vendor-cabinet-vendor"
