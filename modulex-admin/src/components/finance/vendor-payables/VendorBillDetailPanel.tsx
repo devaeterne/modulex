@@ -9,6 +9,7 @@ import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
+import { formatDateOnly } from "@/lib/dates/usDate";
 import {
   allocateVendorPayment,
   getVendorBillDetail,
@@ -181,7 +182,7 @@ export default function VendorBillDetailPanel({ invoiceId, canManage, onChanged 
       <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-gray-800">{billTabs.map((name) => <Button key={name} size="sm" variant={tab === name ? "primary" : "ghost"} onClick={() => setTab(name)}>{name}</Button>)}</div>
 
       {tab === "Overview" ? <div className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Due</span><div>{detail.invoice.due_date ?? "Not set"}</div></div><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Paid</span><div>{money(detail.invoice.paid_amount, currency)}</div></div><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Outstanding</span><div>{money(detail.invoice.outstanding_amount, currency)}</div></div><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Order allocations</span><div>{detail.order_allocations?.length ?? 0}</div></div></div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Due</span><div>{detail.invoice.due_date ? formatDateOnly(detail.invoice.due_date) : "Not set"}</div></div><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Paid</span><div>{money(detail.invoice.paid_amount, currency)}</div></div><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Outstanding</span><div>{money(detail.invoice.outstanding_amount, currency)}</div></div><div><span className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>Order allocations</span><div>{detail.order_allocations?.length ?? 0}</div></div></div>
         {canManage && detail.invoice.status === "draft" ? <div className="grid gap-3 md:grid-cols-3"><div><Label htmlFor="bill-open-fx">Manual FX rate</Label><Input id="bill-open-fx" type="number" min="0" step="0.0000000001" value={manualFxRate} onChange={(event) => setManualFxRate(event.target.value)} placeholder="Only for cross-currency Bill" /></div><div><Label htmlFor="bill-open-fx-source">FX source</Label><Input id="bill-open-fx-source" value={manualFxSource} onChange={(event) => setManualFxSource(event.target.value)} /></div><div className="flex items-end"><Button disabled={busy} onClick={() => void openBill()}>Open Vendor Bill</Button></div></div> : null}
         {canManage && detail.invoice.status === "open" ? <div className="grid gap-3 md:grid-cols-[1fr_auto]"><div><Label htmlFor="bill-void-reason">Void reason</Label><Input id="bill-void-reason" value={voidReason} onChange={(event) => setVoidReason(event.target.value)} /></div><div className="flex items-end"><Button variant="danger" disabled={busy} onClick={() => void voidBill()}>Void Vendor Bill</Button></div></div> : null}
       </div> : null}
