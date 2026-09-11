@@ -10,7 +10,7 @@ import Select from "@/components/form/Select";
 import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
-import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
+import { ADMIN_SURFACE_CARD, ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   calculateCustomVendorCabinetSellPrice,
   loadActiveCustomVendorCabinetVendors,
@@ -174,7 +174,7 @@ export default function CustomVendorCabinetLineModal(props: Props) {
         </div>
 
         {props.mode === "edit" ? (
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <div className={`${ADMIN_SURFACE_CARD} p-4`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <span className={`text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>Current PDF</span>
