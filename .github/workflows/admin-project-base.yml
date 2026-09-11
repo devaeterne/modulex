@@ -4,9 +4,14 @@ on:
   pull_request:
     paths:
       - "modulex-admin/src/app/(admin)/projects/**"
+      - "modulex-admin/src/app/(admin)/customers/[id]/orders/[orderId]/**"
       - "modulex-admin/src/app/api/admin/projects/**"
       - "modulex-admin/src/components/projects/**"
       - "modulex-admin/src/components/customers/project-detail/**"
+      - "modulex-admin/src/components/customers/EntityDocumentsPanel.tsx"
+      - "modulex-admin/src/components/customers/OrderDocumentsPanel.tsx"
+      - "modulex-admin/src/components/customers/CustomerDocumentsPanel.tsx"
+      - "modulex-admin/src/components/customers/PrivateDocumentPreview.tsx"
       - "modulex-admin/src/lib/projects/**"
       - "modulex-admin/src/lib/customers/project-*.ts"
       - "modulex-admin/src/lib/auth/permissions.ts"
@@ -17,6 +22,8 @@ on:
       - "modulex-admin/scripts/countertop-sink-fallback-contract.mjs"
       - "modulex-admin/sql/project-*.sql"
       - "modulex-store/supabase/migrations/*project*.sql"
+      - "modulex-store/supabase/migrations/*entity_document*.sql"
+      - "modulex-store/supabase/migrations/*customer_document*.sql"
       - "modulex-store/supabase/migrations/*procurement*.sql"
       - "modulex-store/supabase/migrations/*payment*.sql"
       - "modulex-store/supabase/migrations/*commission*.sql"

@@ -71,7 +71,6 @@ export default function ProjectDocumentsTab({ projectId }: { projectId: string }
       <EntityDocumentsPanel
         entityType="project"
         entityId={projectId}
-        includeLinkedOrders
         title="Uploaded Documents"
       />
 

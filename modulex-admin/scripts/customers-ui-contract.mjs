@@ -70,7 +70,7 @@ const documents = read("src/components/customers/CustomerDocumentsPanel.tsx");
 const documentSqlPath = "sql/customer-document-lifecycle.sql";
 expect(exists(documentSqlPath), "Customer document lifecycle SQL contract must exist");
 const documentSql = read(documentSqlPath);
-expect(documents.includes("portal_visible: false"), "New customer documents must remain portal-hidden by default");
+expect(/portal_visible,[\s\S]{0,500}values[\s\S]{0,500}\bfalse\b/i.test(documentSql), "New customer documents must remain portal-hidden by default at the database boundary");
 expect(documents.includes("createSignedUrl"), "Private customer documents must use short-lived signed access for preview/download");
 expect(documents.includes('supabase.rpc("set_customer_document_portal_visibility"'), "Portal visibility must use the canonical document lifecycle RPC");
 expect(documents.includes('supabase.rpc("deactivate_customer_document"'), "Document removal must be soft/deactivation through the canonical RPC");

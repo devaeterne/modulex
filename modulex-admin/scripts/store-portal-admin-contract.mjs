@@ -14,9 +14,10 @@ const read = async (relative) => {
   }
 };
 
-const [route, documentsPanel, customerPage, customerTypes] = await Promise.all([
+const [route, documentsPanel, documentLifecycleSql, customerPage, customerTypes] = await Promise.all([
   read("src/app/api/admin/dealer-portal/route.ts"),
   read("src/components/customers/CustomerDocumentsPanel.tsx"),
+  read("sql/customer-document-lifecycle.sql"),
   read("src/app/(admin)/customers/[id]/page.tsx"),
   read("src/lib/customers/types.ts"),
 ]);
@@ -35,7 +36,7 @@ assert.match(route, /restore/, "existing restore lifecycle must remain");
 assert.match(customerPage, /CustomerDocumentsPanel/, "Customer card must expose document management");
 assert.match(documentsPanel, /customer-documents/, "Admin document upload must use the private customer-documents bucket");
 assert.match(documentsPanel, /crypto\.randomUUID\(\)/, "document object paths must use an unguessable UUID segment");
-assert.match(documentsPanel, /portal_visible:\s*false/, "new document metadata must default Dealer visibility off explicitly");
+assert.match(documentLifecycleSql, /portal_visible,[\s\S]{0,500}values[\s\S]{0,500}\bfalse\b/i, "new document metadata must default Dealer visibility off at the database boundary");
 assert.match(documentsPanel, /storage\.from\(bucket\)\.remove\(\[storagePath\]\)/, "orphaned Storage objects must be cleaned up if metadata insert fails");
 assert.match(documentsPanel, /Visible to Dealer Portal/, "Admin must expose an explicit Dealer Portal visibility control");
 assert.match(documentsPanel, /canManagePortal/, "Dealer Portal visibility must use Admin-level portal-management permission");
