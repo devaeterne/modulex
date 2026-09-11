@@ -26,6 +26,10 @@ const registrationMigrationPath = path.join(
   root,
   "../modulex-store/supabase/migrations/20260911145327_entity_document_registration_file_types.sql",
 );
+const deactivateMigrationPath = path.join(
+  root,
+  "../modulex-store/supabase/migrations/20260911153000_entity_document_deactivate_rls_lock_fix.sql",
+);
 
 function read(filePath) {
   return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
@@ -50,6 +54,7 @@ const grantRepair = read(grantRepairPath);
 const customerPolicyGrantRepair = read(customerPolicyGrantRepairPath);
 const tfxMigration = read(tfxMigrationPath);
 const registrationMigration = read(registrationMigrationPath);
+const deactivateMigration = read(deactivateMigrationPath);
 
 requireMatch(
   panel,
@@ -116,5 +121,30 @@ requireMatch(registrationMigration, /application\/vnd\.ms-excel/i, "Entity docum
 requireMatch(registrationMigration, /\.tfx/i, "Entity document registration must accept TFX metadata.");
 requireMatch(registrationMigration, /image\/tiff-fx/i, "Entity document registration must accept the TFX MIME type.");
 requireMatch(registrationMigration, /revoke\s+(?:all|execute)\s+on\s+function\s+public\.register_entity_document/i, "Registration RPC must retain explicit execute hardening.");
+
+requireMatch(
+  deactivateMigration,
+  /create\s+or\s+replace\s+function\s+public\.deactivate_entity_document\s*\(p_document_id\s+uuid\)/i,
+  "Entity document deactivation must be patched through a canonical migration.",
+);
+const lifecycleOnIndex = deactivateMigration.search(
+  /perform\s+set_config\(\s*['"]modulex\.entity_document_lifecycle['"]\s*,\s*['"]on['"]\s*,\s*true\s*\)/i,
+);
+const lockingReadIndex = deactivateMigration.search(
+  /select\s+\*[\s\S]*?from\s+public\.entity_documents[\s\S]*?for\s+update/i,
+);
+if (lifecycleOnIndex < 0 || lockingReadIndex < 0 || lifecycleOnIndex > lockingReadIndex) {
+  throw new Error("Deactivate RPC must enable canonical lifecycle before SELECT ... FOR UPDATE so UPDATE RLS can see the active row.");
+}
+requireMatch(
+  deactivateMigration,
+  /revoke\s+(?:all|execute)\s+on\s+function\s+public\.deactivate_entity_document\s*\(uuid\)\s+from\s+(?:public|anon)/i,
+  "Deactivate RPC must remain unavailable to PUBLIC/anon.",
+);
+requireMatch(
+  deactivateMigration,
+  /grant\s+execute\s+on\s+function\s+public\.deactivate_entity_document\s*\(uuid\)\s+to\s+authenticated/i,
+  "Deactivate RPC must remain executable by authenticated callers and rely on internal role authorization.",
+);
 
 console.log("Project/Order entity document upload contract passed.");
