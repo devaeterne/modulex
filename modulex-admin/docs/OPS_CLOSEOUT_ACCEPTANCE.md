@@ -11,6 +11,7 @@ Production Supabase: `bzjoeernnmvuhzyvbowc`
 - Starting `main`: `015b9c4d2811d4e7ba3d141590f271876909d7ef`
 - Open PRs at start: **0**
 - Latest production migration observed at start: `20260910231259_order_margin_assessment_hardening`
+- Admin production Vercel project `modulex` was **READY** at deployment `dpl_GaxpPQVP6U8r6JZq3bAsimxm8ana`, commit `7054111be7b18cb88ccafe97f8923b6601b64c09` (`perf(admin): close PRF performance workstream (#445)`). This is a pre-existing deployed-SHA lag behind the starting `main`; this OPS PR does not promote production. OPS-A4 therefore requires an explicit expected-SHA/deployed-SHA check instead of assuming `main` is live.
 - This OPS closeout introduces **no production schema migration**. It standardizes existing observability/audit/release contracts and adds CI-enforced documentation/migration-ownership checks.
 
 ## Fresh production Advisor snapshot
