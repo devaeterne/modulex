@@ -7,7 +7,6 @@ const modalPath = path.join(root, "src/components/customers/CustomVendorCabinetL
 const domainPath = path.join(root, "src/lib/customers/custom-vendor-cabinet.ts");
 const newOrderPath = path.join(root, "src/components/customers/NewCustomerOrder.tsx");
 const editOrderPath = path.join(root, "src/components/customers/EditCustomerOrder.tsx");
-const typesPath = path.join(root, "src/lib/customers/types.ts");
 const sidebarPath = path.join(root, "src/layout/AppSidebar.tsx");
 const vendorPagePath = path.join(root, "src/app/(admin)/finance/vendors/page.tsx");
 const migrationPath = path.join(root, "../modulex-store/supabase/migrations/20260911194500_custom_vendor_cabinet_order_lines.sql");
@@ -30,7 +29,6 @@ const modal = fs.readFileSync(modalPath, "utf8");
 const domain = fs.readFileSync(domainPath, "utf8");
 const newOrder = fs.readFileSync(newOrderPath, "utf8");
 const editOrder = fs.readFileSync(editOrderPath, "utf8");
-const types = fs.readFileSync(typesPath, "utf8");
 const sidebar = fs.readFileSync(sidebarPath, "utf8");
 const vendorPage = fs.readFileSync(vendorPagePath, "utf8");
 const migration = fs.readFileSync(migrationPath, "utf8");
@@ -54,6 +52,7 @@ assert(newOrder.includes("setIsCabinetSourceModalOpen(false); setIsProductPicker
 assert(newOrder.includes("setIsCabinetSourceModalOpen(false); setIsVendorCabinetModalOpen(true);"), "New Order Vendor choice must close the source chooser before opening the vendor flow");
 
 assert(editOrder.includes("CustomVendorCabinetLineModal"), "Edit Order must expose the vendor Cabinet entry flow");
+assert(editOrder.includes('type OrderLinePricingModel = OrderPricingModel | "manual_vendor_cabinet"'), "Edit Order must model saved productless Vendor Cabinet lines without widening unrelated product pricing types");
 assert(editOrder.includes("isCabinetSourceModalOpen"), "Edit Order Cabinet entry must keep an explicit source-choice state");
 assert(editOrder.includes("Choose Cabinet Source"), "Edit Order Cabinet entry must show a source chooser before opening either flow");
 assert(editOrder.includes('onClick={() => setIsCabinetSourceModalOpen(true)}>Cabinet</Button>'), "Edit Order Products action must route Cabinet through the source chooser");
@@ -61,7 +60,7 @@ assert(!editOrder.includes('onClick={() => setIsProductPickerOpen(true)}>Cabinet
 assert(editOrder.includes("uploadCustomVendorCabinetDocument"), "Edit Order Vendor Cabinet must upload its private source PDF");
 assert(editOrder.includes("createCustomVendorCabinetOrderLine"), "Edit Order Vendor Cabinet must create the guarded productless order line");
 assert(editOrder.includes('model === "manual_vendor_cabinet"'), "Edit Order must preserve/render productless Vendor Cabinet lines");
-assert(types.includes('"manual_vendor_cabinet"'), "Order pricing model types must include manual_vendor_cabinet");
+assert(editOrder.includes("Saved package · dedicated Vendor Cabinet workflow"), "Edit Order must present existing Vendor Cabinet packages as read-only generic revision lines");
 
 assert(sidebar.includes('name: "Vendor Management", path: "/finance/vendors"'), "Vendor Management must be directly discoverable in the sidebar");
 assert(vendorPage.includes("FinanceVendorsManager"), "Vendor Management must use the canonical vendor master, not a duplicate vendor list");
@@ -73,5 +72,7 @@ assert(!migration.includes("insert into public.products"), "custom Cabinet entry
 assert(editMigration.includes("get_active_order_vendors"), "Edit support migration must expose the narrow active-vendor lookup");
 assert(editMigration.includes("manual_vendor_cabinet"), "Edit support migration must preserve manual Vendor Cabinet lines during generic revisions");
 assert(editMigration.includes("dedicated Vendor Cabinet workflow"), "Generic Order revision must reject mutation/removal of existing Vendor Cabinet lines");
+assert(editMigration.includes("customer_order_items_preserve_manual_vendor_cabinet"), "Edit support migration must install the Vendor Cabinet preservation guard");
+assert(editMigration.includes("customer_order_items_shift_manual_vendor_cabinet_collision"), "Edit support migration must protect line-number collisions during generic revisions");
 
 console.log("PASS: custom vendor Cabinet order-line contract");
