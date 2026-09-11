@@ -1,0 +1,2 @@
+-- A6 Vendor Payables / Order Settlement.
+-- Mirror placeholder replaced atomically from the Admin SQL blob in the next commit.
