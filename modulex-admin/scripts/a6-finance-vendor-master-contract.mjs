@@ -98,7 +98,7 @@ expect(/missing|expired/i.test(ui), "Vendor UI must render missing/expired compl
 expect(ui.includes("Add Vendor"), "Vendor Management must expose a compact Add Vendor action");
 expect(ui.includes("isVendorModalOpen"), "Vendor create/edit must use a modal instead of permanently occupying the page top");
 expect(!ui.includes('title={editingVendor ? "Edit Canonical Vendor" : "New Canonical Vendor"}'), "Vendor Management must not render the large permanent create/edit card");
-for (const tab of ["Overview", "Contacts", "Sources", "Compliance"]) {
+for (const tab of ["Overview", "Contacts", "Sources", "Compliance", "Commitments"]) {
   expect(ui.includes(`"${tab}"`), `Vendor detail must expose a ${tab} tab`);
 }
 expect(ui.includes("vendorTypeFilter"), "Vendor Overview must expose a Vendor Type filter");
