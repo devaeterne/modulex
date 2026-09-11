@@ -162,7 +162,7 @@ requireMatch(deactivateFunction, /pendingStorageCleanup|retryDeactivatedStorageC
 requireNoMatch(deactivateFunction, /private file (?:will be|was) retained/i, "Deactivate UI must not claim the private file is retained after successful removal.");
 requireMatch(
   storageDeleteMigration,
-  /create\s+or\s+replace\s+function\s+private\.can_delete_unregistered_entity_document_object\s*\(p_bucket_id\s+text,\s*p_object_name\s+text\)/i,
+  /create\s+or\s+replace\s+function\s+private\.can_delete_unregistered_entity_document_object\s*\(\s*p_bucket_id\s+text,\s*p_object_name\s+text\s*\)/i,
   "Storage deletion behavior must be changed through a canonical helper migration.",
 );
 requireMatch(storageDeleteMigration, /d\.is_active\s*=\s*true/i, "Storage DELETE must remain blocked while matching document metadata is active.");
