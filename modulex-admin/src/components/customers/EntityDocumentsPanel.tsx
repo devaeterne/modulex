@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
+import PrivateDocumentPreview from "@/components/customers/PrivateDocumentPreview";
 import FormHint from "@/components/form/FormHint";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
@@ -148,6 +149,8 @@ export default function EntityDocumentsPanel({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [orphanCleanup, setOrphanCleanup] = useState<OrphanCleanup | null>(null);
+  const [previewItem, setPreviewItem] = useState<EntityDocument | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const loadDocuments = useCallback(async () => {
     setLoading(true);
@@ -285,24 +288,42 @@ export default function EntityDocumentsPanel({
     setBusyId(null);
   }
 
-  async function openDocument(item: EntityDocument, download: boolean) {
+  async function previewDocument(item: EntityDocument) {
     if (busyId) return;
     setBusyId(item.id);
     setError(null);
     const { data, error: signedUrlError } = await supabase.storage
       .from(item.storage_bucket || bucket)
-      .createSignedUrl(
-        item.storage_path,
-        signedAccessSeconds,
-        download ? { download: item.file_name } : undefined,
-      );
+      .createSignedUrl(item.storage_path, signedAccessSeconds);
     if (signedUrlError || !data?.signedUrl) {
-      setError(signedUrlError?.message || "Private document link could not be created.");
+      setError(signedUrlError?.message || "Private document preview could not be created.");
+      setBusyId(null);
+      return;
+    }
+    setPreviewItem(item);
+    setPreviewUrl(data.signedUrl);
+    setBusyId(null);
+  }
+
+  async function downloadDocument(item: EntityDocument) {
+    if (busyId) return;
+    setBusyId(item.id);
+    setError(null);
+    const { data, error: signedUrlError } = await supabase.storage
+      .from(item.storage_bucket || bucket)
+      .createSignedUrl(item.storage_path, signedAccessSeconds, { download: item.file_name });
+    if (signedUrlError || !data?.signedUrl) {
+      setError(signedUrlError?.message || "Private document download link could not be created.");
       setBusyId(null);
       return;
     }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
     setBusyId(null);
+  }
+
+  function closePreview() {
+    setPreviewItem(null);
+    setPreviewUrl(null);
   }
 
   async function deactivateDocument(item: EntityDocument) {
@@ -318,132 +339,140 @@ export default function EntityDocumentsPanel({
       setBusyId(null);
       return;
     }
+    if (previewItem?.id === item.id) closePreview();
     await loadDocuments();
     setMessage("Document deactivated. The private file was retained for audit/history.");
     setBusyId(null);
   }
 
+  const scopeDescription = entityType === "order"
+    ? "Files uploaded here belong only to this Order. Private preview/download links expire after 60 seconds."
+    : includeLinkedOrders
+      ? "Project files plus linked Order files. The Source column shows the owning record. Private links expire after 60 seconds."
+      : "Files uploaded here belong only to this Project. Private preview/download links expire after 60 seconds.";
+
   return (
-    <ComponentCard
-      title={title}
-      desc="Private Project and Order files. Preview/download links expire after 60 seconds; deactivation retains history."
-    >
-      <div className="space-y-5">
-        {error ? <Alert variant="error" title="Document action failed" message={error} /> : null}
-        {message ? <Alert variant="success" title="Documents updated" message={message} /> : null}
+    <>
+      <ComponentCard title={title} desc={scopeDescription}>
+        <div className="space-y-5">
+          {error ? <Alert variant="error" title="Document action failed" message={error} /> : null}
+          {message ? <Alert variant="success" title="Documents updated" message={message} /> : null}
 
-        {orphanCleanup ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
-            <FormHint>
-              {orphanCleanup.fileName} was uploaded but could not be registered or removed. Resolve this private orphan before uploading more files.
-            </FormHint>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={busyId !== null}
-              onClick={() => void retryOrphanCleanup()}
-            >
-              {busyId === "orphan-cleanup" ? "Cleaning up…" : "Retry orphan cleanup"}
-            </Button>
-          </div>
-        ) : null}
-
-        {canUpload ? (
-          <form onSubmit={uploadDocuments} className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor={`${entityType}-document-files`}>Files</Label>
-              <Input
-                key={fileInputKey}
-                id={`${entityType}-document-files`}
-                type="file"
-                accept={acceptedExtensions}
-                multiple
-                disabled={busyId !== null || orphanCleanup !== null}
-                onChange={selectFiles}
-                hint={selectedSummary}
-              />
-            </div>
-            <div>
-              <Label htmlFor={`${entityType}-document-type`}>Document type</Label>
-              <Select
-                id={`${entityType}-document-type`}
-                options={documentTypeOptions}
-                value={documentType}
-                onChange={setDocumentType}
-                disabled={busyId !== null || orphanCleanup !== null}
-              />
-            </div>
-            <div className="md:col-span-2">
-              <Label htmlFor={`${entityType}-document-description`}>Description</Label>
-              <Input
-                id={`${entityType}-document-description`}
-                value={description}
-                maxLength={1000}
-                disabled={busyId !== null || orphanCleanup !== null}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="Optional note applied to the selected files"
-              />
-            </div>
-            <div className="md:col-span-2 flex justify-end">
-              <Button type="submit" disabled={busyId !== null || files.length === 0 || orphanCleanup !== null}>
-                {busyId === "upload" ? "Uploading…" : `Upload ${files.length || ""} file${files.length === 1 ? "" : "s"}`.trim()}
+          {orphanCleanup ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
+              <FormHint>
+                {orphanCleanup.fileName} was uploaded but could not be registered or removed. Resolve this private orphan before uploading more files.
+              </FormHint>
+              <Button type="button" variant="outline" size="sm" disabled={busyId !== null} onClick={() => void retryOrphanCleanup()}>
+                {busyId === "orphan-cleanup" ? "Cleaning up…" : "Retry orphan cleanup"}
               </Button>
             </div>
-          </form>
-        ) : (
-          <FormHint>You have read-only access to these documents.</FormHint>
-        )}
+          ) : null}
 
-        {error && !loading && !orphanCleanup ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => void loadDocuments()} disabled={busyId !== null}>
-            Retry
-          </Button>
-        ) : null}
+          {canUpload ? (
+            <form onSubmit={uploadDocuments} className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor={`${entityType}-document-files`}>Files</Label>
+                <Input
+                  key={fileInputKey}
+                  id={`${entityType}-document-files`}
+                  type="file"
+                  accept={acceptedExtensions}
+                  multiple
+                  disabled={busyId !== null || orphanCleanup !== null}
+                  onChange={selectFiles}
+                  hint={selectedSummary}
+                />
+              </div>
+              <div>
+                <Label htmlFor={`${entityType}-document-type`}>Document type</Label>
+                <Select
+                  id={`${entityType}-document-type`}
+                  options={documentTypeOptions}
+                  value={documentType}
+                  onChange={setDocumentType}
+                  disabled={busyId !== null || orphanCleanup !== null}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <Label htmlFor={`${entityType}-document-description`}>Description</Label>
+                <Input
+                  id={`${entityType}-document-description`}
+                  value={description}
+                  maxLength={1000}
+                  disabled={busyId !== null || orphanCleanup !== null}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Optional note applied to the selected files"
+                />
+              </div>
+              <div className="md:col-span-2 flex justify-end">
+                <Button type="submit" disabled={busyId !== null || files.length === 0 || orphanCleanup !== null}>
+                  {busyId === "upload" ? "Uploading…" : `Upload ${files.length || ""} file${files.length === 1 ? "" : "s"}`.trim()}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <FormHint>You have read-only access to these documents.</FormHint>
+          )}
 
-        <TableViewport>
-          <Table variant="admin" minWidth="wide">
-            <TableHeader variant="admin">
-              <TableRow>
-                <TableCell isHeader variant="admin">Document</TableCell>
-                <TableCell isHeader variant="admin">Type</TableCell>
-                <TableCell isHeader variant="admin">Source</TableCell>
-                <TableCell isHeader variant="admin">Uploaded</TableCell>
-                <TableCell isHeader variant="admin">Size</TableCell>
-                <TableCell isHeader variant="admin">Actions</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody variant="admin">
-              {loading ? <TableStateRow colSpan={6}>Loading documents…</TableStateRow> : null}
-              {!loading && !error && documents.length === 0 ? <TableStateRow colSpan={6}>No uploaded documents yet.</TableStateRow> : null}
-              {!loading ? documents.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell variant="admin">
-                    <p className="font-medium">{item.file_name}</p>
-                    {item.description ? <p className="text-sm">{item.description}</p> : null}
-                  </TableCell>
-                  <TableCell variant="admin">{documentTypeLabel(item.document_type)}</TableCell>
-                  <TableCell variant="admin">
-                    <Badge color={item.entity_type === "project" ? "primary" : "info"}>{item.source_label}</Badge>
-                  </TableCell>
-                  <TableCell variant="admin">
-                    <p>{item.uploaded_by_name || "Modulex user"}</p>
-                    <p className="text-sm">{formatDateTime(item.created_at)}</p>
-                  </TableCell>
-                  <TableCell variant="admin">{formatBytes(Number(item.file_size_bytes || 0))}</TableCell>
-                  <TableCell variant="admin">
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void openDocument(item, false)}>Preview</Button>
-                      <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void openDocument(item, true)}>Download</Button>
-                      {canUpload ? <Button size="sm" variant="danger" disabled={busyId !== null} onClick={() => void deactivateDocument(item)}>Deactivate</Button> : null}
-                    </div>
-                  </TableCell>
+          {error && !loading && !orphanCleanup ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadDocuments()} disabled={busyId !== null}>Retry</Button>
+          ) : null}
+
+          <TableViewport>
+            <Table variant="admin" minWidth="wide">
+              <TableHeader variant="admin">
+                <TableRow>
+                  <TableCell isHeader variant="admin">Document</TableCell>
+                  <TableCell isHeader variant="admin">Type</TableCell>
+                  <TableCell isHeader variant="admin">Source</TableCell>
+                  <TableCell isHeader variant="admin">Uploaded</TableCell>
+                  <TableCell isHeader variant="admin">Size</TableCell>
+                  <TableCell isHeader variant="admin">Actions</TableCell>
                 </TableRow>
-              )) : null}
-            </TableBody>
-          </Table>
-        </TableViewport>
-      </div>
-    </ComponentCard>
+              </TableHeader>
+              <TableBody variant="admin">
+                {loading ? <TableStateRow colSpan={6}>Loading documents…</TableStateRow> : null}
+                {!loading && !error && documents.length === 0 ? <TableStateRow colSpan={6}>No uploaded documents yet.</TableStateRow> : null}
+                {!loading ? documents.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell variant="admin">
+                      <p className="font-medium">{item.file_name}</p>
+                      {item.description ? <p className="text-sm">{item.description}</p> : null}
+                    </TableCell>
+                    <TableCell variant="admin">{documentTypeLabel(item.document_type)}</TableCell>
+                    <TableCell variant="admin">
+                      <Badge color={item.entity_type === "project" ? "primary" : "info"}>{item.source_label}</Badge>
+                    </TableCell>
+                    <TableCell variant="admin">
+                      <p>{item.uploaded_by_name || "Modulex user"}</p>
+                      <p className="text-sm">{formatDateTime(item.created_at)}</p>
+                    </TableCell>
+                    <TableCell variant="admin">{formatBytes(Number(item.file_size_bytes || 0))}</TableCell>
+                    <TableCell variant="admin">
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void previewDocument(item)}>Preview</Button>
+                        <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void downloadDocument(item)}>Download</Button>
+                        {canUpload ? <Button size="sm" variant="danger" disabled={busyId !== null} onClick={() => void deactivateDocument(item)}>Deactivate</Button> : null}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )) : null}
+              </TableBody>
+            </Table>
+          </TableViewport>
+        </div>
+      </ComponentCard>
+
+      {previewItem && previewUrl ? (
+        <PrivateDocumentPreview
+          fileName={previewItem.file_name}
+          mimeType={previewItem.mime_type}
+          signedUrl={previewUrl}
+          onClose={closePreview}
+          onDownload={() => void downloadDocument(previewItem)}
+        />
+      ) : null}
+    </>
   );
 }
