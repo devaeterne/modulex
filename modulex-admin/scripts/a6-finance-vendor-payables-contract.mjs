@@ -66,20 +66,21 @@ for (const state of ["planned", "committed", "cancelled", "not_invoiced", "parti
 const routeSource = read(route);
 expect(routeSource.includes("PageBreadCrumb"), "Vendor Payables route must keep shared PageBreadCrumb");
 expect(routeSource.includes("FinanceVendorBillsManager"), "Vendor Payables route must preserve the existing /finance/bills manager boundary");
+expect(routeSource.includes("Vendor Payables"), "Vendor Bills route must present the Vendor Payables workspace title");
 
 const managerSource = read(manager);
+const billsSource = read(billsPanel);
+const workspaceSource = `${managerSource}\n${billsSource}`;
 for (const label of ["Commitments", "Vendor Bills", "Payment Schedule", "+ Add Vendor Bill"]) {
-  expect(managerSource.includes(label), `Vendor Payables workspace must expose ${label}`);
+  expect(workspaceSource.includes(label), `Vendor Payables workspace must expose ${label}`);
 }
-expect(!managerSource.includes('title={editingId ? "Edit Vendor Bill Draft" : "New Vendor Bill Draft"}'), "Vendor Bills must not keep the permanent draft form at page top");
-expect(!managerSource.includes("AP Lifecycle Inputs"), "Vendor Bills must not keep the permanent AP Lifecycle Inputs block");
+expect(!workspaceSource.includes('title={editingId ? "Edit Vendor Bill Draft" : "New Vendor Bill Draft"}'), "Vendor Bills must not keep the permanent draft form at page top");
+expect(!workspaceSource.includes("AP Lifecycle Inputs"), "Vendor Bills must not keep the permanent AP Lifecycle Inputs block");
 
 const commitmentsSource = read(commitmentsPanel);
 for (const term of ["Committed", "Invoiced", "Paid", "Remaining", "View Order", "View Project", "View Vendor", "View Vendor PDF", "Vendor Bills"]) {
   expect(commitmentsSource.includes(term), `Commitments UI must expose ${term}`);
 }
-
-const billsSource = read(billsPanel);
 expect(billsSource.includes("+ Add Vendor Bill"), "Vendor Bills must use a contextual Add Vendor Bill action");
 
 const detailSource = read(billDetail);
@@ -93,7 +94,7 @@ for (const term of ["Vendor", "Bill number", "Bill date", "Due date", "Currency"
 }
 
 const scheduleSource = read(paymentSchedule);
-expect(scheduleSource.includes("Open Vendor Bill is required"), "Payment Schedule must remain Vendor-Bill-based");
+expect(scheduleSource.includes("open Vendor Bill is required"), "Payment Schedule must remain Vendor-Bill-based");
 expect(!/commitment[^\n]{0,120}(schedule|payment)/i.test(scheduleSource), "Payment Schedule must not introduce commitment-only scheduling");
 
 console.log("A6 Vendor Payables / Order Settlement contract: PASS");
