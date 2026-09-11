@@ -495,7 +495,14 @@ export default function ProjectDetailWorkspace({ projectId }: { projectId: strin
                 {!loading && activeOrders.length === 0 ? <TableStateRow colSpan={6}>No active Orders are linked to this Project yet.</TableStateRow> : null}
                 {!loading ? activeOrders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell variant="admin"><span className="font-medium">{order.order_number}</span></TableCell>
+                    <TableCell variant="admin">
+                      <div className="space-y-1">
+                        <span className="font-medium">{order.order_number}</span>
+                        {order.customer_reference?.trim() ? (
+                          <p className={`text-xs ${ADMIN_TEXT_STYLES.body}`}>Customer Ref: {order.customer_reference.trim()}</p>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell variant="admin">{displayDate(order.order_date)}</TableCell>
                     <TableCell variant="admin"><Badge color={orderBadgeColor(order.status)}>{statusLabel(order.status)}</Badge></TableCell>
                     <TableCell variant="admin">{order.item_count}</TableCell>
