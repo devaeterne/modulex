@@ -152,12 +152,11 @@ Status: `[~]` domain-specific performance work exists; project-wide A7 performan
 
 ## UXA — Accessibility & Responsive Operations
 
-Status: `[~]` UI foundation is closed; operational accessibility audit remains.
+Status: `[x]` UXA-A1→UXA-A3 closed; operational accessibility and responsive hardening are covered by shared primitives and permanent UI contracts.
 
-- [ ] **UXA-A1 — Keyboard/focus audit.** Tables, dropdowns, modals, drawers, forms, scanner and navigation must be keyboard-operable with predictable focus restoration.
-- [ ] **UXA-A2 — Mobile/tablet operations.** Re-test warehouse/scanner, Customer/Order, Finance and high-use forms at supported breakpoints with no hidden critical action/data.
-- [ ] **UXA-A3 — Destructive/loading states.** Standardize confirmation, disabled, pending, retry and error recovery for destructive/high-risk mutations.
-
+- [x] **UXA-A1 — Keyboard/focus audit.** Tables, dropdowns, modals, drawers, forms, scanner and navigation must be keyboard-operable with predictable focus restoration.
+- [x] **UXA-A2 — Mobile/tablet operations.** Re-test warehouse/scanner, Customer/Order, Finance and high-use forms at supported breakpoints with no hidden critical action/data.
+- [x] **UXA-A3 — Destructive/loading states.** Standardize confirmation, disabled, pending, retry and error recovery for destructive/high-risk mutations.
 ## VAL — Validation Finalization
 
 Status: `[~]` VAL-1→VAL-4 are closed.

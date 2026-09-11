@@ -13,6 +13,8 @@ interface ButtonProps
   variant?: AdminButtonVariant;
   startIcon?: ReactNode;
   endIcon?: ReactNode;
+  pending?: boolean;
+  pendingLabel?: ReactNode;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -24,6 +26,8 @@ const Button: React.FC<ButtonProps> = ({
   className = "",
   type = "button",
   disabled = false,
+  pending = false,
+  pendingLabel,
   ...buttonProps
 }) => {
   const sizeClasses = {
@@ -35,11 +39,12 @@ const Button: React.FC<ButtonProps> = ({
     <button
       {...buttonProps}
       type={type}
-      disabled={disabled}
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
       className={`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors ${ADMIN_FOCUS_RING} ${ADMIN_CONTROL_DISABLED} ${sizeClasses[size]} ${ADMIN_BUTTON_VARIANTS[variant]} ${className}`}
     >
       {startIcon ? <span className="flex items-center">{startIcon}</span> : null}
-      {children}
+      {pending ? pendingLabel ?? children : children}
       {endIcon ? <span className="flex items-center">{endIcon}</span> : null}
     </button>
   );

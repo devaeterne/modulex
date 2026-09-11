@@ -184,4 +184,6 @@ assertOrdered(
   "Store navigation",
 );
 
+await import("./uxa-operations-contract.mjs");
+
 console.log("Admin UI consistency contract: PASS");

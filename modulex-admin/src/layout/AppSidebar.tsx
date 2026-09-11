@@ -274,10 +274,15 @@ export default function AppSidebar({ roles }: { roles: UserRole[] }) {
     <ul className="flex flex-col gap-4">
       {items.map((nav, index) => {
         const isOpen = openSubmenu?.type === type && openSubmenu.index === index;
+        const submenuId = `sidebar-${type}-${index}`;
         return (
           <li key={nav.name}>
             {nav.subItems ? (
               <button
+                type="button"
+                aria-label={nav.name}
+                aria-expanded={isOpen}
+                aria-controls={submenuId}
                 onClick={() => toggleSubmenu(index, type)}
                 className={`menu-item group ${isOpen ? "menu-item-active" : "menu-item-inactive"} cursor-pointer ${!isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"}`}
               >
@@ -285,22 +290,31 @@ export default function AppSidebar({ roles }: { roles: UserRole[] }) {
                 {(isExpanded || isHovered || isMobileOpen) && (
                   <>
                     <span className="menu-item-text">{nav.name}</span>
-                    <ChevronDownIcon className={`ml-auto h-5 w-5 transition-transform duration-200 ${isOpen ? "rotate-180 text-brand-500" : ""}`} />
+                    <ChevronDownIcon aria-hidden="true" className={`ml-auto h-5 w-5 transition-transform duration-200 ${isOpen ? "rotate-180 text-brand-500" : ""}`} />
                   </>
                 )}
               </button>
             ) : nav.path ? (
-              <Link href={nav.path} className={`menu-item group ${isActive(nav.path, nav.exact) ? "menu-item-active" : "menu-item-inactive"}`}>
+              <Link
+                href={nav.path}
+                aria-label={nav.name}
+                aria-current={isActive(nav.path, nav.exact) ? "page" : undefined}
+                className={`menu-item group ${isActive(nav.path, nav.exact) ? "menu-item-active" : "menu-item-inactive"}`}
+              >
                 <span className={isActive(nav.path, nav.exact) ? "menu-item-icon-active" : "menu-item-icon-inactive"}>{nav.icon}</span>
                 {(isExpanded || isHovered || isMobileOpen) && <span className="menu-item-text">{nav.name}</span>}
               </Link>
             ) : null}
 
             {nav.subItems && isOpen && (isExpanded || isHovered || isMobileOpen) && (
-              <ul className="ml-9 mt-2 space-y-1">
+              <ul id={submenuId} className="ml-9 mt-2 space-y-1">
                 {nav.subItems.map((subItem) => (
                   <li key={subItem.path}>
-                    <Link href={subItem.path} className={`menu-dropdown-item ${isActive(subItem.path, subItem.exact) ? "menu-dropdown-item-active" : "menu-dropdown-item-inactive"}`}>
+                    <Link
+                      href={subItem.path}
+                      aria-current={isActive(subItem.path, subItem.exact) ? "page" : undefined}
+                      className={`menu-dropdown-item ${isActive(subItem.path, subItem.exact) ? "menu-dropdown-item-active" : "menu-dropdown-item-inactive"}`}
+                    >
                       {subItem.name}
                       {subItem.new && <span className="menu-dropdown-badge ml-auto">new</span>}
                     </Link>
@@ -316,12 +330,13 @@ export default function AppSidebar({ roles }: { roles: UserRole[] }) {
 
   return (
     <aside
+      aria-label="Admin sidebar"
       className={`fixed left-0 top-0 z-50 mt-16 flex h-[calc(100dvh-4rem)] flex-col border-r border-gray-200 bg-white px-5 text-gray-900 transition-all duration-300 ease-in-out dark:border-gray-800 dark:bg-gray-900 lg:mt-0 lg:h-screen ${isExpanded || isMobileOpen || isHovered ? "w-[290px]" : "w-[90px]"} ${isMobileOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className={`flex py-8 ${!isExpanded && !isHovered ? "lg:justify-center" : "justify-start"}`}>
-        <Link href="/">
+        <Link href="/" aria-label="Modulex dashboard">
           {isExpanded || isHovered || isMobileOpen ? (
             <>
               <Image className="dark:hidden" src="/images/logo/logo.svg" alt="Modulex" width={150} height={40} priority />
@@ -334,7 +349,7 @@ export default function AppSidebar({ roles }: { roles: UserRole[] }) {
       </div>
 
       <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
-        <nav className="mb-6">
+        <nav className="mb-6" aria-label="Primary navigation">
           <div className="flex flex-col gap-4">
             {visibleNavItems.length > 0 && (
               <div>
