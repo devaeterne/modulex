@@ -210,6 +210,12 @@ assert(
   "Project link-existing Order picker must show Customer Reference or No Reference between Order number and status"
 );
 assert(
+  projectDomain.includes("customer_reference: string | null;") &&
+    projectDetail.includes("Customer Ref:") &&
+    /order\.customer_reference\?\.trim\(\)/.test(projectDetail),
+  "Project Orders table must expose Customer Reference from the Project detail payload"
+);
+assert(
   projectDetail.includes('order.status !== "cancelled"'),
   "Project detail must exclude cancelled child Orders"
 );
