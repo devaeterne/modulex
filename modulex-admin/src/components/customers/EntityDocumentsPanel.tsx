@@ -47,6 +47,12 @@ type OrphanCleanup = {
   fileName: string;
 };
 
+type DeactivatedStorageCleanup = {
+  storageBucket: string;
+  storagePath: string;
+  fileName: string;
+};
+
 type Props = {
   entityType: EntityDocumentType;
   entityId: string;
@@ -149,6 +155,7 @@ export default function EntityDocumentsPanel({
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [orphanCleanup, setOrphanCleanup] = useState<OrphanCleanup | null>(null);
+  const [pendingStorageCleanup, setPendingStorageCleanup] = useState<DeactivatedStorageCleanup | null>(null);
   const [previewItem, setPreviewItem] = useState<EntityDocument | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -288,6 +295,23 @@ export default function EntityDocumentsPanel({
     setBusyId(null);
   }
 
+  async function retryDeactivatedStorageCleanup() {
+    if (!pendingStorageCleanup || busyId) return;
+    setBusyId("deactivated-storage-cleanup");
+    setError(null);
+    setMessage(null);
+    const { storageBucket, storagePath, fileName } = pendingStorageCleanup;
+    const { error: cleanupError } = await supabase.storage.from(storageBucket).remove([storagePath]);
+    if (cleanupError) {
+      setError(`${fileName}: Storage cleanup retry failed (${cleanupError.message}).`);
+      setBusyId(null);
+      return;
+    }
+    setPendingStorageCleanup(null);
+    setMessage(`${fileName}: private Storage object deleted. Audit metadata remains.`);
+    setBusyId(null);
+  }
+
   async function previewDocument(item: EntityDocument) {
     if (busyId) return;
     setBusyId(item.id);
@@ -327,7 +351,13 @@ export default function EntityDocumentsPanel({
   }
 
   async function deactivateDocument(item: EntityDocument) {
-    if (!canUpload || busyId || !window.confirm(`Deactivate ${item.file_name}? The private file will be retained for history.`)) return;
+    if (
+      !canUpload
+      || busyId
+      || pendingStorageCleanup
+      || !window.confirm(`Deactivate ${item.file_name} and permanently delete its private file from Storage? Audit metadata will remain.`)
+    ) return;
+
     setBusyId(item.id);
     setError(null);
     setMessage(null);
@@ -339,9 +369,24 @@ export default function EntityDocumentsPanel({
       setBusyId(null);
       return;
     }
+
+    const storageBucket = item.storage_bucket || bucket;
+    const { error: storageDeleteError } = await supabase.storage.from(storageBucket).remove([item.storage_path]);
     if (previewItem?.id === item.id) closePreview();
     await loadDocuments();
-    setMessage("Document deactivated. The private file was retained for audit/history.");
+
+    if (storageDeleteError) {
+      setPendingStorageCleanup({
+        storageBucket,
+        storagePath: item.storage_path,
+        fileName: item.file_name,
+      });
+      setError(`${item.file_name}: metadata was deactivated, but Storage cleanup failed (${storageDeleteError.message}). Retry Storage cleanup to release the file space.`);
+      setBusyId(null);
+      return;
+    }
+
+    setMessage("Document deactivated and its private Storage object deleted. Audit metadata remains.");
     setBusyId(null);
   }
 
@@ -357,6 +402,17 @@ export default function EntityDocumentsPanel({
         <div className="space-y-5">
           {error ? <Alert variant="error" title="Document action failed" message={error} /> : null}
           {message ? <Alert variant="success" title="Documents updated" message={message} /> : null}
+
+          {pendingStorageCleanup ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
+              <FormHint>
+                {pendingStorageCleanup.fileName} was deactivated, but its private Storage object still needs cleanup. Audit metadata is already preserved.
+              </FormHint>
+              <Button type="button" variant="outline" size="sm" disabled={busyId !== null} onClick={() => void retryDeactivatedStorageCleanup()}>
+                {busyId === "deactivated-storage-cleanup" ? "Cleaning up…" : "Retry Storage cleanup"}
+              </Button>
+            </div>
+          ) : null}
 
           {orphanCleanup ? (
             <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
@@ -415,7 +471,7 @@ export default function EntityDocumentsPanel({
             <FormHint>You have read-only access to these documents.</FormHint>
           )}
 
-          {error && !loading && !orphanCleanup ? (
+          {error && !loading && !orphanCleanup && !pendingStorageCleanup ? (
             <Button type="button" variant="outline" size="sm" onClick={() => void loadDocuments()} disabled={busyId !== null}>Retry</Button>
           ) : null}
 
@@ -453,7 +509,7 @@ export default function EntityDocumentsPanel({
                       <div className="flex flex-wrap gap-2">
                         <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void previewDocument(item)}>Preview</Button>
                         <Button size="sm" variant="outline" disabled={busyId !== null} onClick={() => void downloadDocument(item)}>Download</Button>
-                        {canUpload ? <Button size="sm" variant="danger" disabled={busyId !== null} onClick={() => void deactivateDocument(item)}>Deactivate</Button> : null}
+                        {canUpload ? <Button size="sm" variant="danger" disabled={busyId !== null || pendingStorageCleanup !== null} onClick={() => void deactivateDocument(item)}>Deactivate</Button> : null}
                       </div>
                     </TableCell>
                   </TableRow>
