@@ -1,7 +1,7 @@
 # Modulex Admin Roadmap
 
 Last reviewed: 2026-09-11
-Main baseline: `fd0ddf1ca581a433fca458400578aef9af692dc5`
+Main baseline: `015b9c4d2811d4e7ba3d141590f271876909d7ef`
 Current phase: **Admin Final Workstreams**
 Production Supabase: `bzjoeernnmvuhzyvbowc`
 
@@ -167,12 +167,12 @@ Status: `[~]` VAL-1→VAL-4 are closed.
 
 ## OPS — Observability & Release Process
 
-Status: `[ ]` A7.5 remains open.
+Status: `[x]` OPS-A1→OPS-A4 closed; the operational baseline, audit reuse contract, migration runbook and release checklist are documented and CI-enforced.
 
-- [ ] **OPS-A1 — Error monitoring baseline.** Define minimum client/server/API/background-job error capture, severity and operator visibility without leaking secrets/PII.
-- [ ] **OPS-A2 — High-risk audit/event standard.** Document and verify actor/time/entity/action/reason/idempotency expectations for sensitive mutations.
-- [ ] **OPS-A3 — Migration rollout/rollback.** Document canonical migration ownership, preflight, apply order, backward compatibility, rollback/forward-fix policy and post-DDL Advisor checks.
-- [ ] **OPS-A4 — Admin release checklist.** Document and test the Admin + shared Supabase + Vercel release sequence, including CI, migration, deploy and smoke evidence.
+- [x] **OPS-A1 — Error monitoring baseline.** Minimum client/server/API/background-job/vendor/calendar/email error visibility, severity/correlation expectations and secret/PII logging boundaries are defined against existing runtime and queue sources.
+- [x] **OPS-A2 — High-risk audit/event standard.** Actor/time/entity/action/before-after-or-delta/reason/request-or-idempotency expectations are mapped to existing audit/event sources; no parallel per-domain ledger is introduced.
+- [x] **OPS-A3 — Migration rollout/rollback.** Canonical `modulex-store/supabase/migrations` ownership, preflight, merge/apply order, backward-compatible expand/contract, failed-migration handling, append-only forward-fix and Advisor gates are documented and contract-checked.
+- [x] **OPS-A4 — Admin release checklist.** Latest-main/open-PR conflict check, CI, migration state, Security/Performance Advisor, Vercel deploy, signed-in smoke, zero residue and roadmap/acceptance handoff are required by the release standard and executable OPS contract.
 
 ## DOC — Repository Documentation / Handoff
 
