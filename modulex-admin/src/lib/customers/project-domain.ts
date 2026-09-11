@@ -8,6 +8,7 @@ export type ProjectStatus = "draft" | "quoted" | "approved" | "ordered" | "in_pr
 export type CustomerProjectOrder = {
   id: string;
   order_number: string;
+  customer_reference: string | null;
   status: string;
   order_date: string;
   expected_delivery_date: string | null;
