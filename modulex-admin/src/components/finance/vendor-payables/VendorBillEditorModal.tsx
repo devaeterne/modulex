@@ -10,6 +10,7 @@ import Alert from "@/components/ui/alert/Alert";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
+import { ADMIN_COMPAT_APPEARANCE, ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
 import {
   createVendorBillDraft,
   getVendorBillDetail,
@@ -177,7 +178,7 @@ export default function VendorBillEditorModal({
   return (
     <Modal isOpen={isOpen} onClose={() => !busy && onClose()} className="relative w-full max-w-6xl p-6 lg:p-8" ariaLabel={editingBill ? "Edit Vendor Bill" : "Add Vendor Bill"}>
       <form onSubmit={submit} className="space-y-6">
-        <div><h3 className="text-xl font-semibold">{editingBill ? "Edit Vendor Bill Draft" : "+ Add Vendor Bill"}</h3><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Vendor Bill is the AP source document. Order allocations are configured after the Draft is saved.</p></div>
+        <div><h3 className="text-xl font-semibold">{editingBill ? "Edit Vendor Bill Draft" : "+ Add Vendor Bill"}</h3><p className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>Vendor Bill is the AP source document. Order allocations are configured after the Draft is saved.</p></div>
         {message ? <Alert variant="error" title="Vendor Bill" message={message} /> : null}
         {loading ? <div className="py-8 text-center">Loading Vendor Bill…</div> : (
           <>
@@ -193,8 +194,8 @@ export default function VendorBillEditorModal({
             </div>
             <div><Label htmlFor="bill-editor-notes">Notes</Label><TextArea id="bill-editor-notes" value={notes} onChange={setNotes} rows={2} /></div>
 
-            <div className="space-y-3 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-              <div><h4 className="font-semibold">Bill lines</h4><p className="text-xs text-gray-500 dark:text-gray-400">A line may later be allocated across multiple Vendor Cabinet Orders. Project/Order fields here remain optional descriptive attribution.</p></div>
+            <div className={`space-y-3 border p-4 ${ADMIN_COMPAT_APPEARANCE["rounded-xl"]} ${ADMIN_COMPAT_APPEARANCE["border-gray-200"]} ${ADMIN_COMPAT_APPEARANCE["dark:border-gray-800"]}`}>
+              <div><h4 className="font-semibold">Bill lines</h4><p className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>A line may later be allocated across multiple Vendor Cabinet Orders. Project/Order fields here remain optional descriptive attribution.</p></div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                 <div className="xl:col-span-2"><Label htmlFor="bill-line-description">Description</Label><Input id="bill-line-description" value={lineDescription} onChange={(event) => setLineDescription(event.target.value)} /></div>
                 <div><Label htmlFor="bill-line-amount">Amount</Label><Input id="bill-line-amount" type="number" min="0.0001" step="0.0001" value={lineAmount} onChange={(event) => setLineAmount(event.target.value)} /></div>
@@ -205,7 +206,7 @@ export default function VendorBillEditorModal({
               </div>
               <TableViewport>
                 <Table variant="admin" minWidth="compact"><TableHeader variant="admin"><TableRow><TableCell isHeader variant="admin">Description</TableCell><TableCell isHeader variant="admin">Project / Order</TableCell><TableCell isHeader variant="admin" className="text-right">Amount</TableCell><TableCell isHeader variant="admin">Action</TableCell></TableRow></TableHeader><TableBody variant="admin">
-                  {lines.length === 0 ? <TableStateRow colSpan={4}>No Bill lines yet.</TableStateRow> : lines.map((line, index) => <TableRow key={`${line.description}-${index}`}><TableCell variant="admin">{line.description}</TableCell><TableCell variant="admin">{line.projectId || "—"}<div className="text-xs text-gray-500">{line.orderId || "—"}</div></TableCell><TableCell variant="admin" className="text-right">{Number(line.amount).toFixed(2)}</TableCell><TableCell variant="admin"><Button size="sm" variant="ghost" type="button" onClick={() => setLines((current) => current.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button></TableCell></TableRow>)}
+                  {lines.length === 0 ? <TableStateRow colSpan={4}>No Bill lines yet.</TableStateRow> : lines.map((line, index) => <TableRow key={`${line.description}-${index}`}><TableCell variant="admin">{line.description}</TableCell><TableCell variant="admin">{line.projectId || "—"}<div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{line.orderId || "—"}</div></TableCell><TableCell variant="admin" className="text-right">{Number(line.amount).toFixed(2)}</TableCell><TableCell variant="admin"><Button size="sm" variant="ghost" type="button" onClick={() => setLines((current) => current.filter((_, rowIndex) => rowIndex !== index))}>Remove</Button></TableCell></TableRow>)}
                 </TableBody></Table>
               </TableViewport>
             </div>
