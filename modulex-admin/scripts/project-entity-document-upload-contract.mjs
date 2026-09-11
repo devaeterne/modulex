@@ -28,7 +28,7 @@ const registrationMigrationPath = path.join(
 );
 const deactivateMigrationPath = path.join(
   root,
-  "../modulex-store/supabase/migrations/20260911153000_entity_document_deactivate_rls_lock_fix.sql",
+  "../modulex-store/supabase/migrations/20260911152326_entity_document_deactivate_rls_lock_fix.sql",
 );
 
 function read(filePath) {
