@@ -56,7 +56,7 @@ type Props = {
 const bucket = "entity-documents";
 const signedAccessSeconds = 60;
 const maxFileSize = 25 * 1024 * 1024;
-const acceptedExtensions = ".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx,.csv";
+const acceptedExtensions = ".pdf,.jpg,.jpeg,.png,.webp,.docx,.xls,.xlsx,.csv,.tfx";
 
 const documentTypeOptions = [
   { value: "drawing", label: "Drawing" },
@@ -77,8 +77,10 @@ const mimeByExtension: Record<string, string> = {
   png: "image/png",
   webp: "image/webp",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   csv: "text/csv",
+  tfx: "image/tiff-fx",
 };
 
 const allowedMimeTypes = new Set([
@@ -91,6 +93,7 @@ const allowedMimeTypes = new Set([
   "text/csv",
   "application/csv",
   "application/vnd.ms-excel",
+  "image/tiff-fx",
 ]);
 
 function extensionOf(name: string) {
@@ -99,9 +102,9 @@ function extensionOf(name: string) {
 }
 
 function normalizedMimeType(file: File) {
-  const browserType = file.type.trim().toLowerCase();
-  if (browserType) return browserType;
-  return mimeByExtension[extensionOf(file.name)] || "";
+  const extensionType = mimeByExtension[extensionOf(file.name)];
+  if (extensionType) return extensionType;
+  return file.type.trim().toLowerCase();
 }
 
 function safeFileName(name: string) {
@@ -182,7 +185,7 @@ export default function EntityDocumentsPanel({
   }, [loadDocuments]);
 
   const selectedSummary = useMemo(() => {
-    if (files.length === 0) return "PDF, images, DOCX, XLSX or CSV · max 25 MiB each";
+    if (files.length === 0) return "PDF, images, DOCX, XLS/XLSX, CSV or TFX · max 25 MiB each";
     return `${files.length} file${files.length === 1 ? "" : "s"} selected`;
   }, [files]);
 

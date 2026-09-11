@@ -105,3 +105,5 @@ jobs:
         run: node scripts/project-proposal-order-conversion-uuid-aggregate-contract.mjs
       - name: Countertop Sink fallback contract
         run: node scripts/countertop-sink-fallback-contract.mjs
+      - name: Project/Order entity document upload contract
+        run: node scripts/project-entity-document-upload-contract.mjs
