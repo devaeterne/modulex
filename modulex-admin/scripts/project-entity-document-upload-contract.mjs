@@ -9,6 +9,7 @@ const orderPagePath = path.join(root, "src/app/(admin)/customers/[id]/orders/[or
 const projectDocumentsPath = path.join(root, "src/components/customers/project-detail/ProjectDocumentsTab.tsx");
 const customerPanelPath = path.join(root, "src/components/customers/CustomerDocumentsPanel.tsx");
 const previewPath = path.join(root, "src/components/customers/PrivateDocumentPreview.tsx");
+const modalPrimitivePath = path.join(root, "src/components/ui/modal/index.tsx");
 const grantRepairPath = path.join(
   root,
   "../modulex-store/supabase/migrations/20260911134819_entity_document_storage_helper_execute_grants.sql",
@@ -44,6 +45,7 @@ const orderPage = read(orderPagePath);
 const projectDocuments = read(projectDocumentsPath);
 const customerPanel = read(customerPanelPath);
 const preview = read(previewPath);
+const modalPrimitive = read(modalPrimitivePath);
 const grantRepair = read(grantRepairPath);
 const customerPolicyGrantRepair = read(customerPolicyGrantRepairPath);
 const tfxMigration = read(tfxMigrationPath);
@@ -72,8 +74,10 @@ for (const previewPanel of [panel, customerPanel]) {
   requireMatch(previewPanel, /<PrivateDocumentPreview\b/, "Document panels must render the shared in-app private preview dialog.");
   requireNoMatch(previewPanel, /getPublicUrl\(/, "Private document preview must never use public bucket URLs.");
 }
-requireMatch(preview, /role=["']dialog["']/, "Private document preview must expose dialog semantics.");
-requireMatch(preview, /aria-modal=["']true["']/, "Private document preview must identify itself as modal.");
+requireMatch(preview, /<Modal\b/, "Private document preview must use the shared Admin modal primitive.");
+requireMatch(preview, /ariaLabelledBy=\{titleId\}/, "Private document preview must label the shared dialog.");
+requireMatch(modalPrimitive, /role=["']dialog["']/, "Shared modal primitive must expose dialog semantics.");
+requireMatch(modalPrimitive, /aria-modal=["']true["']/, "Shared modal primitive must identify itself as modal.");
 requireMatch(preview, /<iframe\b/, "Browser-previewable files must render inside the application.");
 
 for (const helper of [
@@ -111,6 +115,6 @@ requireMatch(registrationMigration, /\.xls/i, "Entity document registration must
 requireMatch(registrationMigration, /application\/vnd\.ms-excel/i, "Entity document registration must accept the XLS MIME type.");
 requireMatch(registrationMigration, /\.tfx/i, "Entity document registration must accept TFX metadata.");
 requireMatch(registrationMigration, /image\/tiff-fx/i, "Entity document registration must accept the TFX MIME type.");
-requireMatch(registrationMigration, /revoke\s+all\s+on\s+function\s+public\.register_entity_document/i, "Registration RPC must retain explicit execute hardening.");
+requireMatch(registrationMigration, /revoke\s+(?:all|execute)\s+on\s+function\s+public\.register_entity_document/i, "Registration RPC must retain explicit execute hardening.");
 
 console.log("Project/Order entity document upload contract passed.");
