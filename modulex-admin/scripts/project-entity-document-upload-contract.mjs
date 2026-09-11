@@ -32,7 +32,7 @@ const deactivateMigrationPath = path.join(
 );
 const storageDeleteMigrationPath = path.join(
   root,
-  "../modulex-store/supabase/migrations/20260911160000_entity_document_storage_delete_on_deactivate.sql",
+  "../modulex-store/supabase/migrations/20260911154749_entity_document_storage_delete_on_deactivate.sql",
 );
 
 function read(filePath) {
