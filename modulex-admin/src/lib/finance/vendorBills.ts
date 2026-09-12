@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import type { VendorInvoiceOrderAllocation, VendorPaymentOrderAllocation } from "@/lib/finance/vendorPayables";
 
 export type VendorBillDocumentStatus = "draft" | "open" | "void";
 export type VendorBillPaymentStatus = "draft" | "unpaid" | "partially_paid" | "paid" | "void";
@@ -47,6 +48,8 @@ export type VendorBillDetail = {
   lines: VendorBillLine[];
   procurement_allocations: Array<Record<string, unknown>>;
   payment_allocations: Array<Record<string, unknown>>;
+  order_allocations?: VendorInvoiceOrderAllocation[];
+  order_settlements?: VendorPaymentOrderAllocation[];
   audit: Array<Record<string, unknown>>;
 };
 

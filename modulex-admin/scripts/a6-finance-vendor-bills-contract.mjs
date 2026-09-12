@@ -68,16 +68,24 @@ expect(/tg_op\s*=\s*'DELETE'[\s\S]{0,1200}return\s+old/i.test(hardening), "Bill-
 
 const route = "src/app/(admin)/finance/bills/page.tsx";
 const manager = "src/components/finance/FinanceVendorBillsManager.tsx";
+const billsPanel = "src/components/finance/vendor-payables/VendorBillsPanel.tsx";
+const billEditor = "src/components/finance/vendor-payables/VendorBillEditorModal.tsx";
+const billDetail = "src/components/finance/vendor-payables/VendorBillDetailPanel.tsx";
 const adapter = "src/lib/finance/vendorBills.ts";
-for (const file of [route, manager, adapter]) expect(exists(file), `Missing A6-F3B Vendor Bills surface: ${file}`);
-expect(read(route).includes("PageBreadCrumb"), "Finance Vendor Bills route must use shared PageBreadCrumb");
-const ui = read(manager);
+for (const file of [route, manager, billsPanel, billEditor, billDetail, adapter]) expect(exists(file), `Missing A6-F3B Vendor Bills surface: ${file}`);
+const routeSource = read(route);
+expect(routeSource.includes("PageBreadCrumb"), "Finance Vendor Bills route must use shared PageBreadCrumb");
+expect(routeSource.includes("FinanceVendorBillsManager"), "The canonical /finance/bills route must remain the Vendor Bills/Payables workspace boundary");
+expect(/Vendor Bills|Vendor Payables/.test(routeSource), "The /finance/bills route title may be Vendor Bills or Vendor Payables, but the route must remain stable");
+const ui = [read(manager),read(billsPanel),read(billEditor),read(billDetail)].join("\n");
 for (const primitive of ["ComponentCard", "Alert", "Button", "Label", "Input", "Select", "TableViewport"]) {
   expect(ui.includes(primitive), `Finance Vendor Bills must reuse shared ${primitive}`);
 }
 for (const term of ["Due", "Outstanding", "Vendor", "Payment", "Project", "Order"]) {
   expect(ui.toLowerCase().includes(term.toLowerCase()), `Vendor Bills UI must expose ${term}`);
 }
+expect(ui.includes("+ Add Vendor Bill"), "Vendor Bills must be list-first with a contextual Add Vendor Bill action");
+expect(!ui.includes("AP Lifecycle Inputs"), "Vendor Bills must not keep permanent AP lifecycle forms");
 const sidebar = read("src/layout/AppSidebar.tsx");
 expect(sidebar.includes('path: "/finance/bills"') && sidebar.includes('permission: "finance.view"'), "Finance sidebar must expose Vendor Bills using finance.view");
 

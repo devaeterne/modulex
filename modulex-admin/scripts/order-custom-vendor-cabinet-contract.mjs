@@ -12,6 +12,7 @@ const vendorPagePath = path.join(root, "src/app/(admin)/finance/vendors/page.tsx
 const migrationPath = path.join(root, "../modulex-store/supabase/migrations/20260911194500_custom_vendor_cabinet_order_lines.sql");
 const editMigrationPath = path.join(root, "../modulex-store/supabase/migrations/20260911214500_vendor_cabinet_edit_order_support.sql");
 const replaceMigrationPath = path.join(root, "../modulex-store/supabase/migrations/20260911223000_vendor_cabinet_edit_replace.sql");
+const payablesMigrationPath = path.join(root, "../modulex-store/supabase/migrations/20260912010000_a6_finance_vendor_payables.sql");
 
 function assert(condition, message) {
   if (!condition) {
@@ -25,6 +26,7 @@ assert(fs.existsSync(domainPath), "Custom vendor Cabinet entry must use a shared
 assert(fs.existsSync(migrationPath), "Custom vendor Cabinet lines must ship with the canonical Supabase migration");
 assert(fs.existsSync(editMigrationPath), "Edit Order Vendor Cabinet support must ship with a canonical Supabase migration");
 assert(fs.existsSync(replaceMigrationPath), "Saved Vendor Cabinet editing/PDF replacement must ship with a canonical Supabase migration");
+assert(fs.existsSync(payablesMigrationPath), "Vendor Cabinet financial identity must be guarded by the Vendor Payables migration");
 assert(fs.existsSync(vendorPagePath), "Canonical Vendor Management route must exist");
 
 const modal = fs.readFileSync(modalPath, "utf8");
@@ -36,6 +38,7 @@ const vendorPage = fs.readFileSync(vendorPagePath, "utf8");
 const migration = fs.readFileSync(migrationPath, "utf8");
 const editMigration = fs.readFileSync(editMigrationPath, "utf8");
 const replaceMigration = fs.readFileSync(replaceMigrationPath, "utf8");
+const payablesMigration = fs.readFileSync(payablesMigrationPath, "utf8");
 
 for (const label of ["Line Name", "Total Cost", "Markup %", "Vendor PDF"]) {
   assert(modal.includes(label), `vendor Cabinet modal must expose ${label}`);
@@ -90,5 +93,8 @@ assert(replaceMigration.includes("update_custom_vendor_cabinet_order_line"), "Ve
 assert(replaceMigration.includes("source_document_id"), "Vendor Cabinet edit migration must atomically replace the source document reference");
 assert(replaceMigration.includes("manual_vendor_cabinet"), "Vendor Cabinet edit migration must scope mutation to productless manual Vendor Cabinet lines");
 assert(!replaceMigration.includes("insert into public.products"), "Vendor Cabinet editing must never create Product rows");
+assert(payablesMigration.includes("vendor_invoice_order_allocations"), "Vendor Payables must persist Bill-to-Vendor-Cabinet attribution separately");
+assert(payablesMigration.includes("Vendor Cabinet financial identity is locked after Vendor Bill attribution"), "Vendor Cabinet vendor/cost identity must become immutable after Finance attribution");
+assert(payablesMigration.includes("Vendor Cabinet line has Finance attribution and cannot be deleted"), "Attributed Vendor Cabinet lines must not be deletable");
 
 console.log("PASS: custom vendor Cabinet order-line contract");

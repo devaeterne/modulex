@@ -43,6 +43,8 @@ for (const rpc of [
   expect(sql.includes(`private.${rpc}`), `A6-F3C private core ${rpc} is required`);
   expect(sql.includes(`public.${rpc}`), `A6-F3C public RPC ${rpc} is required`);
 }
+expect(/private\.reverse_vendor_payment\s*\(\s*p_transaction_id\s+uuid\s*,\s*p_reason\s+text\s*,\s*p_idempotency_key\s+uuid\s*\)/i.test(sql), "Vendor Payment reversal private signature must remain stable for Finance-aware extension");
+expect(/public\.reverse_vendor_payment\s*\(\s*p_transaction_id\s+uuid\s*,\s*p_reason\s+text\s*,\s*p_idempotency_key\s+uuid/i.test(sql), "Vendor Payment reversal public signature must remain stable for current clients");
 expect(/private\.create_finance_transaction_draft/i.test(sql), "Vendor payment draft creation must reuse Finance Core draft creation");
 expect(/private\.post_finance_transaction/i.test(sql), "Vendor payment posting must reuse Finance Core posting/FX");
 expect(/private\.reverse_finance_transaction/i.test(sql), "Check void/return correction must reuse Finance reversal");

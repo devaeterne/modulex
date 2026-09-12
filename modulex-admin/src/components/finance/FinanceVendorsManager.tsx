@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import DateInput from "@/components/form/DateInput";
@@ -14,6 +15,7 @@ import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableStateRow, TableViewport } from "@/components/ui/table";
 import { ADMIN_TEXT_STYLES } from "@/components/ui/theme/adminTheme";
+import VendorCommitmentsPanel from "@/components/finance/vendor-payables/VendorCommitmentsPanel";
 import { hasPermission } from "@/lib/auth/permissions";
 import { formatDateOnly } from "@/lib/dates/usDate";
 import {
@@ -71,7 +73,7 @@ const complianceStatusOptions = [
   { value: "rejected", label: "Rejected" },
   { value: "not_required", label: "Not Required" },
 ];
-const detailTabs = ["Overview", "Contacts", "Sources", "Compliance"] as const;
+const detailTabs = ["Overview", "Contacts", "Sources", "Compliance", "Commitments"] as const;
 type VendorDetailTab = (typeof detailTabs)[number];
 
 const emptyVendorForm = {
@@ -193,11 +195,17 @@ export default function FinanceVendorsManager() {
         if (!active) return;
         setCanManage(hasPermission(profileResult.profile?.roles, "finance.manage"));
         setSources(nextSources);
+        if (typeof window !== "undefined") {
+          const requestedVendor = new URLSearchParams(window.location.search).get("vendor");
+          if (requestedVendor) void loadDetail(requestedVendor);
+        }
       })
       .catch((error) => {
         if (active) setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor workspace could not be prepared." });
       });
     return () => { active = false; };
+    // Initial access/source bootstrap only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -218,199 +226,86 @@ export default function FinanceVendorsManager() {
     [sources],
   );
 
-  function resetVendorForm() {
-    setVendorForm(emptyVendorForm);
-    setEditingVendor(false);
-  }
-
-  function openNewVendor() {
-    resetVendorForm();
-    setMessage(null);
-    setIsVendorModalOpen(true);
-  }
-
+  function resetVendorForm() { setVendorForm(emptyVendorForm); setEditingVendor(false); }
+  function openNewVendor() { resetVendorForm(); setMessage(null); setIsVendorModalOpen(true); }
   function startVendorEdit() {
     if (!detail) return;
     const vendor = detail.vendor;
     setVendorForm({
-      code: vendor.code,
-      legalName: vendor.legal_name,
-      displayName: vendor.display_name,
-      vendorType: vendor.vendor_type,
-      defaultCurrencyCode: vendor.default_currency_code ?? "USD",
-      remitToName: vendor.remit_to_name ?? "",
-      remitAddressLine1: vendor.remit_address_line1 ?? "",
-      remitAddressLine2: vendor.remit_address_line2 ?? "",
-      remitCity: vendor.remit_city ?? "",
-      remitStateRegion: vendor.remit_state_region ?? "",
-      remitPostalCode: vendor.remit_postal_code ?? "",
-      remitCountryCode: vendor.remit_country_code ?? "US",
-      notes: vendor.notes ?? "",
-    });
-    setEditingVendor(true);
-    setIsVendorModalOpen(true);
+      code: vendor.code, legalName: vendor.legal_name, displayName: vendor.display_name, vendorType: vendor.vendor_type,
+      defaultCurrencyCode: vendor.default_currency_code ?? "USD", paymentTermId: undefined,
+      remitToName: vendor.remit_to_name ?? "", remitAddressLine1: vendor.remit_address_line1 ?? "", remitAddressLine2: vendor.remit_address_line2 ?? "",
+      remitCity: vendor.remit_city ?? "", remitStateRegion: vendor.remit_state_region ?? "", remitPostalCode: vendor.remit_postal_code ?? "", remitCountryCode: vendor.remit_country_code ?? "US", notes: vendor.notes ?? "",
+    } as typeof emptyVendorForm);
+    setEditingVendor(true); setIsVendorModalOpen(true);
   }
-
-  function closeVendorModal() {
-    if (busy) return;
-    setIsVendorModalOpen(false);
-    resetVendorForm();
-  }
+  function closeVendorModal() { if (busy) return; setIsVendorModalOpen(false); resetVendorForm(); }
 
   function validatedVendorInput(): VendorInput | null {
-    if (!vendorForm.code.trim() || !vendorForm.legalName.trim() || !vendorForm.displayName.trim()) {
-      setMessage({ variant: "error", text: "Vendor code, legal name and display name are required." });
-      return null;
-    }
-    if (vendorForm.defaultCurrencyCode.trim() && vendorForm.defaultCurrencyCode.trim().length !== 3) {
-      setMessage({ variant: "error", text: "Default currency must be a 3-letter code." });
-      return null;
-    }
-    if (vendorForm.remitCountryCode.trim() && vendorForm.remitCountryCode.trim().length !== 2) {
-      setMessage({ variant: "error", text: "Remittance country must be a 2-letter code." });
-      return null;
-    }
+    if (!vendorForm.code.trim() || !vendorForm.legalName.trim() || !vendorForm.displayName.trim()) { setMessage({ variant: "error", text: "Vendor code, legal name and display name are required." }); return null; }
+    if (vendorForm.defaultCurrencyCode.trim() && vendorForm.defaultCurrencyCode.trim().length !== 3) { setMessage({ variant: "error", text: "Default currency must be a 3-letter code." }); return null; }
+    if (vendorForm.remitCountryCode.trim() && vendorForm.remitCountryCode.trim().length !== 2) { setMessage({ variant: "error", text: "Remittance country must be a 2-letter code." }); return null; }
     return { ...vendorForm };
   }
 
   async function submitVendor(event: FormEvent) {
-    event.preventDefault();
-    if (!canManage || busy) return;
-    const input = validatedVendorInput();
-    if (!input) return;
+    event.preventDefault(); if (!canManage || busy) return;
+    const input = validatedVendorInput(); if (!input) return;
     setBusy(true);
     try {
       let vendorId = selectedId;
-      if (editingVendor && selectedId) {
-        await updateVendor(selectedId, input);
-        setMessage({ variant: "success", text: "Vendor master updated." });
-      } else {
-        vendorId = await createVendor(input);
-        setMessage({ variant: "success", text: "Vendor created in onboarding status." });
-      }
-      setIsVendorModalOpen(false);
-      resetVendorForm();
-      setOffset(0);
-      await loadVendorList(0);
-      if (vendorId) await loadDetail(vendorId);
-    } catch (error) {
-      setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor could not be saved." });
-    } finally {
-      setBusy(false);
-    }
+      if (editingVendor && selectedId) { await updateVendor(selectedId, input); setMessage({ variant: "success", text: "Vendor master updated." }); }
+      else { vendorId = await createVendor(input); setMessage({ variant: "success", text: "Vendor created in onboarding status." }); }
+      setIsVendorModalOpen(false); resetVendorForm(); setOffset(0); await loadVendorList(0); if (vendorId) await loadDetail(vendorId);
+    } catch (error) { setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor could not be saved." }); }
+    finally { setBusy(false); }
   }
 
   async function changeVendorStatus(status: VendorStatus) {
-    if (!canManage || !selectedId || busy) return;
-    setBusy(true);
-    try {
-      await setVendorStatus(selectedId, status);
-      setMessage({ variant: "success", text: `Vendor status changed to ${status}. Historical references remain intact.` });
-      await refreshSelected();
-    } catch (error) {
-      setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor status could not be changed." });
-    } finally {
-      setBusy(false);
-    }
+    if (!canManage || !selectedId || busy) return; setBusy(true);
+    try { await setVendorStatus(selectedId, status); setMessage({ variant: "success", text: `Vendor status changed to ${status}. Historical references remain intact.` }); await refreshSelected(); }
+    catch (error) { setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor status could not be changed." }); }
+    finally { setBusy(false); }
   }
 
   async function submitContact(event: FormEvent) {
-    event.preventDefault();
-    if (!canManage || !selectedId || busy) return;
-    if (!contactName.trim() || (!contactEmail.trim() && !contactPhone.trim())) {
-      setMessage({ variant: "error", text: "Contact name and at least one email or phone are required." });
-      return;
-    }
+    event.preventDefault(); if (!canManage || !selectedId || busy) return;
+    if (!contactName.trim() || (!contactEmail.trim() && !contactPhone.trim())) { setMessage({ variant: "error", text: "Contact name and at least one email or phone are required." }); return; }
     setBusy(true);
     try {
       await upsertVendorContact({ vendorId: selectedId, contactType, name: contactName, title: contactTitle, email: contactEmail, phone: contactPhone, isPrimary: contactPrimary });
-      setContactName("");
-      setContactTitle("");
-      setContactEmail("");
-      setContactPhone("");
-      setContactPrimary(false);
-      setMessage({ variant: "success", text: "Vendor contact saved." });
-      await refreshSelected();
-    } catch (error) {
-      setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor contact could not be saved." });
-    } finally {
-      setBusy(false);
-    }
+      setContactName(""); setContactTitle(""); setContactEmail(""); setContactPhone(""); setContactPrimary(false); setMessage({ variant: "success", text: "Vendor contact saved." }); await refreshSelected();
+    } catch (error) { setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor contact could not be saved." }); }
+    finally { setBusy(false); }
   }
 
   async function submitSource(event: FormEvent) {
-    event.preventDefault();
-    if (!canManage || !selectedId || !sourceChoice || busy) return;
-    const separator = sourceChoice.indexOf("|");
-    if (separator < 1) return;
+    event.preventDefault(); if (!canManage || !selectedId || !sourceChoice || busy) return;
+    const separator = sourceChoice.indexOf("|"); if (separator < 1) return;
     const sourceSystem = sourceChoice.slice(0, separator) as VendorSourceCandidate["source_system"];
     const sourceCode = sourceChoice.slice(separator + 1);
     const candidate = sources.find((item) => item.source_system === sourceSystem && item.source_code === sourceCode);
-    if (candidate?.mapped_vendor_id && candidate.mapped_vendor_id !== selectedId) {
-      setMessage({ variant: "error", text: "That source identity is already mapped to another canonical vendor." });
-      return;
-    }
+    if (candidate?.mapped_vendor_id && candidate.mapped_vendor_id !== selectedId) { setMessage({ variant: "error", text: "That source identity is already mapped to another canonical vendor." }); return; }
     setBusy(true);
-    try {
-      await mapVendorSourceIdentity({ vendorId: selectedId, sourceSystem, sourceCode, sourceNameSnapshot: candidate?.source_name_snapshot, isPrimary: sourcePrimary });
-      setSourceChoice("");
-      setSourcePrimary(false);
-      setMessage({ variant: "success", text: "Source identity mapped." });
-      const nextSources = await getVendorSourceCandidates();
-      setSources(nextSources);
-      await refreshSelected();
-    } catch (error) {
-      setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor source could not be mapped." });
-    } finally {
-      setBusy(false);
-    }
+    try { await mapVendorSourceIdentity({ vendorId: selectedId, sourceSystem, sourceCode, sourceNameSnapshot: candidate?.source_name_snapshot, isPrimary: sourcePrimary }); setSourceChoice(""); setSourcePrimary(false); setMessage({ variant: "success", text: "Source identity mapped." }); setSources(await getVendorSourceCandidates()); await refreshSelected(); }
+    catch (error) { setMessage({ variant: "error", text: error instanceof Error ? error.message : "Vendor source could not be mapped." }); }
+    finally { setBusy(false); }
   }
 
   async function submitCompliance(event: FormEvent) {
-    event.preventDefault();
-    if (!canManage || !selectedId || busy) return;
-    if (!complianceTitle.trim()) {
-      setMessage({ variant: "error", text: "Compliance document title is required." });
-      return;
-    }
-    if ((storageBucket.trim() && !storagePath.trim()) || (!storageBucket.trim() && storagePath.trim())) {
-      setMessage({ variant: "error", text: "Storage bucket and storage path must be supplied together." });
-      return;
-    }
+    event.preventDefault(); if (!canManage || !selectedId || busy) return;
+    if (!complianceTitle.trim()) { setMessage({ variant: "error", text: "Compliance document title is required." }); return; }
+    if ((storageBucket.trim() && !storagePath.trim()) || (!storageBucket.trim() && storagePath.trim())) { setMessage({ variant: "error", text: "Storage bucket and storage path must be supplied together." }); return; }
     setBusy(true);
     try {
-      await upsertVendorComplianceDocument({
-        vendorId: selectedId,
-        documentType: complianceType,
-        status: complianceStatus,
-        title: complianceTitle,
-        documentNumber: complianceNumber,
-        issuedOn,
-        expiresOn,
-        storageBucket,
-        storagePath,
-        fileName,
-        notes: complianceNotes,
-      });
-      setComplianceNumber("");
-      setIssuedOn("");
-      setExpiresOn("");
-      setStorageBucket("");
-      setStoragePath("");
-      setFileName("");
-      setComplianceNotes("");
-      setMessage({ variant: "success", text: "Compliance metadata saved." });
-      await refreshSelected();
-    } catch (error) {
-      setMessage({ variant: "error", text: error instanceof Error ? error.message : "Compliance metadata could not be saved." });
-    } finally {
-      setBusy(false);
-    }
+      await upsertVendorComplianceDocument({ vendorId: selectedId, documentType: complianceType, status: complianceStatus, title: complianceTitle, documentNumber: complianceNumber, issuedOn, expiresOn, storageBucket, storagePath, fileName, notes: complianceNotes });
+      setComplianceNumber(""); setIssuedOn(""); setExpiresOn(""); setStorageBucket(""); setStoragePath(""); setFileName(""); setComplianceNotes(""); setMessage({ variant: "success", text: "Compliance metadata saved." }); await refreshSelected();
+    } catch (error) { setMessage({ variant: "error", text: error instanceof Error ? error.message : "Compliance metadata could not be saved." }); }
+    finally { setBusy(false); }
   }
 
   function chooseComplianceType(value: string) {
-    const next = value as VendorComplianceType;
-    setComplianceType(next);
+    const next = value as VendorComplianceType; setComplianceType(next);
     setComplianceTitle(next === "w9" ? "W-9" : next === "coi" ? "COI" : next === "license" ? "License" : "Other Compliance Document");
   }
 
@@ -419,119 +314,36 @@ export default function FinanceVendorsManager() {
   return (
     <div className="space-y-6">
       {message ? <Alert variant={message.variant} title={message.variant === "success" ? "Vendor saved" : "Vendor error"} message={message.text} /> : null}
-      {!canManage && !loading ? <Alert variant="info" title="Read-only Finance access" message="Your role can review Vendors, Contacts, Source identities and Compliance but cannot mutate vendor-master data." /> : null}
+      {!canManage && !loading ? <Alert variant="info" title="Read-only Finance access" message="Your role can review Vendors, Contacts, Source identities, Compliance and Commitments but cannot mutate vendor-master data." /> : null}
 
-      <ComponentCard
-        title="Vendors"
-        desc="Search and manage the canonical vendor directory. Create a vendor only when a new counterparty is needed."
-        headerAction={canManage ? <Button size="sm" onClick={openNewVendor}>+ Add Vendor</Button> : undefined}
-      >
+      <ComponentCard title="Vendors" desc="Search and manage the canonical vendor directory. Create a vendor only when a new counterparty is needed." headerAction={canManage ? <Button size="sm" onClick={openNewVendor}>+ Add Vendor</Button> : undefined}>
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
-            <div className="md:col-span-3 xl:col-span-3"><Label htmlFor="vendor-search">Search</Label><Input id="vendor-search" value={search} onChange={(event) => { setSearch(event.target.value); setOffset(0); }} placeholder="Code, legal name or display name" /></div>
-            <div><Label htmlFor="vendor-filter-status">Status</Label><Select id="vendor-filter-status" options={statusOptions} value={statusFilter} onChange={(value) => { setStatusFilter(value); setOffset(0); }} placeholder="All statuses" allowEmpty /></div>
-            <div><Label htmlFor="vendor-filter-type">Type</Label><Select id="vendor-filter-type" options={vendorTypeOptions} value={vendorTypeFilter} onChange={(value) => { setVendorTypeFilter(value); setOffset(0); }} placeholder="All types" allowEmpty /></div>
-          </div>
-
-          <TableViewport>
-            <Table variant="admin" minWidth="standard">
-              <TableHeader variant="admin"><TableRow>{["Vendor", "Type", "Status", "Compliance", "Sources", ""].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader>
-              <TableBody variant="admin" aria-busy={loading}>
-                {loading ? <TableStateRow colSpan={6}>Loading vendors…</TableStateRow> : vendors.length === 0 ? <TableStateRow colSpan={6}>No vendors match these filters.</TableStateRow> : vendors.map((vendor) => (
-                  <TableRow key={vendor.id} variant="admin" className={selectedId === vendor.id ? "bg-gray-50 dark:bg-white/[0.03]" : ""}>
-                    <TableCell variant="admin"><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{vendor.display_name}</div><div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{vendor.code} · {vendor.legal_name}</div></TableCell>
-                    <TableCell variant="admin">{vendor.vendor_type.replaceAll("_", " ")}</TableCell>
-                    <TableCell variant="admin"><Badge color={statusColor(vendor.status)}>{vendor.status}</Badge></TableCell>
-                    <TableCell variant="admin"><div className="flex flex-wrap gap-2"><Badge color={complianceColor(vendor.w9_status)}>W-9 {complianceLabel(vendor.w9_status)}</Badge><Badge color={complianceColor(vendor.coi_status)}>COI {complianceLabel(vendor.coi_status)}</Badge></div></TableCell>
-                    <TableCell variant="admin">{vendor.source_identity_count}</TableCell>
-                    <TableCell variant="admin" className="text-right"><Button size="sm" variant={selectedId === vendor.id ? "primary" : "outline"} onClick={() => void loadDetail(vendor.id)} disabled={detailLoading}>{selectedId === vendor.id ? "Selected" : "Manage"}</Button></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableViewport>
-
-          <div className={`flex flex-wrap items-center justify-between gap-3 text-sm ${ADMIN_TEXT_STYLES.muted}`}>
-            <span>{totalCount} vendor{totalCount === 1 ? "" : "s"}</span>
-            <div className="flex gap-2"><Button size="sm" variant="outline" disabled={loading || offset === 0} onClick={() => setOffset(Math.max(0, offset - pageSize))}>Previous</Button><Button size="sm" variant="outline" disabled={loading || offset + pageSize >= totalCount} onClick={() => setOffset(offset + pageSize)}>Next</Button></div>
-          </div>
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5"><div className="md:col-span-3 xl:col-span-3"><Label htmlFor="vendor-search">Search</Label><Input id="vendor-search" value={search} onChange={(event) => { setSearch(event.target.value); setOffset(0); }} placeholder="Code, legal name or display name" /></div><div><Label htmlFor="vendor-filter-status">Status</Label><Select id="vendor-filter-status" options={statusOptions} value={statusFilter} onChange={(value) => { setStatusFilter(value); setOffset(0); }} placeholder="All statuses" allowEmpty /></div><div><Label htmlFor="vendor-filter-type">Type</Label><Select id="vendor-filter-type" options={vendorTypeOptions} value={vendorTypeFilter} onChange={(value) => { setVendorTypeFilter(value); setOffset(0); }} placeholder="All types" allowEmpty /></div></div>
+          <TableViewport><Table variant="admin" minWidth="standard"><TableHeader variant="admin"><TableRow>{["Vendor", "Type", "Status", "Compliance", "Sources", ""].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader><TableBody variant="admin" aria-busy={loading}>{loading ? <TableStateRow colSpan={6}>Loading vendors…</TableStateRow> : vendors.length === 0 ? <TableStateRow colSpan={6}>No vendors match these filters.</TableStateRow> : vendors.map((vendor) => <TableRow key={vendor.id} variant="admin" className={selectedId === vendor.id ? "bg-gray-50 dark:bg-white/[0.03]" : ""}><TableCell variant="admin"><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{vendor.display_name}</div><div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{vendor.code} · {vendor.legal_name}</div></TableCell><TableCell variant="admin">{vendor.vendor_type.replaceAll("_", " ")}</TableCell><TableCell variant="admin"><Badge color={statusColor(vendor.status)}>{vendor.status}</Badge></TableCell><TableCell variant="admin"><div className="flex flex-wrap gap-2"><Badge color={complianceColor(vendor.w9_status)}>W-9 {complianceLabel(vendor.w9_status)}</Badge><Badge color={complianceColor(vendor.coi_status)}>COI {complianceLabel(vendor.coi_status)}</Badge></div></TableCell><TableCell variant="admin">{vendor.source_identity_count}</TableCell><TableCell variant="admin" className="text-right"><Button size="sm" variant={selectedId === vendor.id ? "primary" : "outline"} onClick={() => void loadDetail(vendor.id)} disabled={detailLoading}>{selectedId === vendor.id ? "Selected" : "Manage"}</Button></TableCell></TableRow>)}</TableBody></Table></TableViewport>
+          <div className={`flex flex-wrap items-center justify-between gap-3 text-sm ${ADMIN_TEXT_STYLES.muted}`}><span>{totalCount} vendor{totalCount === 1 ? "" : "s"}</span><div className="flex gap-2"><Button size="sm" variant="outline" disabled={loading || offset === 0} onClick={() => setOffset(Math.max(0, offset - pageSize))}>Previous</Button><Button size="sm" variant="outline" disabled={loading || offset + pageSize >= totalCount} onClick={() => setOffset(offset + pageSize)}>Next</Button></div></div>
         </div>
       </ComponentCard>
 
-      {detailLoading ? <ComponentCard title="Vendor Detail"><div className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading vendor detail…</div></ComponentCard> : detail ? (
-        <>
-          {selectedWarning ? <Alert variant="warning" title="Compliance warning" message="W-9 or COI is missing/expired. This remains a review warning and does not hard-block payment." /> : null}
-          <ComponentCard
-            title={detail.vendor.display_name}
-            desc={`${detail.vendor.code} · ${detail.vendor.vendor_type.replaceAll("_", " ")}`}
-            headerAction={<Badge color={statusColor(detail.vendor.status)}>{detail.vendor.status}</Badge>}
-          >
-            <div className="flex flex-wrap gap-2">
-              {detailTabs.map((tab) => <Button key={tab} size="sm" variant={detailTab === tab ? "primary" : "ghost"} onClick={() => setDetailTab(tab)}>{tab}</Button>)}
-            </div>
-          </ComponentCard>
+      {detailLoading ? <ComponentCard title="Vendor Detail"><div className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Loading vendor detail…</div></ComponentCard> : detail ? <>
+        {selectedWarning ? <Alert variant="warning" title="Compliance warning" message="W-9 or COI is missing/expired. This remains a review warning and does not hard-block payment." /> : null}
+        <ComponentCard title={detail.vendor.display_name} desc={`${detail.vendor.code} · ${detail.vendor.vendor_type.replaceAll("_", " ")}`} headerAction={<Badge color={statusColor(detail.vendor.status)}>{detail.vendor.status}</Badge>}><div className="flex flex-wrap gap-2">{detailTabs.map((tab) => <Button key={tab} size="sm" variant={detailTab === tab ? "primary" : "ghost"} onClick={() => setDetailTab(tab)}>{tab}</Button>)}</div></ComponentCard>
 
-          {detailTab === "Overview" ? (
-            <ComponentCard title="Overview" desc="Business identity, remittance profile and lifecycle.">
-              <div className="grid gap-4 text-sm md:grid-cols-2 xl:grid-cols-4">
-                <div><span className={ADMIN_TEXT_STYLES.muted}>Code</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.code}</div></div>
-                <div><span className={ADMIN_TEXT_STYLES.muted}>Legal name</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.legal_name}</div></div>
-                <div><span className={ADMIN_TEXT_STYLES.muted}>Currency</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.default_currency_code ?? "Not set"}</div></div>
-                <div><span className={ADMIN_TEXT_STYLES.muted}>Remit to</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.remit_to_name ?? "Not set"}</div></div>
-                <div className="md:col-span-2"><span className={ADMIN_TEXT_STYLES.muted}>Remittance address</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{[detail.vendor.remit_address_line1, detail.vendor.remit_address_line2, detail.vendor.remit_city, detail.vendor.remit_state_region, detail.vendor.remit_postal_code, detail.vendor.remit_country_code].filter(Boolean).join(", ") || "Not set"}</div></div>
-                <div className="md:col-span-2"><span className={ADMIN_TEXT_STYLES.muted}>Notes</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.notes ?? "—"}</div></div>
-              </div>
-              {canManage ? <div className="mt-5 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={startVendorEdit} disabled={busy}>Edit Vendor</Button>{detail.vendor.status !== "active" ? <Button size="sm" onClick={() => void changeVendorStatus("active")} disabled={busy}>Activate</Button> : null}{detail.vendor.status !== "inactive" ? <Button size="sm" variant="outline" onClick={() => void changeVendorStatus("inactive")} disabled={busy}>Deactivate</Button> : null}</div> : null}
-            </ComponentCard>
-          ) : null}
+        {detailTab === "Overview" ? <ComponentCard title="Overview" desc="Business identity, remittance profile and lifecycle."><div className="grid gap-4 text-sm md:grid-cols-2 xl:grid-cols-4"><div><span className={ADMIN_TEXT_STYLES.muted}>Code</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.code}</div></div><div><span className={ADMIN_TEXT_STYLES.muted}>Legal name</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.legal_name}</div></div><div><span className={ADMIN_TEXT_STYLES.muted}>Currency</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.default_currency_code ?? "Not set"}</div></div><div><span className={ADMIN_TEXT_STYLES.muted}>Remit to</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.remit_to_name ?? "Not set"}</div></div><div className="md:col-span-2"><span className={ADMIN_TEXT_STYLES.muted}>Remittance address</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{[detail.vendor.remit_address_line1, detail.vendor.remit_address_line2, detail.vendor.remit_city, detail.vendor.remit_state_region, detail.vendor.remit_postal_code, detail.vendor.remit_country_code].filter(Boolean).join(", ") || "Not set"}</div></div><div className="md:col-span-2"><span className={ADMIN_TEXT_STYLES.muted}>Notes</span><div className={`font-medium ${ADMIN_TEXT_STYLES.strong}`}>{detail.vendor.notes ?? "—"}</div></div></div>{canManage ? <div className="mt-5 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={startVendorEdit} disabled={busy}>Edit Vendor</Button>{detail.vendor.status !== "active" ? <Button size="sm" onClick={() => void changeVendorStatus("active")} disabled={busy}>Activate</Button> : null}{detail.vendor.status !== "inactive" ? <Button size="sm" variant="outline" onClick={() => void changeVendorStatus("inactive")} disabled={busy}>Deactivate</Button> : null}</div> : null}</ComponentCard> : null}
 
-          {detailTab === "Contacts" ? (
-            <ComponentCard title="Contacts" desc="Primary, ordering, billing, remittance and compliance contacts.">
-              {canManage ? <form onSubmit={submitContact} className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div><Label htmlFor="vendor-contact-type">Type</Label><Select id="vendor-contact-type" options={contactTypeOptions} value={contactType} onChange={(value) => setContactType(value as VendorContactType)} /></div><div><Label htmlFor="vendor-contact-name">Name</Label><Input id="vendor-contact-name" value={contactName} onChange={(event) => setContactName(event.target.value)} required /></div><div><Label htmlFor="vendor-contact-title">Title</Label><Input id="vendor-contact-title" value={contactTitle} onChange={(event) => setContactTitle(event.target.value)} /></div><div><Label htmlFor="vendor-contact-email">Email</Label><Input id="vendor-contact-email" type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} /></div><div><Label htmlFor="vendor-contact-phone">Phone</Label><Input id="vendor-contact-phone" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} /></div><div className="flex items-end"><Checkbox id="vendor-contact-primary" label="Primary contact" checked={contactPrimary} onChange={setContactPrimary} disabled={busy} /></div><div className="flex items-end"><Button type="submit" disabled={busy}>Add Contact</Button></div></form> : null}
-              <TableViewport><Table variant="admin"><TableHeader variant="admin"><TableRow>{["Name", "Type", "Email", "Phone", "Primary"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader><TableBody variant="admin">{detail.contacts.length === 0 ? <TableStateRow colSpan={5}>No vendor contacts recorded.</TableStateRow> : detail.contacts.map((contact) => <TableRow key={contact.id}><TableCell variant="admin">{contact.name}{contact.title ? <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{contact.title}</div> : null}</TableCell><TableCell variant="admin">{contact.contact_type}</TableCell><TableCell variant="admin">{contact.email ?? "—"}</TableCell><TableCell variant="admin">{contact.phone ?? "—"}</TableCell><TableCell variant="admin">{contact.is_primary ? "Yes" : "No"}</TableCell></TableRow>)}</TableBody></Table></TableViewport>
-            </ComponentCard>
-          ) : null}
+        {detailTab === "Contacts" ? <ComponentCard title="Contacts" desc="Primary, ordering, billing, remittance and compliance contacts.">{canManage ? <form onSubmit={submitContact} className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div><Label htmlFor="vendor-contact-type">Type</Label><Select id="vendor-contact-type" options={contactTypeOptions} value={contactType} onChange={(value) => setContactType(value as VendorContactType)} /></div><div><Label htmlFor="vendor-contact-name">Name</Label><Input id="vendor-contact-name" value={contactName} onChange={(event) => setContactName(event.target.value)} required /></div><div><Label htmlFor="vendor-contact-title">Title</Label><Input id="vendor-contact-title" value={contactTitle} onChange={(event) => setContactTitle(event.target.value)} /></div><div><Label htmlFor="vendor-contact-email">Email</Label><Input id="vendor-contact-email" type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} /></div><div><Label htmlFor="vendor-contact-phone">Phone</Label><Input id="vendor-contact-phone" value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} /></div><div className="flex items-end"><Checkbox id="vendor-contact-primary" label="Primary contact" checked={contactPrimary} onChange={setContactPrimary} disabled={busy} /></div><div className="flex items-end"><Button type="submit" disabled={busy}>Add Contact</Button></div></form> : null}<TableViewport><Table variant="admin"><TableHeader variant="admin"><TableRow>{["Name", "Type", "Email", "Phone", "Primary"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader><TableBody variant="admin">{detail.contacts.length === 0 ? <TableStateRow colSpan={5}>No vendor contacts recorded.</TableStateRow> : detail.contacts.map((contact) => <TableRow key={contact.id}><TableCell variant="admin">{contact.name}{contact.title ? <div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{contact.title}</div> : null}</TableCell><TableCell variant="admin">{contact.contact_type}</TableCell><TableCell variant="admin">{contact.email ?? "—"}</TableCell><TableCell variant="admin">{contact.phone ?? "—"}</TableCell><TableCell variant="admin">{contact.is_primary ? "Yes" : "No"}</TableCell></TableRow>)}</TableBody></Table></TableViewport></ComponentCard> : null}
 
-          {detailTab === "Sources" ? (
-            <ComponentCard title="Sources" desc="Explicit Vendor Catalog/procurement/invoice identity mappings.">
-              {canManage ? <form onSubmit={submitSource} className="mb-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end"><div><Label htmlFor="vendor-source">Source candidate</Label><Select id="vendor-source" options={sourceOptions} value={sourceChoice} onChange={setSourceChoice} placeholder="Choose a source" /></div><Checkbox id="vendor-source-primary" label="Primary Source" checked={sourcePrimary} onChange={setSourcePrimary} disabled={busy} /><Button type="submit" disabled={busy || !sourceChoice}>Map Source</Button></form> : null}
-              <TableViewport><Table variant="admin"><TableHeader variant="admin"><TableRow>{["Source", "Code", "Name snapshot", "Primary"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader><TableBody variant="admin">{detail.source_identities.length === 0 ? <TableStateRow colSpan={4}>No source identities mapped.</TableStateRow> : detail.source_identities.map((source) => <TableRow key={source.id}><TableCell variant="admin">{source.source_system.replaceAll("_", " ")}</TableCell><TableCell variant="admin">{source.source_code}</TableCell><TableCell variant="admin">{source.source_name_snapshot ?? "—"}</TableCell><TableCell variant="admin">{source.is_primary ? "Yes" : "No"}</TableCell></TableRow>)}</TableBody></Table></TableViewport>
-            </ComponentCard>
-          ) : null}
+        {detailTab === "Sources" ? <ComponentCard title="Sources" desc="Explicit Vendor Catalog/procurement/invoice identity mappings.">{canManage ? <form onSubmit={submitSource} className="mb-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end"><div><Label htmlFor="vendor-source">Source candidate</Label><Select id="vendor-source" options={sourceOptions} value={sourceChoice} onChange={setSourceChoice} placeholder="Choose a source" /></div><Checkbox id="vendor-source-primary" label="Primary Source" checked={sourcePrimary} onChange={setSourcePrimary} disabled={busy} /><Button type="submit" disabled={busy || !sourceChoice}>Map Source</Button></form> : null}<TableViewport><Table variant="admin"><TableHeader variant="admin"><TableRow>{["Source", "Code", "Name snapshot", "Primary"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader><TableBody variant="admin">{detail.source_identities.length === 0 ? <TableStateRow colSpan={4}>No source identities mapped.</TableStateRow> : detail.source_identities.map((source) => <TableRow key={source.id}><TableCell variant="admin">{source.source_system.replaceAll("_", " ")}</TableCell><TableCell variant="admin">{source.source_code}</TableCell><TableCell variant="admin">{source.source_name_snapshot ?? "—"}</TableCell><TableCell variant="admin">{source.is_primary ? "Yes" : "No"}</TableCell></TableRow>)}</TableBody></Table></TableViewport></ComponentCard> : null}
 
-          {detailTab === "Compliance" ? (
-            <ComponentCard title="Compliance" desc="W-9, COI, License and other review metadata. Warnings do not block payment.">
-              <div className="mb-5 flex flex-wrap gap-2"><Badge color={complianceColor(detail.compliance_summary.w9)}>W-9 {complianceLabel(detail.compliance_summary.w9)}</Badge><Badge color={complianceColor(detail.compliance_summary.coi)}>COI {complianceLabel(detail.compliance_summary.coi)}</Badge></div>
-              {canManage ? <form onSubmit={submitCompliance} className="mb-5 space-y-4"><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div><Label htmlFor="vendor-compliance-type">Document type</Label><Select id="vendor-compliance-type" options={complianceTypeOptions} value={complianceType} onChange={chooseComplianceType} /></div><div><Label htmlFor="vendor-compliance-status">Status</Label><Select id="vendor-compliance-status" options={complianceStatusOptions} value={complianceStatus} onChange={(value) => setComplianceStatus(value as VendorComplianceStatus)} /></div><div><Label htmlFor="vendor-compliance-title">Title</Label><Input id="vendor-compliance-title" value={complianceTitle} onChange={(event) => setComplianceTitle(event.target.value)} required /></div><div><Label htmlFor="vendor-compliance-number">Document number</Label><Input id="vendor-compliance-number" value={complianceNumber} onChange={(event) => setComplianceNumber(event.target.value)} /></div><div><Label htmlFor="vendor-compliance-issued">Issued on</Label><DateInput id="vendor-compliance-issued" value={issuedOn} onChange={setIssuedOn} /></div><div><Label htmlFor="vendor-compliance-expires">Expires on</Label><DateInput id="vendor-compliance-expires" value={expiresOn} onChange={setExpiresOn} /></div><div><Label htmlFor="vendor-compliance-bucket">Storage bucket</Label><Input id="vendor-compliance-bucket" value={storageBucket} onChange={(event) => setStorageBucket(event.target.value)} /></div><div><Label htmlFor="vendor-compliance-path">Storage path</Label><Input id="vendor-compliance-path" value={storagePath} onChange={(event) => setStoragePath(event.target.value)} /></div><div><Label htmlFor="vendor-compliance-file">File name</Label><Input id="vendor-compliance-file" value={fileName} onChange={(event) => setFileName(event.target.value)} /></div></div><div><Label htmlFor="vendor-compliance-notes">Compliance notes</Label><TextArea id="vendor-compliance-notes" value={complianceNotes} onChange={setComplianceNotes} rows={2} /></div><Button type="submit" disabled={busy}>Save Compliance</Button></form> : null}
-              <TableViewport><Table variant="admin"><TableHeader variant="admin"><TableRow>{["Document", "Status", "Issued", "Expires", "File reference"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader><TableBody variant="admin">{detail.compliance_documents.length === 0 ? <TableStateRow colSpan={5}>No compliance documents recorded. W-9 and COI remain missing warnings.</TableStateRow> : detail.compliance_documents.map((document) => <TableRow key={document.id}><TableCell variant="admin">{document.title}<div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{document.document_type.toUpperCase()}</div></TableCell><TableCell variant="admin"><Badge color={complianceColor(document.effective_status)}>{complianceLabel(document.effective_status)}</Badge></TableCell><TableCell variant="admin">{formatDateOnly(document.issued_on)}</TableCell><TableCell variant="admin">{formatDateOnly(document.expires_on)}</TableCell><TableCell variant="admin">{document.file_name ?? document.storage_path ?? "—"}</TableCell></TableRow>)}</TableBody></Table></TableViewport>
-            </ComponentCard>
-          ) : null}
-        </>
-      ) : <ComponentCard title="Vendor Detail"><div className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Select a vendor to review Overview, Contacts, Sources and Compliance.</div></ComponentCard>}
+        {detailTab === "Compliance" ? <ComponentCard title="Compliance" desc="W-9, COI, License and other review metadata. Warnings do not block payment."><div className="mb-5 flex flex-wrap gap-2"><Badge color={complianceColor(detail.compliance_summary.w9)}>W-9 {complianceLabel(detail.compliance_summary.w9)}</Badge><Badge color={complianceColor(detail.compliance_summary.coi)}>COI {complianceLabel(detail.compliance_summary.coi)}</Badge></div>{canManage ? <form onSubmit={submitCompliance} className="mb-5 space-y-4"><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"><div><Label htmlFor="vendor-compliance-type">Document type</Label><Select id="vendor-compliance-type" options={complianceTypeOptions} value={complianceType} onChange={chooseComplianceType} /></div><div><Label htmlFor="vendor-compliance-status">Status</Label><Select id="vendor-compliance-status" options={complianceStatusOptions} value={complianceStatus} onChange={(value) => setComplianceStatus(value as VendorComplianceStatus)} /></div><div><Label htmlFor="vendor-compliance-title">Title</Label><Input id="vendor-compliance-title" value={complianceTitle} onChange={(event) => setComplianceTitle(event.target.value)} required /></div><div><Label htmlFor="vendor-compliance-number">Document number</Label><Input id="vendor-compliance-number" value={complianceNumber} onChange={(event) => setComplianceNumber(event.target.value)} /></div><div><Label htmlFor="vendor-compliance-issued">Issued on</Label><DateInput id="vendor-compliance-issued" value={issuedOn} onChange={setIssuedOn} /></div><div><Label htmlFor="vendor-compliance-expires">Expires on</Label><DateInput id="vendor-compliance-expires" value={expiresOn} onChange={setExpiresOn} /></div><div><Label htmlFor="vendor-compliance-bucket">Storage bucket</Label><Input id="vendor-compliance-bucket" value={storageBucket} onChange={(event) => setStorageBucket(event.target.value)} /></div><div><Label htmlFor="vendor-compliance-path">Storage path</Label><Input id="vendor-compliance-path" value={storagePath} onChange={(event) => setStoragePath(event.target.value)} /></div><div><Label htmlFor="vendor-compliance-file">File name</Label><Input id="vendor-compliance-file" value={fileName} onChange={(event) => setFileName(event.target.value)} /></div></div><div><Label htmlFor="vendor-compliance-notes">Compliance notes</Label><TextArea id="vendor-compliance-notes" value={complianceNotes} onChange={setComplianceNotes} rows={2} /></div><Button type="submit" disabled={busy}>Save Compliance</Button></form> : null}<TableViewport><Table variant="admin"><TableHeader variant="admin"><TableRow>{["Document", "Status", "Issued", "Expires", "File reference"].map((label) => <TableCell key={label} isHeader variant="admin">{label}</TableCell>)}</TableRow></TableHeader><TableBody variant="admin">{detail.compliance_documents.length === 0 ? <TableStateRow colSpan={5}>No compliance documents recorded. W-9 and COI remain missing warnings.</TableStateRow> : detail.compliance_documents.map((document) => <TableRow key={document.id}><TableCell variant="admin">{document.title}<div className={`text-xs ${ADMIN_TEXT_STYLES.muted}`}>{document.document_type.toUpperCase()}</div></TableCell><TableCell variant="admin"><Badge color={complianceColor(document.effective_status)}>{complianceLabel(document.effective_status)}</Badge></TableCell><TableCell variant="admin">{formatDateOnly(document.issued_on)}</TableCell><TableCell variant="admin">{formatDateOnly(document.expires_on)}</TableCell><TableCell variant="admin">{document.file_name ?? document.storage_path ?? "—"}</TableCell></TableRow>)}</TableBody></Table></TableViewport></ComponentCard> : null}
+
+        {detailTab === "Commitments" && selectedId ? <div className="space-y-4"><div className="flex flex-wrap gap-2"><Link href={`/finance/bills?tab=commitments&vendor=${selectedId}`}><Button size="sm" variant="outline">View Vendor Payables</Button></Link><Link href={`/finance/bills?tab=bills&vendor=${selectedId}`}><Button size="sm">View Vendor Bills</Button></Link></div><VendorCommitmentsPanel initialVendorId={selectedId} embedded /></div> : null}
+      </> : <ComponentCard title="Vendor Detail"><div className={`text-sm ${ADMIN_TEXT_STYLES.muted}`}>Select a vendor to review Overview, Contacts, Sources, Compliance and Commitments.</div></ComponentCard>}
 
       <Modal isOpen={isVendorModalOpen} onClose={closeVendorModal} className="mx-4 w-full max-w-3xl p-6" ariaLabel={editingVendor ? "Edit Vendor" : "Add Vendor"}>
         <form onSubmit={submitVendor} className="space-y-5">
           <div><h3 className={`text-lg font-semibold ${ADMIN_TEXT_STYLES.strong}`}>{editingVendor ? "Edit Vendor" : "Add Vendor"}</h3><div className={`mt-1 text-sm ${ADMIN_TEXT_STYLES.muted}`}>Keep the first step short. Remittance and notes are optional additional details.</div></div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div><Label htmlFor="vendor-code">Vendor code</Label><Input id="vendor-code" value={vendorForm.code} onChange={(event) => setVendorForm((current) => ({ ...current, code: event.target.value }))} required /></div>
-            <div><Label htmlFor="vendor-display-name">Display name</Label><Input id="vendor-display-name" value={vendorForm.displayName} onChange={(event) => setVendorForm((current) => ({ ...current, displayName: event.target.value }))} required /></div>
-            <div><Label htmlFor="vendor-legal-name">Legal name</Label><Input id="vendor-legal-name" value={vendorForm.legalName} onChange={(event) => setVendorForm((current) => ({ ...current, legalName: event.target.value }))} required /></div>
-            <div><Label htmlFor="vendor-type">Vendor type</Label><Select id="vendor-type" options={vendorTypeOptions} value={vendorForm.vendorType} onChange={(value) => setVendorForm((current) => ({ ...current, vendorType: value as VendorType }))} /></div>
-            <div><Label htmlFor="vendor-currency">Default currency</Label><Input id="vendor-currency" maxLength={3} value={vendorForm.defaultCurrencyCode} onChange={(event) => setVendorForm((current) => ({ ...current, defaultCurrencyCode: event.target.value.toUpperCase() }))} /></div>
-          </div>
-          <details className="p-4">
-            <summary className={`cursor-pointer text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>Additional Details</summary>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div><Label htmlFor="vendor-remit-name">Remit to</Label><Input id="vendor-remit-name" value={vendorForm.remitToName} onChange={(event) => setVendorForm((current) => ({ ...current, remitToName: event.target.value }))} /></div>
-              <div><Label htmlFor="vendor-remit-address">Remittance address</Label><Input id="vendor-remit-address" value={vendorForm.remitAddressLine1} onChange={(event) => setVendorForm((current) => ({ ...current, remitAddressLine1: event.target.value }))} /></div>
-              <div><Label htmlFor="vendor-remit-address2">Address line 2</Label><Input id="vendor-remit-address2" value={vendorForm.remitAddressLine2} onChange={(event) => setVendorForm((current) => ({ ...current, remitAddressLine2: event.target.value }))} /></div>
-              <div><Label htmlFor="vendor-remit-city">City</Label><Input id="vendor-remit-city" value={vendorForm.remitCity} onChange={(event) => setVendorForm((current) => ({ ...current, remitCity: event.target.value }))} /></div>
-              <div><Label htmlFor="vendor-remit-state">State / region</Label><Input id="vendor-remit-state" value={vendorForm.remitStateRegion} onChange={(event) => setVendorForm((current) => ({ ...current, remitStateRegion: event.target.value }))} /></div>
-              <div><Label htmlFor="vendor-remit-postal">Postal code</Label><Input id="vendor-remit-postal" value={vendorForm.remitPostalCode} onChange={(event) => setVendorForm((current) => ({ ...current, remitPostalCode: event.target.value }))} /></div>
-              <div><Label htmlFor="vendor-remit-country">Country</Label><Input id="vendor-remit-country" maxLength={2} value={vendorForm.remitCountryCode} onChange={(event) => setVendorForm((current) => ({ ...current, remitCountryCode: event.target.value.toUpperCase() }))} /></div>
-              <div className="md:col-span-2"><Label htmlFor="vendor-notes">Notes</Label><TextArea id="vendor-notes" value={vendorForm.notes} onChange={(value) => setVendorForm((current) => ({ ...current, notes: value }))} rows={3} /></div>
-            </div>
-          </details>
+          <div className="grid gap-4 md:grid-cols-2"><div><Label htmlFor="vendor-code">Vendor code</Label><Input id="vendor-code" value={vendorForm.code} onChange={(event) => setVendorForm((current) => ({ ...current, code: event.target.value }))} required /></div><div><Label htmlFor="vendor-display-name">Display name</Label><Input id="vendor-display-name" value={vendorForm.displayName} onChange={(event) => setVendorForm((current) => ({ ...current, displayName: event.target.value }))} required /></div><div><Label htmlFor="vendor-legal-name">Legal name</Label><Input id="vendor-legal-name" value={vendorForm.legalName} onChange={(event) => setVendorForm((current) => ({ ...current, legalName: event.target.value }))} required /></div><div><Label htmlFor="vendor-type">Vendor type</Label><Select id="vendor-type" options={vendorTypeOptions} value={vendorForm.vendorType} onChange={(value) => setVendorForm((current) => ({ ...current, vendorType: value as VendorType }))} /></div><div><Label htmlFor="vendor-currency">Default currency</Label><Input id="vendor-currency" maxLength={3} value={vendorForm.defaultCurrencyCode} onChange={(event) => setVendorForm((current) => ({ ...current, defaultCurrencyCode: event.target.value.toUpperCase() }))} /></div></div>
+          <details className="p-4"><summary className={`cursor-pointer text-sm font-medium ${ADMIN_TEXT_STYLES.strong}`}>Additional Details</summary><div className="mt-4 grid gap-4 md:grid-cols-2"><div><Label htmlFor="vendor-remit-name">Remit to</Label><Input id="vendor-remit-name" value={vendorForm.remitToName} onChange={(event) => setVendorForm((current) => ({ ...current, remitToName: event.target.value }))} /></div><div><Label htmlFor="vendor-remit-address">Remittance address</Label><Input id="vendor-remit-address" value={vendorForm.remitAddressLine1} onChange={(event) => setVendorForm((current) => ({ ...current, remitAddressLine1: event.target.value }))} /></div><div><Label htmlFor="vendor-remit-address2">Address line 2</Label><Input id="vendor-remit-address2" value={vendorForm.remitAddressLine2} onChange={(event) => setVendorForm((current) => ({ ...current, remitAddressLine2: event.target.value }))} /></div><div><Label htmlFor="vendor-remit-city">City</Label><Input id="vendor-remit-city" value={vendorForm.remitCity} onChange={(event) => setVendorForm((current) => ({ ...current, remitCity: event.target.value }))} /></div><div><Label htmlFor="vendor-remit-state">State / region</Label><Input id="vendor-remit-state" value={vendorForm.remitStateRegion} onChange={(event) => setVendorForm((current) => ({ ...current, remitStateRegion: event.target.value }))} /></div><div><Label htmlFor="vendor-remit-postal">Postal code</Label><Input id="vendor-remit-postal" value={vendorForm.remitPostalCode} onChange={(event) => setVendorForm((current) => ({ ...current, remitPostalCode: event.target.value }))} /></div><div><Label htmlFor="vendor-remit-country">Country</Label><Input id="vendor-remit-country" maxLength={2} value={vendorForm.remitCountryCode} onChange={(event) => setVendorForm((current) => ({ ...current, remitCountryCode: event.target.value.toUpperCase() }))} /></div><div className="md:col-span-2"><Label htmlFor="vendor-notes">Notes</Label><TextArea id="vendor-notes" value={vendorForm.notes} onChange={(value) => setVendorForm((current) => ({ ...current, notes: value }))} rows={3} /></div></div></details>
           <div className="flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={closeVendorModal}>Cancel</Button><Button type="submit" disabled={busy}>{editingVendor ? "Save Vendor" : "Create Vendor"}</Button></div>
         </form>
       </Modal>

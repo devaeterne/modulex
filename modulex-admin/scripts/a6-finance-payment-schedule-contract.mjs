@@ -30,6 +30,7 @@ expect(!/alter\s+table\s+public\.vendor_invoices[\s\S]{0,800}add\s+column[\s\S]{
 for (const term of ["vendor_id", "invoice_id", "scheduled_payment_date", "planned_amount", "currency_code", "payment_method_id", "source_account_id", "status"]) {
   expect(sql.includes(term), `Payment schedule must include ${term}`);
 }
+expect(/invoice_id\s+uuid\s+not\s+null\s+references\s+public\.vendor_invoices/i.test(sql), "Payment Schedule must require a real Vendor Bill; commitment-only schedules are forbidden");
 expect(/references\s+public\.vendor_invoices/i.test(sql), "Schedule must reuse canonical Vendor Bills");
 expect(/references\s+public\.vendors/i.test(sql), "Schedule must reuse canonical Vendors");
 expect(/references\s+public\.payment_methods/i.test(sql), "Schedule must reuse canonical Payment Methods");
@@ -62,6 +63,7 @@ expect(read(route).includes("PageBreadCrumb"), "Payment Schedule route must use 
 const ui = read(manager);
 for (const primitive of ["ComponentCard", "Alert", "Badge", "Button", "Label", "Input", "Select", "TableViewport"]) expect(ui.includes(primitive), `Payment Schedule must reuse shared ${primitive}`);
 for (const term of ["Due date", "Scheduled date", "Planned", "Outstanding", "Unscheduled", "Payment Method", "Source account", "Cancel"]) expect(ui.toLowerCase().includes(term.toLowerCase()), `Payment Schedule UI must expose ${term}`);
+expect(ui.includes("An open Vendor Bill is required."), "Payment Schedule creation must explicitly require an open Vendor Bill");
 const sidebar = read("src/layout/AppSidebar.tsx");
 expect(sidebar.includes('path: "/finance/payment-schedule"') && sidebar.includes('permission: "finance.view"'), "Finance sidebar must expose Payment Schedule using finance.view");
 

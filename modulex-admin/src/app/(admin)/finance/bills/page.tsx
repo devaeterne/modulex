@@ -3,14 +3,14 @@ import PageBreadCrumb from "@/components/common/PageBreadCrumb";
 import FinanceVendorBillsManager from "@/components/finance/FinanceVendorBillsManager";
 
 export const metadata: Metadata = {
-  title: "Vendor Bills | Modulex Admin",
-  description: "Manage vendor bills, due dates, source allocations and AP settlement",
+  title: "Vendor Payables | Modulex Admin",
+  description: "Review vendor commitments, Vendor Bills, payment attribution and Payment Schedule",
 };
 
 export default function FinanceVendorBillsPage() {
   return (
     <>
-      <PageBreadCrumb pageTitle="Vendor Bills" />
+      <PageBreadCrumb pageTitle="Vendor Payables" />
       <FinanceVendorBillsManager />
     </>
   );
